@@ -137,7 +137,7 @@ describe('TaskPlanBubble', () => {
     expect(wrapper.find('[data-testid="task-card-toggle"]').exists()).toBe(false)
   })
 
-  it('collapses redundant completed prose to the header and expands it on request', async () => {
+  it('keeps redundant completed prose out of the card body and shows it under Details', async () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {
         plan: plan([
@@ -147,6 +147,8 @@ describe('TaskPlanBubble', () => {
             kind: 'text',
             state: 'done',
             text: 'Completed summary',
+            stepInput: '{"text":"Summarize this."}',
+            stepOutput: 'Completed summary',
             redundant: true,
           },
         ]),
@@ -155,19 +157,22 @@ describe('TaskPlanBubble', () => {
     })
 
     const card = wrapper.find('[data-testid="task-card-n2"]')
-    const toggle = wrapper.find('[data-testid="task-card-toggle"]')
+    const details = wrapper.find('[data-testid="task-card-details-toggle"]')
 
     expect(card.find('.task-card__body').exists()).toBe(false)
     expect(card.text()).not.toContain('Completed summary')
-    expect(toggle.attributes('aria-expanded')).toBe('false')
+    expect(wrapper.find('[data-testid="task-card-toggle"]').exists()).toBe(false)
+    expect(details.text()).toContain('taskPlan.details')
+    expect(details.attributes('aria-expanded')).toBe('false')
 
-    await toggle.trigger('click')
+    await details.trigger('click')
 
-    expect(card.find('.task-card__body').text()).toContain('Completed summary')
-    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(card.find('[data-testid="task-card-details"]').text()).toContain('Summarize this.')
+    expect(card.find('[data-testid="task-card-details"]').text()).toContain('Completed summary')
+    expect(details.attributes('aria-expanded')).toBe('true')
   })
 
-  it('collapses only redundant completed prose cards', async () => {
+  it('hides duplicate answer text only on redundant completed prose cards', async () => {
     const wrapper = mount(TaskPlanBubble, {
       props: {
         plan: plan([
@@ -192,16 +197,14 @@ describe('TaskPlanBubble', () => {
     })
 
     const redundantCard = wrapper.find('[data-testid="task-card-n1"]')
-    expect(redundantCard.find('[data-testid="task-card-collapsed-hint"]').exists()).toBe(true)
-    expect(redundantCard.find('[data-testid="task-card-toggle"]').exists()).toBe(true)
+    expect(redundantCard.find('[data-testid="task-card-collapsed-hint"]').exists()).toBe(false)
+    expect(redundantCard.find('[data-testid="task-card-toggle"]').exists()).toBe(false)
+    expect(redundantCard.text()).not.toContain('Repeated answer')
 
     const uniqueCard = wrapper.find('[data-testid="task-card-n2"]')
     expect(uniqueCard.text()).toContain('Unique answer that exists only in this card')
     expect(uniqueCard.find('[data-testid="task-card-collapsed-hint"]').exists()).toBe(false)
     expect(uniqueCard.find('[data-testid="task-card-toggle"]').exists()).toBe(false)
-
-    await redundantCard.find('[data-testid="task-card-toggle"]').trigger('click')
-    expect(redundantCard.text()).toContain('Repeated answer')
   })
 
   it('copies the query and summary from a completed search card', async () => {

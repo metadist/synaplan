@@ -1,6 +1,17 @@
-# Development Guide
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (1/11)**  
+> **← Previous:** [4.11 openDesk Meeting Notes (Jitsi & Matrix)](OPENDESK_MEETING_NOTES.md) · **Next:** [5.2 Backend Architecture & Request Lifecycle →](ARCHITECTURE.md)
 
-Commands and workflows for developing Synaplan.
+# Local Development Workflow
+
+> **In this guide:** How to start and manage the local Synaplan development stack (`make up`), understand the Messenger `worker` and optional `FeatureModule` containers, run backend and frontend quality gates (`make ci-local`), and debug routing and async media jobs.
+
+**On this page:**
+- [Where a Change Goes](#where-a-change-goes) · [Service Management](#service-management) · [The `worker` Service (Async Jobs)](#the-worker-service-async-jobs)
+- [Optional Feature Modules](#optional-feature-modules) — [Secure Compute](#secure-compute) · [Office Conversion](#office-conversion) · [Docling](#docling-extraction-optional) · [SearXNG](#searxng-web-search-optional) · [Keycloak OIDC](#keycloak-and-the-cloud-apps-optional) · [Redis](#redis-cache-sessions-locks-messenger-realtime)
+- [Runtime Benchmarks (`make perf-runtime`)](#runtime-benchmarks) · [Code Quality, Backend, Frontend & Database Commands](#code-quality)
+- [Git Workflow](#git-workflow) · [Useful URLs & Test Users](#useful-urls-development) · [Message Routing (Multi-Task)](#message-routing-multi-task)
+
+---
 
 ## Where a change goes
 
@@ -499,5 +510,11 @@ MessagePreProcessor → MessageClassifier ─┬→ rule-based routing (user tas
 
 ## More Resources
 
-- [AGENTS.md](../AGENTS.md) - AI agent development guide
-- [_devextras/planning/](../_devextras/planning/) - Internal design docs
+- **[Backend Architecture & Request Lifecycle](ARCHITECTURE.md)** — Layers, size ratchets, and how turns execute
+- **[AGENTS.md](../AGENTS.md)** — Coding-agent rules and pre-push quality gates
+- **[_devextras/planning/](../_devextras/planning/)** — Internal roadmap and track design docs
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (1/11)**  
+> **← Previous:** [4.11 openDesk Meeting Notes (Jitsi & Matrix)](OPENDESK_MEETING_NOTES.md) · **Next:** [5.2 Backend Architecture & Request Lifecycle →](ARCHITECTURE.md)

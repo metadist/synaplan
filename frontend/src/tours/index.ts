@@ -26,7 +26,7 @@ const definitions: TourDefinition[] = [
     steps: [
       { target: 'library-tabs', stepKey: 'tabs' },
       { target: 'library-upload', stepKey: 'upload' },
-      { stepKey: 'use' },
+      { target: 'library-files', stepKey: 'use', side: 'top' },
     ],
   },
   {
@@ -39,7 +39,10 @@ const definitions: TourDefinition[] = [
   },
   {
     id: 'tasks',
-    steps: [{ target: 'tasks-new', stepKey: 'new', side: 'left' }, { stepKey: 'approvals' }],
+    steps: [
+      { target: 'tasks-new', stepKey: 'new', side: 'left' },
+      { target: 'tasks-approvals', stepKey: 'approvals', side: 'right' },
+    ],
   },
   {
     id: 'apps',

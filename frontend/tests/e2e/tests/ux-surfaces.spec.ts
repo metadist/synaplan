@@ -171,6 +171,14 @@ test.describe('@ci UX surfaces', () => {
         expect(contrast((await paintOf(item)).color, menuPaint.background)).toBeGreaterThan(
           MIN_TEXT_CONTRAST
         )
+        const euLink = menu.locator('[data-testid="btn-sidebar-v2-website-eu"]')
+        await expect(euLink).toBeVisible()
+        await expect(euLink).toHaveAttribute('href', 'https://www.synaplan.eu/')
+        await expect(euLink).toHaveAttribute('target', '_blank')
+        const techLink = menu.locator('[data-testid="btn-sidebar-v2-website-tech"]')
+        await expect(techLink).toBeVisible()
+        await expect(techLink).toHaveAttribute('href', 'https://www.synaplan.com/de')
+        await expect(techLink).toHaveAttribute('target', '_blank')
         await page
           .locator('[data-testid="overlay-sidebar-v2-user"]')
           .click({ position: { x: 5, y: 5 } })

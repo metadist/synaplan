@@ -1,20 +1,25 @@
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (6/8)**  
+> **← Previous:** [1.5 Runtime & Outbound Options](RUNTIME_OPTIONS.md) · **Next:** [1.7 Updating on Elestio →](UPDATE_ELESTIO.md)
+
 # Update a Self-Hosted Deployment
 
-Synaplan never updates itself. Nothing changes until you run the steps below.
+> **In this guide:** How to safely back up, update, verify, and roll back a self-hosted Synaplan deployment—both for the full `deploy/compose.yaml` contract and for named Docker volumes (`deploy/quickstart/compose.yaml` / Portainer / Dockge).
 
-## Which version to install
+Synaplan never updates itself automatically. Nothing changes on your server until you run the steps below.
 
-Synaplan shows its current version in the sidebar. When a newer release exists,
-the admin area shows that new version number next to the current one, together
-with a link to its release notes. Read the release notes, then use that version
-number in step 2.
+---
 
-## Update
+## Which Version to Install
 
-Run every command from the repository root.
+Synaplan shows its running version in the sidebar. When a newer release is published, the admin area displays the new version number next to the current one with a link to the release notes. Read the release notes first, then use that version number in step 2.
 
-1. **Create a backup.** Do not continue if this command fails. The app is
-   briefly unavailable while the backup is taken.
+---
+
+## Standard Production Update (`deploy/compose.yaml`)
+
+Run every command from the repository root:
+
+1. **Create a backup.** Do not continue if this command fails. The app pauses briefly while a consistent MariaDB, Qdrant, and uploads snapshot is taken.
 
 ```bash
 deploy/scripts/pre-update.sh
@@ -23,47 +28,40 @@ deploy/scripts/pre-update.sh
 2. **Set the new version** in `deploy/.env`, without a leading `v`:
 
 ```dotenv
-# Example format only — use the version shown in Synaplan.
+# Example format only — use the release version shown in Synaplan.
 SYNAPLAN_VERSION=1.4.0
 ```
 
-3. **Start the new version.** The new image is downloaded, and the database
-   migrations run automatically when the app starts.
+3. **Start the new version.** Docker pulls the pinned image and the web container applies database migrations automatically on startup.
 
 ```bash
 docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
 ```
 
-4. **Verify.** This waits for every service, checks health, and prints the
-   running version.
+4. **Verify the deployment.** This script waits for every service to pass its health check and prints the running version.
 
 ```bash
 deploy/scripts/post-update.sh
 ```
 
-## Roll back
+### Roll Back
 
-Put the previous version back in `deploy/.env` and repeat steps 3 and 4. If the
-new version already changed the database, also restore the backup from step 1 as
-described in [Backup and restore](../deploy/README.md#backup-and-restore).
+Put the previous version number back in `deploy/.env` and repeat steps 3 and 4. If the new version already applied database migrations, restore the pre-update backup from step 1 as described in [Backup and restore](../deploy/README.md#backup-and-restore).
+
+---
 
 ## Quickstart volumes
 
-The quickstart (`deploy/quickstart/compose.yaml`) keeps its data in
-named Docker volumes instead of `deploy/data`. The commands below run in a
-terminal on the Docker host and need no `compose.yaml` there, so they work the
-same for a CLI install and for a stack created in Portainer, Dockge or Synology
-Container Manager. They only need the project name: `docker compose ls -a`
-lists it (the folder name for a CLI install, the stack name in a GUI).
+The quickstart (`deploy/quickstart/compose.yaml`) stores its data in named Docker volumes instead of `deploy/data`. The commands below run in a terminal on the Docker host and do not need `compose.yaml` in the current directory, so they work identically for a CLI install and for a stack created in Portainer, Dockge, or Synology Container Manager.
+
+First, find the Compose project name (`docker compose ls -a` lists it—the folder name for a CLI install, or the stack name in a GUI):
 
 ```bash
 docker compose ls -a
-project=synaplan   # the name from the list above
+project=synaplan   # replace with the name from the list above
 ```
 
-1. **Back up** every volume of the project, the generated secrets included.
-   Synaplan is unavailable for the few seconds this takes. The archives hold
-   the database and every password, so only your user may read the folder:
+1. **Back up every volume of the project**, including the generated `secrets` volume. Synaplan is unavailable for the few seconds this takes. Because the archives contain the database and every secret, restrict the backup folder to your user:
 
 ```bash
 docker compose -p "$project" stop
@@ -74,14 +72,11 @@ done
 docker compose -p "$project" start
 ```
 
-2. **Change the release**: set `SYNAPLAN_VERSION` to a version from the
-   [releases page](https://github.com/metadist/synaplan/releases) (without a
-   leading `v`). CLI: put it in the `.env` beside `compose.yaml` and run
-   `docker compose up -d`. GUI: set it in the stack's environment variables and
-   redeploy the stack.
+2. **Change the release:** Set `SYNAPLAN_VERSION` to a version from the [releases page](https://github.com/metadist/synaplan/releases) (without a leading `v`).
+   - **CLI:** Set `SYNAPLAN_VERSION` in the `.env` file beside `compose.yaml` and run `docker compose up -d`.
+   - **Docker GUI:** Set `SYNAPLAN_VERSION` in the stack's environment variables and redeploy the stack.
 
-3. **Roll back**: stop the project, put the backup from step 1 back into its
-   volumes, then set the previous `SYNAPLAN_VERSION` and start it as in step 2:
+3. **Roll back (if needed):** Stop the project, restore the archives from step 1 into their volumes, set the previous `SYNAPLAN_VERSION`, and start the stack again:
 
 ```bash
 docker compose -p "$project" stop
@@ -91,12 +86,15 @@ for f in backup/*.tgz; do
 done
 ```
 
-Step 3 replaces everything those volumes hold now with the backup, so only run
-it with the backup from step 1 next to you. The volumes keep their names and
-labels, so the next backup finds them again.
+> **Important:** Step 3 overwrites the current contents of those volumes with the backup from step 1. The volumes keep their names and Docker labels, so future backups will find them again.
 
-## Good to know
+---
 
-A redeploy on its own never installs a newer version — the version only changes
-when you change it. Always use a released version number; `latest` is rejected
-before anything starts.
+## Good to Know
+
+A container restart or redeploy on its own never installs a newer version—the version only changes when you change `SYNAPLAN_VERSION`. Always use an explicit released version number; mutable tags like `latest` are rejected before anything starts.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (6/8)**  
+> **← Previous:** [1.5 Runtime & Outbound Options](RUNTIME_OPTIONS.md) · **Next:** [1.7 Updating on Elestio →](UPDATE_ELESTIO.md)

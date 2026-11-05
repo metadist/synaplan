@@ -402,3 +402,6 @@ platform in [`../docs/UPDATE_ELESTIO.md`](../docs/UPDATE_ELESTIO.md) and
 [`../docs/UPDATE_SELFHOST.md`](../docs/UPDATE_SELFHOST.md). The application says
 the same thing in the admin area: it reports a newer version and never installs
 one.
+
+For the complete deployment and day-2 administration learning tracks, see the
+[Documentation Index (`docs/README.md`)](../docs/README.md).

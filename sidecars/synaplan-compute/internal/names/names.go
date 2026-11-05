@@ -6,7 +6,13 @@ import (
 	"strings"
 )
 
+// relPathRe is the shape RelPath is willing to return: one or more filename
+// segments, no empty segment. ".." and a leading "-" are rejected separately;
+// this match is what makes the returned string a single checked value.
+
 var fileNameRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
+
+var relPathRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}(?:/[A-Za-z0-9._-]{1,128})*$`)
 
 // FileName reports whether name is a safe input/artefact basename.
 func FileName(name string) bool {
@@ -34,9 +40,12 @@ func RelPath(p string) (string, bool) {
 		return "", false
 	}
 	for _, seg := range strings.Split(clean, "/") {
-		if seg == "" || seg == "." || !fileNameRe.MatchString(seg) || strings.HasPrefix(seg, "-") {
+		if seg == "" || seg == "." || seg == ".." || !fileNameRe.MatchString(seg) || strings.HasPrefix(seg, "-") {
 			return "", false
 		}
+	}
+	if !relPathRe.MatchString(clean) {
+		return "", false
 	}
 	return clean, true
 }

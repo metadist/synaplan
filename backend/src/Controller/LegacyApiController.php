@@ -3,10 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\Message;
+use App\Entity\User;
 use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
-use App\Service\Email\InternalEmailService;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
@@ -41,7 +41,6 @@ class LegacyApiController extends AbstractController
         private WordPressIntegrationService $wordpressIntegrationService,
         private WidgetService $widgetService,
         private PromptService $promptService,
-        private InternalEmailService $emailService,
         private LoggerInterface $logger,
         private PromptModelEligibilityValidator $modelEligibilityValidator,
     ) {
@@ -93,8 +92,10 @@ class LegacyApiController extends AbstractController
     private function messageNew(Request $request): JsonResponse
     {
         try {
-            // Legacy Parameters
-            $userId = $request->query->get('user_id') ?? $request->request->get('user_id') ?? $request->getSession()->get('USERPROFILE')['BID'] ?? 1;
+            $userId = $this->authenticatedUserId();
+            if (null === $userId) {
+                return $this->error('User not authenticated', 401);
+            }
             $messageText = $request->query->get('message') ?? $request->request->get('message') ?? $request->query->get('text') ?? $request->request->get('text') ?? '';
             $widgetId = $request->query->get('widget_id') ?? $request->request->get('widget_id') ?? $request->getSession()->get('widget_id');
 
@@ -102,37 +103,7 @@ class LegacyApiController extends AbstractController
                 return $this->error('Message text cannot be empty', 400);
             }
 
-            // Create Message Entity
-            $message = new Message();
-            $message->setUserId((int) $userId);
-            $message->setText($messageText);
-            $message->setDirect('IN');
-            $message->setStatus('NEW');
-            $message->setUnixTimestamp(time());
-            $message->setDatetime(date('YmdHis'));
-            $message->setMessType('WEB');
-            $message->setTrackId(time());
-
-            // Process
-            $this->preProcessor->process($message);
-            $this->messageRepository->save($message);
-
-            $this->classifier->classify($message);
-            $this->messageRepository->save($message);
-
-            $aiResponse = $this->inferenceRouter->route($message);
-            $this->messageRepository->save($aiResponse);
-
-            // Legacy Response Format
-            return new JsonResponse([
-                'success' => true,
-                'tracking_id' => 'msg_'.$message->getId(),
-                'message_id' => $message->getId(),
-                'response_id' => $aiResponse->getId(),
-                'response' => $aiResponse->getText(),
-                'status' => 'completed',
-                'timestamp' => time(),
-            ]);
+            return $this->acceptLegacyMessage($userId, $messageText);
         } catch (\Exception $e) {
             $this->logger->error('Legacy messageNew failed', [
                 'error' => $e->getMessage(),
@@ -143,12 +114,49 @@ class LegacyApiController extends AbstractController
         }
     }
 
+    private function acceptLegacyMessage(int $userId, string $messageText): JsonResponse
+    {
+        $message = new Message();
+        $message->setUserId($userId);
+        $message->setText($messageText);
+        $message->setDirect('IN');
+        $message->setStatus('NEW');
+        $message->setUnixTimestamp(time());
+        $message->setDatetime(date('YmdHis'));
+        $message->setMessType('WEB');
+        $message->setTrackId(time());
+
+        $this->preProcessor->process($message);
+        $this->messageRepository->save($message);
+
+        $this->classifier->classify($message);
+        $this->messageRepository->save($message);
+
+        $aiResponse = $this->inferenceRouter->route($message);
+        $this->messageRepository->save($aiResponse);
+
+        return new JsonResponse([
+            'success' => true,
+            'tracking_id' => 'msg_'.$message->getId(),
+            'message_id' => $message->getId(),
+            'response_id' => $aiResponse->getId(),
+            'response' => $aiResponse->getText(),
+            'status' => 'completed',
+            'timestamp' => time(),
+        ]);
+    }
+
     /**
      * Legacy: messageGet
      * Holt Message by ID or Tracking-ID.
      */
     private function messageGet(Request $request): JsonResponse
     {
+        $userId = $this->authenticatedUserId();
+        if (null === $userId) {
+            return $this->error('User not authenticated', 401);
+        }
+
         $messageId = $request->query->get('message_id') ?? $request->request->get('message_id') ?? $request->query->get('id') ?? $request->request->get('id');
         $trackingId = $request->query->get('tracking_id') ?? $request->request->get('tracking_id');
 
@@ -161,7 +169,7 @@ class LegacyApiController extends AbstractController
                 return $this->error('Missing message_id or tracking_id', 400);
             }
 
-            if (!$message) {
+            if (!$message instanceof Message || (int) $message->getUserId() !== $userId) {
                 return $this->error('Message not found', 404);
             }
 
@@ -174,7 +182,7 @@ class LegacyApiController extends AbstractController
                     'direction' => $message->getDirection(),
                     'status' => $message->getStatus(),
                     'topic' => $message->getTopic(),
-                    'language' => $message->getLang(),
+                    'language' => $message->getLanguage(),
                     'timestamp' => $message->getUnixTimestamp(),
                 ],
             ]);
@@ -191,12 +199,17 @@ class LegacyApiController extends AbstractController
      */
     private function againOptions(Request $request): JsonResponse
     {
+        $userId = $this->authenticatedUserId();
+        if (null === $userId) {
+            return $this->error('User not authenticated', 401);
+        }
+
         $messageId = $request->query->get('in_id') ?? $request->request->get('in_id') ?? $request->query->get('message_id') ?? $request->request->get('message_id');
 
         try {
             $message = $this->messageRepository->find($messageId);
 
-            if (!$message) {
+            if (!$message instanceof Message || (int) $message->getUserId() !== $userId) {
                 return $this->error('Message not found', 404);
             }
 
@@ -220,9 +233,9 @@ class LegacyApiController extends AbstractController
      */
     private function getProfile(Request $request): JsonResponse
     {
-        $userId = $request->query->get('user_id') ?? $request->request->get('user_id') ?? $request->getSession()->get('USERPROFILE')['BID'] ?? null;
+        $userId = $this->authenticatedUserId();
 
-        if (!$userId) {
+        if (null === $userId) {
             return $this->error('User not authenticated', 401);
         }
 
@@ -254,11 +267,19 @@ class LegacyApiController extends AbstractController
      */
     private function chatStream(Request $request): Response
     {
-        $messageId = $request->query->get('message_id') ?? $request->request->get('message_id');
+        $userId = $this->authenticatedUserId();
+        if (null === $userId) {
+            return $this->error('User not authenticated', 401);
+        }
 
-        // Redirect to new streaming endpoint
+        $messageId = $request->query->get('message_id') ?? $request->request->get('message_id');
+        $message = $this->messageRepository->find($messageId);
+        if (!$message instanceof Message || (int) $message->getUserId() !== $userId) {
+            return $this->error('Message not found', 404);
+        }
+
         return $this->redirectToRoute('api_messages_stream', [
-            'id' => $messageId,
+            'id' => $message->getId(),
         ]);
     }
 
@@ -268,7 +289,7 @@ class LegacyApiController extends AbstractController
      */
     private function ragUpload(Request $request): JsonResponse
     {
-        $userId = $this->getUserIdFromRequest($request);
+        $userId = $this->authenticatedUserId();
 
         if (!$userId) {
             return $this->error('User not authenticated', 401);
@@ -297,7 +318,7 @@ class LegacyApiController extends AbstractController
      */
     private function getWidgets(Request $request): JsonResponse
     {
-        $userId = $this->getUserIdFromRequest($request);
+        $userId = $this->authenticatedUserId();
 
         if (!$userId) {
             return $this->error('User not authenticated', 401);
@@ -335,7 +356,7 @@ class LegacyApiController extends AbstractController
      */
     private function createApiKey(Request $request): JsonResponse
     {
-        $userId = $this->getUserIdFromRequest($request);
+        $userId = $this->authenticatedUserId();
 
         if (!$userId) {
             return $this->error('User not authenticated', 401);
@@ -360,7 +381,7 @@ class LegacyApiController extends AbstractController
      */
     private function saveWidget(Request $request): JsonResponse
     {
-        $userId = $this->getUserIdFromRequest($request);
+        $userId = $this->authenticatedUserId();
 
         if (!$userId) {
             return $this->error('User not authenticated', 401);
@@ -384,7 +405,7 @@ class LegacyApiController extends AbstractController
      */
     private function promptUpdate(Request $request): JsonResponse
     {
-        $userId = $this->getUserIdFromRequest($request);
+        $userId = $this->authenticatedUserId();
 
         if (!$userId) {
             return $this->error('User not authenticated', 401);
@@ -458,109 +479,68 @@ class LegacyApiController extends AbstractController
      * Legacy: sendEmail
      * Sends a confirmation/verification email.
      */
+    /**
+     * Retired. This action mailed any address and did not store the token it
+     * claimed to send.
+     */
     private function sendEmail(Request $request): JsonResponse
     {
-        try {
-            $payload = $this->collectLegacyPayload($request);
-            $email = $payload['email'] ?? null;
-            $type = $payload['type'] ?? 'confirmation';
-            $locale = $payload['locale'] ?? 'en';
+        unset($request);
 
-            if (!$email) {
-                return $this->error('Email is required', 400);
-            }
-
-            // Generate a verification token
-            $token = bin2hex(random_bytes(32));
-
-            // Store token in user record or separate table
-            $user = $this->userRepository->findByEmail($email);
-            if (!$user) {
-                return $this->error('User not found', 404);
-            }
-
-            // Send email based on type
-            if ('confirmation' === $type || 'verification' === $type) {
-                $this->emailService->sendVerificationEmail($email, $token, $locale);
-            }
-
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Email sent successfully',
-            ]);
-        } catch (\Exception $e) {
-            $this->logger->error('Legacy sendEmail failed', ['error' => $e->getMessage()]);
-
-            return $this->error($e->getMessage(), 500);
-        }
+        return $this->error('This action is no longer available.', 410);
     }
 
     /**
-     * Legacy: verifyEmail
-     * Verifies an email token.
+     * Retired. This action reported success without checking a token.
      */
     private function verifyEmail(Request $request): JsonResponse
     {
-        try {
-            $payload = $this->collectLegacyPayload($request);
-            $token = $payload['token'] ?? null;
+        unset($request);
 
-            if (!$token) {
-                return $this->error('Token is required', 400);
-            }
-
-            // TODO: Implement proper token verification
-            // For now, this is a placeholder that would need to check against stored tokens
-            // The actual implementation depends on how tokens are stored (in User entity, separate table, etc.)
-
-            return new JsonResponse([
-                'success' => true,
-                'message' => 'Email verified successfully',
-            ]);
-        } catch (\Exception $e) {
-            $this->logger->error('Legacy verifyEmail failed', ['error' => $e->getMessage()]);
-
-            return $this->error($e->getMessage(), 500);
-        }
+        return $this->error('This action is no longer available.', 410);
     }
 
     /**
-     * Extract user ID from request (Authorization header or request parameter).
+     * The signed-in account. A user_id parameter is never accepted.
      */
-    private function getUserIdFromRequest(Request $request): ?int
+    private function authenticatedUserId(): ?int
     {
-        // Check for Bearer token in Authorization header
-        $authHeader = $request->headers->get('Authorization');
-        if ($authHeader && str_starts_with($authHeader, 'Bearer ')) {
-            $token = substr($authHeader, 7);
-            // TODO: Validate token and extract user ID
-            // For now, check if token matches an API key
-            $apiKey = $this->wordpressIntegrationService->getUserByApiKey($token);
-            if ($apiKey) {
-                return $apiKey;
-            }
+        $user = $this->authenticatedUser();
+
+        return $user instanceof User ? (int) $user->getId() : null;
+    }
+
+    private function authenticatedUser(): ?User
+    {
+        $user = $this->getUser();
+        if (!$user instanceof User || (int) $user->getId() <= 0) {
+            return null;
         }
 
-        // Check request parameter
-        $userId = $request->query->get('user_id') ?? $request->request->get('user_id');
-        if ($userId) {
-            return (int) $userId;
-        }
+        return $user;
+    }
 
-        // Check session
-        $session = $request->getSession();
-        $profile = $session->get('USERPROFILE');
-        if ($profile && isset($profile['BID'])) {
-            return (int) $profile['BID'];
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function assertOwnAccount(User $user, array $payload): void
+    {
+        $email = strtolower(trim((string) ($payload['email'] ?? '')));
+        if ('' === $email || $email !== strtolower($user->getMail())) {
+            throw new \InvalidArgumentException('WordPress setup can only continue for the signed-in account.');
         }
-
-        return null;
     }
 
     private function wpStep1(Request $request): JsonResponse
     {
-        return $this->wpResponse(function () use ($request) {
+        $user = $this->authenticatedUser();
+        if (!$user instanceof User) {
+            return $this->error('User not authenticated', 401);
+        }
+
+        return $this->wpResponse(function () use ($request, $user) {
             $payload = $this->collectLegacyPayload($request);
+            $this->assertOwnAccount($user, $payload);
 
             return $this->wordpressIntegrationService->step1VerifyAndCreateUser($payload);
         });
@@ -568,26 +548,25 @@ class LegacyApiController extends AbstractController
 
     private function wpStep2(Request $request): JsonResponse
     {
-        return $this->wpResponse(function () use ($request) {
-            $payload = $this->collectLegacyPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
+        unset($request);
+        $userId = $this->authenticatedUserId();
+        if (null === $userId) {
+            return $this->error('User not authenticated', 401);
+        }
 
+        return $this->wpResponse(function () use ($userId) {
             return $this->wordpressIntegrationService->step2CreateApiKey($userId);
         });
     }
 
     private function wpStep3(Request $request): JsonResponse
     {
-        return $this->wpResponse(function () use ($request) {
-            $payload = $this->collectLegacyPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
+        $userId = $this->authenticatedUserId();
+        if (null === $userId) {
+            return $this->error('User not authenticated', 401);
+        }
 
+        return $this->wpResponse(function () use ($request, $userId) {
             $file = $request->files->get('file');
             if (null === $file) {
                 throw new \InvalidArgumentException('file upload is required');
@@ -599,25 +578,26 @@ class LegacyApiController extends AbstractController
 
     private function wpStep4(Request $request): JsonResponse
     {
-        return $this->wpResponse(function () use ($request) {
-            $payload = $this->collectLegacyPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
+        unset($request);
+        $userId = $this->authenticatedUserId();
+        if (null === $userId) {
+            return $this->error('User not authenticated', 401);
+        }
 
+        return $this->wpResponse(function () use ($userId) {
             return $this->wordpressIntegrationService->step4EnableFileSearch($userId);
         });
     }
 
     private function wpStep5(Request $request): JsonResponse
     {
-        return $this->wpResponse(function () use ($request) {
+        $userId = $this->authenticatedUserId();
+        if (null === $userId) {
+            return $this->error('User not authenticated', 401);
+        }
+
+        return $this->wpResponse(function () use ($request, $userId) {
             $payload = $this->collectLegacyPayload($request);
-            $userId = (int) ($payload['user_id'] ?? 0);
-            if ($userId <= 0) {
-                throw new \InvalidArgumentException('user_id is required');
-            }
 
             return $this->wordpressIntegrationService->step5SaveWidget($userId, $payload);
         });
@@ -625,11 +605,16 @@ class LegacyApiController extends AbstractController
 
     private function wpWizardComplete(Request $request): JsonResponse
     {
-        return $this->wpResponse(function () use ($request) {
-            $payload = $this->collectLegacyPayload($request);
-            $files = array_values($request->files->all());
+        $user = $this->authenticatedUser();
+        if (!$user instanceof User) {
+            return $this->error('User not authenticated', 401);
+        }
 
-            return $this->wordpressIntegrationService->completeWizard($payload, $files);
+        return $this->wpResponse(function () use ($request, $user) {
+            $payload = $this->collectLegacyPayload($request);
+            $this->assertOwnAccount($user, $payload);
+
+            return $this->wordpressIntegrationService->completeWizard($payload, array_values($request->files->all()));
         });
     }
 

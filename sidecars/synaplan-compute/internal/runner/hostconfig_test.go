@@ -1,14 +1,15 @@
 package runner
 
 import (
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/metadist/synaplan-compute/pkg/contract"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
 )
 
 func liveLayout(t *testing.T) (Policy, Spec) {
@@ -148,7 +149,7 @@ func TestHardenedEgressShapePassesValidation(t *testing.T) {
 	if got := string(hc.NetworkMode); got != "compute-egress-01hx7" {
 		t.Fatalf("NetworkMode = %q", got)
 	}
-	if len(hc.DNS) != 1 || hc.DNS[0] != "127.0.0.1" {
+	if len(hc.DNS) != 1 || hc.DNS[0] != deadResolver {
 		t.Fatalf("Dns = %v, want dead resolver", hc.DNS)
 	}
 	wantEnv := []string{
@@ -251,20 +252,22 @@ func TestValidateHardenedRejectsWeakenedConfig(t *testing.T) {
 		}, policy},
 		{"egress network with live DNS", func(c *container.Config, h *container.HostConfig) {
 			h.NetworkMode = "compute-egress-01hx"
-			h.DNS = []string{"8.8.8.8"}
+			h.DNS = []netip.Addr{netip.MustParseAddr("8.8.8.8")}
 			c.Env = ProxyEnv("http://10.9.0.4:3128")
 		}, policy},
 		{"egress network with extra env", func(c *container.Config, h *container.HostConfig) {
 			h.NetworkMode = "compute-egress-01hx"
-			h.DNS = []string{"127.0.0.1"}
+			h.DNS = []netip.Addr{deadResolver}
 			c.Env = append(ProxyEnv("http://10.9.0.4:3128"), "EVIL=1")
 		}, policy},
 		{"egress network with wrong NO_PROXY", func(c *container.Config, h *container.HostConfig) {
 			h.NetworkMode = "compute-egress-01hx"
-			h.DNS = []string{"127.0.0.1"}
+			h.DNS = []netip.Addr{deadResolver}
 			c.Env = []string{"HTTP_PROXY=http://10.9.0.4:3128", "HTTPS_PROXY=http://10.9.0.4:3128", "NO_PROXY=x"}
 		}, policy},
-		{"offline with DNS override", func(_ *container.Config, h *container.HostConfig) { h.DNS = []string{"127.0.0.1"} }, policy},
+		{"offline with DNS override", func(_ *container.Config, h *container.HostConfig) {
+			h.DNS = []netip.Addr{deadResolver}
+		}, policy},
 		{"host pid", func(_ *container.Config, h *container.HostConfig) { h.PidMode = "host" }, policy},
 		{"host ipc", func(_ *container.Config, h *container.HostConfig) { h.IpcMode = "host" }, policy},
 		{"host uts", func(_ *container.Config, h *container.HostConfig) { h.UTSMode = "host" }, policy},

@@ -163,7 +163,7 @@
     "tabFiles": "Fichiers",
     "tabSearch": "Recherche",
     "tabVectors": "Vecteurs",
-    "intro": "Les fichiers que vous téléversez deviennent des connaissances recherchables pour vos chats.",
+    "intro": "Les fichiers marqués recherchables par l’IA peuvent servir dans les chats et les assistants.",
     "introCta": "Ajouter des fichiers à vos sources…",
     "useInChat": "Utiliser dans le chat",
     "startedChatWithFolder": "Nouvelle discussion démarrée avec {folder}.",
@@ -251,10 +251,10 @@
     "vectorState": {
       "vectorized": "Recherchable par l’IA",
       "vectorizedDetail": "Recherchable par l’IA · {group} · {count} extraits",
-      "processing": "Traitement…",
+      "processing": "Lecture…",
       "none": "Non recherchable",
       "notApplicable": "Non applicable",
-      "failed": "Échec"
+      "failed": "Lecture impossible"
     },
     "filter": {
       "source": "Source",

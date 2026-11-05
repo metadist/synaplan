@@ -232,13 +232,15 @@ test.describe('Navigation: User menu', () => {
       await page.locator(USR.button).click()
     })
 
-    await test.step('Assert: dropdown has Profile and Logout only', async () => {
+    await test.step('Assert: dropdown has Profile, both website links and Logout', async () => {
       const dropdown = page.locator(USR.dropdown)
       await expect(dropdown).toBeVisible({ timeout: TIMEOUTS.SHORT })
       await expect(dropdown.locator(USR.profileBtn)).toBeVisible()
       await expect(dropdown.locator(USR.logoutBtn)).toBeVisible()
+      await expect(dropdown.locator('[data-testid="btn-sidebar-v2-website-eu"]')).toBeVisible()
+      await expect(dropdown.locator('[data-testid="btn-sidebar-v2-website-tech"]')).toBeVisible()
       await expect(dropdown.locator(USR.statisticsBtn)).toHaveCount(0)
-      await expect(dropdown.locator('[role="menuitem"]')).toHaveCount(2)
+      await expect(dropdown.locator('[role="menuitem"]')).toHaveCount(4)
     })
   })
 

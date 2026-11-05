@@ -59,7 +59,7 @@ test.describe('@ci UX journeys', () => {
       const checklist = page.locator(CHECKLIST)
       await expect(checklist).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await expect(page.locator('[data-testid="item-getting-started-file"]')).toContainText(
-        'Library › Files'
+        'A document or a photo'
       )
       await expect(page.locator('[data-testid="item-getting-started-provider"]')).toHaveCount(0)
     })
@@ -67,7 +67,7 @@ test.describe('@ci UX journeys', () => {
     await test.step('Upload a file opens the Library, whose tour can be replayed', async () => {
       await page.locator('[data-testid="item-getting-started-file"]').click()
       await expect(page).toHaveURL(/\/files$/, { timeout: TIMEOUTS.STANDARD })
-      await replayTour(page, 'Everything you keep')
+      await replayTour(page, 'What is on the left')
       await expect.poll(() => toursSeen(page), { timeout: TIMEOUTS.STANDARD }).toContain('library')
     })
 

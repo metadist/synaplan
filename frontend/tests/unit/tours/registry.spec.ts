@@ -20,6 +20,7 @@ const sources = sourceFiles(SRC)
 
 function hasTarget(target: string): boolean {
   if (sources.includes(`data-tour="${target}"`)) return true
+  if (sources.includes(`? '${target}'`)) return true
   const rail = /^rail-(.+)$/.exec(target)
   return (
     !!rail &&

@@ -1,6 +1,11 @@
-# Price drift — resolution procedure
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (8/9)**  
+> **← Previous:** [2.7 Model Catalog & Pricing Maintenance](PRICING_MAINTENANCE.md) · **Next:** [2.9 AWS Marketplace AMI Operations →](AWS_MARKETPLACE_LISTING.md)
 
-Step-by-step procedure for resolving a model price drift reported by the daily `Price Drift Check` workflow (issue "Price drift detected …", or `app:sync-model-prices --fail-on-drift` exiting 2). Written so that a person or an AI agent can execute it without guessing; the background and the per-provider history are in [PRICING_MAINTENANCE.md](PRICING_MAINTENANCE.md). Prices are resold at a 10% margin, so a wrong direction loses money silently — follow it in full, including the STOP conditions.
+# Price Drift — Resolution Procedure
+
+> **In this guide:** The step-by-step runbook for verifying and resolving a model price discrepancy flagged by the daily `Price Drift Check` workflow (`app:sync-model-prices --dry-run --fail-on-drift`).
+
+Step-by-step procedure for resolving a model price drift reported by the daily `Price Drift Check` workflow (issue "Price drift detected …", or `app:sync-model-prices --dry-run --fail-on-drift` exiting 2). Written so that a person or an AI agent can execute it without guessing; the background and the per-provider history are in [PRICING_MAINTENANCE.md](PRICING_MAINTENANCE.md). Prices are resold at a 10% margin, so a wrong direction loses money silently — follow it in full, including the STOP conditions.
 
 ## Ground rules (read all five before touching anything)
 
@@ -180,3 +185,8 @@ Required outcome: all green, the seed step reports the corrected row as `skipped
 - Time-boxed promotional rates are invisible to the check (both sides agree). They live in
   `docs/PRICING_MAINTENANCE.md` § "Time-boxed / reminders" — check that section whenever you
   touch the same provider.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (8/9)**  
+> **← Previous:** [2.7 Model Catalog & Pricing Maintenance](PRICING_MAINTENANCE.md) · **Next:** [2.9 AWS Marketplace AMI Operations →](AWS_MARKETPLACE_LISTING.md)

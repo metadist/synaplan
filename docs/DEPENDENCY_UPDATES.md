@@ -1,4 +1,9 @@
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (11/11)**  
+> **← Previous:** [5.10 End-to-End Testing (Playwright)](E2E_TESTING.md) · **Back to Start:** [Documentation Index →](README.md)
+
 # Renovate PR Review Guide
+
+> **In this guide:** The 12-step decision procedure for reviewing, rebasing, testing, and merging (or blocking) Renovate dependency PRs—covering peer-dependency verification, Docker digest classification, lockfile conflict analysis, and handling broken group members.
 
 How to review, merge, and close Renovate dependency update PRs.
 
@@ -204,3 +209,8 @@ the PR — when reviewing it, check this list).
 | Package | Current pin | Why | Revert to |
 | --- | --- | --- | --- |
 | `phpoffice/phppresentation` | `dev-master as 1.3.0` | The phpspreadsheet **v5** security upgrade (clears CVE-2025-54370 + 6 others) is blocked by phppresentation 1.2.0, which caps phpspreadsheet at `^4.0`. The fix (allow `^5.0`) is merged on phppresentation `master` but not yet tagged (no 1.3.0 release on Packagist). | `^1.3` once **1.3.0** is released. |
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (11/11)**  
+> **← Previous:** [5.10 End-to-End Testing (Playwright)](E2E_TESTING.md) · **Back to Start:** [Documentation Index →](README.md)

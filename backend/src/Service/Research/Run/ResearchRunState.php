@@ -82,6 +82,13 @@ final class ResearchRunState
     public ?ResearchDepth $ceiling = null;
 
     /**
+     * The depth limit that ended the gathering, when one did: one of the
+     * `ResearchBudget` LIMIT_ reasons. It travels to the report, so the
+     * closing sentence can name the limit instead of a generic depth.
+     */
+    public ?string $limitHit = null;
+
+    /**
      * A report file already written before this run was handed to a saved
      * task. New runs do not write one. Not stored: the resume reads it from
      * the hand-over message.
@@ -158,6 +165,7 @@ final class ResearchRunState
             'knowledge_keys' => $this->knowledgeKeys,
             'hint' => $this->hint,
             'ceiling' => $this->ceiling?->value,
+            'limit_hit' => $this->limitHit,
             'spend' => $this->spend->toArray(),
         ];
     }
@@ -275,9 +283,24 @@ final class ResearchRunState
         $state->hint = is_string($hint) && in_array($hint, [ResearchRequest::HINT_BRIEF, ResearchRequest::HINT_DEEPER], true) ? $hint : null;
         $ceiling = $data['ceiling'] ?? null;
         $state->ceiling = is_string($ceiling) ? ResearchDepth::tryFrom($ceiling) : null;
+        $limitHit = $data['limit_hit'] ?? null;
+        $state->limitHit = is_string($limitHit) && in_array($limitHit, ResearchBudget::LIMIT_REASONS, true) ? $limitHit : null;
         $state->spend = ResearchSpend::fromArray($data['spend'] ?? null);
 
         return $state;
+    }
+
+    /**
+     * Remembers the first limit that ended the gathering. Without a named
+     * reason the budget says which one is spent; a reserve the stages keep
+     * for the writer names its own before it is fully spent.
+     */
+    public function noteLimitHit(?string $reason = null): void
+    {
+        if (null !== $reason && !in_array($reason, ResearchBudget::LIMIT_REASONS, true)) {
+            return;
+        }
+        $this->limitHit ??= $reason ?? $this->budget->exhaustedReason();
     }
 
     public function advance(ResearchStatus $status): void

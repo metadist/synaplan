@@ -47,4 +47,14 @@ describe('FilesTabs', () => {
     expect(wrapper.get('[data-testid="subtitle"]').text()).toContain('Finished results')
     expect(wrapper.find('[data-testid="files-tabs"]').exists()).toBe(false)
   })
+
+  it('says on Browse that searchable files can be used, in one uncut line', () => {
+    const wrapper = mountHeader()
+    expect(wrapper.get('[data-testid="subtitle"]').text()).toBe(
+      'Files marked Searchable by AI can be used in chats and assistants.'
+    )
+    expect(wrapper.get('[data-testid="subtitle"]').text()).not.toContain(
+      'Add files to your sources'
+    )
+  })
 })

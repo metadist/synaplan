@@ -116,6 +116,18 @@ a screen.
    approval prompt for interactive own-file edits.
 2. Gates green. (J-AU-5 is walked in AU25b.)
 
+### As delivered
+
+The gate runs on every call that has an actor. A document edit of the
+person's own file is allowed (`own_artefact`), and so are Synaplan's own
+`memory_add` and `file_ingest`. An approval that was already given answers
+allow, so resume does not open a second one. A write or a destructive call
+that runs leaves `tool.executed` with no arguments and no result. The
+OpenAI-compatible loop and custom HTTP gain a `TOOLS` row. The Messages
+loop already wrote that row and still does, so a call is not counted twice.
+A mutating gateway tool while approvals are off is still refused; the gate
+records the block.
+
 ---
 
 ## AU25b — Tool calls in the audit log (ota-candidate)

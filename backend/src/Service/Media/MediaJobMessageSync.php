@@ -7,6 +7,7 @@ namespace App\Service\Media;
 use App\Repository\MessageRepository;
 use App\Service\File\ThumbnailService;
 use App\Service\Message\GeneratedMediaTextRenderer;
+use App\Service\Message\PlaceholderReply;
 use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -33,6 +34,11 @@ use Symfony\Contracts\EventDispatcher\EventDispatcherInterface;
  * `task_plan` meta is patched (state/url/error) and the BMESSAGE_TASKS row is
  * healed via the job key — the reload then shows the finished card exactly
  * like a card that completed inside the live turn.
+ *
+ * Placeholder replies are the exception: the assembler stored a generating
+ * token or the degraded fallback because the image was still running. Those
+ * may be replaced with the storage marker (or cleared on failure) without
+ * touching model-written prose.
  */
 final readonly class MediaJobMessageSync
 {
@@ -94,13 +100,7 @@ final readonly class MediaJobMessageSync
 
         $nodeId = $job->getNodeId();
         if (null !== $nodeId && '' !== $nodeId) {
-            // Multitask node job: the task card is the surface — patch the
-            // persisted card state and NEVER touch the assembled reply text
-            // or the single-task `media_job` banner meta (see class docblock).
-            $this->syncTaskPlanCard($job, $message, $status['state']);
-            if (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
-                $this->attachGeneratedFile($job, $message);
-            }
+            $this->syncMultitaskNodeJob($job, $message, $status['state']);
         } else {
             $mediaJobMeta = [
                 'job_id' => $job->getJobKey(),
@@ -207,6 +207,48 @@ final readonly class MediaJobMessageSync
         ];
 
         $message->setMeta('ai_usage_extra', (string) json_encode($entries));
+    }
+
+    /**
+     * Card is the DAG media surface. Replace the body only when it is still a
+     * placeholder (generating token / degraded fallback / empty) — never a
+     * composed answer that already mentions the image.
+     */
+    private function syncMultitaskNodeJob(MediaJob $job, \App\Entity\Message $message, string $state): void
+    {
+        $this->syncTaskPlanCard($job, $message, $state);
+        if (MediaJob::STATUS_COMPLETED === $job->getStatus()) {
+            $this->attachGeneratedFile($job, $message);
+            $this->replacePlaceholderReply(
+                $message,
+                GeneratedMediaTextRenderer::storageMarker($job->getType()),
+                $job,
+            );
+
+            return;
+        }
+        if (in_array($job->getStatus(), [
+            MediaJob::STATUS_FAILED,
+            MediaJob::STATUS_TIMED_OUT,
+            MediaJob::STATUS_CANCELLED,
+        ], true)) {
+            $this->replacePlaceholderReply($message, '', $job);
+        }
+    }
+
+    private function replacePlaceholderReply(\App\Entity\Message $message, string $replacement, MediaJob $job): void
+    {
+        if (!PlaceholderReply::isPlaceholder($message->getText())) {
+            return;
+        }
+        $message->setText($replacement);
+        if ('' === $replacement) {
+            return;
+        }
+        $prompt = trim((string) $job->getPrompt());
+        if ('' !== $prompt) {
+            $message->setMeta('media_prompt', $prompt);
+        }
     }
 
     /**

@@ -135,17 +135,11 @@ const isProseKind = computed(() => ['text', 'extract'].includes(props.card.kind)
 // The full results are available via the Sources dropdown on the message body.
 const isSearchKind = computed(() => props.card.kind === 'search')
 
-// #1229 smart collapse: only DONE prose that is repeated in the answer body
-// collapses. Unique card content stays visible; media and streaming cards never
-// collapse.
-const userExpanded = ref<boolean | null>(null)
-const isCollapsible = computed(
+// Done prose that is already in the chat answer stays in Details only.
+// Unique card content, media and streaming cards still show their body.
+const hideDuplicateBody = computed(
   () => isProseKind.value && props.card.state === 'done' && props.card.redundant === true
 )
-const collapsed = computed(() => isCollapsible.value && userExpanded.value !== true)
-const toggleCollapsed = () => {
-  userExpanded.value = collapsed.value
-}
 
 // Copy-to-clipboard for completed prose and search cards (#1229). Search cards
 // copy their query plus the visible source summary; media cards expose download
@@ -306,26 +300,13 @@ const outputShown = computed(() =>
 
       <button
         type="button"
-        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
-        :aria-label="$t('taskPlan.details')"
+        class="pill text-xs whitespace-nowrap shrink-0"
         :aria-expanded="detailsOpen"
         data-testid="task-card-details-toggle"
         @click="detailsOpen = !detailsOpen"
       >
         <Icon :icon="detailsOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="w-4 h-4" />
-      </button>
-
-      <button
-        v-if="isCollapsible"
-        type="button"
-        class="p-1 rounded-xl txt-muted hover:txt-primary transition-colors"
-        :aria-label="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
-        :aria-expanded="!collapsed"
-        :title="collapsed ? $t('taskPlan.expand') : $t('taskPlan.collapse')"
-        data-testid="task-card-toggle"
-        @click="toggleCollapsed"
-      >
-        <Icon :icon="collapsed ? 'mdi:chevron-down' : 'mdi:chevron-up'" class="w-4 h-4" />
+        <span class="font-medium">{{ $t('taskPlan.details') }}</span>
       </button>
 
       <span class="flex items-center gap-1 text-xs">
@@ -510,18 +491,9 @@ const outputShown = computed(() =>
         <span v-else-if="card.query">{{ card.query }}</span>
       </div>
 
-      <!-- Redundant prose collapsed to a one-line hint (#1129 / #1229) -->
-      <p
-        v-if="!isSearchKind && card.text && collapsed"
-        class="text-xs txt-muted"
-        data-testid="task-card-collapsed-hint"
-      >
-        {{ $t('taskPlan.redundantCollapsed') }}
-      </p>
-
-      <!-- Streaming / final text (prose and non-search kinds) -->
+      <!-- Streaming / unique text. Duplicate answer text lives under Details. -->
       <div
-        v-if="!isSearchKind && card.text && !collapsed"
+        v-if="!isSearchKind && card.text && !hideDuplicateBody"
         class="task-card__body text-sm txt-primary break-words"
       >
         <MessageText

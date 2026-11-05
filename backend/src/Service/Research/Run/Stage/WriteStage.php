@@ -21,6 +21,8 @@ final readonly class WriteStage implements ResearchStage
 
     public function run(StageContext $ctx): StageResult
     {
+        // However the run arrived here, a spent limit is named in the end.
+        $ctx->state->noteLimitHit();
         $prior = $ctx->state->priorReport;
         if ([] === $ctx->state->ledger->evidenceForWriter() && (null === $prior || '' === trim($prior))) {
             return new StageResult('check');

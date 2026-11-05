@@ -11,8 +11,8 @@ import { TIMEOUTS } from '../config/config'
  */
 export async function openChatManager(page: Page): Promise<Locator> {
   const panel = page.locator(selectors.nav.sidebarChats)
-  // The Chats rail icon starts a new chat. Click it only when the list is
-  // not already on screen, so opening the list does not leave the thread.
+  // The Chats rail returns to the last thread. Click it only when the list
+  // is not already on screen.
   if (!(await panel.isVisible())) {
     await page.locator(selectors.nav.sidebarV2ChatNav).click()
   }
@@ -44,7 +44,7 @@ export async function nameActiveChat(page: Page, title: string): Promise<void> {
     )
   }
   // The sidebar list is a snapshot from before this rename. Reloading picks the
-  // title up. Clicking the Chats rail would start another chat instead.
+  // title up without depending on a rail click.
   const chatsLoaded = page.waitForResponse(
     (res) =>
       new URL(res.url()).pathname.endsWith('/api/v1/chats') &&

@@ -35,7 +35,7 @@ const subtitle = computed(() => {
     case 'search':
       return t('files.searchIntro')
     default:
-      return `${t('files.intro')} ${t('files.introCta')}`
+      return t('files.intro')
   }
 })
 </script>

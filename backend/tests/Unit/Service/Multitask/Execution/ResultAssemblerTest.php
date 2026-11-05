@@ -245,6 +245,64 @@ final class ResultAssemblerTest extends TestCase
         $result = $this->assembler->assemble($plan, $ctx);
 
         $this->assertFalse($result['all_failed']);
+        $this->assertSame('__IMAGE_GENERATING__', $result['content']);
+    }
+
+    public function testRunningImageDoesNotUseTheDegradedFallback(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'de', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation'],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ctx = $this->context('ein papagei', 'de');
+        $ctx->setResult('n1', NodeResult::running(['media_job' => ['job_id' => 'abc', 'type' => 'image']]));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame('__IMAGE_GENERATING__', $result['content']);
+        $this->assertStringNotContainsString('nicht vollständig', $result['content']);
+        $this->assertFalse($result['all_failed']);
+    }
+
+    public function testSuccessfulChatTextIsKeptWhileMediaRuns(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'chat'],
+                ['id' => 'n2', 'capability' => 'image_generation', 'depends_on' => ['n1']],
+                ['id' => 'n3', 'capability' => 'compose_reply', 'depends_on' => ['n1', 'n2']],
+            ],
+        ]);
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok('Here is a poem about a parrot.'));
+        $ctx->setResult('n2', NodeResult::running(['media_job' => ['job_id' => 'abc', 'type' => 'image']]));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame('Here is a poem about a parrot.', $result['content']);
+    }
+
+    public function testSuccessfulMediaFilesWithoutTextUseTheStorageMarker(): void
+    {
+        $plan = TaskPlan::fromArray([
+            'version' => 1, 'language' => 'en', 'reply_node' => 'n2',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'image_generation'],
+                ['id' => 'n2', 'capability' => 'compose_reply', 'depends_on' => ['n1']],
+            ],
+        ]);
+        $ctx = $this->context();
+        $ctx->setResult('n1', NodeResult::ok(null, [['path' => 'uploads/parrot.png', 'type' => 'image']]));
+        $ctx->setResult('n2', NodeResult::ok(''));
+
+        $result = $this->assembler->assemble($plan, $ctx);
+
+        $this->assertSame('__IMAGE_GENERATED__', $result['content']);
+        $this->assertSame('uploads/parrot.png', $result['files'][0]['path']);
     }
 
     /**

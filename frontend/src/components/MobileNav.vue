@@ -79,7 +79,7 @@
           />
         </button>
 
-        <div v-if="!isGuestMode && libraryExpanded" class="pl-4 pb-1">
+        <div v-if="!isGuestMode && libraryExpanded" class="pl-4 pb-1" data-tour="library-tabs">
           <router-link
             v-for="link in libraryLinks"
             :key="link.id"

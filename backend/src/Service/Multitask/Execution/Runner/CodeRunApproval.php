@@ -11,7 +11,6 @@ use App\Service\Compute\ComputeConfig;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
-use App\Service\Tool\Execution\GateMode;
 use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolChannel;
@@ -102,7 +101,6 @@ final readonly class CodeRunApproval
                     Capability::CodeRun->value,
                     $args,
                     new ToolCaller($userId, ToolChannel::CODE_RUN, unattended: PolicyContext::Unattended === $policyContext),
-                    null === $this->executionGate ? GateMode::AsTodayNever : GateMode::AsTodayAlways,
                     decision: new GateRequest(
                         $user,
                         $policyContext,

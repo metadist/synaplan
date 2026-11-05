@@ -734,94 +734,94 @@
     },
     "chats": {
       "rail": {
-        "title": "Fünf Bereiche",
-        "body": "Diese Leiste wechselt zwischen Chats, Bibliothek, Assistenten, Apps und Admin. Jeder Bereich öffnet daneben sein eigenes Menü."
+        "title": "Die Bereiche",
+        "body": "Diese Symbole wechseln den Bereich: Chats, Bibliothek, Assistenten und Apps. Admin sieht nur, wer die Instanz verwaltet. Ein Klick öffnet daneben das Menü."
       },
       "new": {
-        "title": "Neuen Chat starten",
-        "body": "Jeder Chat wird in der Liste darunter gespeichert, damit du später zurückkehren kannst."
+        "title": "Ein neuer Chat",
+        "body": "Dieser Knopf startet ein leeres Gespräch. Was du vorher geschrieben hast, bleibt in der Liste darunter und lässt sich wieder öffnen."
       },
       "input": {
-        "title": "Frag einfach",
-        "body": "Schreib deine Frage und drücke Enter. Synaplan wählt ein passendes Modell und kann deine Dateien und Erinnerungen nutzen."
+        "title": "Einfach fragen",
+        "body": "Hier schreibst du. Enter schickt die Nachricht ab, die Antwort erscheint darüber."
       },
       "plus": {
-        "title": "Dateien und Werkzeuge",
-        "body": "Hänge eine Datei oder ein Foto an oder schalte für diese Nachricht ein Werkzeug wie die Websuche ein."
+        "title": "Datei oder Werkzeug",
+        "body": "Plus hängt eine Datei oder ein Foto an diese Nachricht. Dort nimmst du auch ein Werkzeug dazu, zum Beispiel die Suche im Web."
       },
       "model": {
-        "title": "Modell wählen",
-        "body": "Lass es auf Automatik oder wähle selbst ein Modell. Deine Standards findest du unter Assistenten › KI-Einstellungen."
+        "title": "Welches Modell antwortet",
+        "body": "Der Name hier ist das Modell dieser Antwort. Tippe darauf, wenn du ein anderes willst. Was für alle gilt, stellst du unter Assistenten bei den KI-Einstellungen ein."
       },
       "search": {
-        "title": "Alles finden",
-        "body": "Durchsuche Chats, Dateien, Assistenten und Seiten von überall, auch mit Strg+K oder ⌘K."
+        "title": "Etwas wiederfinden",
+        "body": "Dieses Feld durchsucht Chats, Dateien, Assistenten und Seiten. Dieselbe Suche öffnest du von überall mit Strg+K oder ⌘K."
       }
     },
     "library": {
       "tabs": {
-        "title": "Alles, was du aufbewahrst",
-        "body": "Deine Dateien, was aus Apps ankam, was die KI erzeugt hat, dazu Suche und Erinnerungen — je ein Tab."
+        "title": "Was links steht",
+        "body": "Durchsuchen sind die Dateien, die du selbst abgelegt hast. Eingang ist, was andere Apps geschickt haben. KI-erstellt ist, was die KI erzeugt hat. Suche sucht darin."
       },
       "upload": {
-        "title": "Dateien hinzufügen",
-        "body": "Leg Dateien hier ab. Synaplan liest sie, damit Chats und Assistenten aus ihrem Inhalt antworten können."
+        "title": "Dateien ablegen",
+        "body": "Hier lädst du Dateien hoch oder ziehst sie her. In Antworten nutzt die KI nur Dateien, die als durchsuchbar markiert sind. Bei Fotos, Aufnahmen und von der KI erzeugten Dateien setzt du die Markierung selbst."
       },
       "use": {
-        "title": "Im Chat verwenden",
-        "body": "Wähle im Chat + › Wissensordner, um aus einem Ordner zu antworten, oder frag einfach — passende Dateien werden selbst gefunden."
+        "title": "Dieselben Dateien im Chat",
+        "body": "Im Chat öffnest du Plus und wählst einen Wissensordner. Die Antwort kommt aus den durchsuchbaren Dateien in diesem Ordner."
       }
     },
     "assistants": {
       "create": {
-        "title": "Assistenten erstellen",
-        "body": "Ein Assistent merkt sich Anweisungen, Dateien und Werkzeuge, damit du sie nicht in jedem Chat wiederholst."
+        "title": "Einen Assistenten anlegen",
+        "body": "Ein Assistent merkt sich Anweisungen, Dateien und Werkzeuge. Du legst das einmal fest. Jeder Chat mit ihm kennt es dann."
       },
       "gallery": {
-        "title": "Deine Assistenten",
-        "body": "Starte einen Chat damit, bearbeite ihn, kopiere eine Vorlage oder teile ihn mit deinem Team."
+        "title": "Die Liste",
+        "body": "Hier liegen die Assistenten, die es schon gibt. Einen öffnest du zum Chatten, zum Ändern oder zum Teilen mit deinem Team."
       },
       "more": {
-        "title": "Aufgaben und Freigaben",
-        "body": "Im Menü Assistenten findest du auch Aufgaben, die nach Zeitplan laufen, wartende Freigaben und deine KI-Einstellungen."
+        "title": "Noch in diesem Menü",
+        "body": "Aufgaben laufen zu einer Zeit, die du angibst. Unter Freigaben wartet, was du erst erlauben musst. Die KI-Einstellungen sind auch hier."
       }
     },
     "tasks": {
       "new": {
-        "title": "Aufgabe erstellen",
-        "body": "Beschreibe, was die KI tun soll und auf Wunsch wann. Sie läuft dann von selbst."
+        "title": "Eine Aufgabe beschreiben",
+        "body": "Schreib, was die KI tun soll, und wann. Sie startet nicht von allein. Die Aufgabe bleibt aus, bis du sie einschaltest."
       },
       "approvals": {
-        "title": "Du behältst die Kontrolle",
-        "body": "Bevor eine Aufgabe eine Mail sendet oder etwas ändert, fragt sie dich unter Freigaben. Ergebnisse stehen in den Läufen der Aufgabe."
+        "title": "Du sagst ja",
+        "body": "Bevor eine Aufgabe eine Mail schickt oder etwas ändert, erscheint eine Karte unter Freigaben. Ohne dein Ja geht nichts raus. Was dabei herauskam, steht in den Läufen dieser Aufgabe."
       }
     },
     "apps": {
       "search": {
-        "title": "App finden",
-        "body": "Suche nach Name oder Vorhaben, zum Beispiel Mail oder Kalender."
+        "title": "Eine App suchen",
+        "body": "Tippe einen Namen ins Suchfeld, zum Beispiel Mail oder Kalender."
       },
       "tabs": {
-        "title": "Alle oder verbunden",
-        "body": "Verbunden zeigt nur, was du schon nutzt, damit du es schnell prüfen oder trennen kannst."
+        "title": "Alle oder nur deine",
+        "body": "Alle ist die ganze Liste. Verbunden zeigt nur die Apps, die du schon verbunden hast."
       },
       "list": {
-        "title": "App öffnen",
-        "body": "Jede App erklärt, was sie kann, verbindet sich in wenigen Schritten und lässt sich auf derselben Seite abschalten."
+        "title": "Eine App öffnen",
+        "body": "Öffne eine App und lies, was sie tut. Verbinden und wieder Abschalten geht auf derselben Seite."
       }
     },
     "admin": {
       "cards": {
-        "title": "Dein Server auf einen Blick",
-        "body": "Benutzer, neue Registrierungen, abgeschaltete Funktionen und zu prüfende Modelle. Jede Karte öffnet die Seite dahinter."
+        "title": "Die Zahlen",
+        "body": "Jede Karte ist eine Zahl, zum Beispiel Benutzer oder Modelle zum Prüfen. Ein Klick öffnet die Seite dazu."
       },
       "attention": {
-        "title": "Was dich braucht",
-        "body": "Probleme stehen hier, jeweils mit einem Knopf, der dich direkt zur Lösung bringt."
+        "title": "Was nicht stimmt",
+        "body": "Hier steht, was Aufmerksamkeit braucht. Jede Zeile hat einen Knopf, der direkt zur Lösung führt."
       },
       "sections": {
-        "title": "Admin-Bereiche",
-        "body": "Systemstatus, KI-Infrastruktur, Benutzer und Systemkonfiguration. Die Konfiguration hat eine eigene Einstellungs-Suche."
+        "title": "Die Seiten unter Admin",
+        "body": "Hier erreichst du System-Status, KI-Infrastruktur, Benutzer und Systemkonfiguration. In der Systemkonfiguration kannst du die Einstellungen durchsuchen."
       }
     },
     "checklist": {
@@ -832,23 +832,23 @@
       "items": {
         "provider": {
           "title": "KI-Anbieter einrichten",
-          "where": "Unter Admin › KI-Infrastruktur"
+          "where": "Damit Synaplan antworten kann, braucht es einen Anbieter, zum Beispiel Claude oder ein Modell auf deinem eigenen Server."
         },
         "file": {
           "title": "Datei hochladen",
-          "where": "Du findest sie danach unter Bibliothek › Dateien"
+          "where": "Ein Dokument oder ein Foto, aus dem die KI später antworten kann."
         },
         "assistant": {
           "title": "Assistenten erstellen",
-          "where": "Er erscheint unter Assistenten"
+          "where": "Anweisungen, Dateien und Werkzeuge einmal festlegen. Jeder Chat mit diesem Assistenten kennt sie dann."
         },
         "app": {
           "title": "App verbinden",
-          "where": "Verbundene Apps stehen unter Apps › Verbunden"
+          "where": "Etwas, das du schon nutzt, zum Beispiel Mail oder den Kalender. Synaplan kann dann damit arbeiten."
         },
         "providerDemo": {
           "title": "Eigenen KI-Anbieter hinzufügen",
-          "where": "Du nutzt gerade die Synaplan Demo"
+          "where": "Die Synaplan Demo ist zum Ausprobieren. Mit einem eigenen Anbieter bleiben die Antworten bei dir."
         }
       }
     }

@@ -7,25 +7,6 @@
       <div class="max-w-[100rem] mx-auto space-y-6">
         <FilesTabs />
 
-        <!-- §4.9 E: first-visit dismissible explainer; remembered per user. -->
-        <Transition name="fade">
-          <div
-            v-if="showExplainer"
-            class="flex items-start gap-3 p-3 sm:p-4 rounded-xl border border-[var(--brand)]/20 bg-[var(--brand)]/[0.05]"
-            data-testid="files-explainer"
-          >
-            <InformationCircleIcon class="w-5 h-5 text-[var(--brand)] shrink-0 mt-0.5" />
-            <p class="text-sm txt-secondary flex-1 min-w-0">{{ $t('files.explainer.text') }}</p>
-            <button
-              class="shrink-0 px-2.5 py-1 rounded-xl text-xs font-medium text-[var(--brand)] hover:bg-[var(--brand)]/10 transition-colors"
-              data-testid="btn-explainer-dismiss"
-              @click="dismissExplainer"
-            >
-              {{ $t('files.explainer.dismiss') }}
-            </button>
-          </div>
-        </Transition>
-
         <!-- Storage Quota Widget -->
         <StorageQuotaWidget ref="storageWidget" @upgrade="handleUpgrade" />
 
@@ -670,6 +651,7 @@
               v-else-if="displayedFolders.length === 0 && paginatedFiles.length === 0"
               class="flex flex-col items-center justify-center py-20 gap-4"
               data-testid="state-empty"
+              data-tour="library-files"
             >
               <div
                 class="w-20 h-20 rounded-2xl bg-[var(--brand)]/10 flex items-center justify-center"
@@ -873,7 +855,11 @@
               </div>
 
               <!-- All files table -->
-              <div v-if="paginatedFiles.length > 0" data-testid="section-table">
+              <div
+                v-if="paginatedFiles.length > 0"
+                data-testid="section-table"
+                data-tour="library-files"
+              >
                 <!-- Mobile card list -->
                 <div class="sm:hidden space-y-2">
                   <button
@@ -1148,7 +1134,7 @@
             </div>
 
             <!-- Finder-style file list -->
-            <div v-else data-testid="section-table">
+            <div v-else data-testid="section-table" data-tour="library-files">
               <!-- Mobile card list -->
               <div class="sm:hidden space-y-2">
                 <button
@@ -1415,7 +1401,6 @@ import {
   TrashIcon,
   XMarkIcon,
   ExclamationTriangleIcon,
-  InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 import filesService, {
   type FileItem,
@@ -1593,23 +1578,6 @@ const filterIncoming = ref(false)
 const filterSharedWithMe = ref(false)
 const incomingCount = ref(0)
 let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
-
-// §4.9 E: first-visit explainer, remembered per user via localStorage.
-const EXPLAINER_DISMISSED_KEY = 'synaplan:files:explainer-dismissed'
-const showExplainer = ref(false)
-try {
-  showExplainer.value = localStorage.getItem(EXPLAINER_DISMISSED_KEY) !== '1'
-} catch {
-  showExplainer.value = true
-}
-const dismissExplainer = () => {
-  showExplainer.value = false
-  try {
-    localStorage.setItem(EXPLAINER_DISMISSED_KEY, '1')
-  } catch {
-    /* ignore storage failures */
-  }
-}
 
 const activeFilterCount = computed(() => {
   let count = 0

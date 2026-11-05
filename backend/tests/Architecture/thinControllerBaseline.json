@@ -1,12 +1,12 @@
 {
     "_comment": "Thin-controller ledger (tests/Architecture/ThinControllerTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_THIN_CONTROLLER=1 and review the diff.",
     "recorded": "2026-10-17",
-    "updated": "2026-10-28",
+    "updated": "2026-11-04",
     "limits": {
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 103,
+        "methodLines": 102,
         "entityManager": 14,
         "aiFacade": 5
     },
@@ -44,7 +44,6 @@
         "src/Controller/InboundEmailHandlerController.php::InboundEmailHandlerController::update": 92,
         "src/Controller/KeycloakAuthController.php::KeycloakAuthController::callback": 178,
         "src/Controller/KeycloakAuthController.php::KeycloakAuthController::login": 82,
-        "src/Controller/LegacyApiController.php::LegacyApiController::messageNew": 52,
         "src/Controller/LegacyApiController.php::LegacyApiController::promptUpdate": 71,
         "src/Controller/MediaController.php::MediaController::generateFromImages": 53,
         "src/Controller/MessageController.php::MessageController::getExtractedMemories": 71,

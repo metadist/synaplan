@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution;
 
+use App\Service\Message\GeneratedMediaTextRenderer;
+use App\Service\Message\PlaceholderReply;
 use App\Service\Multitask\Plan\Capability;
+use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Plan\TaskPlan;
 
 /**
@@ -18,21 +21,6 @@ use App\Service\Multitask\Plan\TaskPlan;
  */
 final class ResultAssembler
 {
-    /**
-     * Static fallback shown when no node produced any text. Keyed by the
-     * detected message language (the frontend-supported set); English is the
-     * fallback for everything else. The backend has no translator service —
-     * normal replies are localized by the model itself, so only this
-     * degraded-path constant needs a map.
-     */
-    private const FALLBACK_TEXT = [
-        'en' => "I couldn't fully complete that request.",
-        'de' => 'Ich konnte diese Anfrage leider nicht vollständig abschließen.',
-        'es' => 'No pude completar esa solicitud por completo.',
-        'fr' => "Je n'ai pas pu terminer cette demande entièrement.",
-        'tr' => 'Bu isteği tamamen tamamlayamadım.',
-    ];
-
     /**
      * Shown while a step is waiting for a decision. The tool has not run.
      */
@@ -330,12 +318,6 @@ final class ResultAssembler
         return self::WAITING_TEXT[$language] ?? self::WAITING_TEXT['en'];
     }
 
-    /**
-     * Whether a card's prose already appears (verbatim, whitespace-normalized)
-     * inside the final answer text (#1229). Containment — not equality — so a
-     * compose_reply that wraps the card text in a connector sentence still
-     * marks the card redundant.
-     */
     private function isWaitingForApproval(TaskPlan $plan, NodeContext $context): bool
     {
         foreach ($plan->nodes as $node) {
@@ -348,6 +330,81 @@ final class ResultAssembler
         return false;
     }
 
+    /**
+     * A node still running (async media) or never started (blocked by one)
+     * means the reply is not a failure — do not use the degraded fallback.
+     */
+    private function isInProgress(TaskPlan $plan, NodeContext $context): bool
+    {
+        foreach ($plan->nodes as $node) {
+            $result = $context->getResult($node->id);
+            if (null === $result || $result->isRunning() || NodeStatus::Pending === $result->status) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Prefer the single-task generating token so reload, history and channels
+     * share one placeholder. Non-media in-progress steps stay empty — the
+     * task card is the surface.
+     */
+    private function inProgressContent(TaskPlan $plan, NodeContext $context): string
+    {
+        foreach ($plan->topologicalOrder() as $node) {
+            $result = $context->getResult($node->id);
+            if (null === $result || !$result->isRunning()) {
+                continue;
+            }
+            $type = $this->mediaTypeFrom($node, $result);
+            if (null !== $type) {
+                return GeneratedMediaTextRenderer::generatingMarker($type);
+            }
+        }
+
+        return '';
+    }
+
+    private function mediaTypeFrom(TaskNode $node, NodeResult $result): ?string
+    {
+        $mediaJob = $result->metadata['media_job'] ?? null;
+        if (is_array($mediaJob) && is_string($mediaJob['type'] ?? null) && '' !== $mediaJob['type']) {
+            $type = strtolower($mediaJob['type']);
+            if (in_array($type, ['image', 'video', 'audio'], true)) {
+                return $type;
+            }
+        }
+        $kind = $node->capability->uiKind();
+        if (in_array($kind, ['image', 'video', 'audio'], true)) {
+            return $kind;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $files
+     */
+    private function markerForFiles(array $files): ?string
+    {
+        foreach ($files as $file) {
+            $type = is_string($file['type'] ?? null) ? strtolower($file['type']) : '';
+            if (in_array($type, ['image', 'video', 'audio'], true)) {
+                return GeneratedMediaTextRenderer::storageMarker($type);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Whether a card's prose already appears (verbatim, whitespace-normalized)
+     * inside the final answer text (#1229). Containment — not equality — so a
+     * compose_reply that wraps the card text in a connector sentence still
+     * marks the card redundant.
+     */
     private function isRedundantText(string $cardText, string $finalText): bool
     {
         $normalize = static fn (string $s): string => trim((string) preg_replace('/\s+/u', ' ', $s));
@@ -394,14 +451,24 @@ final class ResultAssembler
 
             return [$text, $files, $metadata];
         }
+        if ('' === $text && $this->isInProgress($plan, $context)) {
+            $text = $this->inProgressContent($plan, $context);
+
+            return [$text, $files, $metadata];
+        }
         if ('' === $text) {
-            $text = self::FALLBACK_TEXT[$language] ?? self::FALLBACK_TEXT['en'];
-            // Only when nothing else wrote an answer. A recovered summary or
-            // tool result stays as it is — the failed step is already on its
-            // card, and appending "provider 500" would rewrite that reply.
-            $notes = $this->failedStepNotes($plan, $context, $language);
-            if ([] !== $notes) {
-                $text = rtrim($text)."\n".implode("\n", $notes);
+            $mediaMarker = $this->markerForFiles($files);
+            if (null !== $mediaMarker) {
+                $text = $mediaMarker;
+            } else {
+                $text = PlaceholderReply::fallbackFor($language);
+                // Only when nothing else wrote an answer. A recovered summary or
+                // tool result stays as it is — the failed step is already on its
+                // card, and appending "provider 500" would rewrite that reply.
+                $notes = $this->failedStepNotes($plan, $context, $language);
+                if ([] !== $notes) {
+                    $text = rtrim($text)."\n".implode("\n", $notes);
+                }
             }
         } elseif (in_array($textFrom, self::INPUT_CAPABILITIES, true)) {
             $note = $this->notFinished($plan, $context, $language);

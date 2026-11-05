@@ -1,4 +1,19 @@
-# Backend architecture
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (2/11)**  
+> **← Previous:** [5.1 Local Development Workflow](DEVELOPMENT.md) · **Next:** [5.3 Adding an AI Provider →](PROVIDERS.md)
+
+# Backend Architecture & Request Lifecycle
+
+> **In this guide:** How the Symfony backend in `backend/` is structured—covering the Deptrac layer contract, size and thin-controller ratchets, FrankenPHP worker pools, and the end-to-end execution paths for `MessageProcessor`, `ChatHandler`, `StreamController`, channel turns, `MediaGenerationHandler`, `AiCallPipeline`, `ProviderCatalog`, `ToolInvoker`, and GDPR account erasure.
+
+**On this page:**
+- [Layers (Deptrac)](#layers) · [Size Limits (`SizeRatchetTest`)](#size-limits)
+- [Runtime Config (`RuntimeConfigAssembler`)](#runtime-config--get-apiv1configruntime) · [Readiness (`/api/health/ready`)](#readiness--get-apihealthready) · [Two Worker Pools](#two-worker-pools)
+- [Chat Turn (`ChatHandler`)](#chat-turn--chathandler) · [Chat Stream (`StreamController`)](#chat-stream--postget-apiv1messagesstream) · [Message Turn (`MessageProcessor`)](#message-turn--messageprocessor)
+- [Channel Turns (Widget, Email, WhatsApp)](#channel-turns) · [Media Turn (`MediaGenerationHandler`)](#media-turn--mediagenerationhandler) · [File Analysis (`FileAnalysisHandler`)](#file-analysis--fileanalysishandler)
+- [Provider Adapters (`AiCallPipeline` & `ProviderCatalog`)](#provider-adapters) · [Tool Path (`ToolInvoker`)](#tool-path)
+- [Tagged Collections, Account Erasure & System Settings](#lists-are-tagged-collections) · [Research Runs](#research-runs) · [Where New Code Goes](#where-new-code-goes)
+
+---
 
 How the Symfony backend in `backend/` is put together, and where new code
 goes. Two checks keep the shape: deptrac enforces the layers, and the size
@@ -466,24 +481,37 @@ adapter:
 Every tool call goes through `ToolInvoker`
 (`App\Service\Tool\Execution\`). Chat, the Messages API, the
 OpenAI-compatible API, Saved Tasks, MCP fetch and action, approval resume,
-and memory and file ingest all use it. The invoker asks the gate, runs one
-executor, and shortens the text the model sees to 12,000 characters.
+and memory and file ingest all use it. The invoker asks the gate on every
+call, runs one executor, and shortens the text the model sees to 12,000
+characters.
 
-| Caller | What happens today |
+A write or a destructive call that runs leaves one `tool.executed` row in
+the audit log. The row names the tool, the source, the kind, the outcome
+and how long it took. It does not contain the arguments or the result. A
+read is counted and is not an audit row. A document edit on the person's
+own file is a write with policy auto, so the gate runs and nobody is asked.
+An approval that was already given is not asked again.
+
+The OpenAI-compatible loop and a custom HTTP tool write a `TOOLS` usage
+row. The Messages loop already wrote that row and still does, so a call is
+not counted twice.
+
+| Caller | What the gate does |
 | ------ | ------------------ |
-| Chat and document edits | The tool runs. The approval gate is not asked. |
-| Messages API and OpenAI-compatible API | The gate is asked only when approvals are on. |
-| Saved Tasks and MCP actions | The gate is asked. |
-| File work | The gate is asked here. The file-work runner then runs the code. |
-| Read-only MCP fetch | The gate is not asked. A shared Notion connection is allowed. A write is not. |
-| Resume after someone approves | The gate is not asked again. |
+| Chat and document edits | Asked. An edit of the person's own file is allowed. |
+| Messages API and OpenAI-compatible API | Asked. A read is allowed. A write waits for approval when approvals are on. |
+| Saved Tasks and MCP actions | Asked. An already-approved step is not asked again. |
+| File work | Asked here. The file-work runner then runs the code. |
+| Read-only MCP fetch | Asked. A read is allowed. A shared Notion connection stays allowed. A write is not. |
+| Resume after someone approves | Asked, and the answer is allow, so a second approval is not opened. |
+| Memory and file ingest | Asked. They are the person's own records, so they are allowed and audited. |
 
 A Saved Task keeps the full MCP text for the next step. The 12,000-character
 limit is only for the model.
 
 `backend/tests/Characterization/__snapshots__/tool_loops.json` is the
-contract for stop reasons, gate decisions and result text. Usage rows and
-the `tool.executed` audit line still belong to the caller.
+contract for stop reasons, gate decisions, audit rows, usage rows and
+result text.
 
 ## Lists are tagged collections
 
@@ -583,3 +611,8 @@ run's last step writes the report into the chat. See `docs/RESEARCH.md`.
   job, `AccountLanguage::SUPPORTED` for the UI locales).
 - See `AGENTS.md` for the merge gate and `docs/PHP_CONVENTIONS.md` for code
   style.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (2/11)**  
+> **← Previous:** [5.1 Local Development Workflow](DEVELOPMENT.md) · **Next:** [5.3 Adding an AI Provider →](PROVIDERS.md)

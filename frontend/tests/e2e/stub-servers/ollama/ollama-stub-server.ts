@@ -109,8 +109,14 @@ function getBody(obj: unknown): Record<string, unknown> | null {
     : null
 }
 
+const MAX_STREAM_DELAY_MS = 5_000
+
 function sleep(ms: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, ms))
+  let delay = ms
+  if (delay > MAX_STREAM_DELAY_MS) {
+    delay = MAX_STREAM_DELAY_MS
+  }
+  return new Promise((r) => setTimeout(r, delay))
 }
 
 function shouldSimulateError(endpoint: string): number | null {
@@ -215,7 +221,13 @@ const server = http.createServer((req, res) => {
         if (typeof bodyObj.enableThinking === 'boolean')
           config.enableThinking = bodyObj.enableThinking
         if (typeof bodyObj.thinkingText === 'string') config.thinkingText = bodyObj.thinkingText
-        if (typeof bodyObj.streamDelayMs === 'number') config.streamDelayMs = bodyObj.streamDelayMs
+        if (
+          typeof bodyObj.streamDelayMs === 'number' &&
+          bodyObj.streamDelayMs >= 0 &&
+          bodyObj.streamDelayMs <= MAX_STREAM_DELAY_MS
+        ) {
+          config.streamDelayMs = bodyObj.streamDelayMs
+        }
         if (Array.isArray(bodyObj.models)) config.models = bodyObj.models as StubConfig['models']
         if (bodyObj.simulateError != null)
           config.simulateError = bodyObj.simulateError as StubConfig['simulateError']

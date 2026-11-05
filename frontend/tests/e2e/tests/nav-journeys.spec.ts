@@ -176,6 +176,49 @@ test.describe('@ci Navigation journeys', () => {
     })
   })
 
+  test('After Library, Chats opens the last thread', async ({ page }) => {
+    const title = `Last chat ${Date.now()}`
+    const chat = new ChatHelper(page)
+
+    await test.step('Name the open chat, then leave for Library', async () => {
+      await openApp(page)
+      await chat.startNewChat()
+      await nameActiveChat(page, title)
+    })
+
+    const chatId = await page.evaluate(() => window.localStorage.getItem('synaplan_active_chat_id'))
+    expect(chatId).toBeTruthy()
+
+    await test.step('Chats brings the same thread back; New Chat is the empty path', async () => {
+      await page.locator(NAV.sidebarV2Files).click()
+      await expect(page).toHaveURL(/\/files/, { timeout: TIMEOUTS.STANDARD })
+
+      await page.locator(NAV.sidebarV2ChatNav).click()
+      await expect(page).toHaveURL(/\/$/, { timeout: TIMEOUTS.STANDARD })
+      await expect(page.locator(CHAT.textInput)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      const chatsPanel = page.locator(NAV.sidebarChats)
+      await expect(chatsPanel).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+      await expect(chatsPanel).toHaveAttribute('data-chats-loading', 'false', {
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect
+        .poll(() => page.evaluate(() => window.localStorage.getItem('synaplan_active_chat_id')), {
+          timeout: TIMEOUTS.STANDARD,
+        })
+        .toBe(chatId)
+      await expect(chatsPanel.locator(NAV.chatV2Row).filter({ hasText: title })).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+
+      await chat.startNewChat()
+      await expect
+        .poll(() => page.evaluate(() => window.localStorage.getItem('synaplan_active_chat_id')), {
+          timeout: TIMEOUTS.STANDARD,
+        })
+        .not.toBe(chatId)
+    })
+  })
+
   test('J-NV-3 One key, one place', async ({ page, credentials }) => {
     await login(page, CREDENTIALS.getAdminCredentials())
 

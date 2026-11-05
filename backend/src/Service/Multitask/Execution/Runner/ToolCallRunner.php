@@ -21,7 +21,6 @@ use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\Custom\InvalidToolTemplateException;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Execution\CustomHttpToolExecutor;
-use App\Service\Tool\Execution\GateMode;
 use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\McpToolExecutor;
 use App\Service\Tool\Execution\ToolCaller;
@@ -125,7 +124,6 @@ final readonly class ToolCallRunner implements TaskRunner
                     $toolName,
                     $arguments,
                     new ToolCaller((int) $userId, ToolChannel::SAVED_TASK, unattended: true),
-                    $approved ? GateMode::AsTodayNever : GateMode::AsTodayAlways,
                     decision: new GateRequest(
                         $actor instanceof User ? $actor : null,
                         PolicyContext::Unattended,
@@ -133,6 +131,7 @@ final readonly class ToolCallRunner implements TaskRunner
                         allowUnattended: true === ($context->options['allow_unattended'] ?? false),
                         nodeApproval: $override,
                         resolvedRequest: $actor instanceof User ? $this->resolvedRequest((int) $userId, $toolName, $arguments) : null,
+                        alreadyApproved: $approved,
                     ),
                     user: $actor instanceof User ? $actor : null,
                     decideOnly: ToolSource::Custom !== $descriptor->source && ToolSource::Mcp !== $descriptor->source,
@@ -230,7 +229,6 @@ final readonly class ToolCallRunner implements TaskRunner
                 new CustomHttpToolExecutor($this->logger, $this->customTools, $this->httpExecutor, $this->toolsConfig),
             ],
             gate: $this->executionGate,
-            toolsConfig: $this->toolsConfig,
         );
     }
 

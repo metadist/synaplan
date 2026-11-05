@@ -1,7 +1,17 @@
-# n8n and Saved Tasks
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (2/11)**  
+> **← Previous:** [4.1 External Connections](CONNECTIONS.md) · **Next:** [4.3 OpenAI-Compatible API (`/v1`) →](OPENAI_COMPATIBLE_API.md)
+
+# n8n and Saved Tasks (Inbound & Outbound Webhooks)
+
+> **In this guide:** How external automation platforms like n8n trigger a Synaplan Saved Task via HMAC-signed inbound HTTPS webhooks (`POST /api/v1/webhooks/saved-tasks/{token}`), how a Saved Task posts step results back out to another system, and how task templates/bundles strip secrets on export.
 
 Synaplan does not embed n8n. Another system starts a Saved Task, or a Saved Task
-sends a result out. Both use ordinary HTTPS.
+sends a result out. Both use ordinary HTTPS:
+
+```
+External System (n8n) ──POST /api/v1/webhooks/saved-tasks/{token}──► Saved Task (202 Accepted, queued)
+Saved Task Step       ──POST JSON + X-Synaplan-Signature───────────► External Webhook (n8n)
+```
 
 ## Another system starts a Saved Task
 
@@ -55,3 +65,8 @@ Export / import (`saved_tasks` in the bundle file) behaves the same way:
 schedules and webhooks arrive off, tokens, HMAC secrets and mailbox ids are
 never in the file, MCP tools travel by server name, and unknown fields are
 rejected.
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (2/11)**  
+> **← Previous:** [4.1 External Connections](CONNECTIONS.md) · **Next:** [4.3 OpenAI-Compatible API (`/v1`) →](OPENAI_COMPATIBLE_API.md)

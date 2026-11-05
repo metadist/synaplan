@@ -16,6 +16,7 @@ use App\Prompt\PromptCatalog;
 use App\Repository\FileRepository;
 use App\Service\RAG\RagScopeResolver;
 use App\Service\RAG\VectorStorage\DTO\RagScope;
+use App\Service\Research\Run\Ledger\EvidenceCard;
 use App\Service\Research\Run\Ledger\PassageSplitter;
 use App\Service\Research\Run\Ledger\PassageVerifier;
 use App\Service\Research\Run\Ledger\ResearchBrief;
@@ -1182,7 +1183,7 @@ final class ResearchStagesTest extends TestCase
     {
         [$ctx] = $this->open();
         $this->readyToRead($ctx);
-        $ctx->state->ledger->addEvidence(new \App\Service\Research\Run\Ledger\EvidenceCard('', 's1', 'p1', 'The unit price is 12.40 EUR.', ['§1'], []));
+        $ctx->state->ledger->addEvidence(new EvidenceCard('', 's1', 'p1', 'The unit price is 12.40 EUR.', ['§1'], []));
         $ctx->state->ledger->setReport('The unit price is 12.40 EUR [e1]. Delivery takes a day [e9].');
 
         (new DeliverStage())->run($ctx);
@@ -1261,6 +1262,71 @@ final class ResearchStagesTest extends TestCase
             ['class' => ResearchFinishSchema::class],
             ['class' => ResearchCheckSchema::class],
         ];
+    }
+
+    public function testASpentClockWritesFromWhatWasFoundAndNamesTheLimitAtDelivery(): void
+    {
+        [$ctx, $caller] = $this->open(ResearchDepth::Standard);
+        $ctx->state->ledger->setBrief(new ResearchBrief('Compare the prices', 'en', 'report'));
+        $ctx->state->ledger->addPoint('Unit price');
+        $ctx->state->ledger->addPoint('Warranty');
+        $source = $ctx->state->ledger->addSource(Source::web('https://maker.example/price', 'Price list'));
+        $ctx->state->ledger->addEvidence(new EvidenceCard('', $source, 'p1', 'The unit price is 12.40 EUR.', ['§1'], []));
+        $ctx->state->advance(ResearchStatus::Gathering);
+        $ctx->state->budget->at(new \DateTimeImmutable('2026-10-24T09:06:00+00:00'));
+
+        // Nothing is scripted: a paid call from here would throw, and none may happen.
+        self::assertSame('check', (new WriteStage(new StageCall($caller)))->run($ctx)->next);
+        self::assertSame([], $caller->seen);
+        self::assertFalse($ctx->state->status->isTerminal());
+        self::assertSame('wall', $ctx->state->limitHit);
+        self::assertStringContainsString('The unit price is 12.40 EUR.', (string) $ctx->state->ledger->report());
+
+        $calls = new StageCall($caller);
+        self::assertSame('deliver', (new CheckStage($calls, new DraftCheck(), new ResearchInputBudget()))->run($ctx)->next);
+        self::assertSame([], $caller->seen);
+        self::assertSame('done', (new DeliverStage())->run($ctx)->next);
+
+        self::assertSame(ResearchStatus::Complete, $ctx->state->status);
+        $outcome = $ctx->state->outcome;
+        self::assertNotNull($outcome);
+        self::assertSame(ResearchOutcome::COMPLETE_AT_LIMIT, $outcome->code);
+        self::assertSame(1, $outcome->params['covered'] ?? null);
+        self::assertSame(2, $outcome->params['points'] ?? null);
+        self::assertSame('wall', $outcome->params['limit'] ?? null);
+        self::assertSame('standard', $outcome->params['depth'] ?? null);
+        self::assertSame('6', $outcome->params['limit_value'] ?? null);
+        self::assertStringContainsString('time limit (6 minutes)', $outcome->text());
+    }
+
+    public function testASpentBudgetWithNothingToWriteFromEndsNamingTheLimit(): void
+    {
+        [$ctx, $caller] = $this->open();
+        $ctx->state->budget->spend('calls', 6);
+
+        $result = (new BriefStage(new StageCall($caller)))->run($ctx);
+
+        self::assertSame('done', $result->next);
+        self::assertSame([], $caller->seen);
+        self::assertSame(ResearchStatus::Stopped, $ctx->state->status);
+        $outcome = $ctx->state->outcome;
+        self::assertNotNull($outcome);
+        self::assertSame(ResearchOutcome::STOPPED_LIMIT, $outcome->code);
+        self::assertSame('calls', $outcome->params['limit'] ?? null);
+        self::assertSame('quick', $outcome->params['depth'] ?? null);
+        self::assertSame('6', $outcome->params['limit_value'] ?? null);
+        self::assertSame(0, $outcome->params['covered'] ?? null);
+        self::assertStringContainsString('model-call limit (6 calls)', $outcome->text());
+    }
+
+    public function testTheLimitThatEndedTheSearchSurvivesASave(): void
+    {
+        [$ctx] = $this->open(ResearchDepth::Standard);
+        $ctx->state->noteLimitHit('wall');
+
+        $restored = ResearchRunState::decode($ctx->state->encode());
+
+        self::assertSame('wall', $restored?->limitHit);
     }
 
     /**

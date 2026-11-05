@@ -1,4 +1,9 @@
-# OpenAI-Compatible API
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (3/11)**  
+> **← Previous:** [4.2 Saved Tasks & n8n Webhooks](N8N.md) · **Next:** [4.4 Anthropic-Compatible Messages API (`/v1/messages`) →](ANTHROPIC_COMPATIBLE_API.md)
+
+# OpenAI-Compatible API (`/v1`)
+
+> **In this guide:** How to use Synaplan as a drop-in OpenAI server (`/v1/chat/completions`, `/v1/models`, `/v1/audio/transcriptions`) from Python, TypeScript, curl, Cursor, or Continue—including client function-call passthrough, server-injected MCP/web-search tools, and multi-session streaming speech-to-text.
 
 Synaplan exposes an OpenAI-compatible API at `/v1/`. Any tool, SDK, or application that speaks the OpenAI protocol can use Synaplan as a drop-in replacement.
 
@@ -470,3 +475,8 @@ Any tool that supports custom OpenAI endpoints works with Synaplan:
 - **Continue.dev**: Set `apiBase` in config
 - **LangChain**: Use `ChatOpenAI(base_url="...")`
 - **LlamaIndex**: Use `OpenAI(api_base="...")`
+
+---
+
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (3/11)**  
+> **← Previous:** [4.2 Saved Tasks & n8n Webhooks](N8N.md) · **Next:** [4.4 Anthropic-Compatible Messages API (`/v1/messages`) →](ANTHROPIC_COMPATIBLE_API.md)
