@@ -182,18 +182,11 @@ function challengeLanguage(): string {
   return /^[a-z]{2}$/.test(code) ? code : 'auto'
 }
 
-function parentOrigin(): string {
-  if (window.location.origin && window.location.origin !== 'null') {
-    return window.location.origin
-  }
-  return `${window.location.protocol}//${window.location.host}`
-}
-
 function hostedPageUrl(action: string): string {
   const base = getNativeApiBaseUrl().replace(/\/$/, '')
   const params = new URLSearchParams({
     action,
-    parent: parentOrigin(),
+    parent: window.location.origin,
     theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
     lang: challengeLanguage(),
   })
@@ -227,7 +220,7 @@ function hostedTurnstileToken(action: string): Promise<string> {
   const frame = document.createElement('iframe')
   frame.id = HOSTED_FRAME_ID
   frame.title = i18n.global.t('auth.signupBlocked.challengeTitle')
-  frame.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin')
+  frame.setAttribute('referrerpolicy', 'no-referrer')
   frame.style.position = 'fixed'
   frame.style.right = 'max(1rem, env(safe-area-inset-right))'
   frame.style.bottom =
