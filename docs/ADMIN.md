@@ -448,9 +448,17 @@ rate-limiter cache, so they hold across a multi-node deployment.
 
 Turnstile wins over reCAPTCHA when both are configured and fails closed:
 Cloudflare unreachable means the sign-up is refused, not waved through. The
-browser obtains a token before the redirect to Google, GitHub or Apple, and
-the native app does the same inside the app before it opens the system
-browser, then sends that token on the start URL. The callback refuses a new
+browser obtains a token before the redirect to Google, GitHub or Apple. The
+native app cannot run the widget in its own document: that origin is
+`capacitor://localhost` on iOS and `https://localhost` on Android, and
+Turnstile only runs on an `http`/`https` page whose hostname is authorized
+for the widget. The app therefore frames `GET /api/v1/auth/human-check` on
+the real site (invisible until Cloudflare asks for a tap) and sends the
+posted token on sign-in, sign-up and the system-browser start URL. Do not
+add `localhost` to the widget to paper over this — a token minted on
+localhost would be valid for the public API. The page's `frame-ancestors`
+policy allows only the app origins, and the edge proxy must not put
+`X-Frame-Options: SAMEORIGIN` on that one path. The callback refuses a new
 account whose flow did not pass it. Adding `?native=true` to the start URL
 does not skip that check — the flag only chooses where the answer is sent.
 An installed app that does not yet send the token cannot create a new social
