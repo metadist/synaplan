@@ -971,13 +971,19 @@ Allowed topic keys: [KEYLIST]
    reads `inputs.file: "$nX.file"`, and carries the creative instruction in
    `inputs.prompt` — the vision model then writes about the REAL image.
    A parallel `chat` node would invent an image it has never seen.
-7. Meeting / appointment / calendar event / reminder for a specific time
-   ("set up a meeting", "mail me a meeting note for tomorrow 15:00 with Tom",
-   "I need a meeting reminder for tomorrow at 9:00 with Sanam", "erinnere
-   mich an den Termin morgen um 9") → one `calendar_event` node — NEVER a
-   `chat` node that merely talks about the appointment. Resolve the relative
-   time against the time context into an absolute ISO-8601 `start` + IANA
-   `timezone`, fill title/attendees/location/duration.
+7. Meeting / appointment / calendar event / reminder
+   ("set up a meeting tomorrow at 15:00", "mail me a meeting note for tomorrow
+   15:00 with Tom", "I need a meeting reminder for tomorrow at 9:00 with Sanam",
+   "erinnere mich an den Termin morgen um 9") → one `calendar_event` node —
+   NEVER a `chat` node that merely talks about the appointment. Resolve the
+   clock time the user named against the time context into an absolute ISO-8601
+   `start` + IANA `timezone`. Fill title/attendees/location; default
+   duration_minutes to 60 when they did not name a length.
+   If they asked for a calendar event but named NO clock time ("tomorrow" or
+   "Freitag" alone is not an hour), do NOT emit `calendar_event` and do NOT
+   invent 09:00. Emit one `compose_reply` whose `inputs.text` asks for the
+   time in the SAME language as the latest user message.
+   The plan's `language` field is that message's language, not the UI locale.
    When the user asks to PUT the event into a connected calendar ("put it
    into my Outlook", "trag es in meinen Kalender ein") AND the Connected
    channels list has a channel of kind calendar, ALSO set `params.channel`
@@ -1412,11 +1418,13 @@ hits via `$n1.text`. Without an explicit "my emails" intent this node is
 never emitted.
 
 ### Calendar invite ("I need a meeting reminder for tomorrow at 9:00 with Sanam")
-The event fields go in `params`. Resolve the relative time against the time
+The event fields go in `params`. Resolve the named clock time against the time
 context into an absolute ISO-8601 LOCAL `start` (the wall-clock time in the
 user's timezone) plus the matching IANA `timezone`. Use the user's local
 timezone from the time context — never force "UTC" unless that is genuinely the
 user's zone. (The example below assumes a user in Europe/Berlin.)
+`compose_reply` must pass the runner's confirmation through `$n1.text` — never
+write an English sentence here when the user wrote in another language.
 
 {
   "version": 1,
@@ -1424,7 +1432,19 @@ user's zone. (The example below assumes a user in Europe/Berlin.)
   "reply_node": "n2",
   "tasks": [
     { "id": "n1", "capability": "calendar_event", "params": { "title": "Meeting with Sanam", "start": "2026-06-10T09:00:00", "timezone": "Europe/Berlin", "duration_minutes": 60, "attendees": ["Sanam"] } },
-    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "Here is your meeting invite for tomorrow at 09:00 with Sanam.", "attachments": ["$n1.file"] } }
+    { "id": "n2", "capability": "compose_reply", "depends_on": ["n1"], "inputs": { "text": "$n1.text", "attachments": ["$n1.file"] } }
+  ]
+}
+
+### Calendar invite missing a clock time ("termin morgen in den kalender")
+No hour was named, so do not invent 09:00. Ask in the user's language:
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n1",
+  "tasks": [
+    { "id": "n1", "capability": "compose_reply", "inputs": { "text": "Um welche Uhrzeit soll der Termin liegen? Eine konkrete Uhrzeit fehlt noch, zum Beispiel „morgen um 15 Uhr“." } }
   ]
 }
 

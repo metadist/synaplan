@@ -52,10 +52,8 @@ final class CalendarTimezoneTest extends TestCase
 
         self::assertTrue($result->isSuccessful());
         self::assertCount(1, $result->files);
-        self::assertStringContainsString(
-            'Calendar invite "Dentist" — 2026-09-19 10:00 (Europe/Berlin)',
-            (string) $result->text
-        );
+        self::assertStringContainsString('I added a calendar event "Dentist" for 2026-09-19 at 10:00 for one hour.', (string) $result->text);
+        self::assertSame('Europe/Berlin', $result->metadata['calendar_event']['timezone'] ?? null);
         // 10:00 CEST (UTC+2) lands on the correct UTC instant in the .ics.
         self::assertStringContainsString('DTSTART:20260919T080000Z', (string) $this->storedIcs);
     }
@@ -69,7 +67,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString('(Europe/Berlin)', (string) $result->text);
+        self::assertSame('Europe/Berlin', $result->metadata['calendar_event']['timezone'] ?? null);
         self::assertStringContainsString('DTSTART:20260919T080000Z', (string) $this->storedIcs);
     }
 
@@ -82,7 +80,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString('(Europe/Berlin)', (string) $result->text);
+        self::assertSame('Europe/Berlin', $result->metadata['calendar_event']['timezone'] ?? null);
     }
 
     public function testUserNamedUtcWinsOverTheStoredProfileZone(): void
@@ -94,10 +92,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString(
-            'Calendar invite "Deploy review" — 2026-09-19 10:00 (UTC)',
-            (string) $result->text
-        );
+        self::assertStringContainsString('I added a calendar event "Deploy review" for 2026-09-19 at 10:00 for one hour.', (string) $result->text);
         self::assertStringContainsString('DTSTART:20260919T100000Z', (string) $this->storedIcs);
     }
 
@@ -110,7 +105,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString('(America/New_York)', (string) $result->text);
+        self::assertSame('America/New_York', $result->metadata['calendar_event']['timezone'] ?? null);
         // 10:00 EDT (UTC-4) == 14:00Z.
         self::assertStringContainsString('DTSTART:20260919T140000Z', (string) $this->storedIcs);
     }
@@ -185,7 +180,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString('(Europe/Berlin)', (string) $result->text);
+        self::assertSame('Europe/Berlin', $result->metadata['calendar_event']['timezone'] ?? null);
     }
 
     public function testUserNamedUtcBeatsPlannerZoneAndProfile(): void
@@ -199,10 +194,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString(
-            'Calendar invite "Deploy review" — 2026-09-19 10:00 (UTC)',
-            (string) $result->text
-        );
+        self::assertStringContainsString('I added a calendar event "Deploy review" for 2026-09-19 at 10:00 for one hour.', (string) $result->text);
         self::assertStringContainsString('DTSTART:20260919T100000Z', (string) $this->storedIcs);
     }
 
@@ -215,7 +207,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString('(America/New_York)', (string) $result->text);
+        self::assertSame('America/New_York', $result->metadata['calendar_event']['timezone'] ?? null);
         self::assertStringContainsString('DTSTART:20260919T140000Z', (string) $this->storedIcs);
     }
 
@@ -228,7 +220,7 @@ final class CalendarTimezoneTest extends TestCase
         );
 
         self::assertTrue($result->isSuccessful());
-        self::assertStringContainsString('(Europe/Berlin)', (string) $result->text);
+        self::assertSame('Europe/Berlin', $result->metadata['calendar_event']['timezone'] ?? null);
     }
 
     public function testSlashLookalikeDoesNotExtractAZone(): void

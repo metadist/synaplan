@@ -48,9 +48,10 @@ final class TurnstileVerifierTest extends TestCase
     public function testFailsClosedOnEmptyTokenNetworkErrorAndGarbage(): void
     {
         $noCall = new MockHttpClient(function (): MockResponse {
-            $this->fail('An empty token must be refused before any request');
+            $this->fail('An empty or oversized token must be refused before any request');
         });
         $this->assertFalse((new TurnstileVerifier($noCall, new NullLogger(), '0xSECRET'))->verify('', '1.2.3.4'));
+        $this->assertFalse((new TurnstileVerifier($noCall, new NullLogger(), '0xSECRET'))->verify(str_repeat('a', 2049), '1.2.3.4'));
 
         $down = new MockHttpClient(new MockResponse('', ['error' => 'connection refused']));
         $this->assertFalse((new TurnstileVerifier($down, new NullLogger(), '0xSECRET'))->verify('tok', '1.2.3.4'));
