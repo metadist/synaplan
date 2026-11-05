@@ -159,17 +159,23 @@ jobs:
             # The Actions log and Discord already say why. The pull request
             # itself stayed silent when 5.7.1 was held back, so the hold looked
             # like auto-merge had been removed. One comment per reason, so a
-            # later run of the same hold does not pile on.
-            body="Release rollout held this pull request back: ${reason}"
-            # Compared as JSON, so a quoted or multi-line body cannot look like
-            # a new reason and stack another comment on the next run.
-            found="$(
-              gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/comments" \
-                | jq -s --arg body "$body" 'any(.[]; if type == "array" then any(.[]; .body == $body) else false end)'
-            )" || found=false
-            if [ "$found" != true ]; then
-              gh pr comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "$body" \
-                || echo "::warning::Could not comment on #${NUMBER}"
+            # later run of the same hold does not pile on. Dry runs stay
+            # read-only.
+            if [ "$DRY_RUN" != true ]; then
+              body="Release rollout held this pull request back: ${reason}"
+              # Compared as JSON, so a quoted or multi-line body cannot look like
+              # a new reason and stack another comment on the next run. If the
+              # comment list cannot be read, do not guess false and risk posting
+              # a duplicate.
+              if ! found="$(
+                gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${NUMBER}/comments" \
+                  | jq -s --arg body "$body" 'any(.[]; if type == "array" then any(.[]; .body == $body) else false end)'
+              )"; then
+                echo "::warning::Could not read comments on #${NUMBER}"
+              elif [ "$found" != true ]; then
+                gh pr comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "$body" \
+                  || echo "::warning::Could not comment on #${NUMBER}"
+              fi
             fi
 
             exit 0
@@ -229,6 +235,9 @@ jobs:
           # catalog, and anything else on this branch must stay held back.
           allowed="$(node scripts/read-release-version.mjs --paths | jq -Rsc 'split("\n") | map(select(length > 0))')"
           files="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json files --jq '[.files[].path]')"
+          if [ "$(printf '%s' "$files" | jq 'length')" -eq 0 ]; then
+            block "the pull request changes no files"
+          fi
           unexpected="$(
             jq -rn --argjson allowed "$allowed" --argjson files "$files" '
               [$files[] | select(. as $path | ($allowed | index($path)) == null)] | join(", ")
@@ -251,7 +260,8 @@ jobs:
           for attempt in $(seq 1 10); do
             state="$(
               gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" \
-                --json mergeable,statusCheckRollup --jq '{
+                --json headRefOid,mergeable,statusCheckRollup --jq '{
+                  headRefOid: .headRefOid,
                   mergeable: .mergeable,
                   gate: ([.statusCheckRollup[]? | select(.name == "All Checks Passed")] | last)
                 }'
@@ -262,6 +272,11 @@ jobs:
             echo "Attempt ${attempt}: GitHub has not computed mergeability yet; waiting."
             sleep 6
           done
+
+          head_sha="$(printf '%s' "$state" | jq -r .headRefOid)"
+          if [ "$head_sha" != "$SHA" ]; then
+            block "the pull request head moved from \`${SHA}\` to \`${head_sha}\` while the guards were running"
+          fi
 
           if [ "$mergeable" != MERGEABLE ]; then
             block "GitHub reports the pull request as \`${mergeable}\` rather than mergeable"
@@ -281,6 +296,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           NUMBER: ${{ steps.proposal.outputs.number }}
+          SHA: ${{ steps.proposal.outputs.sha }}
           VERSION: ${{ steps.guards.outputs.version }}
         run: |
           set -euo pipefail
@@ -306,11 +322,14 @@ jobs:
           # would have checked, the guards above established already.
           #
           # Squash, to keep one commit per release on the default branch, with
-          # the title GitHub's own squash merge would have produced.
+          # the title GitHub's own squash merge would have produced. Pass the
+          # inspected head SHA so GitHub refuses the merge (409) if the branch
+          # moved after the guards ran.
           title="$(gh pr view "$NUMBER" --repo "$GITHUB_REPOSITORY" --json title --jq .title)"
           merged="$(
             gh api --method PUT "repos/${GITHUB_REPOSITORY}/pulls/${NUMBER}/merge" \
               -f merge_method=squash \
+              -f "sha=${SHA}" \
               -f "commit_title=${title} (#${NUMBER})" \
               --jq '.merged'
           )"

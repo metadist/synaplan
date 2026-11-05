@@ -360,6 +360,9 @@ test('the shipped files name one and the same released version', () => {
   const quickstart = readQuickstartComposeVersion(
     readFileSync(join(ROOT, 'deploy', 'quickstart', 'compose.yaml'), 'utf8')
   )
+  const quickstartLite = readQuickstartComposeVersion(
+    readFileSync(join(ROOT, 'deploy', 'quickstart', 'compose.lite.yaml'), 'utf8')
+  )
   const casaos = readCasaosComposeVersion(
     readFileSync(join(ROOT, 'deploy', 'casaos', 'Synaplan', 'docker-compose.yml'), 'utf8')
   )
@@ -409,6 +412,16 @@ test('the shipped files name one and the same released version', () => {
   assert.equal(elestio, packer, 'The AWS AMI must bake the same version as Elestio')
   assert.equal(elestio, quickstart.image, 'The quickstart image default must match Elestio')
   assert.equal(elestio, quickstart.appVersion, 'The quickstart APP_VERSION must match Elestio')
+  assert.equal(
+    elestio,
+    quickstartLite.image,
+    'The lite quickstart image default must match Elestio'
+  )
+  assert.equal(
+    elestio,
+    quickstartLite.appVersion,
+    'The lite quickstart APP_VERSION must match Elestio'
+  )
   assert.equal(elestio, casaos.image, 'The CasaOS image tag must match Elestio')
   assert.equal(elestio, casaos.appVersion, 'The CasaOS APP_VERSION must match Elestio')
   assert.equal(elestio, casaos.storeVersion, 'The CasaOS store version must match Elestio')
