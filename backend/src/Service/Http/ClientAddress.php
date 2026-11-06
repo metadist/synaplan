@@ -14,10 +14,10 @@ use Symfony\Component\HttpFoundation\Request;
  * unless the immediate peer is a trusted proxy. Cloudflare's
  * `CF-Connecting-IP` is the real client when that hop set it, and a visitor
  * can otherwise send the header themselves to pick a fresh rate-limit bucket.
- * It counts only when the address in front of the trusted proxies is a
- * Cloudflare edge. A proxy that merely forwards the header, such as the
- * local Caddy hop, does not. A list, or anything that is not one IP address,
- * is ignored.
+ * It counts only when a Cloudflare edge in the deployment's trusted-proxy
+ * chain handed the request to the application. A local proxy that merely
+ * forwards the header, or a Cloudflare range that the deployment did not
+ * trust, does not. A list, or anything that is not one IP address, is ignored.
  */
 final readonly class ClientAddress
 {
@@ -105,15 +105,7 @@ final readonly class ClientAddress
 
     private static function trustedCloudflareIp(Request $request): ?string
     {
-        if (!$request->isFromTrustedProxy()) {
-            return null;
-        }
-
-        // The peer Symfony stops at is who spoke to the trusted proxies.
-        // Caddy on 127.0.0.1 is trusted and forwards this header unchanged,
-        // so a visitor can set it. Only a Cloudflare edge actually writes it.
-        $peer = self::safeClientIp($request);
-        if (!is_string($peer) || !IpUtils::checkIp($peer, self::CLOUDFLARE_RANGES)) {
+        if (!self::cameThroughTrustedCloudflareHop($request)) {
             return null;
         }
 
@@ -133,6 +125,66 @@ final readonly class ClientAddress
         }
 
         return $header;
+    }
+
+    /**
+     * True only when at least one hop in the request's contiguous trusted-proxy
+     * suffix is both trusted by the deployment (`SYMFONY_TRUSTED_PROXIES`) and
+     * a published Cloudflare edge.
+     *
+     * A local proxy on `127.0.0.1` is trusted for worker-pool forwarding, not
+     * as Cloudflare; an external Cloudflare Worker whose IP was never added to
+     * `SYMFONY_TRUSTED_PROXIES` is not a trusted proxy at all.
+     */
+    private static function cameThroughTrustedCloudflareHop(Request $request): bool
+    {
+        $trusted = Request::getTrustedProxies();
+        if ([] === $trusted || !$request->isFromTrustedProxy()) {
+            return false;
+        }
+
+        $chain = [];
+        if (0 !== (Request::getTrustedHeaderSet() & Request::HEADER_X_FORWARDED_FOR) && $request->headers->has('X-Forwarded-For')) {
+            foreach (explode(',', (string) $request->headers->get('X-Forwarded-For')) as $part) {
+                $ip = self::normalizeHop($part);
+                if (null !== $ip) {
+                    $chain[] = $ip;
+                }
+            }
+        }
+
+        $remote = $request->server->get('REMOTE_ADDR');
+        if (is_string($remote)) {
+            $remoteIp = self::normalizeHop($remote);
+            if (null !== $remoteIp) {
+                $chain[] = $remoteIp;
+            }
+        }
+
+        for ($i = count($chain) - 1; $i >= 0; --$i) {
+            $hop = $chain[$i];
+            if (!IpUtils::checkIp($hop, $trusted)) {
+                return false;
+            }
+            if (IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function normalizeHop(string $raw): ?string
+    {
+        $ip = trim($raw);
+        if (str_starts_with($ip, '[')) {
+            $end = strpos($ip, ']', 1);
+            $ip = false === $end ? '' : substr($ip, 1, $end - 1);
+        } elseif (str_contains($ip, '.') && 1 === substr_count($ip, ':')) {
+            $ip = (string) strstr($ip, ':', true);
+        }
+
+        return false !== filter_var($ip, FILTER_VALIDATE_IP) ? $ip : null;
     }
 
     private static function safeClientIp(Request $request): ?string

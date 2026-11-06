@@ -77,7 +77,7 @@ final class ClientAddressTest extends TestCase
 
     public function testTrustedCloudflareHeaderWinsOverASpoofedForwardedFor(): void
     {
-        $this->trustProxy();
+        $this->trustCloudflareProxy();
         $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
         $request->headers->set('X-Forwarded-For', '198.51.100.50, 104.16.1.1');
         $request->headers->set('CF-Connecting-IP', '203.0.113.10');
@@ -97,9 +97,22 @@ final class ClientAddressTest extends TestCase
         $this->assertSame('203.0.113.10', ClientAddress::resolve($request));
     }
 
-    public function testCloudflareAddressLeftOfTheRealClientDoesNotCount(): void
+    public function testUntrustedCloudflarePeerBehindLocalProxyCannotSpoofConnectingIp(): void
     {
         Request::setTrustedProxies(['127.0.0.1'], Request::HEADER_X_FORWARDED_FOR);
+        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $request->headers->set('X-Forwarded-For', '104.16.1.1');
+        $request->headers->set('CF-Connecting-IP', '198.51.100.99');
+
+        ClientAddress::align($request);
+
+        $this->assertSame('104.16.1.1', $request->getClientIp());
+        $this->assertSame('104.16.1.1', ClientAddress::resolve($request));
+    }
+
+    public function testCloudflareAddressLeftOfTheRealClientDoesNotCount(): void
+    {
+        Request::setTrustedProxies(['127.0.0.1', '104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR);
         $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
         $request->headers->set('X-Forwarded-For', '104.16.1.1, 203.0.113.10');
         $request->headers->set('CF-Connecting-IP', '198.51.100.99');
@@ -112,29 +125,29 @@ final class ClientAddressTest extends TestCase
 
     public function testACloudflareListIsIgnored(): void
     {
-        $this->trustProxy();
-        $request = $this->forwarded('104.16.1.1');
+        $this->trustCloudflareProxy();
+        $request = $this->forwarded('203.0.113.10, 104.16.1.1');
         $request->headers->set('CF-Connecting-IP', '203.0.113.10, 203.0.113.11');
 
-        $this->assertSame('104.16.1.1', ClientAddress::resolve($request));
+        $this->assertSame('203.0.113.10', ClientAddress::resolve($request));
     }
 
     public function testACloudflareHeaderNamingATrustedProxyIsIgnored(): void
     {
-        Request::setTrustedProxies(['10.0.0.8', '127.0.0.1'], Request::HEADER_X_FORWARDED_FOR);
+        Request::setTrustedProxies(['10.0.0.8', '127.0.0.1', '104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR);
         $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
         $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 10.0.0.8');
         $request->headers->set('CF-Connecting-IP', '10.0.0.8');
 
         ClientAddress::align($request);
 
-        $this->assertSame('104.16.1.1', $request->getClientIp());
-        $this->assertSame('104.16.1.1', ClientAddress::resolve($request));
+        $this->assertSame('203.0.113.10', $request->getClientIp());
+        $this->assertSame('203.0.113.10', ClientAddress::resolve($request));
     }
 
     public function testAlignDoesNotCreateAConflictingForwardedHeader(): void
     {
-        Request::setTrustedProxies(['10.0.0.8'], Request::HEADER_X_FORWARDED_FOR | Request::HEADER_FORWARDED);
+        Request::setTrustedProxies(['10.0.0.8', '104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR | Request::HEADER_FORWARDED);
         $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
         $request->headers->set('X-Forwarded-For', '104.16.1.1');
         $request->headers->set('Forwarded', 'for=104.16.1.1');
@@ -148,7 +161,7 @@ final class ClientAddressTest extends TestCase
 
     public function testTrustedCloudflareIpv6HopUsesTheConnectingHeader(): void
     {
-        $this->trustProxy();
+        $this->trustCloudflareProxy();
         $request = $this->forwarded('2606:4700:4700::1111');
         $request->headers->set('CF-Connecting-IP', '2001:db8::10');
 
@@ -157,7 +170,7 @@ final class ClientAddressTest extends TestCase
 
     public function testSubscriberAlignsGetClientIpWithTheResolver(): void
     {
-        $this->trustProxy();
+        $this->trustCloudflareProxy();
         $request = $this->forwarded('104.16.1.1');
         $request->headers->set('CF-Connecting-IP', '203.0.113.10');
 
@@ -171,6 +184,11 @@ final class ClientAddressTest extends TestCase
     private function trustProxy(): void
     {
         Request::setTrustedProxies(['10.0.0.8'], Request::HEADER_X_FORWARDED_FOR);
+    }
+
+    private function trustCloudflareProxy(): void
+    {
+        Request::setTrustedProxies(['10.0.0.8', '104.16.0.0/13', '2606:4700::/32'], Request::HEADER_X_FORWARDED_FOR);
     }
 
     private function forwarded(string $client): Request

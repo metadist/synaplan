@@ -78,7 +78,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCreateSessionWithCloudflareHeaders(): void
     {
-        Request::setTrustedProxies(['10.0.0.8'], Request::HEADER_X_FORWARDED_FOR);
+        Request::setTrustedProxies(['10.0.0.8', '104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR);
         $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
         $request->headers->set('X-Forwarded-For', '104.16.1.1');
         $request->headers->set('CF-Connecting-IP', '203.0.113.42');
