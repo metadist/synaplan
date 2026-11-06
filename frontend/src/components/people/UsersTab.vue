@@ -1,5 +1,5 @@
 <template>
-  <div data-testid="section-users">
+  <div data-testid="section-users" data-tour="admin-users">
     <div class="surface-card rounded-lg p-4 mb-6">
       <div class="flex gap-4 flex-wrap">
         <div class="flex-1 min-w-[300px]">
@@ -16,6 +16,7 @@
           type="button"
           class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
           data-testid="btn-add-user"
+          data-tour="admin-users-add"
           @click="showAddUser = !showAddUser"
         >
           {{ $t('admin.users.addUser') }}

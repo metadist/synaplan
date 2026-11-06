@@ -812,6 +812,7 @@
       "next": "Suivant",
       "back": "Retour",
       "done": "Terminé",
+      "end": "Arrêter la visite",
       "progress": "{current} sur {total}"
     },
     "chats": {
@@ -838,6 +839,28 @@
       "search": {
         "title": "Retrouver quelque chose",
         "body": "Ce champ cherche dans les chats, fichiers, assistants et pages. La même recherche s’ouvre de n’importe où avec Ctrl+K ou ⌘K."
+      }
+    },
+    "chatsGuest": {
+      "rail": {
+        "title": "Ce que vous pouvez ouvrir",
+        "body": "En tant qu’invité, vous êtes dans Chats. Bibliothèque, Assistants et Apps restent fermés jusqu’à un compte avec un forfait ou un code d’invitation. C’est pour cela que chaque icône ne fonctionne pas encore."
+      },
+      "input": {
+        "title": "Posez simplement la question",
+        "body": "En tant qu’invité, vous pouvez écrire quelques messages. Avec un compte, vos chats sont enregistrés."
+      },
+      "plus": {
+        "title": "Un fichier ou un outil",
+        "body": "Joindre des fichiers et utiliser des outils vient avec un compte."
+      },
+      "model": {
+        "title": "Quel modèle répond",
+        "body": "Avec un compte, vous choisissez parmi plus de modèles."
+      },
+      "plan": {
+        "title": "Un compte, puis un forfait",
+        "body": "Un compte a besoin d’un forfait ou d’un code d’invitation. Cela ouvre Bibliothèque, Assistants et Apps."
       }
     },
     "library": {
@@ -893,17 +916,17 @@
       }
     },
     "admin": {
-      "cards": {
-        "title": "Les chiffres",
-        "body": "Chaque carte est un décompte, par exemple les utilisateurs ou les modèles à vérifier. Un clic ouvre cette page."
+      "list": {
+        "title": "Les personnes de cette installation",
+        "body": "Voici les comptes qui peuvent utiliser Synaplan ici. Une personne invitée qui essaie seulement le chat n’apparaît pas dans cette liste."
       },
-      "attention": {
-        "title": "Ce qui ne va pas",
-        "body": "Voici ce qui demande de l’attention. Chaque ligne a un bouton qui mène à la solution."
+      "add": {
+        "title": "Ajouter quelqu’un",
+        "body": "Un compte a besoin d’un forfait ou d’un code d’invitation. La personne apparaît alors ici et peut utiliser Bibliothèque, Assistants et Apps."
       },
-      "sections": {
+      "menu": {
         "title": "Les pages d’administration",
-        "body": "D’ici vous atteignez État du système, Infrastructure IA, Utilisateurs et Configuration système. Configuration système a sa propre recherche dans les paramètres."
+        "body": "Utilisateurs se trouve sous Administration, à côté d’État du système, Infrastructure IA et Configuration système."
       }
     },
     "checklist": {

@@ -200,4 +200,26 @@ test.describe('@ci Admin panel', () => {
       }
     }
   })
+
+  test('admin tour starts on Users and End tour dismisses it', async ({ page }) => {
+    const reset = await page.request.put(`${getApiUrl()}/api/v1/profile`, {
+      data: { toursSeen: [] },
+    })
+    expect(reset.ok()).toBeTruthy()
+    await page.evaluate(() => localStorage.removeItem('synaplan.toursSeen'))
+    await page.goto('/admin/people')
+    await expect(page.locator(selectors.pages.people)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await expect(page.locator(selectors.admin.sectionUsers)).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await page.locator(selectors.tour.pageHelp).click()
+    const popover = page.locator(selectors.tour.popover)
+    await expect(popover).toBeVisible({ timeout: TIMEOUTS.SHORT })
+    await expect(popover).toContainText('The people on this installation')
+    await expect(page.locator(selectors.tour.end)).toBeVisible()
+    await page.locator(selectors.tour.end).click()
+    await expect(popover).toHaveCount(0, { timeout: TIMEOUTS.SHORT })
+  })
 })

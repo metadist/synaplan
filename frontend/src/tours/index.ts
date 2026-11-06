@@ -9,6 +9,9 @@ export const SERVICES_STARTING_TOAST_SEEN_ID = 'services.starting.seen'
 /** All-ready toast when the last starting service finishes (C15); also suppresses progress pills in later sessions. */
 export const SERVICES_READY_TOAST_SEEN_ID = 'services.ready.seen'
 
+/** Guest-only chat tour. Stored separately so a later account still gets the member tour. */
+export const GUEST_CHATS_TOUR_ID = 'chatsGuest'
+
 const definitions: TourDefinition[] = [
   {
     id: 'chats',
@@ -19,6 +22,16 @@ const definitions: TourDefinition[] = [
       { target: 'chat-plus', stepKey: 'plus', side: 'top' },
       { target: 'chat-model', stepKey: 'model', side: 'top' },
       { target: 'search', stepKey: 'search', side: 'right' },
+    ],
+  },
+  {
+    id: GUEST_CHATS_TOUR_ID,
+    steps: [
+      { target: 'rail', stepKey: 'rail', side: 'right' },
+      { target: 'chat-input', stepKey: 'input', side: 'top' },
+      { target: 'chat-plus', stepKey: 'plus', side: 'top' },
+      { target: 'chat-model', stepKey: 'model', side: 'top' },
+      { stepKey: 'plan' },
     ],
   },
   {
@@ -55,9 +68,9 @@ const definitions: TourDefinition[] = [
   {
     id: 'admin',
     steps: [
-      { target: 'admin-cards', stepKey: 'cards' },
-      { target: 'admin-attention', stepKey: 'attention', side: 'top' },
-      { target: 'rail-operate', stepKey: 'sections', side: 'right' },
+      { target: 'admin-users', stepKey: 'list', side: 'top' },
+      { target: 'admin-users-add', stepKey: 'add', side: 'bottom' },
+      { target: 'rail-operate', stepKey: 'menu', side: 'right' },
     ],
   },
 ]
@@ -66,6 +79,12 @@ const registry = new Map(definitions.map((tour) => [tour.id, tour]))
 
 export function getTour(id: string): TourDefinition | undefined {
   return registry.get(id)
+}
+
+/** Guests get the Chats-only tour; signed-in members keep the full one. */
+export function resolveRouteTourId(id: string, isAuthenticated: boolean): string {
+  if (id === 'chats' && !isAuthenticated) return GUEST_CHATS_TOUR_ID
+  return id
 }
 
 export function tourIds(): string[] {

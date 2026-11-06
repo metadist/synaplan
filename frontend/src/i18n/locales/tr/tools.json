@@ -738,6 +738,7 @@
       "next": "İleri",
       "back": "Geri",
       "done": "Bitti",
+      "end": "Turu bitir",
       "progress": "{current} / {total}"
     },
     "chats": {
@@ -764,6 +765,28 @@
       "search": {
         "title": "Bir şeyi yeniden bulun",
         "body": "Bu alan sohbetleri, dosyaları, asistanları ve sayfaları arar. Aynı arama her yerden Ctrl+K veya ⌘K ile açılır."
+      }
+    },
+    "chatsGuest": {
+      "rail": {
+        "title": "Neyi açabilirsiniz",
+        "body": "Misafir olarak Sohbetler’desiniz. Kütüphane, Asistanlar ve Uygulamalar, bir planı veya davet kodu olan bir hesabınız olana kadar kapalı kalır. Bu yüzden her simge henüz çalışmaz."
+      },
+      "input": {
+        "title": "Sadece sorun",
+        "body": "Misafir olarak birkaç mesaj yazabilirsiniz. Bir hesapla sohbetleriniz kaydedilir."
+      },
+      "plus": {
+        "title": "Bir dosya veya bir araç",
+        "body": "Dosya eklemek ve araçlar bir hesapla gelir."
+      },
+      "model": {
+        "title": "Hangi model yanıtlar",
+        "body": "Bir hesapla daha fazla model arasından seçersiniz."
+      },
+      "plan": {
+        "title": "Önce hesap, sonra plan",
+        "body": "Bir hesabın bir plana veya davet koduna ihtiyacı vardır. Böylece Kütüphane, Asistanlar ve Uygulamalar açılır."
       }
     },
     "library": {
@@ -819,17 +842,17 @@
       }
     },
     "admin": {
-      "cards": {
-        "title": "Sayılar",
-        "body": "Her kart bir sayıdır, örneğin kullanıcılar veya kontrol edilecek modeller. Bir tıklama o sayfayı açar."
+      "list": {
+        "title": "Bu kurulumdaki kişiler",
+        "body": "Bunlar burada Synaplan’ı kullanabilen hesaplardır. Sohbeti yalnızca misafir olarak deneyen bu listede görünmez."
       },
-      "attention": {
-        "title": "Neyin ters gittiği",
-        "body": "Dikkat isteyenler burada. Her satırda sizi çözüme götüren bir düğme vardır."
+      "add": {
+        "title": "Birini ekleyin",
+        "body": "Bir hesabın bir plana veya davet koduna ihtiyacı vardır. Sonra kişi burada görünür ve Kütüphane, Asistanlar ve Uygulamaları kullanabilir."
       },
-      "sections": {
+      "menu": {
         "title": "Yönetim sayfaları",
-        "body": "Buradan Sistem durumu, AI altyapısı, Kullanıcılar ve Sistem yapılandırmasına ulaşırsınız. Sistem yapılandırmasının ayarlar için kendi araması vardır."
+        "body": "Kullanıcılar, Yönetim altında Sistem durumu, AI altyapısı ve Sistem yapılandırmasının yanındadır."
       }
     },
     "checklist": {

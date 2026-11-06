@@ -14,7 +14,8 @@ export const peopleRoute: RouteRecordRaw = {
     requiresAuth: true,
     requiresAdmin: true,
     titleKey: 'pageTitles.adminPeople',
-    i18n: ['admin', 'config'],
+    i18n: ['admin', 'config', 'tools'],
+    tour: 'admin',
   },
   beforeEnter: peopleRouteGuard,
 }

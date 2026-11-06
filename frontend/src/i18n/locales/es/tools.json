@@ -738,6 +738,7 @@
       "next": "Siguiente",
       "back": "Atrás",
       "done": "Listo",
+      "end": "Terminar visita",
       "progress": "{current} de {total}"
     },
     "chats": {
@@ -764,6 +765,28 @@
       "search": {
         "title": "Volver a encontrar algo",
         "body": "Este campo busca chats, archivos, asistentes y páginas. La misma búsqueda se abre desde cualquier sitio con Ctrl+K o ⌘K."
+      }
+    },
+    "chatsGuest": {
+      "rail": {
+        "title": "Qué puedes abrir",
+        "body": "Como invitado estás en Chats. Biblioteca, Asistentes y Apps siguen cerrados hasta que tengas una cuenta con un plan o un código de invitación. Por eso no funciona cada icono."
+      },
+      "input": {
+        "title": "Solo pregunta",
+        "body": "Como invitado puedes escribir unos mensajes. Con una cuenta se guardan tus chats."
+      },
+      "plus": {
+        "title": "Un archivo o una herramienta",
+        "body": "Adjuntar archivos y usar herramientas llega con una cuenta."
+      },
+      "model": {
+        "title": "Qué modelo responde",
+        "body": "Con una cuenta eliges entre más modelos."
+      },
+      "plan": {
+        "title": "Una cuenta, luego un plan",
+        "body": "Una cuenta necesita un plan o un código de invitación. Así llegan Biblioteca, Asistentes y Apps."
       }
     },
     "library": {
@@ -819,17 +842,17 @@
       }
     },
     "admin": {
-      "cards": {
-        "title": "Las cifras",
-        "body": "Cada tarjeta es un recuento, por ejemplo usuarios o modelos a revisar. Un clic abre esa página."
+      "list": {
+        "title": "Las personas de esta instalación",
+        "body": "Estas son las cuentas que pueden usar Synaplan aquí. Quien solo prueba el chat como invitado no aparece en esta lista."
       },
-      "attention": {
-        "title": "Qué no va bien",
-        "body": "Aquí está lo que necesita atención. Cada fila tiene un botón que te lleva a la solución."
+      "add": {
+        "title": "Añadir a alguien",
+        "body": "Una cuenta necesita un plan o un código de invitación. Entonces la persona aparece aquí y puede usar Biblioteca, Asistentes y Apps."
       },
-      "sections": {
+      "menu": {
         "title": "Las páginas de administración",
-        "body": "Desde aquí llegas a Estado del sistema, Infraestructura de IA, Usuarios y Configuración del sistema. La configuración del sistema tiene su propia búsqueda de ajustes."
+        "body": "Usuarios está bajo Administración, junto a Estado del sistema, Infraestructura de IA y Configuración del sistema."
       }
     },
     "checklist": {
