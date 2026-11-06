@@ -10,6 +10,7 @@ use App\Service\Auth\OidcAuthorizeParams;
 use App\Service\Auth\OidcScopeResolver;
 use App\Service\Auth\OidcTokenService;
 use App\Service\Auth\TokenService;
+use App\Service\Http\ClientAddress;
 use App\Service\OAuth\OAuthStateService;
 use App\Service\OidcUserService;
 use OpenApi\Attributes as OA;
@@ -294,7 +295,7 @@ class KeycloakAuthController extends AbstractController
             // path — never let a fresh sign-in inherit somebody else's
             // suspended admin session).
             $appAccessToken = $this->tokenService->generateAccessToken($user);
-            $appRefreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+            $appRefreshToken = $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request));
             $this->tokenService->addAuthCookies($response, $appAccessToken, $appRefreshToken);
             $this->impersonationService->attachClearStashCookies($response);
 

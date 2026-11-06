@@ -6,6 +6,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Service\File\CloudFilesConfig;
+use App\Service\Http\ClientAddress;
 use App\Service\PlatformLink\DeliveryAddressService;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
 use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
@@ -82,7 +83,7 @@ final class PlatformInstanceController extends AbstractController
                 \is_string($data['host'] ?? null) ? $data['host'] : '',
                 \is_array($data['redirect_uris'] ?? null) ? $data['redirect_uris'] : [],
                 $user,
-                $request->getClientIp() ?? '',
+                ClientAddress::resolve($request) ?? '',
             );
         } catch (PlatformLinkValidationException $e) {
             return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);

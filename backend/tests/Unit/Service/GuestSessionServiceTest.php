@@ -10,6 +10,7 @@ use App\Repository\GuestSessionRepository;
 use App\Repository\UserRepository;
 use App\Service\Chat\GuestChatConfig;
 use App\Service\Chat\GuestSessionService;
+use App\Service\Http\ClientAddress;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -17,6 +18,22 @@ use Symfony\Component\HttpFoundation\Request;
 
 class GuestSessionServiceTest extends TestCase
 {
+    /** @var list<string> */
+    private array $previousProxies = [];
+
+    private int $previousHeaderSet = 0;
+
+    protected function setUp(): void
+    {
+        $this->previousProxies = Request::getTrustedProxies();
+        $this->previousHeaderSet = Request::getTrustedHeaderSet();
+    }
+
+    protected function tearDown(): void
+    {
+        Request::setTrustedProxies($this->previousProxies, $this->previousHeaderSet);
+    }
+
     /**
      * @param EntityManagerInterface|null $em          override EntityManager
      * @param GuestSessionRepository|null $sessionRepo override session repository
@@ -61,7 +78,9 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCreateSessionWithCloudflareHeaders(): void
     {
-        $request = new Request();
+        Request::setTrustedProxies(['10.0.0.8', '104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR);
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
+        $request->headers->set('X-Forwarded-For', '104.16.1.1');
         $request->headers->set('CF-Connecting-IP', '203.0.113.42');
         $request->headers->set('CF-IPCountry', 'DE');
 
@@ -78,9 +97,30 @@ class GuestSessionServiceTest extends TestCase
 
         $this->assertSame('test-uuid-123', $session->getSessionId());
         $this->assertSame('203.0.113.42', $session->getIpAddress());
+        $this->assertSame(ClientAddress::resolve($request), $session->getIpAddress());
         $this->assertSame('DE', $session->getCountry());
         $this->assertSame(5, $session->getMaxMessages());
         $this->assertSame(0, $session->getMessageCount());
+    }
+
+    public function testCreateSessionIgnoresASpoofedCloudflareHeader(): void
+    {
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '198.51.100.9']);
+        $request->headers->set('CF-Connecting-IP', '203.0.113.42');
+
+        $sessionRepo = $this->createStub(GuestSessionRepository::class);
+        $sessionRepo->method('countActiveSessionsByIp')->willReturn(0);
+        $sessionRepo->method('sumActiveMessageCountByIp')->willReturn(0);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->once())->method('persist');
+        $em->expects($this->once())->method('flush');
+
+        $service = $this->createService(em: $em, sessionRepo: $sessionRepo);
+        $session = $service->createSession('spoofed-uuid', $request);
+
+        $this->assertSame('198.51.100.9', $session->getIpAddress());
+        $this->assertSame(ClientAddress::resolve($request), $session->getIpAddress());
     }
 
     public function testCreateSessionWithoutCloudflareHeaders(): void
@@ -104,8 +144,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCreateSessionFiltersTorCountry(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
         $request->headers->set('CF-IPCountry', 'T1');
 
         $sessionRepo = $this->createStub(GuestSessionRepository::class);
@@ -133,8 +172,7 @@ class GuestSessionServiceTest extends TestCase
             ->with('duplicate-uuid')
             ->willReturn($existing);
 
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
 
         $service = $this->createService(sessionRepo: $sessionRepo);
 
@@ -146,8 +184,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCreateSessionThrowsOverflowWhenIpLimitExceeded(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->expects($this->once())
@@ -172,8 +209,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCreateSessionAllowsWhenUnderIpLimit(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->expects($this->once())
@@ -194,8 +230,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCreateSessionCapsMaxMessagesByIpBudget(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->method('countActiveSessionsByIp')->willReturn(1);
@@ -216,8 +251,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCreateSessionGivesZeroMaxMessagesWhenIpBudgetExhausted(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '1.2.3.4');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '1.2.3.4']);
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->method('countActiveSessionsByIp')->willReturn(2);
@@ -557,8 +591,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testCustomMaxSessionsPerIpIsRespected(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '10.0.0.1');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '10.0.0.1']);
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->expects(self::any())->method('countActiveSessionsByIp')
@@ -574,8 +607,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testHighMaxSessionsPerIpAllowsMoreSessions(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '10.0.0.1');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '10.0.0.1']);
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->expects(self::any())->method('countActiveSessionsByIp')
@@ -594,8 +626,7 @@ class GuestSessionServiceTest extends TestCase
 
     public function testDefaultMaxSessionsPerIpMatchesConstant(): void
     {
-        $request = new Request();
-        $request->headers->set('CF-Connecting-IP', '10.0.0.1');
+        $request = Request::create('/', 'GET', [], [], [], ['REMOTE_ADDR' => '10.0.0.1']);
 
         $sessionRepo = $this->createMock(GuestSessionRepository::class);
         $sessionRepo->expects(self::any())->method('countActiveSessionsByIp')

@@ -436,7 +436,11 @@ never throttled; only *new* accounts are.
 The per-IP windows need the real client address. Behind Cloudflare or a load
 balancer set `SYMFONY_TRUSTED_PROXIES` (and `SYMFONY_TRUSTED_HEADERS=x-forwarded-for`);
 without them every request looks like the proxy and the per-IP limit turns
-into a second installation-wide one.
+into a second installation-wide one. `CF-Connecting-IP` counts only when a
+Cloudflare edge in `SYMFONY_TRUSTED_PROXIES` handed the request to the
+application. A local proxy that forwards the header, or a Cloudflare range not
+listed in `SYMFONY_TRUSTED_PROXIES`, does not, so a visitor cannot pick a fresh
+allowance by sending it.
 
 The pause switch is the emergency brake during a flood of fake accounts: it
 takes effect at once on all nodes (shared Redis + BCONFIG), refuses every new

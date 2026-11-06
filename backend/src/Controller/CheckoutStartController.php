@@ -12,6 +12,7 @@ use App\Service\Billing\PayFirst\PayFirstCheckout;
 use App\Service\Billing\PayFirst\PayFirstConfig;
 use App\Service\Billing\PayFirst\PayFirstException;
 use App\Service\Client\ClientContextResolver;
+use App\Service\Http\ClientAddress;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -88,7 +89,8 @@ final class CheckoutStartController extends AbstractController
 
         $body = json_decode($request->getContent(), true);
         $body = is_array($body) ? $body : [];
-        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload($body), 'checkout_start', $request->getClientIp())) {
+        $clientAddress = ClientAddress::resolve($request);
+        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload($body), 'checkout_start', $clientAddress)) {
             return $this->json(['success' => false, 'error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -96,7 +98,7 @@ final class CheckoutStartController extends AbstractController
             $started = $this->checkout->start(
                 is_string($body['email'] ?? null) ? $body['email'] : '',
                 is_string($body['plan'] ?? null) ? $body['plan'] : '',
-                $request->getClientIp(),
+                $clientAddress,
             );
         } catch (PayFirstException $e) {
             $headers = $e->getRetryAfterSeconds() > 0 ? ['Retry-After' => (string) $e->getRetryAfterSeconds()] : [];

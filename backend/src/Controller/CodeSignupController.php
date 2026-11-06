@@ -12,6 +12,7 @@ use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupProtection;
 use App\Service\Auth\TokenService;
 use App\Service\Billing\PayFirst\PayFirstConfig;
+use App\Service\Http\ClientAddress;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -69,7 +70,7 @@ final class CodeSignupController extends AbstractController
         }
         $body = json_decode($request->getContent(), true);
         $body = is_array($body) ? $body : [];
-        if (!$this->protection->verifyHuman(SignupProtection::tokenFromPayload($body), 'code_signup', $request->getClientIp())) {
+        if (!$this->protection->verifyHuman(SignupProtection::tokenFromPayload($body), 'code_signup', ClientAddress::resolve($request))) {
             return $this->json(['success' => false, 'error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -141,7 +142,7 @@ final class CodeSignupController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
             ],
         ]);
-        $this->tokenService->addAuthCookies($response, $this->tokenService->generateAccessToken($user), $this->tokenService->generateRefreshToken($user, $request->getClientIp()));
+        $this->tokenService->addAuthCookies($response, $this->tokenService->generateAccessToken($user), $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request)));
         $this->impersonation->attachClearStashCookies($response);
 
         return $response;
@@ -173,7 +174,7 @@ final class CodeSignupController extends AbstractController
             $accepted = $this->signup->request(
                 is_string($body['email'] ?? null) ? $body['email'] : '',
                 is_string($body['code'] ?? null) ? $body['code'] : '',
-                $request->getClientIp(),
+                ClientAddress::resolve($request),
                 $request->getLocale(),
             );
         } catch (CodeSignupRateLimited $e) {

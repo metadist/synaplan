@@ -10,6 +10,7 @@ use App\Service\Billing\PayFirst\PayFirstClaim;
 use App\Service\Billing\PayFirst\PayFirstClaimResult;
 use App\Service\Billing\PayFirst\PayFirstConfig;
 use App\Service\Billing\PayFirst\PayFirstException;
+use App\Service\Http\ClientAddress;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -63,7 +64,7 @@ final class CheckoutClaimController extends AbstractController
         if (!$this->config->canSettle()) {
             return $this->notFound();
         }
-        if (!$this->claimLimiter->create($request->getClientIp() ?? 'unknown')->consume()->isAccepted()) {
+        if (!$this->claimLimiter->create(ClientAddress::resolve($request) ?? 'unknown')->consume()->isAccepted()) {
             return $this->json(['success' => false, 'error' => 'Too many attempts. Please wait a few minutes and try again.', 'code' => 'PAY_FIRST_RATE_LIMITED'], Response::HTTP_TOO_MANY_REQUESTS);
         }
 
@@ -86,7 +87,7 @@ final class CheckoutClaimController extends AbstractController
             'signedIn' => null !== $result->signIn,
         ]);
         if (null !== $result->signIn) {
-            $this->tokenService->addAuthCookies($response, $this->tokenService->generateAccessToken($result->signIn), $this->tokenService->generateRefreshToken($result->signIn, $request->getClientIp()));
+            $this->tokenService->addAuthCookies($response, $this->tokenService->generateAccessToken($result->signIn), $this->tokenService->generateRefreshToken($result->signIn, ClientAddress::resolve($request)));
             $response->headers->clearCookie(PayFirstCheckout::NONCE_COOKIE, '/');
         }
 

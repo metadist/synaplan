@@ -281,3 +281,4 @@ merges, never in parallel. The admission flip (row 28, AS6) waits for PC1.
 | ---- | ------ |
 | 2026-10-25 | Plan written from an audit of #2714, #2716, #2740, #2743 and open #2744 against every identity path and the consumers in `synaplan-charts`, `synaplan-platform`, `synaplan-nextcloud`, `synaplan-opencloud`, `synaplan-desktop`, `Synamail`, `synaplan-apps`, `synaplan-docs`. No code changed. Security details kept in the private `synaplan-platform` note. |
 | 2026-10-25 | Copilot review round 1 on #2745: §3.4 becomes the grant model (all level writers, same-tier admin grants, legacy reconstruction), D6 a table, new D10, IC5b and T7; switches close account creation, never sign-in (§3.2, IC2, E3, J-IAM-2); per-address isolation proven by exhausting one address (T4, J-IAM-3, J-IAM-5). |
+| 2026-11-06 | Delivery grouped into six pull requests in this repository: IC1; IC2+IC3; IC4; IC5+IC5b; IC6+IC8; IC7. Order and decisions unchanged. |
