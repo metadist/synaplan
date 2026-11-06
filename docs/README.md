@@ -98,6 +98,7 @@ Once an instance is running, this track covers day-to-day administration: user a
 | **2.7** | **[Model Catalog & Pricing Maintenance](PRICING_MAINTENANCE.md)** | How `CostCalculationService` bills tokens/media/audio, the 7-step price verification playbook, LiteLLM sync, model discovery, and retirements. |
 | **2.8** | **[Resolving Model Price Drift](PRICE_DRIFT_PROCEDURE.md)** | Step-by-step runbook when the daily `app:sync-model-prices --fail-on-drift` check reports a discrepancy against LiteLLM. |
 | **2.9** | **[AWS Marketplace AMI Operations](AWS_MARKETPLACE_LISTING.md)** | How the free AWS Marketplace AMI is built with Packer, verified in CloudFormation, and published via the Catalog API. |
+| **2.10** | **[Where a message goes](DATA_FLOW.md)** | Hosted platform, a selected cloud model, or a self-hosted install. The public trust center cites this page. |
 
 ---
 
