@@ -35,6 +35,14 @@ final class BankStatementParserTest extends TestCase
         self::assertNull($result['invoice_number'], 'A yyyy-mm-dd date must not be read as an invoice number');
     }
 
+    public function testDateIsNotReadAsTheAmount(): void
+    {
+        $result = $this->parser->parse('Received 10.00 EUR on 28.07.2026');
+
+        self::assertSame(10.0, $result['amount']);
+        self::assertSame('2026-07-28', $result['date']);
+    }
+
     public function testUnreadableTextYieldsNulls(): void
     {
         $result = $this->parser->parse('payment received, thanks');

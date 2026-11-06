@@ -190,7 +190,7 @@ function mount(root, context = {}) {
   const assetBaseUrl = pluginBaseUrl
   // Endpoints live one level up from the asset route (.../plugins/x/assets).
   const apiRoot = pluginBaseUrl.replace(/\/assets\/?$/, '')
-  const api = makeApi(originUrl, apiRoot)
+  const api = makeApi(originUrl, apiRoot, context.request)
 
   root.innerHTML = ''
   const container = el('div', { class: 'sfb' })
@@ -204,8 +204,10 @@ function mount(root, context = {}) {
  * the session cookie (`credentials: 'include'`), and a 401 triggers a single
  * token refresh + retry. Returns parsed JSON or throws Error(body.error).
  */
-function makeApi(originUrl, apiRoot) {
+function makeApi(originUrl, apiRoot, request) {
   let refreshPromise = null
+  const routeFor = (path) =>
+    originUrl && apiRoot.startsWith(originUrl) ? apiRoot.slice(originUrl.length) + path : path
 
   const refresh = async () => {
     if (refreshPromise) return refreshPromise
@@ -226,12 +228,17 @@ function makeApi(originUrl, apiRoot) {
   }
 
   return async (path, opts = {}) => {
-    const doFetch = () =>
-      fetch(`${apiRoot}${path}`, {
+    const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) }
+    const doFetch = () => {
+      if (typeof request === 'function') {
+        return request(routeFor(path), { ...opts, headers })
+      }
+      return fetch(`${apiRoot}${path}`, {
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
+        headers,
         ...opts,
       })
+    }
 
     let res = await doFetch()
     if (res.status === 401 && (await refresh())) {
@@ -385,9 +392,11 @@ function renderTryPanel(api, messages, language) {
   const input = el('input', { type: 'text', placeholder: t.placeholder })
   const send = el('button', { class: 'sfb-btn sfb-btn--primary', text: t.send })
 
+  let sending = false
   async function submit(text) {
     const value = (text || input.value).trim()
-    if (!value) return
+    if (!value || sending) return
+    sending = true
     addBubble(log, 'user', 'info', value)
     input.value = ''
     setBusy([send], true)
@@ -400,6 +409,7 @@ function renderTryPanel(api, messages, language) {
     } catch (err) {
       addBubble(log, 'bot', 'error', `Request failed: ${err.message}`)
     } finally {
+      sending = false
       setBusy([send], false)
     }
   }

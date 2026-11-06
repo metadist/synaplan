@@ -44,7 +44,7 @@ final class OverdueInvoicesHandler implements CommandHandlerInterface
             sprintf('| %s | %s | %s | %s |', $context->t->trans('overdue.col.invoice'), $context->t->trans('overdue.col.due'), $context->t->trans('overdue.col.dayslate'), $context->t->trans('overdue.col.amount')),
             '|---|---|---:|---:|',
         ];
-        $total = 0.0;
+        $totals = [];
         foreach ($overdue as $invoice) {
             $lines[] = sprintf(
                 '| %s | %s | %d | %s |',
@@ -53,13 +53,21 @@ final class OverdueInvoicesHandler implements CommandHandlerInterface
                 $invoice->daysOverdue($today),
                 $this->money($invoice->total, $invoice->currency),
             );
-            $total += $invoice->total;
+            $totals[$invoice->currency] = ($totals[$invoice->currency] ?? 0.0) + $invoice->total;
         }
-        $currency = $overdue[0]->currency;
+        $parts = [];
+        foreach ($totals as $currency => $sum) {
+            $parts[] = $this->money($sum, $currency);
+        }
         $lines[] = '';
-        $lines[] = $context->t->trans('overdue.summary', count($overdue), $this->money($total, $currency));
+        $lines[] = $context->t->trans('overdue.summary', count($overdue), implode(' + ', $parts));
 
-        return CommandResult::info(implode("\n", $lines), ['count' => count($overdue), 'total' => round($total, 2)]);
+        $rounded = [];
+        foreach ($totals as $currency => $sum) {
+            $rounded[$currency] = round($sum, 2);
+        }
+
+        return CommandResult::info(implode("\n", $lines), ['count' => count($overdue), 'totals' => $rounded]);
     }
 
     private function money(float $amount, string $currency): string

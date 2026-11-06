@@ -53,7 +53,12 @@ final class AiCommandExtractor implements AiCommandExtractorInterface
         }
 
         $type = CommandType::tryFrom((string) ($json['command'] ?? 'unknown'));
-        if (null === $type || CommandType::Unknown === $type) {
+        if (!in_array($type, [
+            CommandType::CreateDraftInvoice,
+            CommandType::RegisterPayment,
+            CommandType::ShowOverdue,
+            CommandType::Help,
+        ], true)) {
             return null;
         }
 

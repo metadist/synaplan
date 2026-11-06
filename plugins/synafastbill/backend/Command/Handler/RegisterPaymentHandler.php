@@ -66,7 +66,7 @@ final class RegisterPaymentHandler implements CommandHandlerInterface
 
         $paidDate = $parsed['date'] ?? $context->clock->today()->format('Y-m-d');
         $open = $this->openInvoices($context);
-        $candidates = $this->match($open, $parsed['amount'], $parsed['invoice_number']);
+        $candidates = $this->match($open, $parsed['amount'], $parsed['invoice_number'], $parsed['currency']);
 
         if ([] === $candidates) {
             $forInvoice = null !== $parsed['invoice_number'] ? $context->t->trans('pay.for_invoice', $parsed['invoice_number']) : '';
@@ -100,7 +100,11 @@ final class RegisterPaymentHandler implements CommandHandlerInterface
         $lines = [$context->t->trans('pay.several', $this->money($parsed['amount'], $parsed['currency'] ?? 'EUR')), ''];
         foreach ($candidates as $index => $invoice) {
             $lines[] = sprintf('%d. %s — %s (due %s)', $index + 1, '' !== $invoice->invoiceNumber ? $invoice->invoiceNumber : ('#'.$invoice->id), $this->money($invoice->total, $invoice->currency), $invoice->dueDate);
-            $stored[] = ['invoice_id' => $invoice->id, 'invoice_number' => $invoice->invoiceNumber];
+            $stored[] = [
+                'invoice_id' => $invoice->id,
+                'invoice_number' => $invoice->invoiceNumber,
+                'currency' => $invoice->currency,
+            ];
         }
         $lines[] = '';
         $lines[] = $context->t->trans('pay.reply_number');
@@ -116,7 +120,7 @@ final class RegisterPaymentHandler implements CommandHandlerInterface
 
     private function resumeSelection(ParsedCommand $command, HandlerContext $context): CommandResult
     {
-        /** @var array<int, array{invoice_id: int, invoice_number: string}> $candidates */
+        /** @var array<int, array{invoice_id: int, invoice_number: string, currency?: string}> $candidates */
         $candidates = $context->data()['candidates'] ?? [];
         $selection = (int) ($command->params['selection'] ?? 0);
 
@@ -132,9 +136,13 @@ final class RegisterPaymentHandler implements CommandHandlerInterface
             'amount' => (float) ($context->data()['amount'] ?? 0),
         ]);
 
+        $currency = is_string($chosen['currency'] ?? null) && '' !== $chosen['currency']
+            ? (string) $chosen['currency']
+            : 'EUR';
+
         return CommandResult::confirm($context->t->trans(
             'pay.confirm_short',
-            $this->money((float) ($context->data()['amount'] ?? 0), 'EUR'),
+            $this->money((float) ($context->data()['amount'] ?? 0), $currency),
             (string) ($context->data()['paid_date'] ?? ''),
             '' !== $chosen['invoice_number'] ? (string) $chosen['invoice_number'] : ('#'.$chosen['invoice_id']),
         ));
@@ -182,8 +190,15 @@ final class RegisterPaymentHandler implements CommandHandlerInterface
      *
      * @return array<int, Invoice>
      */
-    private function match(array $open, float $amount, ?string $invoiceNumber): array
+    private function match(array $open, float $amount, ?string $invoiceNumber, ?string $currency): array
     {
+        if (null !== $currency && '' !== $currency) {
+            $open = array_values(array_filter(
+                $open,
+                static fn (Invoice $invoice): bool => 0 === strcasecmp($invoice->currency, $currency),
+            ));
+        }
+
         if (null !== $invoiceNumber && '' !== $invoiceNumber) {
             $byNumber = array_values(array_filter(
                 $open,

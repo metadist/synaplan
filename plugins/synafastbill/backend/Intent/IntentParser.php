@@ -22,7 +22,7 @@ final class IntentParser
     ];
 
     private const NEGATIONS = [
-        'no', 'n', 'nope', 'cancel', 'stop', 'abort', 'never mind', 'nevermind',
+        'no', 'n', 'nope', 'cancel', 'stop', 'abort', 'never mind', 'nevermind', 'not', 'dont', 'do not',
         'nein', 'abbrechen', 'stopp', 'nicht',
     ];
 
@@ -44,17 +44,17 @@ final class IntentParser
             return new ParsedCommand(CommandType::Help, [], $text);
         }
 
-        $normalized = mb_strtolower($text);
+        $normalized = str_replace(["'", '’'], '', mb_strtolower($text));
 
         $selection = $this->detectSelection($normalized);
         if (null !== $selection) {
             return new ParsedCommand(CommandType::Confirm, ['selection' => $selection], $text);
         }
-        if ($this->isAffirmation($normalized)) {
-            return new ParsedCommand(CommandType::Confirm, [], $text);
-        }
         if ($this->isNegation($normalized)) {
             return new ParsedCommand(CommandType::Cancel, [], $text);
+        }
+        if ($this->isAffirmation($normalized)) {
+            return new ParsedCommand(CommandType::Confirm, [], $text);
         }
 
         if (null !== $this->aiExtractor) {
@@ -162,7 +162,7 @@ final class IntentParser
 
     private function detectSelection(string $normalized): ?int
     {
-        if (1 === preg_match('/^(?:take |use |the |number |option |nr\.? ?|#)*([1-9])(?:st|nd|rd|th)?\b/u', $normalized, $m)) {
+        if (1 === preg_match('/^(?:take |use |the |number |option |nr\.? ?|#)*([1-9]\d*)(?:st|nd|rd|th)?\b/u', $normalized, $m)) {
             return (int) $m[1];
         }
         foreach (self::ORDINALS as $word => $index) {
@@ -176,25 +176,26 @@ final class IntentParser
 
     private function isAffirmation(string $normalized): bool
     {
-        return $this->matchesShortPhrase($normalized, self::AFFIRMATIONS);
+        return $this->matchesShortPhrase($normalized, self::AFFIRMATIONS, true);
     }
 
     private function isNegation(string $normalized): bool
     {
-        return $this->matchesShortPhrase($normalized, self::NEGATIONS);
+        return $this->matchesShortPhrase($normalized, self::NEGATIONS, false);
     }
 
     /**
      * True when the input is a short answer whose first word is one of the given
-     * tokens, or whose text contains one of the multi-word phrases. Punctuation
+     * tokens. A multi-word affirmation must be the whole answer, so "do not go
+     * ahead" is not a yes. A multi-word refusal may also be a prefix. Punctuation
      * is ignored so "ja, passt" or "yes!" still match.
      *
      * @param array<int, string> $vocabulary
      */
-    private function matchesShortPhrase(string $normalized, array $vocabulary): bool
+    private function matchesShortPhrase(string $normalized, array $vocabulary, bool $phraseMustBeWhole): bool
     {
         $tokens = preg_split('/[^\p{L}\p{N}]+/u', $normalized, -1, PREG_SPLIT_NO_EMPTY) ?: [];
-        if ([] === $tokens || count($tokens) > 4) {
+        if ([] === $tokens || count($tokens) > 6) {
             return false;
         }
         $first = $tokens[0];
@@ -202,7 +203,7 @@ final class IntentParser
 
         foreach ($vocabulary as $entry) {
             if (str_contains($entry, ' ')) {
-                if (str_contains($joined, $entry)) {
+                if ($joined === $entry || (!$phraseMustBeWhole && str_starts_with($joined, $entry.' '))) {
                     return true;
                 }
             } elseif ($first === $entry) {

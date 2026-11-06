@@ -6,6 +6,7 @@ namespace Plugin\Synafastbill\Controller;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Repository\ModelRepository;
 use App\Service\ModelConfigService;
 use App\Service\PluginDataService;
 use OpenApi\Attributes as OA;
@@ -23,6 +24,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -45,6 +47,8 @@ final class SynafastbillController extends AbstractController
         private readonly ModelConfigService $modelConfigService,
         private readonly AiFacade $aiFacade,
         private readonly HttpClientInterface $http,
+        private readonly ModelRepository $models,
+        private readonly LockFactory $locks,
     ) {
     }
 
@@ -205,7 +209,14 @@ final class SynafastbillController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Empty message'], Response::HTTP_BAD_REQUEST);
         }
 
-        $result = $this->buildRouter($userId, $language)->dispatch($message, 'chat_'.$this->sanitize($chatId));
+        $sessionKey = 'chat_'.$this->sanitize($chatId);
+        $lock = $this->locks->createLock('synafastbill-'.$userId.'-'.$sessionKey, 30.0);
+        $lock->acquire(true);
+        try {
+            $result = $this->buildRouter($userId, $language)->dispatch($message, $sessionKey);
+        } finally {
+            $lock->release();
+        }
 
         return $this->json([
             'success' => true,
@@ -264,7 +275,23 @@ final class SynafastbillController extends AbstractController
             return [];
         }
 
-        return null !== $modelId ? ['model_id' => $modelId] : [];
+        if (null === $modelId) {
+            return [];
+        }
+        $model = $this->models->find($modelId);
+        if (null === $model) {
+            return ['model_id' => $modelId];
+        }
+        $name = $model->getProviderId();
+        if ('' === $name) {
+            $name = $model->getName();
+        }
+
+        return [
+            'model_id' => $modelId,
+            'model' => $name,
+            'provider' => $model->getService(),
+        ];
     }
 
     /**

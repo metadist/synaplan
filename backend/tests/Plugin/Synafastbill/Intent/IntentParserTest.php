@@ -59,6 +59,9 @@ final class IntentParserTest extends TestCase
         self::assertSame(CommandType::Confirm, $this->parser->parse('ja, passt')->type);
         self::assertSame(CommandType::Cancel, $this->parser->parse('no')->type);
         self::assertSame(CommandType::Cancel, $this->parser->parse('cancel')->type);
+        self::assertSame(CommandType::Cancel, $this->parser->parse('do not go ahead')->type);
+        self::assertSame(CommandType::Cancel, $this->parser->parse("don't do it")->type);
+        self::assertSame(CommandType::Confirm, $this->parser->parse('/fastbill yes')->type);
     }
 
     public function testSelectionByNumberAndOrdinal(): void
@@ -66,6 +69,7 @@ final class IntentParserTest extends TestCase
         $byNumber = $this->parser->parse('2');
         self::assertSame(CommandType::Confirm, $byNumber->type);
         self::assertSame(2, $byNumber->params['selection']);
+        self::assertSame(12, $this->parser->parse('12')->params['selection']);
 
         $byOrdinal = $this->parser->parse('take the first one');
         self::assertSame(CommandType::Confirm, $byOrdinal->type);

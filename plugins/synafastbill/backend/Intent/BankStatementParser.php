@@ -28,7 +28,9 @@ final class BankStatementParser
     private function extractAmount(string $text): ?float
     {
         // Matches 1.190,00 / 1,190.00 / 1190.00 / 1190,00 / 99.99 optionally with a currency symbol.
-        $count = preg_match_all('/(?<![\w.,])(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})|\d+[.,]\d{2})(?![\w])/u', $text, $matches);
+        // A date such as 28.07.2026 must not win as an amount. The match may
+        // not end in the middle of a longer dotted or comma-separated number.
+        $count = preg_match_all('/(?<![\w.,])(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})|\d+[.,]\d{2})(?![\w.,])/u', $text, $matches);
         if (0 === $count || false === $count) {
             return null;
         }
