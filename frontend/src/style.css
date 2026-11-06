@@ -2325,6 +2325,9 @@ input[type='week']:not(:disabled)::-webkit-calendar-picker-indicator {
   background: var(--brand-hover);
   border-color: var(--brand-hover);
 }
+.driver-popover.synaplan-tour .driver-popover-footer .driver-popover-end-btn {
+  margin-right: auto;
+}
 .driver-popover.synaplan-tour .driver-popover-close-btn {
   color: var(--txt-secondary);
 }

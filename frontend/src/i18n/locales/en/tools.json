@@ -812,6 +812,7 @@
       "next": "Next",
       "back": "Back",
       "done": "Done",
+      "end": "End tour",
       "progress": "{current} of {total}"
     },
     "chats": {
@@ -838,6 +839,28 @@
       "search": {
         "title": "Find something again",
         "body": "This field searches chats, files, assistants and pages. The same search opens from anywhere with Ctrl+K or ⌘K."
+      }
+    },
+    "chatsGuest": {
+      "rail": {
+        "title": "What you can open",
+        "body": "As a guest you are in Chats. Library, Assistants and Apps stay closed until you have an account with a plan or an invitation code. That is why not every icon works yet."
+      },
+      "input": {
+        "title": "Just ask",
+        "body": "As a guest you can write a few messages. With an account your chats are saved."
+      },
+      "plus": {
+        "title": "A file or a tool",
+        "body": "Attaching files and using tools comes with an account."
+      },
+      "model": {
+        "title": "Which model answers",
+        "body": "With an account you choose from more models."
+      },
+      "plan": {
+        "title": "An account, then a plan",
+        "body": "An account needs a plan or an invitation code. That unlocks Library, Assistants and Apps."
       }
     },
     "library": {
@@ -893,17 +916,17 @@
       }
     },
     "admin": {
-      "cards": {
-        "title": "The numbers",
-        "body": "Each card is one count, such as users or models to check. A click opens that page."
+      "list": {
+        "title": "The people on this installation",
+        "body": "These are the accounts that can use Synaplan here. A guest who only tries the chat does not appear on this list."
       },
-      "attention": {
-        "title": "What is wrong",
-        "body": "This is what needs attention. Each row has a button that takes you to the fix."
+      "add": {
+        "title": "Add someone",
+        "body": "An account needs a plan or an invitation code. Then the person shows up here and can use Library, Assistants and Apps."
       },
-      "sections": {
+      "menu": {
         "title": "The admin pages",
-        "body": "From here you reach System status, AI infrastructure, Users and System configuration. System configuration has its own search across the settings."
+        "body": "Users sits under Admin, next to System status, AI infrastructure and System configuration."
       }
     },
     "checklist": {

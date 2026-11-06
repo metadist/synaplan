@@ -47,6 +47,10 @@ vi.mock('@/composables/useAuth', () => ({
   useAuth: () => ({ logout: vi.fn(), isImpersonating: false }),
 }))
 
+vi.mock('@/composables/useTour', () => ({
+  useTour: () => ({ startTour: vi.fn(), hasTour: () => false, maybeAutoStart: vi.fn() }),
+}))
+
 vi.mock('@/services/featuresService', () => ({
   getFeaturesStatus: vi.fn().mockResolvedValue({ features: {} }),
 }))
@@ -121,6 +125,7 @@ describe('SidebarV2 New Chat lock', () => {
     const wrapper = await mountSidebar({ guest: true })
 
     expect(wrapper.find('[data-testid="section-sidebar-chats-guest"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="btn-guest-tour"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="btn-sidebar-v2-new-chat"]').exists()).toBe(false)
     expect(vi.mocked(httpClient).mock.calls.some(([url]) => url === '/api/v1/chats')).toBe(false)
     wrapper.unmount()

@@ -70,6 +70,7 @@ export const selectors = {
     navOverlay: '[data-testid="overlay-sidebar-v2-nav"]',
     /** Expand sidebar when collapsed (so chat dropdown is visible) */
     sidebarExpand: '[data-testid="btn-sidebar-expand"]',
+    sidebarV2Expand: '[data-testid="btn-sidebar-v2-expand"]',
     /** V2 sidebar: single plus button to start new chat (no toggle/dropdown) */
     sidebarV2NewChat: '[data-testid="btn-sidebar-v2-new-chat"]',
     /** §4.3: mobile push-drawer (replaces the bottom tab bar) */
@@ -798,10 +799,16 @@ export const selectors = {
   unsavedBar: {
     save: '[data-testid="btn-unsaved-save"]',
   },
+  tour: {
+    popover: '.driver-popover',
+    end: '[data-testid="btn-tour-end"]',
+    pageHelp: '[data-testid="btn-page-help"]',
+  },
   guest: {
     banner: '[data-testid="guest-banner"]',
     bannerSignup: '[data-testid="guest-banner-signup"]',
     bannerDismiss: '[data-testid="guest-banner-dismiss"]',
+    tour: '[data-testid="btn-guest-tour"]',
     signupModal: '[data-testid="guest-signup-modal"]',
     modalRegister: '[data-testid="guest-modal-register"]',
     modalLogin: '[data-testid="guest-modal-login"]',

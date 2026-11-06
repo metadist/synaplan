@@ -80,4 +80,15 @@ describe('resolveConfigDeepLink', () => {
   ])('leaves %s / %s where it is', (tab, section) => {
     expect(resolveConfigDeepLink(tab, section)).toBeNull()
   })
+
+  it('sends every mapped AI section from a search /admin/config link to AI infrastructure', () => {
+    for (const tab of AI_TAB_IDS) {
+      for (const ref of AI_TAB_SECTIONS[tab]) {
+        expect(resolveConfigDeepLink(ref.tab, ref.section), `${ref.tab}.${ref.section}`).toEqual({
+          path: '/admin/setup',
+          tab,
+        })
+      }
+    }
+  })
 })

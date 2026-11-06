@@ -15,6 +15,7 @@
           :title="$t('people.title')"
           :subtitle="$t('people.subtitle')"
           icon="mdi:account-group"
+          tour-id="admin"
         >
           <TabNav
             v-if="tabNavItems.length > 1"

@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const driveSpy = vi.fn()
 const destroySpy = vi.fn()
-let lastConfig: { steps: Array<{ element?: Element }>; onDestroyStarted?: () => void } | null = null
+let lastConfig: {
+  steps: Array<{ element?: Element }>
+  onDestroyStarted?: () => void
+  onPopoverRender?: (popover: { footerButtons: HTMLElement }) => void
+} | null = null
 vi.mock('driver.js', () => ({
   driver: (config: typeof lastConfig) => {
     lastConfig = config
@@ -59,6 +63,17 @@ describe('useTour', () => {
     expect(driveSpy).toHaveBeenCalledOnce()
     expect(lastConfig?.steps).toHaveLength(1)
     lastConfig?.onDestroyStarted?.()
+  })
+
+  it('puts End tour on the popover so a step can be left without finishing', () => {
+    useTour().startTour('demo')
+    const footerButtons = document.createElement('div')
+    lastConfig?.onPopoverRender?.({ footerButtons })
+    const end = footerButtons.querySelector('[data-testid="btn-tour-end"]') as HTMLButtonElement
+    expect(end).toBeTruthy()
+    end.click()
+    expect(destroySpy).toHaveBeenCalledOnce()
+    expect(JSON.parse(localStorage.getItem('synaplan.toursSeen') ?? '[]')).toEqual(['demo'])
   })
 
   it('marks the tour seen and frees the slot however it is closed', async () => {
