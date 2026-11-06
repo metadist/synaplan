@@ -14,7 +14,7 @@ run are entries here, not chat messages.
 | Step | Pull request | State |
 | ---- | ------------ | ----- |
 | IC0 | | not started — private note |
-| IC1 | branch `fix/iam-client-address` | in review |
+| IC1 | [#3027](https://github.com/metadist/synaplan/pull/3027) | in review |
 | PC1 | | not started (`synaplan-platform`) |
 | PC2 | | waits for D4 |
 | IC2+IC3 | | one pull request after D1 and D2 — same files |
