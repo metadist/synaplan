@@ -19,7 +19,7 @@ run are entries here, not chat messages.
 | IC1 | [#3027](https://github.com/metadist/synaplan/pull/3027) | merged |
 | PC1 | | not started (`synaplan-platform`) |
 | PC2 | | waits for D4 |
-| IC2+IC3 | | this branch — pull request URL lands here when it is open |
+| IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | in review |
 | IC4 | | not started — own pull request, the fixes the matrix finds |
 | IC5+IC5b | | waits for D6 and D10 — one pull request, schema then the People row |
 | IC6+IC8 | | waits for IC2 and IC5 — one pull request, the guide and the journeys |
