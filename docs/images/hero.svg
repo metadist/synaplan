@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="Synaplan - We produce AI freedom">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" width="1200" height="420" role="img" aria-label="Synaplan. Own the flow.">
   <defs>
     <linearGradient id="accent" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1200" y2="0">
       <stop offset="0" stop-color="#0003C7"/>
@@ -57,8 +57,8 @@
   <rect class="fade d3" x="500" y="278" width="200" height="5" rx="2.5" fill="url(#accent)"/>
 
   <!-- Tagline -->
-  <text class="fade d3" x="600" y="324" text-anchor="middle" font-size="26" font-weight="600" fill="#1E293B">We produce AI freedom.</text>
+  <text class="fade d3" x="600" y="324" text-anchor="middle" font-size="26" font-weight="600" fill="#1E293B">Own the flow.</text>
 
   <!-- Sub-line -->
-  <text class="fade d4" x="600" y="362" text-anchor="middle" font-size="17.5" fill="#55637A">Hundreds of models &#183; DAG task routing &#183; RAG knowledge &#183; sovereign &amp; air-gap ready &#183; Apache-2.0</text>
+  <text class="fade d4" x="600" y="362" text-anchor="middle" font-size="17.5" fill="#55637A">Your knowledge &#183; your models &#183; your channels &#183; Apache-2.0</text>
 </svg>

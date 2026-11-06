@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **Documentation Index** · **[Public User Docs (docs.synaplan.com)](https://docs.synaplan.com/)**  
+> **[Main README](../README.md)** · **[Platform reference](PLATFORM_REFERENCE.md)** · **Documentation Index** · **[Public User Docs (docs.synaplan.com)](https://docs.synaplan.com/)**  
 > **Start the Learning Path:** [1.1 Platform Capabilities & Mental Model →](FEATURES.md)
 
 # Synaplan Documentation
