@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b5c9a793ca231dc138b91cf802e470f9",
+    "content-hash": "9d105b9f337bcb39cd113db747d054c9",
     "packages": [
         {
             "name": "api-platform/doctrine-common",
@@ -5427,16 +5427,16 @@
         },
         {
             "name": "openai-php/client",
-            "version": "v0.21.0",
+            "version": "v0.22.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/openai-php/client.git",
-                "reference": "ebec896ab0b0dff3917a70d30db67c7a64c548c0"
+                "reference": "23e1da353c02a39be03980ae968fba802cf70555"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/openai-php/client/zipball/ebec896ab0b0dff3917a70d30db67c7a64c548c0",
-                "reference": "ebec896ab0b0dff3917a70d30db67c7a64c548c0",
+                "url": "https://api.github.com/repos/openai-php/client/zipball/23e1da353c02a39be03980ae968fba802cf70555",
+                "reference": "23e1da353c02a39be03980ae968fba802cf70555",
                 "shasum": ""
             },
             "require": {
@@ -5498,7 +5498,7 @@
             ],
             "support": {
                 "issues": "https://github.com/openai-php/client/issues",
-                "source": "https://github.com/openai-php/client/tree/v0.21.0"
+                "source": "https://github.com/openai-php/client/tree/v0.22.0"
             },
             "funding": [
                 {
@@ -5514,7 +5514,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-17T11:01:09+00:00"
+            "time": "2026-10-31T15:12:58+00:00",
+            "published-time": "2026-10-31T15:13:27+00:00"
         },
         {
             "name": "opis/json-schema",
@@ -5943,7 +5944,8 @@
                 "issues": "https://github.com/php-http/discovery/issues",
                 "source": "https://github.com/php-http/discovery/tree/1.20.0"
             },
-            "time": "2024-10-02T11:20:13+00:00"
+            "time": "2024-10-02T11:20:13+00:00",
+            "published-time": "2024-10-02T11:21:00+00:00"
         },
         {
             "name": "php-http/multipart-stream-builder",
@@ -5999,7 +6001,8 @@
                 "issues": "https://github.com/php-http/multipart-stream-builder/issues",
                 "source": "https://github.com/php-http/multipart-stream-builder/tree/1.4.2"
             },
-            "time": "2024-09-04T13:22:54+00:00"
+            "time": "2024-09-04T13:22:54+00:00",
+            "published-time": "2024-09-04T13:23:14+00:00"
         },
         {
             "name": "phpdocumentor/reflection-common",
@@ -6816,16 +6819,16 @@
         },
         {
             "name": "predis/predis",
-            "version": "v3.7.0",
+            "version": "v3.7.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/predis/predis.git",
-                "reference": "4d91f3b08a60c3bacc2afbd8dc41724559b7626a"
+                "reference": "2496e6d91ba4e137b47a6b802dc7e088ebf31df4"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/predis/predis/zipball/4d91f3b08a60c3bacc2afbd8dc41724559b7626a",
-                "reference": "4d91f3b08a60c3bacc2afbd8dc41724559b7626a",
+                "url": "https://api.github.com/repos/predis/predis/zipball/2496e6d91ba4e137b47a6b802dc7e088ebf31df4",
+                "reference": "2496e6d91ba4e137b47a6b802dc7e088ebf31df4",
                 "shasum": ""
             },
             "require": {
@@ -6867,7 +6870,7 @@
             ],
             "support": {
                 "issues": "https://github.com/predis/predis/issues",
-                "source": "https://github.com/predis/predis/tree/v3.7.0"
+                "source": "https://github.com/predis/predis/tree/v3.7.1"
             },
             "funding": [
                 {
@@ -6875,7 +6878,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-08T16:46:04+00:00"
+            "time": "2026-11-03T17:55:20+00:00",
+            "published-time": "2026-11-03T17:56:07+00:00"
         },
         {
             "name": "psr/cache",
@@ -7127,7 +7131,8 @@
             "support": {
                 "source": "https://github.com/php-fig/http-client"
             },
-            "time": "2023-09-23T14:17:50+00:00"
+            "time": "2023-09-23T14:17:50+00:00",
+            "published-time": "2023-09-23T14:18:12+00:00"
         },
         {
             "name": "psr/http-factory",
@@ -7235,7 +7240,8 @@
             "support": {
                 "source": "https://github.com/php-fig/http-message/tree/2.0"
             },
-            "time": "2023-04-04T09:54:51+00:00"
+            "time": "2023-04-04T09:54:51+00:00",
+            "published-time": "2023-04-04T09:55:35+00:00"
         },
         {
             "name": "psr/http-server-handler",
@@ -17679,5 +17685,5 @@
         "ext-iconv": "*"
     },
     "platform-dev": {},
-    "plugin-api-version": "2.9.0"
+    "plugin-api-version": "2.11.0"
 }
