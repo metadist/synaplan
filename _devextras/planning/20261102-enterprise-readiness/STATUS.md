@@ -6,11 +6,11 @@ the STATUS of rows 35–42.
 
 | Step | Owner repository | State |
 | ---- | ---------------- | ----- |
-| Plan | `synaplan` | written 2026-11-02; §5 unticked |
-| ER1 trust center | `synaplan-org-website`, `synaplan-website`, `synaplan-internal`, `synaplan-platform` | drafted 2026-11-06. Page on synaplan.eu `/trust` (DE, EN, FR), linked from synaplan.com. AVV template in `synaplan-internal`, TOMs source in `synaplan-platform`. DPO review still open. D7 not ticked; the page follows the proposed place (org site, product site links). |
+| Plan | `synaplan` | written 2026-11-02; D7 ticked 2026-11-06; D1–D6 still open |
+| ER1 trust center | `synaplan-org-website`, `synaplan-website`, `synaplan-internal`, `synaplan-platform` | drafted 2026-11-06. Page on synaplan.eu `/trust` (DE, EN, FR), linked from synaplan.com. D7 confirmed: org site, product site links. AVV template covers Art. 28 including breach notice and a DPIA assist. Management has not countersigned it; the company record names no data protection officer. Live reachability is `/status`. It is not a measured monthly uptime. |
 | ER2 supply chain | `synaplan`, `synaplan-base-php`, `synaplan-charts` | not started — needs D4 |
 | ER3 certification | `synaplan-platform` (private plan) | not started — needs D3 |
-| ER4 public sector | `synaplan-opendesk`, `synaplan-internal` | not started — LWL deadline 2026-11-23 |
+| ER4 public sector | `synaplan-opendesk`, `synaplan-internal` | LWL participation kit drafted 2026-11-06 in `synaplan-internal` (`ausschreibungen/lwl-rvh-016-22-26`). Not filed. The 23 November 2026 11:00 deadline is the request to participate, not the priced offer. Selection criteria for a pentest, C5 and references above 500 users are not met on current evidence. Headcount, turnover and insurance are blank on purpose. |
 | ER5 partners | website, `synaplan-charts` | not started — D6 open |
 | ER6 distribution | `synaplan-platform` marketing plan, `synaplan-charts`, `synaplan-website` | AWS engineering done, seller registration open |
 | ER7 packaging | `synaplan` seeder, website | not started — D1 open |

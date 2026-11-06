@@ -206,7 +206,7 @@ never gate on a licence key (D1).
 - [ ] **D4 (ER2).** SBOM + cosign + provenance in the release workflows of `synaplan`, `synaplan-base-php`, `synaplan-charts`. CI change, owner call.
 - [ ] **D5 (ER6).** Opt-in install telemetry: yes (count + version only, off by default, stated in the setup wizard) or no.
 - [ ] **D6 (ER5).** Partner fleet view on `BPLATFORMINSTANCES`: in scope for 2027 H1, or partners only get the chart pattern.
-- [ ] **D7 (ER1).** The trust center lives on `synaplan-org-website` (sovereignty) with a link from `synaplan-website`, or the other way round.
+- [x] **D7 (ER1).** Confirmed by the owner on 2026-11-06: the trust center lives on `synaplan-org-website`, and `synaplan-website` links to it.
 
 ## 6. Order
 
