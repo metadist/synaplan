@@ -49,6 +49,12 @@ final class SynafastbillController extends AbstractController
     }
 
     #[Route('/setup-check', name: 'setup_check', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/synafastbill/setup-check',
+        summary: 'Check whether FastBill credentials are configured',
+        security: [['ApiKey' => []]],
+        tags: ['Synafastbill Plugin'],
+    )]
     #[OA\Response(response: 200, description: 'Whether FastBill credentials are configured')]
     public function setupCheck(int $userId, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -64,6 +70,12 @@ final class SynafastbillController extends AbstractController
     }
 
     #[Route('/config', name: 'config_get', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/synafastbill/config',
+        summary: 'Get the FastBill configuration',
+        security: [['ApiKey' => []]],
+        tags: ['Synafastbill Plugin'],
+    )]
     #[OA\Response(response: 200, description: 'Plugin configuration (API key masked)')]
     public function getConfig(int $userId, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -85,6 +97,12 @@ final class SynafastbillController extends AbstractController
     }
 
     #[Route('/config', name: 'config_put', methods: ['PUT'])]
+    #[OA\Put(
+        path: '/api/v1/user/{userId}/plugins/synafastbill/config',
+        summary: 'Save the FastBill configuration',
+        security: [['ApiKey' => []]],
+        tags: ['Synafastbill Plugin'],
+    )]
     #[OA\Response(response: 200, description: 'Configuration saved')]
     public function putConfig(int $userId, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -113,6 +131,12 @@ final class SynafastbillController extends AbstractController
     }
 
     #[Route('/test-connection', name: 'test_connection', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/{userId}/plugins/synafastbill/test-connection',
+        summary: 'Check the FastBill credentials with a read-only call',
+        security: [['ApiKey' => []]],
+        tags: ['Synafastbill Plugin'],
+    )]
     #[OA\Response(response: 200, description: 'Read-only credential check')]
     public function testConnection(int $userId, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -141,6 +165,12 @@ final class SynafastbillController extends AbstractController
     }
 
     #[Route('/help', name: 'help', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/synafastbill/help',
+        summary: 'Show the FastBill command help',
+        security: [['ApiKey' => []]],
+        tags: ['Synafastbill Plugin'],
+    )]
     #[OA\Response(response: 200, description: 'Static command help overview')]
     public function help(int $userId, #[CurrentUser] ?User $user): JsonResponse
     {
@@ -153,6 +183,12 @@ final class SynafastbillController extends AbstractController
     }
 
     #[Route('/chat', name: 'chat', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/user/{userId}/plugins/synafastbill/chat',
+        summary: 'Handle one FastBill chat turn',
+        security: [['ApiKey' => []]],
+        tags: ['Synafastbill Plugin'],
+    )]
     #[OA\Response(response: 200, description: 'Handle one /fastbill chat turn')]
     public function chat(int $userId, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {

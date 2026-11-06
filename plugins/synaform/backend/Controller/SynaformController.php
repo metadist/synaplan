@@ -5390,6 +5390,14 @@ class SynaformController extends AbstractController
     // =========================================================================
 
     #[Route('/assets/{path}', name: 'assets', methods: ['GET'], requirements: ['path' => '.+'])]
+    #[OA\Get(
+        path: '/api/v1/user/{userId}/plugins/synaform/assets/{path}',
+        summary: 'Download a file from the Synaform page',
+        security: [['ApiKey' => []]],
+        tags: ['Synaform Plugin'],
+    )]
+    #[OA\Response(response: 200, description: 'The file')]
+    #[OA\Response(response: 404, description: 'No such file')]
     public function assets(string $path): Response
     {
         $pluginDir = dirname(__DIR__, 2);
