@@ -34,7 +34,6 @@ final class EgressInventoryTest extends TestCase
         'synasort',
         'synaads',
         'synafastbill',
-        'synamail',
     ];
 
     private const SCRATCH = <<<'PHP'
