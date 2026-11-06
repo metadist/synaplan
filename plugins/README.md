@@ -7,6 +7,18 @@ autoconfigures its services. The plugins directory can be overridden with the
 `PLUGINS_DIR` environment variable (defaults to `/plugins`, then
 `backend/plugins`).
 
+## In this image
+
+`synascriber` and `synamail` are part of this repository and of CI.
+`synamail` stores contact profiles for the Outlook add-in. The add-in
+itself stays in [metadist/Synamail](https://github.com/metadist/Synamail).
+Install it for one user with `app:plugin:install`. It is not added to
+`DEFAULT_USER_PLUGINS`. To leave it out of a build you make yourself,
+delete `plugins/synamail` before the image is built. A switch that hides
+a plugin inside an image you pulled, without rebuilding, is a later step
+and is not available yet. The rules for a plugin we ship are in
+[`_devextras/planning/20261104-hosted-plugins/01_rules.md`](../_devextras/planning/20261104-hosted-plugins/01_rules.md).
+
 ## Frontend files
 
 Files under `plugins/<id>/frontend/` are served publicly at
