@@ -103,6 +103,30 @@ final class WebSearchTopicPolicyTest extends TestCase
      * vote-only search — and that fallback lives in MessageProcessor, not
      * here. This test pins that shouldSearch() stays attachment-agnostic.
      */
+    public function testAScheduledAssistantSearchesWithoutAClassifierVote(): void
+    {
+        self::assertTrue(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, false, 'Erstelle jetzt die Übersicht.', true),
+            'a schedule is an order: no vote and no magic phrase required',
+        );
+        self::assertTrue(
+            WebSearchTopicPolicy::shouldSearch('general', false, true, null, 'hello', true),
+            'internet allowed: a short instruction is not small talk',
+        );
+        self::assertFalse(
+            WebSearchTopicPolicy::shouldSearch('general', false, false, null, 'Erstelle jetzt die Übersicht.', true),
+            'internet off on the assistant still blocks the schedule',
+        );
+        self::assertFalse(
+            WebSearchTopicPolicy::shouldSearch('text2pic', false, null, null, 'Zeichne eine Katze.', true),
+            'a media topic never searches, schedule or not',
+        );
+        self::assertFalse(
+            WebSearchTopicPolicy::shouldSearch('general', false, null, false, 'Erstelle jetzt die Übersicht.'),
+            'the same text in a normal chat still needs a vote or an explicit request',
+        );
+    }
+
     public function testShouldSearchHonoursVoteForAttachmentQuestions(): void
     {
         self::assertTrue(
