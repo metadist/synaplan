@@ -178,6 +178,48 @@ final class OAuthSignupGateTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function testClosedSwitchRefusesNewAccountsAtEveryOAuthDoorIncludingInvitationCodes(): void
+    {
+        $this->users->method('findOneBy')->willReturn(null);
+        $this->users->method('findByGithubId')->willReturn(null);
+        $this->users->method('findByAppleSub')->willReturn(null);
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+
+        $gate = $this->gate(false);
+        $stateWithCode = ['nonce' => 'n-code', 'code' => 'BHTB2345CQA7', OAuthSignupGate::STATE_HUMAN => true];
+
+        foreach ([
+            fn () => $gate->assertGoogleSignup('new@example.com', $stateWithCode, '203.0.113.1'),
+            fn () => $gate->assertGithubSignup('new@example.com', 12345, $stateWithCode, '203.0.113.1'),
+            fn () => $gate->assertAppleSignup('apple-sub-new', 'new@example.com', $stateWithCode, '203.0.113.1', false),
+            fn () => $gate->assertAppleSignup('apple-sub-native', 'new@example.com', ['code' => 'BHTB2345CQA7'], '203.0.113.1', true),
+        ] as $call) {
+            try {
+                $call();
+                $this->fail('Closed switch must refuse every OAuth self-sign-up door even with an invitation code');
+            } catch (SignupBlockedException $e) {
+                $this->assertSame(SignupBlockedException::CODE_CLOSED, $e->getReasonCode());
+                $this->assertSame(403, $e->getHttpStatus());
+            }
+        }
+    }
+
+    public function testExistingAccountsStillSignInAtEveryOAuthDoorWhenSelfSignUpIsOff(): void
+    {
+        $existing = new User();
+        $this->users->method('findOneBy')->willReturn($existing);
+        $this->users->method('findByGithubId')->willReturn($existing);
+        $this->users->method('findByAppleSub')->willReturn($existing);
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+
+        $gate = $this->gate(false);
+        $gate->assertGoogleSignup('known@example.com', ['nonce' => 'n1'], '203.0.113.1');
+        $gate->assertGithubSignup(null, 99, ['nonce' => 'n2'], '203.0.113.1');
+        $gate->assertAppleSignup('apple-sub-1', null, ['nonce' => 'n3'], '203.0.113.1', false);
+        $gate->assertAppleSignup('apple-sub-1', null, [], '203.0.113.1', true);
+        $this->addToAssertionCount(4);
+    }
+
     public function testCompleteNewUserInitialisesTheModelDefaults(): void
     {
         $user = $this->createMock(User::class);

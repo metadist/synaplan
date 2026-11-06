@@ -23,7 +23,7 @@ final class UserLifecycleSignupTest extends TestCase
     public function testAdmissionIsCheckedBeforeTheAddressIsLookedUp(): void
     {
         $users = $this->createMock(UserRepository::class);
-        $users->expects($this->never())->method('findOneBy');
+        $users->expects($this->never())->method('findOtherByNormalizedEmail');
         $admission = $this->createMock(SignupAdmission::class);
         $admission->method('resolve')->willThrowException(SignupBlockedException::admissionRequired());
 
@@ -35,7 +35,7 @@ final class UserLifecycleSignupTest extends TestCase
     {
         $existing = $this->createMock(User::class);
         $users = $this->createMock(UserRepository::class);
-        $users->expects($this->once())->method('findOneBy')->with(['mail' => 'known@example.com'])->willReturn($existing);
+        $users->expects($this->once())->method('findOtherByNormalizedEmail')->with('known@example.com', 0)->willReturn($existing);
         $hasher = $this->createMock(UserPasswordHasherInterface::class);
         $hasher->expects($this->once())->method('hashPassword')->with($existing, 'secret');
         $admission = $this->createMock(SignupAdmission::class);

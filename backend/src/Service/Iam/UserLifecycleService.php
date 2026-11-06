@@ -64,7 +64,7 @@ final readonly class UserLifecycleService
             return null;
         }
 
-        $existing = $this->users->findOneBy(['mail' => $email]);
+        $existing = $this->users->findOtherByNormalizedEmail($email, 0);
         if ($existing instanceof User) {
             // Same work as a real sign-up, so the two answers take the same time.
             $this->logger->warning('Registration attempt with existing email', ['email' => $email, 'ip' => $clientIp]);
@@ -169,7 +169,7 @@ final readonly class UserLifecycleService
         }
 
         $user = new User();
-        $user->setMail($email);
+        $user->setMail(mb_strtolower(trim($email)));
         $user->setCreated(date('Y-m-d H:i:s'));
         $user->setType($type);
         $user->setProviderId($providerId);

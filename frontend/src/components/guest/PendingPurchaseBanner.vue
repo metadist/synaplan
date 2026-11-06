@@ -16,11 +16,11 @@
         </span>
 
         <router-link
-          to="/register"
+          :to="isSelfSignupOpen(config.auth) ? '/register' : '/login'"
           data-testid="pending-purchase-banner-cta"
           class="text-xs font-semibold text-white whitespace-nowrap px-2.5 py-1 rounded-full bg-brand shadow-sm transition-shadow duration-300 hover:shadow-md hover:shadow-brand/40 sm:px-3"
         >
-          {{ $t('iap.pendingBanner.cta') }}
+          {{ isSelfSignupOpen(config.auth) ? $t('iap.pendingBanner.cta') : $t('auth.signIn') }}
         </router-link>
 
         <button
@@ -49,6 +49,10 @@
  * automatically after the next sign-in.
  */
 import { Icon } from '@iconify/vue'
+import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
+
+const config = useConfigStore()
 
 defineProps<{
   visible: boolean

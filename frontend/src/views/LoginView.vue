@@ -351,7 +351,7 @@
             </form>
 
             <p
-              v-if="config.auth.registrationEnabled && !config.auth.signupPaused"
+              v-if="signupOpen"
               class="mt-[21px] -mb-[3px] sm:mt-6 sm:mb-0 text-center text-sm txt-secondary"
             >
               {{ $t('auth.noAccount') }}
@@ -421,6 +421,7 @@ import { useSignupChallenge } from '../composables/useSignupChallenge'
 import { signupBlockedText } from '@/utils/signupBlockedMessage'
 import { validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { useSocialAuth } from '@/composables/useSocialAuth'
@@ -438,6 +439,7 @@ const { locale, t } = useI18n()
 const themeStore = useTheme()
 const { getToken: getChallengeToken } = useSignupChallenge()
 const config = useConfigStore()
+const signupOpen = computed(() => isSelfSignupOpen(config.auth))
 
 const isDark = themeStore.isDark
 

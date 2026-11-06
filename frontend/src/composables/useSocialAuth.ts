@@ -18,6 +18,7 @@ import { isNativeApp, getNativePlatform } from '@/services/api/nativeRuntime'
 import { startNativeOAuth } from '@/services/api/nativeOAuth'
 import { startNativeAppleSignIn } from '@/services/api/nativeAppleAuth'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
+import { signupBlockedText } from '@/utils/signupBlockedMessage'
 import { useSignupChallenge } from './useSignupChallenge'
 
 export interface SocialProvider {
@@ -96,7 +97,9 @@ export function useSocialAuth() {
         if (!result.success) {
           // A user-dismissed browser is a silent cancellation, not an error.
           if (!result.cancelled) {
-            error.value = result.error || 'Login failed'
+            error.value =
+              signupBlockedText(t, result.errorCode, result.error || 'Login failed') ||
+              'Login failed'
           }
           return false
         }

@@ -549,6 +549,7 @@ const onEmailBlur = () => {
 }
 
 onMounted(() => {
+  if (!signupOpen.value) return
   loadSocialProviders()
   void loadAdmissionPlans()
 })

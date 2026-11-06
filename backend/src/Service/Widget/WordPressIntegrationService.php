@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Service\Widget;
 
 use App\Entity\File;
@@ -26,17 +28,17 @@ final readonly class WordPressIntegrationService
     private const GROUP_KEY = 'WORDPRESS_WIZARD';
 
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
-        private readonly EntityManagerInterface $em,
-        private readonly UserRepository $userRepository,
-        private readonly WordPressApiKeyIssuer $apiKeyIssuer,
-        private readonly PromptRepository $promptRepository,
-        private readonly PromptService $promptService,
-        private readonly FileStorageService $fileStorageService,
-        private readonly FileProcessor $fileProcessor,
-        private readonly VectorizationService $vectorizationService,
-        private readonly WidgetService $widgetService,
-        private readonly LoggerInterface $logger,
+        private HttpClientInterface $httpClient,
+        private EntityManagerInterface $em,
+        private UserRepository $userRepository,
+        private WordPressApiKeyIssuer $apiKeyIssuer,
+        private PromptRepository $promptRepository,
+        private PromptService $promptService,
+        private FileStorageService $fileStorageService,
+        private FileProcessor $fileProcessor,
+        private VectorizationService $vectorizationService,
+        private WidgetService $widgetService,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -67,17 +69,16 @@ final readonly class WordPressIntegrationService
 
         $existingUser = $this->userRepository->findByEmail($email);
 
-        if ($existingUser instanceof User) {
-            $hash = $existingUser->getPassword();
-            if ('' === $hash || !password_verify($password, $hash)) {
-                $this->logger->info('WordPress wizard: rejected an existing account without a matching password');
+        $dummyHash = '$2y$10$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
+        $hash = $existingUser instanceof User ? $existingUser->getPassword() : '';
+        $passwordMatched = password_verify($password, '' !== $hash ? $hash : $dummyHash) && '' !== $hash;
 
-                throw new \RuntimeException('WordPress site verification failed');
-            }
-        }
-
-        if (!$existingUser instanceof User) {
-            $this->logger->info('WordPress wizard: refused to create an account');
+        if (!$existingUser instanceof User || !$passwordMatched) {
+            $this->logger->info(
+                $existingUser instanceof User
+                    ? 'WordPress wizard: rejected an existing account without a matching password'
+                    : 'WordPress wizard: refused to create an account',
+            );
 
             throw new \RuntimeException('WordPress site verification failed');
         }
