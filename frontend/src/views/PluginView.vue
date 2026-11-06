@@ -41,6 +41,7 @@ import { useConfigStore } from '@/stores/config'
 import { useAuthStore } from '@/stores/auth'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { authedFetch } from '@/services/api/authedFetch'
 import { createLoadGate, pluginTranslator, readPluginLocale } from '@/services/pluginLocale'
 
 const route = useRoute()
@@ -117,6 +118,8 @@ async function loadPlugin() {
         config: activePlugin,
         locale: active,
         t: pluginTranslator(local, english),
+        request: (path: string, init?: RequestInit) =>
+          authedFetch(`${configStore.apiBaseUrl}${path}`, init ?? {}),
       })
     } else {
       throw new Error('Plugin does not export a default object with a mount() function')

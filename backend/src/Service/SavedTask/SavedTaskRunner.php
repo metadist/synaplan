@@ -230,9 +230,11 @@ final readonly class SavedTaskRunner
      * search and memory lookups the manual request had.
      *
      * A task built on a real Task Prompt (an assistant) keeps the fixed topic:
-     * there the prompt IS the behaviour the user wants to run. `saved_task`
-     * keeps the run plannable (multi-step tasks must run their DAG, not
-     * degrade to chat).
+     * there the prompt IS the behaviour the user wants to run. A schedule of
+     * such an assistant orders a web search (`schedule_search`); the
+     * assistant's internet opt-out and media topics still refuse it.
+     * `saved_task` keeps the run plannable (multi-step tasks must run their
+     * DAG, not degrade to chat).
      *
      * @param array<string, mixed> $triggerPayload
      *
@@ -255,6 +257,13 @@ final readonly class SavedTaskRunner
         $agentId = (int) ($task->getTriggerConfig()['agentId'] ?? 0);
         if ($agentId > 0) {
             $options['agentId'] = $agentId;
+        }
+        // A schedule is an order, not a chat turn the sorter may shrug off.
+        // Internet still off on the assistant blocks the search later; media
+        // topics never search. A chat "schedule this" has no assistant id
+        // and keeps the sorter's vote.
+        if (SavedTask::TRIGGER_SCHEDULE === $task->getTriggerType() && $agentId > 0) {
+            $options['schedule_search'] = true;
         }
         if (null !== $runId) {
             $options['saved_task_run_id'] = $runId;

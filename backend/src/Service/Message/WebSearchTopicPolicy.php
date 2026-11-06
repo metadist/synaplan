@@ -484,7 +484,10 @@ final class WebSearchTopicPolicy
      * `$promptMetadata['tool_internet'] ?? null` — only `false` changes the
      * outcome. Pass `$classifierVote` as the classifier's `web_search` hint
      * (`$classification['web_search'] ?? null`) and `$messageText` as the raw
-     * user message so the triviality veto can run.
+     * user message so the triviality veto can run. `$scheduledAssistant` is a
+     * Saved Task schedule of an assistant: the person ordered the run, so it
+     * searches without a classifier vote. It does not beat an internet
+     * opt-out or a media topic.
      */
     public static function shouldSearch(
         ?string $topic,
@@ -492,6 +495,7 @@ final class WebSearchTopicPolicy
         ?bool $promptToolInternet = null,
         ?bool $classifierVote = null,
         ?string $messageText = null,
+        bool $scheduledAssistant = false,
     ): bool {
         // Rule 1: explicit prompt opt-out is a hard disable (beats everything).
         if (false === $promptToolInternet) {
@@ -506,6 +510,12 @@ final class WebSearchTopicPolicy
         // Rule 3: media-generation topics never consume web context.
         if (self::isNonWebSearchTopic($topic)) {
             return false;
+        }
+
+        // A scheduled assistant run is an order. The classifier's vote does
+        // not get to drop it, and a short instruction is not small talk.
+        if ($scheduledAssistant) {
+            return true;
         }
 
         // Rule 4: trust the model's BWEBSEARCH vote, but veto trivial chats.

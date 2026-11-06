@@ -1,34 +1,47 @@
 <div align="center">
 
-<a href="https://www.synaplan.com"><img src="docs/images/hero.svg" alt="Synaplan — We produce AI freedom" width="100%"></a>
+<a href="https://www.synaplan.com"><img src="docs/images/hero.svg" alt="Synaplan. Own the flow." width="100%"></a>
 
-**We produce AI freedom.**
+# Synaplan. Own the flow.
 
-[**Try it hosted**](https://web.synaplan.com/) or [**run it yourself in three minutes**](#quickstart) — open-source, self-hosted AI platform (PHP/Symfony): chat with any model, RAG over your docs, embeddable widget, MCP, and see the cost of every answer. Apache-2.0. On web.synaplan.com you sign up with a paid plan or an invitation code. We send invitation codes to friends and partners who want to try it; write to [team@synaplan.com](mailto:team@synaplan.com). Running it yourself stays free.
+**Your knowledge, your models, your channels – one open-source AI platform you control end to end.**
 
-[Website](https://www.synaplan.com) &nbsp;·&nbsp; [Docs](https://docs.synaplan.com/) &nbsp;·&nbsp; [Live instance](https://web.synaplan.com/) &nbsp;·&nbsp; [iOS](https://apps.apple.com/app/id6784278288?ct=github-readme) &nbsp;·&nbsp; [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) &nbsp;·&nbsp; [Desktop](https://github.com/metadist/synaplan-desktop) &nbsp;·&nbsp; [Outlook Add-in](https://github.com/metadist/Synamail) &nbsp;·&nbsp; [Discord](https://discord.com/invite/kQB3eDjWfF)
+Build AI assistants on your own documents and put them wherever work happens: web, WhatsApp, email, Outlook, Nextcloud and ownCloud. Mix local models with the best cloud AI, see what every answer costs, and decide what the AI is allowed to do.
+
+[**Run it in three minutes**](#quickstart) &nbsp;·&nbsp; [**Try it hosted**](https://web.synaplan.com/) &nbsp;·&nbsp; [**Docs**](https://docs.synaplan.com/) &nbsp;·&nbsp; [**Discord**](https://discord.com/invite/kQB3eDjWfF)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/metadist/synaplan)](https://github.com/metadist/synaplan/releases)
 [![GitHub stars](https://img.shields.io/github/stars/metadist/synaplan?style=flat&logo=github)](https://github.com/metadist/synaplan/stargazers)
-[![Docker](https://img.shields.io/badge/Docker-one%20command-2496ED?logo=docker&logoColor=white)](#quickstart)
-[![Download on the App Store](https://img.shields.io/badge/App%20Store-Download-0D96F6?logo=apple&logoColor=white)](https://apps.apple.com/app/id6784278288?ct=github-readme)
-[![Get it on Google Play](https://img.shields.io/badge/Google%20Play-Download-414141?logo=googleplay&logoColor=white)](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme)
-[![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/kQB3eDjWfF)
-[![API Docs](https://img.shields.io/badge/API-OpenAPI%20%2F%20Swagger-6BA539?logo=openapiinitiative&logoColor=white)](https://web.synaplan.com/api/doc)
+[![Discord](https://img.shields.io/badge/Discord-join%20us-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/kQB3eDjWfF)
+
+<sub>Self-hosting is free. The hosted version opens with a paid plan or an invitation code – ask us at <a href="mailto:team@synaplan.com">team@synaplan.com</a>.</sub>
 
 </div>
-
----
-
-<p align="center">If Synaplan is useful to you, a star helps the next person find it.</p>
 
 <p align="center">
   <img src="docs/images/synaplan-admin-tour.gif" alt="A thirty-second tour of Synaplan: a chat answer and its cost, default models with cost badges, the file library, generated images and audio, and connected apps" width="100%">
 </p>
 
-<p align="center"><sub>Chat, what each answer cost, your files, generated media, and the apps you can connect. About 30 seconds.</sub></p>
+<p align="center"><sub>Chat, the cost of every answer, your files, generated media and connected apps – in about 30 seconds.</sub></p>
+
+---
+
+## Own the flow
+
+- **Own your channels.** One assistant answers on your website, in WhatsApp, by email, in Outlook and inside Nextcloud and ownCloud – with the same knowledge and the same rules everywhere.
+- **Own your models.** Hundreds of models from OpenAI, Anthropic, Google, Mistral, sovereign EU providers or locally via Ollama. Mix them per task: sensitive work stays local, everything else gets the best model for the job.
+- **Own your costs.** Every answer shows its model and price. A planner splits bigger requests into steps and spends the expensive model only where it matters.
+- **Own the decisions.** Actions like sending mail or creating tickets wait for your approval, and every step is logged.
+- **Own the stack.** On-prem, EU cloud or fully air-gapped. No training on your data, no forced telemetry, no feature paywall: self-hosted Synaplan is the same software as our cloud, under Apache-2.0.
+
+**Running in production at** Megaherz Yoga · SANI Pflegedienst · National Secure Cloud · PlateArt
+
+---
 
 ## Quickstart
+
+**You need:** Docker with Compose v2 and 8 GB of RAM.
 
 ```bash
 git clone https://github.com/metadist/synaplan.git
@@ -36,9 +49,37 @@ cd synaplan
 make up
 ```
 
-Open **<http://localhost:5173>**. Log in as `admin@synaplan.com` / `admin123` and type your first message: it starts the Synaplan Demo (40 messages/day for 14 days, no API key needed — [how it works](https://docs.synaplan.com/demo)). Or connect [your own AI key](https://docs.synaplan.com/own-ai-keys) (free: [Groq](https://console.groq.com)) or [local Ollama](https://docs.synaplan.com/modules/local-ai).
+Open **<http://localhost:5173>**, log in as `admin@synaplan.com` / `admin123` and say hello. Your first message starts the **Synaplan Demo – no API key needed** (40 messages a day for 14 days, [how it works](https://docs.synaplan.com/demo)). When you're ready, add [your own key](https://docs.synaplan.com/own-ai-keys) (free: [Groq](https://console.groq.com)) or run [local models with Ollama](https://docs.synaplan.com/modules/local-ai).
 
-A published image, a Docker GUI, a closed network, or a Linux server: [More ways to install](#more-ways-to-install).
+The first start downloads everything and takes 5–15 minutes. After that, Synaplan starts in seconds.
+
+> [!IMPORTANT]
+> These logins are for trying Synaplan on your own machine. On a server, use the [installer](#install-it-your-way) – it creates its own admin password.
+
+---
+
+## Install it your way
+
+| Where | How | Guide |
+| --- | --- | --- |
+| **Your machine** | `make up` – the quickstart above | [Quickstart](#quickstart) |
+| **Published image, no git** | One `compose.yaml`, then `docker compose up -d` | [Published image](docs/PLATFORM_REFERENCE.md#published-image-no-git-checkout) |
+| **Docker GUI** | Portainer, Dockge, Synology: paste the compose file as a stack | [Docker GUI](docs/PLATFORM_REFERENCE.md#published-image-no-git-checkout) |
+| **Closed network** | No route to the internet, HTTPS on your LAN address | [Closed network](docs/PLATFORM_REFERENCE.md#closed-network) |
+| **Linux server** | The installer pins a release, generates secrets and runs a smoke test | [On a server](docs/PLATFORM_REFERENCE.md#on-a-server) |
+| **Kubernetes** | Helm charts for clusters | [synaplan-charts](https://github.com/metadist/synaplan-charts) |
+| **One click** | [RepoCloud](https://repocloud.io/details/Synaplan/) · [Elestio](https://elest.io/open-source/synaplan) | – |
+
+A Linux server in one line:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | \
+  bash -s -- --mode server --domain https://ai.example.com
+```
+
+**Public sector & sovereign cloud (EU/CH):** [synaplan.eu](https://www.synaplan.eu/) covers openDesk, Nextcloud and OpenCloud deployments, on-premises or in an EU cloud.
+
+---
 
 ## How it compares
 
@@ -55,24 +96,11 @@ If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
 ---
 
-## Why Synaplan
-
-- **Freedom, not a plan tier.** The whole platform — backend, frontend, widgets, plugins — is Apache-2.0 and starts with one command. Self-hosted is the same software as the cloud, and a self-hosted install still lets people create their own accounts. The hosted platform at [web.synaplan.com](https://web.synaplan.com/) admits a new account with a paid plan or an invitation code. Friends and partners can ask for a code at [team@synaplan.com](mailto:team@synaplan.com).
-- **Hundreds of models, one place.** OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, HuggingFace, sovereign EU providers, and any local model via Ollama. Swap a provider per task in the UI.
-- **The planner spends the expensive model only where it matters.** A request becomes a small task graph (extract → summarize → generate → reply). Live cards show the steps. Every answer shows what it cost.
-- **Yours, including offline.** On-prem, EU cloud, or fully air-gapped. No training on your data. No forced telemetry.
-- **Where you already work.** Web, [iPhone](https://apps.apple.com/app/id6784278288?ct=github-readme), [Android](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme), [Desktop](https://github.com/metadist/synaplan-desktop), [Outlook](https://github.com/metadist/Synamail), a chat widget, WhatsApp, email — plus Microsoft 365, Dropbox, Nextcloud / ownCloud, calendars, Jira, Confluence and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
-- **Extend it without a fork.** Plugins, an OpenAPI REST API, an MCP server and client, and an Anthropic-compatible endpoint for Claude Code and friends. Optional sidecars stay off until you turn them on.
-
----
-
 ## Take the tour
 
 ![A tour through Synaplan: chat with live cost tracking, one-key provider setup, per-task model choice, document search, media generation, the embeddable chat widget and white-label branding](docs/images/synaplan-tour.webp)
 
-<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a></p>
-
-Click any screenshot to see it full size.
+<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a> &nbsp;·&nbsp; Click any screenshot to see it full size.</p>
 
 <table>
   <tr>
@@ -90,7 +118,7 @@ Click any screenshot to see it full size.
     </td>
     <td width="25%" align="center">
       <a href="docs/images/tour/rag-search.webp"><img src="docs/images/tour/thumbs/rag-search.webp" alt="Semantic search across uploaded documents" width="100%"></a><br>
-      <sub><b>RAG search</b><br>Semantic search over your files</sub>
+      <sub><b>Document search</b><br>Answers from your own files</sub>
     </td>
   </tr>
   <tr>
@@ -128,458 +156,87 @@ Click any screenshot to see it full size.
   </tr>
 </table>
 
-<sub>Regenerate these assets after a UI change with <code>scripts/build-readme-tour.sh</code>.</sub>
-
----
-
-## More ways to install
-
-The [quickstart](#quickstart) is a local checkout. The variants below are a published image, a machine with no route to the public internet, and a Linux server.
-
-### On this machine
-
-The [quickstart](#quickstart) is this path. Open **<http://localhost:5173>**. A status screen is up within seconds and lists every boot step, then switches to the app when it is ready. First start: 5–15 minutes. Later starts: seconds.
-
-`make up` answers on `:5173` first, then downloads the chat services (database, Redis, backend) before memories, spoken answers, office files and the dev tools. `docker compose up -d` starts the same stack; `:5173` stays quiet until every image has been pulled.
-
-1. Log in as `admin@synaplan.com` / `admin123`. The status screen shows this too.
-2. Type your first chat message: it starts the Synaplan Demo (14 days, 40 messages a day via `web.synaplan.com`). Or paste one provider key (free: [Groq](https://console.groq.com)). You do not edit a config file for that.
-3. Same notes in the terminal: `docker compose logs -f startup-notes`.
-
-No cloud key? `COMPOSE_PROFILES=local-ai ENABLE_LOCAL_GPT_OSS=true make up` pulls a local chat model (`gpt-oss:20b`, ~14 GB). Chat starts when the download finishes.
-
-### Published image, no git checkout
-
-One file is enough. A `.env` beside it is optional.
-
-```bash
-mkdir synaplan && cd synaplan
-curl -fsSL -o compose.yaml https://raw.githubusercontent.com/metadist/synaplan/main/deploy/quickstart/compose.yaml
-docker compose up -d
-```
-
-Open **<http://127.0.0.1:8000>**. The first visit opens the setup: create the administrator, then click **Start with Synaplan Demo** or paste one provider key (free: [Groq](https://console.groq.com)), done. The first start pulls the images and takes a few minutes.
-
-Need a smaller footprint (~3.2 GB instead of ~5.3 GB)? [`deploy/quickstart/compose.lite.yaml`](deploy/quickstart/compose.lite.yaml) omits `tts`, `qdrant` (document search stays on MariaDB VECTOR; memories pause) and `centrifugo` while keeping the exact same volume names — so you can switch to `compose.yaml` later without losing a single chat or file.
-
-**Docker GUI** (Portainer, Dockge, Synology Container Manager, …): create a stack, paste [`deploy/quickstart/compose.yaml`](deploy/quickstart/compose.yaml) as its compose file, deploy. Any setting from [`deploy/quickstart/.env.example`](deploy/quickstart/.env.example) goes into the stack's environment variables — nothing is required. When the GUI runs on another machine (a NAS or a server), add `SYNAPLAN_HTTP_BIND=0.0.0.0` and `SYNAPLAN_URL=http://<that machine's IP>:8000`; without them Synaplan only opens on that machine itself. Dockge marks the stack "exited" once the one-time `secrets-init` step has finished; that is expected, and Synaplan keeps running.
-
-**Settings** go into `.env`, then `docker compose up -d` again (in a GUI: the stack's variables, then redeploy):
-
-- `SYNAPLAN_VERSION` picks a release tag from the [releases page](https://github.com/metadist/synaplan/releases). Empty means the release this file was published with. Never `latest`.
-- `SYNAPLAN_HTTP_BIND=0.0.0.0` plus `SYNAPLAN_URL=http://<this machine's IP>:8000` opens it to your network. `SYNAPLAN_URL` must be the address people type, or live chat stays disconnected. Over plain `http://` on a network address, browsers block the microphone and copying to the clipboard; chat and files work. For those two, use [Closed network](#closed-network) HTTPS.
-- Provider keys, a bootstrap administrator and mail are listed in the example with one line each.
-
-**Data** lives in named Docker volumes — the database, uploads, vectors and the generated secrets. Keep them together: a database without its `secrets` volume does not start. `docker compose down` keeps everything; `docker compose down -v` deletes it all.
-
-**Change the release:** back up the volumes, set `SYNAPLAN_VERSION`, run `docker compose up -d` (or redeploy the stack in the GUI). Going back to an older tag after a newer one migrated the database means restoring that backup. The steps are in [Update a self-hosted deployment](docs/UPDATE_SELFHOST.md#quickstart-volumes).
-
-Office documents, local AI, file work, closed-network TLS and scripted backups use the full [`deploy/compose.yaml`](deploy/compose.yaml) with [`deploy/selfhost.env.example`](deploy/selfhost.env.example) instead.
-
-### Closed network
-
-Opt-in. The default stays `http://127.0.0.1:8000` on this machine.
-
-Turn it on when the network has **no route to the public internet** and people open Synaplan by the machine's address. Chat needs `https://<address>/`. The machine creates the certificate. The browser warns once.
-
-Any IPv4 address on that network works, including `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `100.64.0.0/10` and `169.254.0.0/16`, plus a block you assigned and do not announce.
-
-```bash
-cp deploy/selfhost.env.example deploy/.env
-# Set SYNAPLAN_VERSION. Leave SYNAPLAN_HTTP_BIND at 127.0.0.1.
-deploy/scripts/local-tls.sh 10.0.0.15
-deploy/scripts/prepare.sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml pull
-deploy/scripts/validate-release.sh
-docker compose --env-file deploy/.env -f deploy/compose.yaml up -d
-```
-
-Colleagues open **https://10.0.0.15/**. Ports 80 and 443 must be free. The app itself stays on `127.0.0.1:8000`. A second interface is another argument: `deploy/scripts/local-tls.sh 10.0.0.15 192.168.1.20`. A public name keeps your own HTTPS proxy and leaves this off.
-
-Details: [docs.synaplan.com/local-network](https://docs.synaplan.com/local-network) · [deploy/README.md](deploy/README.md#local-network).
-
-### On a server
-
-The commands above are the development stack (source build, Vite, MailHog, phpMyAdmin) or the published image. For a Linux server, the installer writes `deploy/.env`, pins the latest release, and runs prepare → pull → validate → start → smoke-test. Secrets land in `deploy/data/secrets.env`.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | \
-  bash -s -- --mode server --domain https://ai.example.com
-```
-
-The same steps by hand are in [Installation](docs/INSTALLATION.md) and [deploy/README.md](deploy/README.md). Flags: `bash install.sh --help`.
-
-One-liner for the development stack, if you would rather not clone by hand:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh | bash
-```
-
-### One-click deploy
-
-<a href="https://repocloud.io/details/Synaplan/"><img src="https://d16t0pc4846x52.cloudfront.net/deploylobe.svg" alt="Deploy on RepoCloud" height="42"></a>
-<a href="https://elest.io/open-source/synaplan"><img src="https://elest.io/images/logos/deploy-to-elestio-btn.png" alt="Deploy on Elestio" height="42"></a>
+<!-- Regenerate these assets after a UI change with scripts/build-readme-tour.sh -->
 
 ---
 
 ## One AI, everywhere you work
 
-The same assistant, the same knowledge base, the same model policy — on every channel your team already uses. Connect a system once under **Channels**; the planner can then read from it and deliver results into it.
-
-### Conversation surfaces
+The same assistant, the same knowledge, the same model policy – on every channel your team and your customers already use.
 
 | Surface | What it does | Get it |
-|---------|--------------|--------|
-| **Web app** | Full chat + admin UI, light/dark, five languages | This repo — `make up` |
-| **Mobile apps** | Chat, documents and voice on iPhone and Android — pointed at web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
-| **Synaplan Desktop** | Pair a computer and run skills on it. In the web app: **Channels → Synaplan Desktop**. No installer yet — build from the repository. | [metadist/synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
-| **Outlook add-in** | Bring Synaplan into Outlook (Web, new & classic, Mac) — find and process mail without sending it anywhere | [metadist/Synamail](https://github.com/metadist/Synamail) |
-| **Chat widget** | Embed your assistant on any website with one snippet — cross-origin ready, human takeover included | [Widget guide](https://docs.synaplan.com/index.php/widget) |
-| **WhatsApp & Email** | The AI answers on the channel the question came in on | [WhatsApp](docs/WHATSAPP.md) · [Email](docs/EMAIL.md) |
-| **MCP & Claude Code** | Your RAG and memories as MCP tools; Anthropic-compatible `POST /v1/messages` endpoint | [MCP guide](https://docs.synaplan.com/index.php/mcp) · [guide](docs/ANTHROPIC_COMPATIBLE_API.md) |
+| --- | --- | --- |
+| **Web app** | Full chat and admin UI, light and dark, five languages | This repo |
+| **Mobile apps** | Chat, documents and voice on iPhone and Android – on web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
+| **Outlook add-in** | Find and process mail inside Outlook (Web, new & classic, Mac) without sending it anywhere | [Synamail](https://github.com/metadist/Synamail) |
+| **Chat widget** | Your assistant on any website with one snippet, human takeover included | [Widget guide](https://docs.synaplan.com/widget) |
+| **WhatsApp & email** | The AI answers on the channel the question came in on | [WhatsApp](docs/WHATSAPP.md) · [Email](docs/EMAIL.md) |
+| **Nextcloud, ownCloud & OpenCloud** | Use your assistants inside your file cloud, with its files as knowledge – your file store stays in charge | [Nextcloud](https://web.synaplan.com/apps/nextcloud) · [ownCloud](https://web.synaplan.com/apps/owncloud) · [OpenCloud](https://github.com/metadist/synaplan-opencloud) |
+| **Synaplan Desktop** | Pair a computer and run skills on it (no installer yet – build from source) | [synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
+| **MCP & Claude Code** | Your knowledge and memories as MCP tools, plus an Anthropic-compatible endpoint | [MCP guide](https://docs.synaplan.com/mcp) |
 
-### Connected systems
-
-Set these up under **Manage → Connections** (or **Manage → Connections → MCP Servers** / **Manage → Channels → Email**). In chat, use the channel word shown as a pill on the Connections page — for example *nextcloud*, *dropbox*, *outlook*.
-
-| Channel | What it unlocks | Setup |
-|---------|-----------------|-------|
-| **Microsoft 365** | Live Outlook mail search, calendar events (`outlook`), send from your own mailbox | **Manage → Connections** — OAuth, no password stored |
-| **Dropbox** | Save generated files into a Dropbox folder (`dropbox`) | **Manage → Connections** — OAuth |
-| **Nextcloud / ownCloud / WebDAV** | File results into a folder you own (`nextcloud` / `folder`) | **Manage → Connections** — app password, never your account password |
-| **CalDAV calendar** | Put generated meetings into a calendar you own (`calendar`) | Same Nextcloud preset can create folder + calendar in one step |
-| **IMAP mailbox** | Live search of any IMAP inbox, merged with Microsoft 365 results | **Manage → Channels → Email** |
-| **Jira & Confluence** | Search and summarize; create tickets or pages when you allow writes. A pasted Confluence page is read through the signed-in account | **Manage → Connections → MCP Servers** — Jira & Confluence card, then sign in with Atlassian (no API token) |
-| **Saved Tasks** | Pin a plan and run it on demand or on a schedule (hourly / daily / weekdays) | **Manage → Automations → Saved Tasks** |
-| **Nextcloud / OpenCloud apps** | Use files from those clouds as AI knowledge — the file store stays in charge | [synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) · [synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) |
-
-Details and channel words: [docs/CONNECTIONS.md](docs/CONNECTIONS.md).
+**Connects to** Microsoft 365 · Dropbox · Nextcloud / ownCloud / WebDAV · CalDAV · IMAP · Jira & Confluence · your own MCP servers – [how to connect](docs/CONNECTIONS.md)
 
 ---
 
-## The Synaplan ecosystem
+## Under the hood
 
-Everything below is the same platform, packaged for different homes. Pick what fits — nothing else is required.
+- **Stack:** Symfony (PHP) backend, Vue frontend, MariaDB VECTOR or Qdrant for document search, Redis, Docker.
+- **Lean core:** app, database and Redis. Local AI, office files, web search, voice and more are building blocks you switch on when you need them.
+- **Open by design:** OpenAPI REST API, MCP server and client, an Anthropic-compatible `/v1/messages` endpoint and a plugin system – extend Synaplan without forking it.
 
-| Project | What it is |
-|---------|------------|
-| **[synaplan](https://github.com/metadist/synaplan)** | The platform itself (this repo): backend, frontend, widget, plugins, dev stack, and the `deploy/` production contract with Elestio, AWS Marketplace, and Umbrel adapters |
-| **[synaplan-charts](https://github.com/metadist/synaplan-charts)** | Helm charts for Kubernetes — for partners and enterprises running K8s clusters |
-| **[Mobile apps](https://github.com/metadist/synaplan-apps)** | Native iOS and Android — [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
-| **[synaplan-desktop](https://github.com/metadist/synaplan-desktop)** | Synaplan Desktop — pair a computer and run skills on it. No installer yet; build from source. |
-| **[Synamail](https://github.com/metadist/Synamail)** | Outlook add-in (Web, new & classic, Mac) — Synaplan inside your mailbox |
-| **[synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud)** / **[synaplan-opencloud](https://github.com/metadist/synaplan-opencloud)** | Apps for Nextcloud / OpenCloud — use those files as AI knowledge while the file store stays in charge (ownCloud works via the built-in WebDAV connection) |
-| **[synaplan-tts](https://github.com/metadist/synaplan-tts)** | Optional self-hosted text-to-speech service for voice output |
-| **[synaplan-base-php](https://github.com/metadist/synaplan-base-php)** | The base Docker image (FrankenPHP + gRPC + whisper.cpp) the platform builds on |
-
----
-
-## Prerequisites
-
-- **Docker** + **Docker Compose v2** (Docker Desktop on macOS/Windows, or Docker Engine + the Compose plugin on Linux)
-- **Git** (the one-line installer also works with `curl` + `tar` when git is missing)
-- **8 GB RAM** minimum (16 GB recommended once you add the `local-ai` profile)
-- **~4 GB free disk** for the standard install (includes file work + spoken answers; +~1 GB for `local-ai`, +~14 GB if you also enable the local chat model)
-- A few host ports must be free. The list, and how to change one without editing the Compose file, is in [Installation — Port conflicts](docs/INSTALLATION.md#port-conflicts).
-
-> **Apple Silicon (M1–M4) Macs — build the backend image, don't pull it.** The three-step start above already does this: `make up` builds the backend and worker locally from a multi-arch base image, so PHP/FrankenPHP runs **natively on `arm64`** with no emulation tax. That is by far the fastest setup, and it is the default — you don't have to do anything special. (The published `ghcr.io/metadist/synaplan` image is multi-arch too, so pulling it also runs natively.) The first local build takes a few minutes; every later start is a cache hit. phpMyAdmin is the official multi-arch image and runs natively on Apple Silicon. MailHog is still an amd64-only upstream image — if you keep it, enable **Docker Desktop → Settings → General → "Use Rosetta for x86/amd64 emulation on Apple Silicon"** (macOS 13+) so it emulates quickly.
-
----
-
-## Install Options
-
-| Mode | Command | Size | Best For |
-|------|---------|------|----------|
-| **One-liner** | `curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh \| bash` | ~4 GB | Easiest start — checks prerequisites, fetches, and starts the standard stack (`--mode server` available for production) |
-| **Standard** | `make up` | ~4 GB | Local try-out: chat works after one click (Synaplan Demo or your own key), file work, spoken answers — status page first, then the rest |
-| **Quickstart (lite)** | `deploy/quickstart/compose.lite.yaml` | ~3.2 GB | Published image, 6 runtime containers (no git clone, no `.env`; shares volumes with `compose.yaml`) |
-| **+ local AI** | `COMPOSE_PROFILES=local-ai make up` | ~5 GB | Adds Ollama and the `bge-m3` embedding model on your own hardware (local chat model optional, +~14 GB) |
-| **Production** | `install.sh --mode server` or `deploy/` compose + scripts | published image | Self-host on a Linux server — see [Installation](docs/INSTALLATION.md) |
-| **Kubernetes** | [synaplan-charts](https://github.com/metadist/synaplan-charts) | published image | Helm-based cluster deployments for partners and enterprises |
-
-**Public sector & sovereign cloud (EU/CH):** [synaplan.eu](https://www.synaplan.eu/) covers openDesk, Nextcloud and OpenCloud deployments, on-premises or in an EU cloud.
-
-A plain `docker compose up -d` starts the same stack but `:5173` stays silent until every image is pulled. `make up` answers within seconds, then finishes chat before it downloads the optional images.
-
-No AI weights are downloaded by default, so the first boot is dominated by the Docker images and `npm ci`. `COMPOSE_PROFILES=local-ai` is the same switch a self-hosted install uses in `deploy/.env`, and it pulls the local embedding model (`bge-m3`, ~1 GB) in the background for RAG and semantic search; progress is shown in the app.
-
-Prefer the shell to the UI for provider keys? Keys in `backend/.env` still work — the backend reads that file when the container starts and imports the key into the encrypted store on first use. Write the key before starting, or restart the containers afterwards:
-
-```bash
-echo "GROQ_API_KEY=your_key" >> backend/.env
-make up
-# already running? pick up the new key with:
-# docker compose restart backend worker
-```
-
----
-
-## Access
-
-Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API docs at <http://localhost:8000/api/doc>. phpMyAdmin, MailHog, Qdrant, Tika, Ollama and TTS: [Installation — Development service URLs](docs/INSTALLATION.md#development-service-urls).
-
-**Default Login Credentials:**
-
-| Email | Password | Level |
-|-------|----------|-------|
-| admin@synaplan.com | admin123 | ADMIN |
-| demo@synaplan.com | demo123 | PRO |
-| test@example.com | test123 | NEW (unverified) |
-
-> ⚠️ These logins are public knowledge — anyone who can open your instance can use them. Change the admin password after your first login, and never expose an install that still uses them to a network others can reach. For a server, use [On a server](#on-a-server): the installer generates its own admin password.
-
----
-
-## Features
-
-- **AI Chat** — Ollama, OpenAI, Anthropic, Gemini, Groq, Mistral, xAI, TrustedTokens (DE), A2Agent (CN), HuggingFace ([provider list](#ai-providers--models))
-- **Self-aware assistant** — Ask "What can you do here?" or type `/help`; the AI assistant answers from this installation's live capabilities, not a generic brochure
-- **Multi-Task DAG Routing** — An AI planner decomposes complex requests into a directed task graph (extract → summarize → generate → reply), routes each step to the model that fits it, and streams live task cards while the steps execute — cheaper models for simple steps means fewer wasted tokens
-- **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
-- **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/index.php/widget))
-- **Mobile Apps** — Chat, documents and voice on iPhone and Android, pointed at web.synaplan.com or at your own server ([App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme))
-- **Synaplan Desktop** — Pair a computer and run skills on it. Open **Channels → Synaplan Desktop**. No installer yet ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
-- **AI assistants** — Saved recipes (instructions, knowledge folders, tools, triggers) that you publish in versions ([assistants](https://docs.synaplan.com/assistants))
-- **Tools & approvals** — One tool registry; write-class actions pause under **Approvals** ([tools](https://docs.synaplan.com/tools-and-approvals))
-- **Users & groups** — Share folders, chats, assistants and tasks; **Operate → Users** ([people](https://docs.synaplan.com/people-and-groups))
-- **File work** — Short Python or Node runs on *copies* of files you picked, in an isolated sidecar ([guide](docs/COMPUTE.md))
-- **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md))
-- **WhatsApp** — Meta Business API integration
-- **Email** — AI-powered email responses, plus live mailbox search (IMAP and Microsoft 365)
-- **Connections** — Microsoft 365, Dropbox, Nextcloud / ownCloud / WebDAV, CalDAV — read mail, file results, write calendar events ([connections guide](docs/CONNECTIONS.md))
-- **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule, with a **Steps** editor and webhook trigger (**Manage → Automations → Saved Tasks**)
-- **Watched pages** — Save a URL, compare it on a schedule, and mail the diff when it changes
-- **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output; five baked voices, UI language selects the voice)
-- **Documents** — PDF, Word, Excel, images with OCR; the assistant can also build and revise Office files; optional Collabora CODE sidecar for thumbnails, PDF export, preview and combine ([office documents](https://docs.synaplan.com/index.php/office-documents))
-- **AI Memories** — User profiling with Qdrant vector search
-- **Feedback System** — Feedback capture and analysis powered by Qdrant
-- **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/index.php/plugins))
-- **MCP Server** *(early access)* — Connect AI clients (Claude, Cursor, …) over the Model Context Protocol; your RAG and memories become tools at `POST /mcp` ([MCP guide](https://docs.synaplan.com/index.php/mcp))
-- **MCP Client** *(early access)* — Connect *your* MCP servers (Jira, Confluence, CRM, wiki, n8n, …) under **Manage → Connections → MCP Servers**. The planner pulls live data via `mcp_fetch` and, when you enable **allow write actions** on that server, can create tickets or pages via `mcp_action` — destructive tools stay refused. SSRF-guarded, per-topic opt-in. Seeded `BCONFIG` flags (`MCP.CLIENT_ENABLED`, `MULTITASK.MCP_FETCH_ENABLED`, `MULTITASK.MCP_ACTION_ENABLED`) turn this on; an explicit `0` row is the operator kill switch. See [docs/MULTITASK_DATA_NODES.md](docs/MULTITASK_DATA_NODES.md)
-- **Claude Code & Anthropic-compatible API** — Point Claude Code or any Anthropic-protocol client at your instance (`POST /v1/messages`); configure under **Manage → Developer & devices → Coding clients** ([guide](docs/ANTHROPIC_COMPATIBLE_API.md))
-
----
-
-## AI Providers & Models
-
-Synaplan is provider-neutral: connect the providers you want in **Operate → AI infrastructure → Providers & keys** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — those are read at container start and imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
-
-A new OpenAI-compatible provider is one class. Names, icons, the key check and the outbound allowlist all read that class. The command is in [docs/PROVIDERS.md](docs/PROVIDERS.md).
-
-| Provider | Variable in `backend/.env` | Models |
-|----------|---------------------------|--------|
-| OpenAI | `OPENAI_API_KEY` | GPT-5.6 Sol / Terra / Luna, GPT-5.5 (+ Pro), GPT-5.4 (+ mini), GPT Image, Whisper, text-embedding-3 |
-| Anthropic | `ANTHROPIC_API_KEY` | Claude Opus 5, Sonnet 5, Fable 5, Opus 4.8, Haiku 4.5 (chat + vision) |
-| Google Gemini | `GOOGLE_GEMINI_API_KEY` | Gemini 3.x / 2.5 chat + vision, Nano Banana (incl. Pro / Lite), Veo 3.1, Gemini TTS |
-| Groq | `GROQ_API_KEY` | Qwen 3.6 27B (chat + vision), GPT-OSS 20B/120B, Whisper Large v3 |
-| Mistral 🇫🇷 | `MISTRAL_API_KEY` | Mistral Medium 3.5 (+ vision), Mistral Large 3, Mistral Large 4 (+ vision), Voxtral transcription + TTS |
-| xAI | `XAI_API_KEY` | Grok 4.7 / 4.6 / 4.5 (+ vision, 500K context), Grok Imagine image + video (incl. Pro / 1.5 tiers) |
-| [Meta](https://dev.meta.ai/) | `META_API_KEY` | Muse Spark 1.3, Muse Wonder (+ vision), Muse Image, Muse Voice Transcribe — Meta Model API |
-| [Cerebras](https://cloud.cerebras.ai/) | `CEREBRAS_API_KEY` | Qwen 3.8 27B (+ vision), GPT OSS 120B — very fast inference (~2,000–3,000 tokens/s) |
-| [TrustedTokens](https://trustedtokens.eu/) 🇩🇪 | `TRUSTEDTOKENS_API_KEY` | GLM 5.2 / 5.3 (+ Flash vision), Chimera, Qwen3.6 35B (+ vision), GPT OSS 120B — sovereign inference on German GPUs (TNG), zero data retention |
-| [A2Agent](https://a2agent.me/) 🇨🇳 | `A2AGENT_API_KEY` | Qwen3.8 MAX / Flash (+ vision), DeepSeek V4 Pro / Flash, MiniMax M3 — Chinese frontier models via the A2Agent gateway |
-| HuggingFace | `HUGGINGFACE_API_KEY` | Kimi K3.1 Pro / K3 / K2.5 / K2.6 / K2.7 Code (chat + vision) |
-| TheHive | `THEHIVE_API_KEY` | Flux Schnell, SDXL |
-| Higgsfield | `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET` | Soul, Reve, DoP, Kling 2.1 |
-| Cloudflare Workers AI | `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` | bge-m3 embeddings (also usable as embedding fallback) |
-| Ollama 🇩🇪 self-hosted | `OLLAMA_BASE_URL` (no key) | Any local model — chat, vision, bge-m3 embeddings |
-
-**Transparent pricing.** Every model carries its provider's own rate (USD per 1M tokens in/out, or per image / second / character for media) — no proprietary credit unit in between. The selector shows a Free / Low / Mid / High cost badge next to each model and on every answer, `GET /api/v1/config/models` returns `priceIn` / `priceOut`, and the Statistics page logs the real cost of each call. On the hosted instance at [web.synaplan.com](https://web.synaplan.com/) that same catalog is what your plan meters against; self-hosted with Ollama, the per-token cost is simply zero. Details: [Model pricing & cost transparency](https://docs.synaplan.com/index.php/faq).
-
-> Model catalog changes (new models, retired generations, price updates) ship as seeders, so an existing install is repointed to a supported successor instead of silently keeping a dead model — a retirement records the successor and every install is switched off on the next deploy. See [docs/PRICING_MAINTENANCE.md](docs/PRICING_MAINTENANCE.md).
-
----
-
-## Lean by design: core vs optional building blocks
-
-`make up` starts a complete platform, but the **core is deliberately small**: the app, its database and Redis. Everything else is a building block that adds one capability and costs RAM. Switch a block on when you need it and off when you don't — Synaplan keeps running either way and simply hides the matching feature. The boot status screen at <http://localhost:5173> lists the live on/off state of every block, and **Operate → System status** (`/admin/features`) does the same after login.
-
-| Block | Gives you | Default | Switch |
-|-------|-----------|---------|--------|
-| **Core** — `frontend`, `backend`, `worker`, `scheduler`, `db` (MariaDB), `redis` | The app, its API, async jobs, scheduled jobs, storage, cache and queues | always on | — |
-| **Ollama** (`ollama`) | Local AI on your hardware: `bge-m3` embeddings for document search, optional local chat (`ENABLE_LOCAL_GPT_OSS=true`) | **off** | `COMPOSE_PROFILES=local-ai make up` — the same switch as `deploy/.env` in production |
-| **Qdrant** (`qdrant`) | Vector database for AI memories, feedback analysis and large-scale RAG | on | `docker compose stop qdrant` — document search itself runs on **MariaDB VECTOR** (the default `VECTOR_STORAGE_PROVIDER`), so RAG keeps working; memories pause |
-| **Centrifugo** (`centrifugo`) | Live support: human takeover of widget chats, typing indicators, operator notifications ([realtime guide](docs/REALTIME.md)) | on | `REALTIME_ENABLED=false make up` (then `docker compose stop centrifugo`) — the dashboard falls back to plain REST refreshes |
-| **Apache Tika** (`tika`) | Text extraction from PDF, Word, Excel and 1000+ formats for RAG | on | `docker compose stop tika` — uploads then index plain text / OCR only |
-| **Collabora CODE** (`collabora`) | Office files: thumbnails, “Download as PDF”, inline preview, “Combine as PDF” (~2 GB RAM) — [details](docs/INSTALLATION.md#office-conversion-collabora) | **on** | `docker compose stop collabora` |
-| **Docling** (`docling`) | Layout-aware extraction (tables, headings) in front of Tika — [module](https://docs.synaplan.com/modules/docling) | **off** | `docker compose --profile docling up -d` |
-| **SearXNG** (`searxng`) | Self-hosted web search so queries stay on your network — [module](https://docs.synaplan.com/modules/searxng) | **off** | `docker compose --profile searxng up -d` |
-| **File work** (`compute`) | Short Python / Node jobs on copies of files you pick — [details](docs/INSTALLATION.md#file-work-secure-compute) | **on** | `COMPUTE_URL=disabled make up` |
-| **Text-to-speech** (`tts`) | Spoken answers, five built-in voices — [details](#text-to-speech) | **on** | `docker compose stop tts` |
-| **Keycloak** (`keycloak`) | SSO test realm for OIDC development ([configuration](docs/CONFIGURATION.md)) | **off** | `docker compose --profile oidc up -d` |
-
-**Keep a default-on block off across restarts.** `docker compose stop` is undone by the next `up -d`. To make a block opt-in permanently, give it a profile in a `docker-compose.override.yml` (not tracked by git) — plain `up -d` then skips it, `--profile optional` brings it back:
-
-```yaml
-services:
-  qdrant:
-    profiles: [optional]
-```
-
-Production follows the same rule set: [`deploy/compose.yaml`](deploy/README.md) always starts web/worker/scheduler plus db/redis/centrifugo/tika/qdrant and spoken answers, with `office`, `local-ai` and `compute` as profiles (`COMPOSE_PROFILES=office,local-ai,compute` in `deploy/.env`). Kubernetes installs wire the same services via [synaplan-charts](https://github.com/metadist/synaplan-charts). The other dev-only containers (`phpmyadmin`, `mailhog`, `frontend-widgets`, `startup-notes`) never ship to production.
-
----
-
-## Realtime & Background Processing
-
-Both compose files also start four internal services (no host ports, no setup needed):
-
-| Service | Role |
-|---------|------|
-| `redis` | Mandatory shared infrastructure: cache, sessions, locks, rate limits, message queues (Redis Streams), Centrifugo engine |
-| `centrifugo` | WebSocket gateway for realtime features (live chat takeover, typing indicators, operator notifications) — browsers connect same-origin via `/connection/websocket` |
-| `worker` | Symfony Messenger consumer that executes async jobs (AI processing, document indexing, widget crawling) |
-| `scheduler` | Ticks every 60 s: saved tasks, media-job reaping, ephemeral-file cleanup, update check |
-
-In a multi-node cluster all nodes share one Redis, so WebSocket events published on one node reach browsers connected to any other. Details: [docs/REALTIME.md](docs/REALTIME.md).
-
----
-
-## Text-to-Speech
-
-Voice output starts with `make up` — [synaplan-tts](https://github.com/metadist/synaplan-tts), image [`ghcr.io/metadist/synaplan-tts`](https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts). The image already contains **five Piper voices** (English, German, Spanish, French, Turkish). Stop the `tts` container to hide the speaker control.
-
-```bash
-# Already running after `make up`. Standalone on another machine:
-docker run -d --name synaplan-tts -p 127.0.0.1:10200:10200 ghcr.io/metadist/synaplan-tts:latest
-```
-
-The backend looks at `SYNAPLAN_TTS_URL` (compose default `http://tts:10200`).
-
-**The UI language selects the voice.** Chat sends the active frontend locale (`en` / `de` / `es` / `fr` / `tr`); if the backend detects a different reply language, that wins. Piper then maps the short code to the matching baked voice (German UI → kerstin, Spanish → davefx, …). There is no separate voice picker. Add more Piper models by dropping `.onnx` + `.onnx.json` into the extra-voices volume — see [synaplan-tts README](https://github.com/metadist/synaplan-tts#adding-more-voices) and [docs.synaplan.com/tts](https://docs.synaplan.com/index.php/tts).
-
----
-
-## Office documents
-
-Thumbnails, PDF export, inline preview and “Combine as PDF” use Collabora CODE. `make up` starts it. Chat and DOCX / XLSX / PPTX generation still work if you stop it. The URL is `http://collabora:9980` in `backend/.env.example`. Setup: [Installation — Office conversion](docs/INSTALLATION.md#office-conversion-collabora).
-
----
-
-## File work
-
-The assistant can run a short Python or Node program on copies of files you already picked. `make up` starts it. The dev token, and how to turn the sidecar off, are in [Installation — File work](docs/INSTALLATION.md#file-work-secure-compute).
-
----
-
-## Common Commands
-
-```bash
-# Startup progress ("please wait..." notes + READY message)
-docker compose logs -f startup-notes
-
-# Logs
-docker compose logs -f backend
-
-# Restart
-docker compose restart backend
-
-# Reset database
-docker compose down -v && make up
-
-# Run tests
-make test
-
-# Code quality
-make lint
-```
+Full feature list, every AI provider, all building blocks and developer commands: **[Platform reference](docs/PLATFORM_REFERENCE.md)**.
 
 ---
 
 ## Troubleshooting
 
 | Problem | What to do |
-|---------|------------|
-| "Port already in use" on start | A host port Synaplan needs is taken — the list and how to move one are in [Port conflicts](docs/INSTALLATION.md#port-conflicts) |
-| Containers stop right after start | Give Docker at least 8 GB RAM (see [Prerequisites](#prerequisites)), then look at `docker compose logs -f backend` |
-| Chat gives no answers | Use the Synaplan Demo, paste one provider key, or add the `local-ai` profile — all three are in the [quickstart](#quickstart) |
-| First start seems stuck | The first start downloads all images and takes 5–15 minutes; `docker compose logs -f startup-notes` shows where it is |
+| --- | --- |
+| "Port already in use" on start | A port Synaplan needs is taken – see [Port conflicts](docs/INSTALLATION.md#port-conflicts) |
+| Containers stop right after start | Give Docker at least 8 GB of RAM, then check `docker compose logs -f backend` |
+| Chat gives no answers | Use the Synaplan Demo, paste one provider key, or add the `local-ai` profile – see the [quickstart](#quickstart) |
+| First start seems stuck | The first start downloads all images and takes 5–15 minutes. `docker compose logs -f startup-notes` shows where it is |
 | Anything else | Ask in [Discord](https://discord.com/invite/kQB3eDjWfF) or open a [GitHub issue](https://github.com/metadist/synaplan/issues) |
 
 ---
 
-## Documentation
+## Learn more
 
-- **Public user & product docs:** **[docs.synaplan.com](https://docs.synaplan.com/)** (source: [`metadist/synaplan-docs`](https://github.com/metadist/synaplan-docs))
-- **In-repository technical manual & learning path:** **[`docs/README.md`](docs/README.md)** — organized into five sequential tracks with previous/next navigation in every guide.
-
-Changing this codebase? Start with one of these two:
-
-| I want to… | Open |
-| ---------- | ---- |
-| Add an AI provider | [PROVIDERS.md](docs/PROVIDERS.md) — one class, one command |
-| Follow a tool call | [ARCHITECTURE.md](docs/ARCHITECTURE.md#tool-path) — one invoker for chat, the APIs, Saved Tasks and MCP |
-
-### Learning Tracks in [`docs/`](docs/README.md)
-
-| Track | Guides |
-| ----- | ------ |
-| **1. Getting Started & Deployment** | [Platform Capabilities](docs/FEATURES.md) → [Installation](docs/INSTALLATION.md) → [Configuration & AI Providers](docs/CONFIGURATION.md) → [Feature Flags](docs/FEATURE_FLAGS.md) → [Runtime & Outbound Options](docs/RUNTIME_OPTIONS.md) → [Update Self-Hosted](docs/UPDATE_SELFHOST.md) · [Elestio](docs/UPDATE_ELESTIO.md) · [AWS](docs/UPDATE_AWS.md) |
-| **2. Administration, Security & Billing** | [Day-2 Operations & Governance](docs/ADMIN.md) → [Health Probes](docs/HEALTH_MONITORING.md) → [Observability](docs/OBSERVABILITY.md) → [Outbound Traffic & Egress](docs/EGRESS.md) → [Self-Hosted Billing](docs/BILLING_SELFHOST.md) → [Payment Channels & IAP](docs/PAYMENTS_CHANNELS.md) → [Model Pricing](docs/PRICING_MAINTENANCE.md) → [Price Drift Procedure](docs/PRICE_DRIFT_PROCEDURE.md) → [AWS Marketplace AMI](docs/AWS_MARKETPLACE_LISTING.md) |
-| **3. AI Engine, Knowledge & Execution** | [Knowledge Base & RAG](docs/RAG.md) → [Conversation Continuity & Memory](docs/CONVERSATION_CONTINUITY.md) → [Session Files & Edits](docs/SESSION_FILES.md) → [Multi-Task Data Nodes](docs/MULTITASK_DATA_NODES.md) → [Deep & Automatic Research](docs/RESEARCH.md) → [Secure Compute (File Work)](docs/COMPUTE.md) |
-| **4. Channels, Gateways & Integrations** | [External Connections](docs/CONNECTIONS.md) → [Saved Tasks & n8n](docs/N8N.md) → [OpenAI-Compatible API (`/v1`)](docs/OPENAI_COMPATIBLE_API.md) → [Anthropic Messages API (`/v1/messages`)](docs/ANTHROPIC_COMPATIBLE_API.md) → [Synaplan Desktop Protocol](docs/DESKTOP.md) → [Chat Widget](docs/WIDGET.md) → [WhatsApp](docs/WHATSAPP.md) → [Email](docs/EMAIL.md) → [Live Voice](docs/LIVE_VOICE.md) → [Self-Hosted Voice](docs/LIVE_VOICE_SELF_HOSTED.md) → [openDesk Meeting Notes](docs/OPENDESK_MEETING_NOTES.md) |
-| **5. Developer & Contributor Guide** | [Local Development](docs/DEVELOPMENT.md) → [Backend Architecture](docs/ARCHITECTURE.md) → [Adding an AI Provider](docs/PROVIDERS.md) → [PHP Conventions](docs/PHP_CONVENTIONS.md) → [Frontend Conventions](docs/FRONTEND_CONVENTIONS.md) → [OpenAPI & Zod Patterns](docs/API_PATTERNS.md) → [Realtime WebSockets](docs/REALTIME.md) → [Migrations & Seeders](docs/MIGRATIONS.md) → [UX Contract (U1–U12)](docs/UX_CONTRACT.md) → [E2E Testing](docs/E2E_TESTING.md) → [Renovate PR Review](docs/DEPENDENCY_UPDATES.md) |
-
-## Related Repositories
-
-| Repo | Purpose |
-|------|---------|
-| [synaplan](https://github.com/metadist/synaplan) | Main app (this repo) |
-| [synaplan-docs](https://github.com/metadist/synaplan-docs) | Public docs site (docs.synaplan.com) |
-| [Synamail](https://github.com/metadist/Synamail) | Outlook add-in |
-| [synaplan-desktop](https://github.com/metadist/synaplan-desktop) | Synaplan Desktop (Windows, macOS, Linux). No installer yet; build from source. |
-| [synaplan-apps](https://github.com/metadist/synaplan-apps) | iOS and Android apps — [App Store](https://apps.apple.com/app/id6784278288) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app) |
-| [synaplan-nextcloud](https://github.com/metadist/synaplan-nextcloud) | Nextcloud integration |
-| [synaplan-opencloud](https://github.com/metadist/synaplan-opencloud) | OpenCloud integration |
-| [synaplan-tts](https://github.com/metadist/synaplan-tts) | Optional Piper TTS — [image](https://github.com/metadist/synaplan-tts/pkgs/container/synaplan-tts) with 4 baked voices |
-| [synaplan-sortx](https://github.com/metadist/synaplan-sortx) | Document-sorting plugin + local tool |
-| [synaplan-charts](https://github.com/metadist/synaplan-charts) | Helm charts for Kubernetes |
-| [synaplan-platform](https://github.com/metadist/synaplan-platform) | Production deployment configs |
+- **[docs.synaplan.com](https://docs.synaplan.com/)** – guides for users and admins
+- **[docs/README.md](docs/README.md)** – the technical manual, in five learning tracks
+- **[Platform reference](docs/PLATFORM_REFERENCE.md)** – install variants, features, providers and building blocks
+- Changing the code? Start with [adding an AI provider](docs/PROVIDERS.md) or [following a tool call](docs/ARCHITECTURE.md#tool-path).
 
 ---
 
-## Project Structure
+## Help shape what's next
 
-```
-synaplan/
-├── backend/        # Symfony PHP API
-├── frontend/       # Vue.js SPA
-├── docs/           # Developer documentation
-├── deploy/         # Production self-host compose + lifecycle scripts
-├── sidecars/       # Optional sidecars (secure compute)
-├── _docker/        # Docker configs
-└── plugins/        # Plugin system
-```
+We build Synaplan in the open. Tell us what you'd use it for, vote on ideas or show what you built in [Discussions](https://github.com/metadist/synaplan/discussions) – we read everything.
 
----
-
-## Star history
-
-<a href="https://star-history.com/#metadist/synaplan&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" />
-   <img alt="Star history of metadist/synaplan" src="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" width="720">
- </picture>
-</a>
-
-## Community & Support
-
-- **[Discord](https://discord.com/invite/kQB3eDjWfF)** — chat with the team and community; the fastest place for self-hosting and configuration questions
-- **[GitHub Issues](https://github.com/metadist/synaplan/issues)** — bugs and feature requests
-- **[Security policy](SECURITY.md)** — how to report a vulnerability privately, and what happens next
-- **[www.synaplan.com](https://www.synaplan.com)** — product, hosting and enterprise contact
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md). [AGENTS.md](AGENTS.md) is the guide for coding agents working in this repository.
+- 💬 **[Discord](https://discord.com/invite/kQB3eDjWfF)** – the fastest place for self-hosting and configuration questions
+- 🐛 **[Issues](https://github.com/metadist/synaplan/issues)** – bugs and feature requests
+- 🙌 **[Contributing](CONTRIBUTING.md)** – how to get your first pull request merged ([AGENTS.md](AGENTS.md) is the guide for coding agents)
+- 🔒 **[Security policy](SECURITY.md)** – report a vulnerability privately
 
 ---
 
 ## License
 
-[Apache-2.0](LICENSE)
+[Apache-2.0](LICENSE) · Built in Düsseldorf by [metadist](https://www.synaplan.com) · Member of the Open Source Business Alliance
 
 <p align="center">
-  <a href="https://osb-alliance.de/" target="_blank" rel="noopener noreferrer"><img src="docs/images/osba-member.png" alt="OSBA" width="180" height="90"></a>
+  <a href="https://osb-alliance.de/" target="_blank" rel="noopener noreferrer"><img src="docs/images/osba-member.png" alt="OSBA member" width="180" height="90"></a>
+</p>
+
+<p align="center"><b>If Synaplan helps you own your flow, a ⭐ helps the next team find it.</b></p>
+
+<p align="center">
+  <a href="https://star-history.com/#metadist/synaplan&Date">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date&theme=dark" />
+      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" />
+      <img alt="Star history of metadist/synaplan" src="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" width="720">
+    </picture>
+  </a>
 </p>

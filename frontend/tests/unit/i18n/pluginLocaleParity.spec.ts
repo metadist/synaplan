@@ -70,6 +70,6 @@ describe('plugin locale parity', () => {
         }
       }
     }
-    expect(checked.sort()).toEqual(['hello_world', 'synascriber'])
+    expect(checked.sort()).toEqual(['hello_world', 'synamail', 'synascriber'])
   })
 })
