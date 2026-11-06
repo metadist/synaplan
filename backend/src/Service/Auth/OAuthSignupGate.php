@@ -7,6 +7,7 @@ namespace App\Service\Auth;
 use App\Entity\SignupCode;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Http\ClientAddress;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -72,7 +73,7 @@ final readonly class OAuthSignupGate
         }
 
         $token = (string) $request->query->get('challenge', '');
-        if ($this->protection->verifyHuman($token, 'signup', $request->getClientIp())) {
+        if ($this->protection->verifyHuman($token, 'signup', ClientAddress::resolve($request))) {
             return $extras + [self::STATE_HUMAN => true];
         }
 

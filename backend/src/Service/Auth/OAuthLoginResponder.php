@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Auth;
 
 use App\Entity\User;
+use App\Service\Http\ClientAddress;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -46,7 +47,7 @@ final readonly class OAuthLoginResponder
         }
 
         $accessToken = $this->tokenService->generateAccessToken($user);
-        $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+        $refreshToken = $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request));
 
         $response = new RedirectResponse($this->frontendUrl.'/auth/callback?'.http_build_query([
             'success' => 'true',
