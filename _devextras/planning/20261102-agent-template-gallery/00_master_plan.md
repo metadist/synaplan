@@ -23,6 +23,7 @@ learns what it still needs, and has a working agent within minutes.
 | F3 | — | Plugin packs install agents as the admin with `BSOURCE = plugin:<id>`, publish them and share them with everyone; a changed pack publishes a new version | `Service/Plugin/PluginAgentInstaller.php:28-37` |
 | F4 | P2 | A template that needs a mail connection, an image model, a tool or a cloud folder fails at first use instead of saying so at install | — |
 | F5 | P2 | The use-case research lists Tier B (cases 2, 4, 6) as "pack it" and Tier A as "showcase now", with utterance tests; none ships as a template | `20260913-use-case-research/README.md` §4 |
+| F6 | P1 | On 2026-11-06 the Assistants list (v5.71) still has no cards. **Create assistant** opens the empty form | owner screenshots 2026-11-06 15:05 |
 
 ## 2. What is fine — do not "fix" it
 
@@ -80,7 +81,20 @@ version exists, the agent shows "A newer template version exists" with
 **Show changes** (bundle diff) and **Update**. Updating never overwrites
 the person's own edits without showing the diff (D4).
 
-### 3.4 The first templates
+### 3.4 The first three cards (named 2026-11-06, not built)
+
+These sit on the Assistants list, under **Create assistant**. **Create
+assistant** stays the empty form. A card opens that same form already
+filled. The rest of the gallery (categories, search, the full T1–T15
+set) still follows §3.3.
+
+| Card | Gaps the person fills | Already written into the form |
+| ---- | --------------------- | ----------------------------- |
+| These pages, every morning | the page addresses, the time, chat or email | only what is new; one sentence when nothing qualifies. Row 44 AX11 |
+| These documents, one answer | the folder | the answer names the place it came from |
+| This website, the frequent questions | the public address | the widget answers from those pages |
+
+### 3.5 The first templates
 
 Ten from the use-case research and five general ones. The order follows
 the research tiers and the umbrella's buyer list.
