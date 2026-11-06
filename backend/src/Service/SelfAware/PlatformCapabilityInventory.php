@@ -137,7 +137,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $chatReady,
             $chatReady ? 'workspace model' : 'no chat provider key configured',
             'ask your administrator to connect an AI provider',
-            'Operate → AI infrastructure → Providers & keys',
+            'Admin → AI infrastructure → Providers & keys',
             'using-synaplan',
         );
         $fileAnalysisReady = $this->modelResolves('PIC2TEXT', $userId) && $chatReady;
@@ -147,7 +147,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $fileAnalysisReady,
             $fileAnalysisReady ? 'documents, images, audio' : 'no vision / analysis model configured',
             'upload the file once a vision / analysis model is configured',
-            'Operate → AI infrastructure → Providers & keys',
+            'Admin → AI infrastructure → Providers & keys',
             'using-synaplan',
         );
         $vectorizeReady = $this->modelResolves('VECTORIZE', $userId);
@@ -157,7 +157,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $vectorizeReady,
             $vectorizeReady ? $this->vectorStorage->getProviderName() : 'no embedding model configured',
             'upload files after an embedding model is set',
-            'Operate → AI infrastructure → Providers & keys',
+            'Admin → AI infrastructure → Providers & keys',
             'using-synaplan',
         );
         $qdrantConfigured = $this->envNonEmpty('QDRANT_URL');
@@ -177,7 +177,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $imageReady,
             $imageReady ? '' : 'no image model configured',
             'describe the image in words, or add an image model',
-            'Operate → AI infrastructure → Providers & keys',
+            'Admin → AI infrastructure → Providers & keys',
             'using-synaplan',
         );
         $videoReady = $this->modelResolves('TEXT2VID', $userId);
@@ -187,7 +187,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $videoReady,
             $videoReady ? '' : 'no video model configured',
             'image generation is the nearest alternative',
-            'Operate → AI infrastructure → Providers & keys',
+            'Admin → AI infrastructure → Providers & keys',
             'using-synaplan',
         );
         $facts[] = $this->fact(
@@ -196,7 +196,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $ttsAvailable,
             $ttsAvailable ? 'MP3' : 'no TTS model or SYNAPLAN_TTS_URL',
             'I can write the text; audio needs a TTS model or the local speech service',
-            'Operate → AI infrastructure → Providers & keys → Speech output, or set SYNAPLAN_TTS_URL',
+            'Admin → AI infrastructure → Providers & keys → Speech output, or set SYNAPLAN_TTS_URL',
             'tts',
         );
         $facts[] = $this->fact(
@@ -205,7 +205,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $this->modelResolves('SOUND2TEXT', $userId),
             'transcribe uploads',
             'type the words, or add a transcription model',
-            'Operate → AI infrastructure → Providers & keys',
+            'Admin → AI infrastructure → Providers & keys',
             'using-synaplan',
         );
         $webSearchOn = $this->webSearch->isEnabled($userId > 0 ? $userId : null);
@@ -215,7 +215,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $webSearchOn,
             $webSearchOn ? '/search' : 'no web search provider configured',
             'paste the text you want analysed',
-            'Operate → System configuration → Web search',
+            'Admin → System configuration → Web search (/admin/config?tab=web_search)',
             'using-synaplan',
         );
         $facts[] = $this->flagFact(
@@ -226,7 +226,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             true,
             'public pages',
             'paste the page text',
-            'Operate → System configuration → Features → Saved tasks & watched pages',
+            'Admin → System configuration → Features → Saved tasks & watched pages',
             'dag-routing',
         );
         $facts[] = $this->flagFact(
@@ -401,7 +401,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $assistantsOn,
             $assistantsOn ? 'build, publish and share assistants' : 'assistants are off',
             'use the built-in topics, or ask your administrator to switch assistants on',
-            'Operate → System configuration → Features → AI assistants',
+            'Admin → System configuration → Features → AI assistants',
             'assistants',
         );
         $approvalsOn = $this->toolsConfig->isApprovalsEnabled($userId > 0 ? $userId : null);
@@ -411,7 +411,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $approvalsOn,
             $approvalsOn ? 'write actions wait in chat and inbox' : 'approvals are off',
             'actions run without asking once approvals are on',
-            'Operate → System configuration → Features → Tools & approvals',
+            'Admin → System configuration → Features → Tools & approvals',
             'tools-and-approvals',
         );
         // Custom tools need BOTH the per-user HTTP switch and the registry kill
@@ -424,7 +424,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $customToolsOn,
             $customToolsOn ? 'your own APIs as chat tools' : 'custom tools are off',
             'paste the API result into chat',
-            'Operate → System configuration → Features → Tools & approvals',
+            'Admin → System configuration → Features → Tools & approvals',
             'tools-and-approvals',
         );
         $sharingOn = $this->iamConfig->isSharingEnabled($userId > 0 ? $userId : null);
@@ -434,7 +434,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
             $sharingOn,
             $sharingOn ? 'share folders, chats, assistants, tasks, widgets' : 'sharing is off',
             'send a copy instead, or ask your administrator to switch sharing on',
-            'Operate → System configuration → Features → Users & sharing',
+            'Admin → System configuration → Features → Users & sharing',
             'people-and-groups',
         );
 
@@ -446,7 +446,7 @@ final readonly class PlatformCapabilityInventory implements CapabilityInventory
                     true,
                     'Python/Node runs on copies of chosen files',
                     $row['alternative'],
-                    'Operate → System status → Secure compute',
+                    'Admin → System status → Secure compute',
                     'modules/compute',
                 );
                 continue;
