@@ -250,7 +250,25 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $this->assertNotNull($webSearch);
         $this->assertSame(CapabilityState::NeedsSetup, $webSearch->state);
         $this->assertStringNotContainsString('Brave', (string) $webSearch->detail);
-        $this->assertStringContainsString('Operate → System configuration → Web search', (string) $webSearch->adminHint);
+        $this->assertSame(
+            'Admin → System configuration → Web search (/admin/config?tab=web_search)',
+            $webSearch->adminHint,
+        );
+    }
+
+    public function testAdminHintsNameTheMenuPeopleSee(): void
+    {
+        $this->setEnv('QDRANT_URL', '');
+
+        $report = $this->inventory(chatReady: true, models: [], brave: true, billing: false, agents: true)->build(2);
+
+        foreach ($report->facts as $fact) {
+            $this->assertStringNotContainsString(
+                'Operate →',
+                (string) $fact->adminHint,
+                $fact->id.' still names a menu that is not on screen',
+            );
+        }
     }
 
     public function testUploadFormatsStayCompactWithOverflowCount(): void
