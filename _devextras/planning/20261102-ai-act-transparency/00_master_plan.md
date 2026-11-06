@@ -4,7 +4,7 @@ Row 36. Umbrella: [`20261102-enterprise-readiness/`](../20261102-enterprise-read
 
 Article 50 of the AI Act has applied since **2026-08-02**. Systems that
 were already on the market before that date must mark generated content
-machine-readably by **2026-12-02** (to be confirmed by counsel, D1). Two
+machine-readably by **2026-12-02**. No counsel review (D1). Two
 obligations hit Synaplan directly, and one hits every customer:
 
 | Article | Who | Obligation | Synaplan today |
@@ -68,14 +68,14 @@ provider bytes ─► GeneratedMediaStore::keep()
                   │    c2pa.created, digitalSourceType=trainedAlgorithmicMedia,
                   │    softwareAgent = model name from BMODELS, ingredient = provider manifest
                   ├─ XMP/IPTC digitalSourceType where C2PA cannot embed   AT3
-                  └─ invisible watermark (phase 2, D5)          AT7
+                  └─ invisible watermark — not built (D5)       AT7
                ─► register file (BFILES) with provenance columns          AT3
 ```
 
-- **Signer runs out of process.** The private key never sits in the PHP app container. A small sidecar, `c2pa-signer`, wraps `c2patool` / `c2pa-rs` behind `POST /sign` (bytes + manifest JSON → signed bytes) and `POST /verify`. It is a `FeatureModule` under `Module/Sidecar/` beside Tika and Docling. When absent, media are stored as today plus the XMP fallback, and Admin → System status says "Generated media are not signed".
+- **Signer runs in the app.** The private key is a file under `/certs`, owner uid 65532, and is not an environment variable of PHP. The process listens on `127.0.0.1`. When it is absent, media are stored as today plus the XMP fallback, and Admin → System status says generated media are not signed.
 - **Model name is data.** `softwareAgent` comes from the model row (`BMODELS` name + provider), never a literal.
 - **Provider marks survive.** If the provider bytes carry a manifest, it becomes the ingredient of ours (`--parent`). No step in the pipeline re-encodes a generated original. Derived files (thumbnails, Office embeds, Telegram voice) get their own manifest with `c2pa.converted` / `compositeWithTrainedAlgorithmicMedia`.
-- **Certificate.** Phase 1 uses a metadist signing certificate (D2). Verifiers show it as "valid, issuer not on the trust list" until a C2PA-conformant CA certificate is bought. The `digitalSourceType` signal works either way.
+- **Certificate.** The metadist self-issued certificate stays (D2). Verifiers show it as "valid, issuer not on the trust list". A public CA certificate is not bought. The `digitalSourceType` signal works either way.
 - **Provenance on the file row.** New nullable columns on `BFILES`: `BGENERATED` (bool), `BGENMODEL` (model id), `BCREDENTIALS` (none / signed / provider / both). Migration with raw idempotent `addSql`, the Galera rule.
 
 ### 3.3 AI literacy (Art. 4) — material plus a record, off by default
@@ -86,13 +86,13 @@ provider bytes ─► GeneratedMediaStore::keep()
 
 ## 4. Decisions
 
-- [ ] **D1 (AT1, AT3).** Counsel confirms the dates (50(2) for systems already on the market: 2026-12-02) and the role split: metadist is the provider for `web.synaplan.com`, the self-host operator for their install. AT1 and AT3 ship before 2026-12-02 regardless.
-- [ ] **D2 (AT3).** Phase 1 signing certificate: metadist self-issued (free, "untrusted issuer") now. A C2PA-conformant CA certificate is bought when ER3 starts.
-- [ ] **D3 (AT3).** Signer as a sidecar image `ghcr.io/metadist/synaplan-c2pa-signer` (Rust `c2patool`, about 20 MB). The alternative is the `c2patool` binary inside `synaplan-base-php` — rejected: it puts the key next to PHP and couples base-image releases. This is a new compose service and image, so it is the owner's call (AGENTS.md "Docker/CI").
-- [ ] **D4.** No watermarking of LLM text by Synaplan. Disclosure covers text, and the model provider owns the text watermark.
-- [ ] **D5 (AT7).** Invisible watermark for images, phase 2, before 2027-02-02: Adobe TrustMark (MIT, open source, Python) in the same signer sidecar, with detection exposed at `/verify`. The alternative is to wait for a consortium detector under the Code.
-- [ ] **D6 (AT6).** The literacy confirmation never blocks work. It is a card with a reminder, not a gate.
-- [ ] **D7 (AT1).** Mail disclosure is a footer on every AI-written reply, not only the first, because mail threads are forwarded.
+- [x] **D1 (AT1, AT3).** No counsel review. The date stays 2026-12-02 and the role split stays as written here: metadist is the provider for `web.synaplan.com`, the self-host operator for their install. The implementation does not wait on a lawyer.
+- [x] **D2 (AT3).** No public C2PA certificate. The metadist self-issued certificate stays. Verifiers keep showing "valid, issuer not on the trust list". It is not bought when ER3 starts.
+- [x] **D3 (AT3).** The signer runs inside the Synaplan image, on `127.0.0.1`, as uid 65532. The key is a file under `/certs`. There is no second container and no separate signer image.
+- [x] **D4.** No watermarking of LLM text by Synaplan. Disclosure covers text, and the model provider owns the text watermark.
+- [x] **D5 (AT7).** No invisible watermark. TrustMark is not built. `/verify` keeps `"watermark": null`.
+- [x] **D6 (AT6).** The literacy confirmation never blocks work. It is a card with a reminder, not a gate.
+- [x] **D7 (AT1).** Mail disclosure is a footer on every AI-written reply, not only the first, because mail threads are forwarded.
 
 ## 5. Journeys
 
@@ -102,7 +102,7 @@ provider bytes ─► GeneratedMediaStore::keep()
 | J-AT-2 | Someone mails the support address handled by an assistant. The reply's footer says an AI assistant of the company wrote it. The owner edits the footer text in the mail handler; saving an empty text is refused with "The AI notice cannot be empty. Write at least one sentence." | Mail sender, owner |
 | J-AT-3 | A user generates an image in chat and opens Files → preview. It shows "Generated by {model} on {date} · Content credentials signed". **Download** gives a file that `c2patool` and contentcredentials.org read as AI-generated | User |
 | J-AT-4 | An administrator turns on "Ask people to read 'Using AI well'". A user sees the card at the next sign-in, reads it and confirms. The admin sees "1 of 3 confirmed" in People and exports the CSV | Admin, user |
-| J-AT-5 | Without the signer sidecar, Admin → System status says "Generated media are not signed. Add the signer to mark images, audio and video as AI-generated." with a link to the docs section. Generation still works | Operator |
+| J-AT-5 | Without the signer, Admin → System status says generated media are not signed, with a link to the docs section. Generation still works | Operator |
 
 ## 6. Steps
 
@@ -133,17 +133,20 @@ before their first `.vue`:
 | The footer annoys customers in long mail threads | D7 explains why. The text is editable, a single line and not a banner |
 | CDN or image optimiser strips the manifest | Originals are served as stored (AT2 test). `docs/AI_ACT.md` tells operators not to put an image optimiser in front of `/api/v1/files/uploads/` |
 | Signing adds latency to generation | Signing happens on the worker after `keep()` (same job), measured in AT3. Budget ≤ 300 ms per image; video is signed in streaming mode |
-| Untrusted certificate confuses people | AT4 copy says "signed by Synaplan" and does not claim "verified". D2 upgrades the certificate |
-| Date or role reading is wrong | D1 counsel check. AT1 and AT3 are right under any reading |
+| Untrusted certificate confuses people | AT4 copy says "signed by Synaplan" and does not claim "verified". No public certificate (D2) |
+| Date or role reading is wrong | Accepted without a counsel review (D1). AT1 and AT3 ship on the dates in this plan |
 
 ## 8. Non-goals
 
 - Classifying customer use cases as high-risk, or conformity assessments.
 - Watermarking model text.
 - Detecting AI content uploaded by users, beyond showing an existing manifest in AT4.
+- An invisible watermark. TrustMark is not built, and `/verify` returns `"watermark": null` (D5).
 
 ## 9. Change log
 
 | Date | Change |
 | ---- | ------ |
 | 2026-11-02 | Plan written from the AI Act text, the final Code of Practice on transparency (June 2026), C2PA 2.3 guidance and the July 2026 C2PA note on synthetic content, and a read of the widget, channel and media code on `main`. No code changed. |
+| 2026-11-06 | D1 and D2 closed: no counsel review, no public C2PA certificate. |
+| 2026-11-06 | Plan closed. AT0–AT6 are on `main`. D3 is the in-app signer. D4, D6 and D7 match what shipped. AT7 and D5 are not built: no TrustMark. |

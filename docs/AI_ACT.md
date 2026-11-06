@@ -1,6 +1,6 @@
 # AI Act transparency
 
-Synaplan is a tool an organisation deploys. This note says what the product does for the transparency duties in the EU AI Act, and what the organisation still does itself. It is not legal advice. Dates and the exact article text stay with counsel (decision D1 in the planning notes).
+Synaplan is a tool an organisation deploys. This note says what the product does for the transparency duties in the EU AI Act, and what the organisation still does itself. It is not legal advice.
 
 ## Roles
 
@@ -10,7 +10,7 @@ Synaplan is a tool an organisation deploys. This note says what the product does
 
 ## What Synaplan does
 
-- **Article 50, machine-readable marking.** A generated image, audio, or video is stored once. Synaplan does not re-encode that original, so a mark the model provider already put on the file stays. When the content-credentials sidecar is configured, Synaplan asks it to sign the file. The private key stays on the sidecar. When the sidecar is absent, a PNG or JPEG gets an XMP fallback (`trainedAlgorithmicMedia`) and the file list says "Not signed".
+- **Article 50, machine-readable marking.** A generated image, audio, or video is stored once. Synaplan does not re-encode that original, so a mark the model provider already put on the file stays. When the signer is configured, Synaplan signs the file inside the app. The private key stays with uid 65532. When the signer is absent, a PNG or JPEG gets an XMP fallback (`trainedAlgorithmicMedia`) and the file list says "Not signed".
 - **Article 50, telling a person.** Mail adds the sentence to every AI reply. WhatsApp and Telegram say it on the first reply of a conversation and again after 24 hours of silence. The website widget shows the sentence, the company name when the owner set one, and the privacy link. The sentence cannot be removed.
 - **Article 4, AI literacy.** "Using AI well" is ten short sections. An administrator can ask everyone to read it once. The card offers "Read now" and "Remind me tomorrow". Nobody is blocked. The switch is off until an administrator turns it on.
 
@@ -19,7 +19,7 @@ Synaplan is a tool an organisation deploys. This note says what the product does
 - Tell people, in their own channels, who is responsible for the assistant.
 - Decide which data may be pasted into a chat.
 - Keep a person in the loop before a draft is sent, published, or filed.
-- Put the signer key and certificate in the sidecar secret when content credentials must be trusted outside this server. The development certificate is created on the sidecar and is not a public trust anchor.
+- Mount the signer key and certificate at `/certs` when content credentials must be trusted outside this server. The development certificate is not a public trust anchor.
 
 ## Settings
 
@@ -56,7 +56,7 @@ An arm64 image has no c2patool binary. The signer then stays off and PNG and JPE
 
 ## Helm
 
-The chart lives in [synaplan-charts](https://github.com/metadist/synaplan-charts) ([#106](https://github.com/metadist/synaplan-charts/pull/106)), not in this repository. It is off by default. Turning it on mounts the key into the Synaplan pods and sets `C2PA_SIGNER_URL` to `http://127.0.0.1:8787`. There is no second Deployment, no host port and no Ingress. The signer binary ships in the Synaplan image. It is linux amd64 only. An arm64 pod does not sign and uses the XMP note for PNG and JPEG.
+The chart lives in [synaplan-charts](https://github.com/metadist/synaplan-charts) ([#107](https://github.com/metadist/synaplan-charts/pull/107)), not in this repository. It is off by default. Turning it on mounts the key into the Synaplan pods and sets `C2PA_SIGNER_URL` to `http://127.0.0.1:8787`. There is no second Deployment, no host port and no Ingress. The signer binary ships in the Synaplan image. It is linux amd64 only. An arm64 pod does not sign and uses the XMP note for PNG and JPEG.
 
 - `c2paSigner.enabled`
 - `c2paSigner.keySecretRef` — Secret data key `key.pem`, copied to `/certs/key.pem`
