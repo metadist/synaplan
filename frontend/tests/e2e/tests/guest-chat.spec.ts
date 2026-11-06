@@ -47,6 +47,47 @@ test.describe('@ci @smoke Guest Trial Chat', () => {
     })
   })
 
+  test('guest tour stays in Chats, names the plan, and End tour dismisses it', async ({ page }) => {
+    await test.step('Arrange: open guest chat with a fresh tour', async () => {
+      await page.addInitScript(() => localStorage.removeItem('synaplan.toursSeen'))
+      await page.goto('/')
+      await expect(page.locator(selectors.chat.textInput)).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
+    })
+
+    await test.step('Act: start the guest tour from Show me around', async () => {
+      const start = page.locator(selectors.guest.tour)
+      if (!(await start.isVisible())) {
+        await page.locator(selectors.nav.sidebarV2Expand).click()
+      }
+      await start.click()
+    })
+
+    await test.step('Assert: first bubble is Chats-only and names a plan', async () => {
+      const popover = page.locator(selectors.tour.popover)
+      await expect(popover).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(popover).toContainText('What you can open')
+      await expect(popover).toContainText('plan or an invitation code')
+      await expect(popover).not.toContainText('Admin appears')
+      await expect(page.locator(selectors.tour.end)).toBeVisible()
+    })
+
+    await test.step('Act: end the tour from the first step', async () => {
+      await page.locator(selectors.tour.end).click()
+    })
+
+    await test.step('Assert: overlay is gone and the tour is remembered', async () => {
+      await expect(page.locator(selectors.tour.popover)).toHaveCount(0, {
+        timeout: TIMEOUTS.SHORT,
+      })
+      const seen = await page.evaluate(
+        () => JSON.parse(localStorage.getItem('synaplan.toursSeen') ?? '[]') as string[]
+      )
+      expect(seen).toContain('chatsGuest')
+    })
+  })
+
   test('guest banner signup link navigates to registration', async ({ page }) => {
     await test.step('Arrange: open guest chat', async () => {
       await page.goto('/')

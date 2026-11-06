@@ -1,5 +1,5 @@
 import { ref, readonly } from 'vue'
-import { driver, type DriveStep } from 'driver.js'
+import { driver, type DriveStep, type PopoverDOM } from 'driver.js'
 import 'driver.js/dist/driver.css'
 import { i18n } from '@/i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -207,6 +207,20 @@ function startTour(id: string): boolean {
     stageRadius: 12,
     allowClose: true,
     smoothScroll: true,
+    onPopoverRender: (popover: PopoverDOM) => {
+      const host = popover.footerButtons ?? popover.footer
+      if (!host || host.querySelector('[data-testid="btn-tour-end"]')) return
+      const end = document.createElement('button')
+      end.type = 'button'
+      end.className = 'driver-popover-end-btn'
+      end.setAttribute('data-testid', 'btn-tour-end')
+      end.textContent = String(t('tours.common.end'))
+      end.addEventListener('click', () => {
+        finish()
+        instance.destroy()
+      })
+      host.insertBefore(end, host.firstChild)
+    },
     // The close button does not emit closeClick once this hook is set, so it
     // has to record the dismissal and destroy the tour itself.
     onCloseClick: () => {

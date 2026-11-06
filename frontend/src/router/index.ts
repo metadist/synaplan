@@ -658,7 +658,6 @@ const router = createRouter({
         requiresAdmin: true,
         titleKey: 'pageTitles.admin',
         i18n: ['admin', 'config'],
-        tour: 'admin',
       },
       beforeEnter: adminDashboardRedirect,
     },
