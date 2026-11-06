@@ -84,10 +84,14 @@ No verification required. Users can immediately chat:
 
 ### Phone Verification (Optional)
 
-1. User enters phone in web interface
-2. System sends 6-digit code via WhatsApp
-3. User confirms code
-4. Higher rate limits unlocked
+The person verifies by writing **to** Synaplan, not by receiving an SMS.
+
+1. They enter **their** mobile number (with country code) in Apps → WhatsApp
+2. The app shows a short code and the install's WhatsApp numbers (`WHATSAPP_DISPLAY_NUMBERS`)
+3. They send that code on WhatsApp to one of those numbers
+4. A confirmation comes back automatically and higher rate limits unlock
+
+Set `WHATSAPP_DISPLAY_NUMBERS` to comma-separated E.164 numbers (for example `+4915116038214,+16282253244`). Leave it empty on self-hosted installs until the operator's own numbers are known — the UI then says the numbers are not listed, instead of showing hosted Synaplan numbers.
 
 ---
 

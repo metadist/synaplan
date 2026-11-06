@@ -82,12 +82,18 @@
                 clip-rule="evenodd"
               />
             </svg>
-            <div class="flex-1">
-              <p class="text-sm font-medium txt-primary">Send a WhatsApp Message First</p>
-              <p class="text-xs txt-secondary mt-1">
-                Please send a WhatsApp message to one of our numbers first. After that, try
-                requesting the verification code again.
+            <div class="flex-1 space-y-3">
+              <p class="text-sm font-medium txt-primary">
+                {{ $t('config.phoneVerification.whatsappRequiredTitle') }}
               </p>
+              <p class="text-xs txt-secondary">
+                {{
+                  inboundNumbers.length > 0
+                    ? $t('config.phoneVerification.whatsappRequiredLead')
+                    : $t('config.phoneVerification.whatsappRequiredLeadMissing')
+                }}
+              </p>
+              <WhatsAppInboundNumberList :numbers="inboundNumbers" />
             </div>
           </div>
         </div>
@@ -139,71 +145,12 @@
         class="space-y-4 mt-6"
         data-testid="section-code-display"
       >
-        <!-- Instructions -->
-        <div
-          class="surface-card p-6 border-l-4 border-brand rounded-lg"
-          data-testid="alert-code-instructions"
-        >
-          <div class="space-y-4">
-            <div>
-              <h4 class="text-lg font-semibold txt-primary mb-2 flex items-center gap-2">
-                <svg
-                  class="w-5 h-5 text-brand"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                Verification Instructions
-              </h4>
-              <p class="text-sm txt-secondary">
-                Send this code to one of our WhatsApp numbers to verify your phone.
-              </p>
-            </div>
-
-            <!-- Code Display -->
-            <div class="bg-gradient-to-br from-brand/5 to-brand/10 rounded-xl p-6 text-center">
-              <p class="text-xs txt-secondary uppercase tracking-wider mb-2">
-                Your Verification Code
-              </p>
-              <div class="text-5xl font-bold txt-primary tracking-[0.5em] font-mono select-all">
-                {{ displayCode }}
-              </div>
-              <p class="text-xs txt-secondary mt-4">Code expires in 5 minutes</p>
-              <div v-if="timeRemaining" class="mt-2">
-                <span
-                  class="text-xs font-medium"
-                  :class="timeRemaining < 60 ? 'text-red-600' : 'txt-secondary'"
-                >
-                  ⏱️ {{ formatTimeRemaining(timeRemaining) }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Steps -->
-            <div class="space-y-2 text-sm txt-secondary">
-              <p class="flex items-start gap-2">
-                <span class="font-semibold txt-primary">1.</span>
-                Open WhatsApp on your phone
-              </p>
-              <p class="flex items-start gap-2">
-                <span class="font-semibold txt-primary">2.</span>
-                Send the code <strong class="font-mono txt-primary">{{ displayCode }}</strong> to
-                any of our numbers
-              </p>
-              <p class="flex items-start gap-2">
-                <span class="font-semibold txt-primary">3.</span>
-                You will receive a confirmation message automatically
-              </p>
-            </div>
-          </div>
-        </div>
+        <PhoneVerificationInstructions
+          :code="displayCode"
+          :time-remaining="timeRemaining"
+          :inbound-numbers="inboundNumbers"
+          :format-time-remaining="formatTimeRemaining"
+        />
 
         <!-- Rate Limit Info -->
         <div
@@ -301,6 +248,10 @@ import { useDialog } from '@/composables/useDialog'
 import { useI18n } from 'vue-i18n'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { DevicePhoneMobileIcon } from '@heroicons/vue/24/outline'
+import PhoneVerificationInstructions from '@/components/config/PhoneVerificationInstructions.vue'
+import WhatsAppInboundNumberList, {
+  type WhatsAppInboundNumber,
+} from '@/components/config/WhatsAppInboundNumberList.vue'
 import { useConfigStore } from '@/stores/config'
 import { refreshAccessToken } from '@/services/api/httpClient'
 import { getErrorMessage as getUnknownErrorMessage } from '@/utils/errorMessage'
@@ -317,6 +268,7 @@ interface PhoneVerificationStatus {
   verified?: boolean
   verified_at?: number | null
   pending_verification?: boolean
+  inbound_numbers?: WhatsAppInboundNumber[]
 }
 
 interface PhoneVerificationActionPayload {
@@ -326,6 +278,7 @@ interface PhoneVerificationActionPayload {
   rate_limit?: { retry_after?: number; attempts_remaining?: number | null }
   cooldown_remaining?: number
   retry_after?: number
+  inbound_numbers?: WhatsAppInboundNumber[]
 }
 
 const loading = ref(false)
@@ -339,6 +292,7 @@ const requesting = ref(false)
 const currentTime = ref(Math.floor(Date.now() / 1000)) // Unix timestamp in seconds
 const cooldownRemaining = ref(0) // Seconds until next code can be generated
 const attemptsRemaining = ref<number | null>(null) // Remaining attempts before 5-minute lockout
+const inboundNumbers = ref<WhatsAppInboundNumber[]>([])
 
 const config = useConfigStore()
 const API_BASE = config.appBaseUrl
@@ -390,6 +344,10 @@ const formatTimeRemaining = (seconds: number): string => {
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
+}
+
+const applyInboundNumbers = (payload: { inbound_numbers?: WhatsAppInboundNumber[] }) => {
+  inboundNumbers.value = Array.isArray(payload.inbound_numbers) ? payload.inbound_numbers : []
 }
 
 const buildHeaders = (withJson = false) => {
@@ -474,6 +432,7 @@ const loadStatus = async () => {
 
     const data = payload as PhoneVerificationStatus
     status.value = data
+    applyInboundNumbers(data)
 
     // Don't automatically show verification pending on initial load
     // Only show it if user explicitly requested verification
@@ -553,7 +512,8 @@ const requestVerification = async () => {
         attemptsRemaining.value = data.rate_limit.attempts_remaining ?? null
       }
 
-      success('Verification code generated! Send it to our WhatsApp number.')
+      applyInboundNumbers(data)
+      success(t('config.phoneVerification.codeGeneratedToast'))
     } else {
       throw new Error('Invalid response from server')
     }
