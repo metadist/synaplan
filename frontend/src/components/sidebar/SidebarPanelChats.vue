@@ -5,6 +5,14 @@
     data-testid="section-sidebar-chats-guest"
   >
     <p class="text-sm txt-secondary">{{ $t('guest.banner.subtitle') }}</p>
+    <button
+      type="button"
+      class="btn-secondary w-full px-4 py-2.5 text-sm font-medium min-h-11"
+      data-testid="btn-guest-tour"
+      @click="startGuestTour"
+    >
+      {{ $t('tours.common.start') }}
+    </button>
     <router-link
       :to="configStore.auth.registrationEnabled ? '/register' : '/login'"
       class="btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium min-h-11"
@@ -186,6 +194,8 @@ import { useChatHistory, type HistoryChat } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
+import { useTour } from '@/composables/useTour'
+import { GUEST_CHATS_TOUR_ID } from '@/tours'
 
 const {
   iamSharingEnabled,
@@ -274,7 +284,12 @@ const dateGroupLabel = (chat: HistoryChat): string | null =>
 
 const authStore = useAuthStore()
 const configStore = useConfigStore()
+const { startTour } = useTour()
 const isGuest = computed(() => !authStore.isAuthenticated)
+
+function startGuestTour(): void {
+  startTour(GUEST_CHATS_TOUR_ID)
+}
 
 const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))
 const pinnedExpanded = ref(readExpanded(PINNED_EXPANDED_KEY))

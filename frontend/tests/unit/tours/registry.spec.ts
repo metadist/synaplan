@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { getTour, tourIds } from '@/tours'
+import { getTour, GUEST_CHATS_TOUR_ID, resolveRouteTourId, tourIds } from '@/tours'
 
 const SRC = resolve(__dirname, '../../../src')
 const LOCALES = ['en', 'de', 'es', 'fr', 'tr'] as const
@@ -37,8 +37,25 @@ function readTours(locale: string): Record<string, unknown> {
 describe('tour registry', () => {
   it('covers every rail area', () => {
     expect(tourIds()).toEqual(
-      expect.arrayContaining(['chats', 'library', 'assistants', 'apps', 'admin'])
+      expect.arrayContaining([
+        'chats',
+        'library',
+        'assistants',
+        'apps',
+        'admin',
+        GUEST_CHATS_TOUR_ID,
+      ])
     )
+  })
+
+  it('gives guests the Chats-only tour and keeps the member chats tour', () => {
+    expect(resolveRouteTourId('chats', false)).toBe(GUEST_CHATS_TOUR_ID)
+    expect(resolveRouteTourId('chats', true)).toBe('chats')
+    expect(resolveRouteTourId('admin', false)).toBe('admin')
+    expect(getTour(GUEST_CHATS_TOUR_ID)?.steps.some((step) => step.target === 'chat-new')).toBe(
+      false
+    )
+    expect(getTour(GUEST_CHATS_TOUR_ID)?.steps.some((step) => step.stepKey === 'plan')).toBe(true)
   })
 
   it.each(tourIds())('%s keeps to a short tour whose targets exist', (id) => {
@@ -48,6 +65,11 @@ describe('tour registry', () => {
     for (const step of tour.steps) {
       if (step.target) expect(hasTarget(step.target), step.target).toBe(true)
     }
+  })
+
+  it.each(LOCALES)('every locale names End tour', (locale) => {
+    const tours = readTours(locale) as { common?: { end?: string } }
+    expect(tours.common?.end, `${locale} tours.common.end`).toBeTruthy()
   })
 
   it.each(LOCALES)('every step has a title and body in %s', (locale) => {
