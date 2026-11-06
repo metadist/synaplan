@@ -12,6 +12,7 @@ use App\Service\Billing\StripeEntitlement;
 use App\Service\Billing\UsageTopup;
 use App\Service\Billing\UsageTopupRejected;
 use App\Service\Client\ClientContextResolver;
+use App\Service\Http\ClientAddress;
 use App\Service\Iap\IapPricingService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -432,10 +433,7 @@ class SubscriptionController extends AbstractController
             ]);
 
             // In dev mode, show the actual error for debugging
-            $errorMessage = 'Payment service error. Please try again later.';
-            if ('dev' === $_ENV['APP_ENV']) {
-                $errorMessage = $e->getMessage();
-            }
+            $errorMessage = 'dev' === $_ENV['APP_ENV'] ? $e->getMessage() : 'Payment service error. Please try again later.';
 
             return $this->json([
                 'error' => $errorMessage,
@@ -1037,7 +1035,7 @@ class SubscriptionController extends AbstractController
      */
     private function checkCheckoutRateLimit(User $user, Request $request): bool
     {
-        $ip = $request->getClientIp() ?? 'unknown';
+        $ip = ClientAddress::resolve($request) ?? 'unknown';
         if (!$this->checkoutIpLimiter->create($ip)->consume()->isAccepted()) {
             $this->logger->warning('Checkout per-IP limit reached', ['ip' => $ip, 'user_id' => $user->getId()]);
 

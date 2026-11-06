@@ -9,6 +9,7 @@ use App\Service\Auth\EmailLinkSignIn;
 use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\TokenService;
 use App\Service\Billing\PayFirst\PayFirstConfig;
+use App\Service\Http\ClientAddress;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -56,7 +57,7 @@ final class EmailLinkController extends AbstractController
         }
         $body = json_decode($request->getContent(), true);
         try {
-            $this->signIn->request(is_array($body) && is_string($body['email'] ?? null) ? $body['email'] : '', $request->getClientIp());
+            $this->signIn->request(is_array($body) && is_string($body['email'] ?? null) ? $body['email'] : '', ClientAddress::resolve($request));
         } catch (EmailLinkRateLimited $e) {
             return $this->json(
                 ['success' => false, 'error' => 'Too many attempts. Please wait a few minutes and try again.', 'code' => 'EMAIL_LINK_RATE_LIMITED'],
@@ -105,7 +106,7 @@ final class EmailLinkController extends AbstractController
         }
 
         $response = $this->json(['success' => true]);
-        $this->tokenService->addAuthCookies($response, $this->tokenService->generateAccessToken($user), $this->tokenService->generateRefreshToken($user, $request->getClientIp()));
+        $this->tokenService->addAuthCookies($response, $this->tokenService->generateAccessToken($user), $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request)));
         $this->impersonation->attachClearStashCookies($response);
 
         return $response;

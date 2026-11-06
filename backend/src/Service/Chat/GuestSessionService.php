@@ -8,6 +8,7 @@ use App\Entity\GuestSession;
 use App\Entity\User;
 use App\Repository\GuestSessionRepository;
 use App\Repository\UserRepository;
+use App\Service\Http\ClientAddress;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -81,7 +82,7 @@ final class GuestSessionService
 
     public function resolveClientIp(Request $request): ?string
     {
-        return $request->headers->get('CF-Connecting-IP') ?? $request->getClientIp();
+        return ClientAddress::resolve($request);
     }
 
     /**

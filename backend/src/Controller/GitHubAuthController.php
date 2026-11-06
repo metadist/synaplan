@@ -8,6 +8,7 @@ use App\Repository\UserRepository;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
+use App\Service\Http\ClientAddress;
 use App\Service\OAuth\OAuthStateService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -168,7 +169,7 @@ class GitHubAuthController extends AbstractController
 
             // A new account needs the human check from the start of the flow
             // and a free signup slot; an existing account signs in as before.
-            $this->signupGate->assertGithubSignup($email, $userInfo['id'] ?? null, $statePayload, $request->getClientIp());
+            $this->signupGate->assertGithubSignup($email, $userInfo['id'] ?? null, $statePayload, ClientAddress::resolve($request));
             $user = $this->findOrCreateUser(
                 $userInfo,
                 $email,

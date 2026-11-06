@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\Http\ClientAddress;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 use App\Service\PlatformLink\OutlookConnectService;
 use OpenApi\Attributes as OA;
@@ -92,7 +93,7 @@ final class AddinConnectController extends AbstractController
                 \is_string($data['base_url'] ?? null) ? $data['base_url'] : '',
                 $request->getSchemeAndHttpHost(),
                 (string) $request->headers->get('User-Agent', ''),
-                $request->getClientIp() ?? '',
+                ClientAddress::resolve($request) ?? '',
             );
         } catch (PlatformLinkValidationException $e) {
             return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
