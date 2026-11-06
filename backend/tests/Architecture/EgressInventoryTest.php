@@ -30,10 +30,8 @@ final class EgressInventoryTest extends TestCase
      */
     private const IGNORED_PLUGINS = [
         'brogent',
-        'synaform',
         'synasort',
         'synaads',
-        'synafastbill',
     ];
 
     private const SCRATCH = <<<'PHP'

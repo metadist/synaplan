@@ -1,0 +1,35 @@
+{
+  "title": "Synafastbill",
+  "subtitle": "Habla con tu cuenta de FastBill desde el chat.",
+  "settings": {
+    "heading": "Conexión con FastBill",
+    "email": "Correo de la cuenta",
+    "apiKey": "Clave API",
+    "apiKeyHint": "Se guarda por usuario y se enmascara. Déjalo vacío para conservar la clave actual.",
+    "currency": "Moneda predeterminada",
+    "vat": "IVA predeterminado %",
+    "unit": "Unidad predeterminada",
+    "language": "Idioma",
+    "save": "Guardar",
+    "testConnection": "Probar conexión",
+    "saved": "Ajustes guardados.",
+    "testOk": "Conexión correcta: se alcanzaron {count} registro(s) de cliente.",
+    "testFailed": "Error de conexión. Comprueba el correo y la clave API.",
+    "officialSite": "Sitio web oficial de FastBill",
+    "apiDocs": "¿Dónde encuentro mi clave API?"
+  },
+  "chat": {
+    "heading": "Pruébalo aquí",
+    "placeholder": "p. ej. crea una nueva factura en borrador para el cliente XYZ",
+    "send": "Enviar",
+    "hint": "También puedes escribir /fastbill … directamente en el chat de Synaplan."
+  },
+  "help": {
+    "heading": "Comandos",
+    "createInvoice": "Crear una nueva factura (guiado)",
+    "registerPayment": "Conciliar y registrar un pago a partir del texto bancario pegado",
+    "showOverdue": "Listar facturas vencidas",
+    "help": "Mostrar esta descripción",
+    "safety": "Todas las acciones de escritura piden confirmación primero. Las facturas se crean como borradores."
+  }
+}

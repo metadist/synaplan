@@ -1,0 +1,42 @@
+{
+  "id": "synafastbill",
+  "name": "synafastbill",
+  "namespace": "Plugin\\Synafastbill",
+  "version": "0.1.0",
+  "displayName": "Synafastbill",
+  "description": "Talk to your FastBill account from the Synaplan chat: draft invoices, register payments, and list overdue invoices via /fastbill.",
+  "author": "Synaplan",
+  "homepage": "https://github.com/metadist/synafastbill",
+  "license": "Apache-2.0",
+  "minSynaplanVersion": "1.0.0",
+  "capabilities": ["api", "frontend", "migrations", "chat"],
+  "chatCommands": [
+    {
+      "command": "fastbill",
+      "endpoint": "/chat",
+      "description": "Draft invoices, register payments, and list overdue invoices in FastBill."
+    }
+  ],
+  "routes": [
+    {"path": "/setup-check", "method": "GET", "description": "Check whether FastBill credentials are configured"},
+    {"path": "/config", "method": "GET", "description": "Get plugin configuration (API key masked)"},
+    {"path": "/config", "method": "PUT", "description": "Update plugin configuration (FastBill email, API key, defaults)"},
+    {"path": "/test-connection", "method": "POST", "description": "Verify the stored credentials with a read-only customer.get"},
+    {"path": "/chat", "method": "POST", "description": "Handle one /fastbill chat turn: parse prompt, run/confirm a FastBill command, return a reply"},
+    {"path": "/help", "method": "GET", "description": "Static command help overview"}
+  ],
+  "migrations": [
+    "001_setup.sql"
+  ],
+  "config": {
+    "group": "P_synafastbill",
+    "settings": [
+      {"key": "enabled", "type": "boolean", "default": true, "description": "Enable Synafastbill plugin"},
+      {"key": "default_language", "type": "string", "default": "en", "description": "Language for chat help/replies"},
+      {"key": "command_model", "type": "string", "default": "default", "description": "AI model used to parse prompts into structured commands"},
+      {"key": "default_currency", "type": "string", "default": "EUR", "description": "Default invoice currency"},
+      {"key": "default_vat_percent", "type": "string", "default": "19", "description": "Default VAT rate for new invoice items"},
+      {"key": "default_unit", "type": "string", "default": "hours", "description": "Default unit for new invoice items"}
+    ]
+  }
+}

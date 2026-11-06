@@ -16,9 +16,9 @@ step. D2, D4, D5, D7, D8, D10, D12 and D14 stay open.
 | HP3 | not started | — | needs D1, D9, which are now ticked; still behind HP4 |
 | HP4 | worked on 2026-11-05 | held to the example bar in this step | Synamail profiles. Snapshot of metadist/Synamail `a176caef5fd28e76ac60f401ca3c57b22fadbd51`, history not imported. Outlook add-in stays in that repository |
 | HP5 | not started | — | blocked on a published Desktop release (draft `v0.1.0` does not count) |
-| HP6 | not started | — | synafastbill |
+| HP6 | hosted 2026-11-06, not yet an example | no | synafastbill is in `plugins/synafastbill`. Shared HTTP client replaces curl. French and the live FastBill walk are still open |
 | HP7 | not started | — | Synaads; needs PQ1 |
-| HP8 | not started | — | Synaform series HP8a–g |
+| HP8 | hosted 2026-11-06, split still open | no | The running Synaform tree is in `plugins/synaform`. The controller and the page are still over the size bar |
 | HP9 | not started | — | WordPress rewrite, its own repository |
 | HP10 | blocked | — | SortX; needs the security note below |
 
@@ -28,9 +28,9 @@ step. D2, D4, D5, D7, D8, D10, D12 and D14 stay open.
 | -- | ------------ | ---------- | ---------------------------- | ------- |
 | `synascriber` | yes, 0.4.1 | no | already on `main` | homepage pointer (HP1) |
 | `synamail` | this step, not on `main` yet | ignore line removed in this step | metadist/Synamail `a176caef5fd28e76ac60f401ca3c57b22fadbd51` (`synamail-plugin/` only) | French, tests and the docs install link are part of HP4 |
-| `synafastbill` | no | yes, line only | metadist/synafastbill `42323c2` is the public tip as of this note; re-check at import | curl client, French, tests live outside the plugin (HP6) |
+| `synafastbill` | yes, from the running copy (2026-11-06) | no | GitHub tip `42323c2` is current and has no open pull request. The imported tree had already diverged from that tip | French locale and the live FastBill walk |
 | `synaads` | no | yes, line only | metadist/Synaads tip at import | size, no locales, no tests, `_devextras/test-synaads.sh` (HP7) |
-| `synaform` | no (local gitignored copy only) | yes | metadist/Synaform `d98ae8d` (v4.4.3) as of this note; re-check at import | 11,885-line controller, 9,218-line page (HP8) |
+| `synaform` | yes, from the running copy (2026-11-06) | no | GitHub tip `d98ae8d` (v4.4.3) is current and has no open pull request. The imported tree uses `AiFacade` and is not a byte match | controller and page still over the size bar (HP8 split) |
 | `sortx` | no | ignore line is `plugins/synasort/`, folder absent | private; no SHA until §6 | security pass (HP10) |
 | desktop | companion | — | — | no published installer (HP5) |
 | wordpress chat | companion | — | tag `1.0.10` is the old plugin, not the snapshot | calls `app.synaplan.com/api.php`, creates accounts (HP9) |

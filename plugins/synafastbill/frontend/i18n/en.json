@@ -1,0 +1,35 @@
+{
+  "title": "Synafastbill",
+  "subtitle": "Talk to your FastBill account from the chat.",
+  "settings": {
+    "heading": "FastBill connection",
+    "email": "Account e-mail",
+    "apiKey": "API key",
+    "apiKeyHint": "Stored per user and masked. Leave blank to keep the current key.",
+    "currency": "Default currency",
+    "vat": "Default VAT %",
+    "unit": "Default unit",
+    "language": "Language",
+    "save": "Save",
+    "testConnection": "Test connection",
+    "saved": "Settings saved.",
+    "testOk": "Connection OK — reached {count} customer record(s).",
+    "testFailed": "Connection failed. Check the account e-mail and API key.",
+    "officialSite": "Official FastBill website",
+    "apiDocs": "Where do I find my API key?"
+  },
+  "chat": {
+    "heading": "Try it here",
+    "placeholder": "e.g. create a new draft invoice for customer XYZ",
+    "send": "Send",
+    "hint": "You can also type /fastbill … directly in the Synaplan chat."
+  },
+  "help": {
+    "heading": "Commands",
+    "createInvoice": "Draft a new invoice (guided)",
+    "registerPayment": "Match and register a payment from pasted bank text",
+    "showOverdue": "List overdue invoices",
+    "help": "Show this overview",
+    "safety": "All write actions ask for confirmation first. Invoices are created as drafts."
+  }
+}

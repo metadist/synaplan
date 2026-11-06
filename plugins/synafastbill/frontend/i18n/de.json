@@ -1,0 +1,35 @@
+{
+  "title": "Synafastbill",
+  "subtitle": "Sprich mit deinem FastBill-Konto direkt aus dem Chat.",
+  "settings": {
+    "heading": "FastBill-Verbindung",
+    "email": "Konto-E-Mail",
+    "apiKey": "API-Schlüssel",
+    "apiKeyHint": "Pro Benutzer gespeichert und maskiert. Leer lassen, um den aktuellen Schlüssel zu behalten.",
+    "currency": "Standardwährung",
+    "vat": "Standard-MwSt. %",
+    "unit": "Standardeinheit",
+    "language": "Sprache",
+    "save": "Speichern",
+    "testConnection": "Verbindung testen",
+    "saved": "Einstellungen gespeichert.",
+    "testOk": "Verbindung OK — {count} Kundendatensatz/-sätze erreichbar.",
+    "testFailed": "Verbindung fehlgeschlagen. Bitte E-Mail und API-Schlüssel prüfen.",
+    "officialSite": "Offizielle FastBill-Website",
+    "apiDocs": "Wo finde ich meinen API-Schlüssel?"
+  },
+  "chat": {
+    "heading": "Hier ausprobieren",
+    "placeholder": "z. B. erstelle einen neuen Rechnungsentwurf für Kunde XYZ",
+    "send": "Senden",
+    "hint": "Du kannst auch direkt /fastbill … im Synaplan-Chat eingeben."
+  },
+  "help": {
+    "heading": "Befehle",
+    "createInvoice": "Neue Rechnung (geführt) anlegen",
+    "registerPayment": "Zahlung aus eingefügtem Banktext zuordnen und buchen",
+    "showOverdue": "Überfällige Rechnungen auflisten",
+    "help": "Diese Übersicht anzeigen",
+    "safety": "Alle schreibenden Aktionen werden vorher bestätigt. Rechnungen werden als Entwurf angelegt."
+  }
+}
