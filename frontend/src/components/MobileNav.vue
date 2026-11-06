@@ -270,7 +270,7 @@
 
                 <template v-if="isGuestMode">
                   <router-link
-                    v-if="configStore.auth.registrationEnabled"
+                    v-if="isSelfSignupOpen(configStore.auth)"
                     to="/register"
                     class="v2-drawer-account font-medium"
                     style="color: var(--brand)"
@@ -622,6 +622,7 @@ import {
 import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
 import { useConfigStore } from '../stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 import { useSidebarStore } from '../stores/sidebar'
 import { useIncomingStore } from '../stores/incoming'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'

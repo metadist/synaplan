@@ -148,14 +148,13 @@
                 >
                   {{ $t('guest.retry') }}
                 </button>
-                <!-- Sign-in fallback: /register is unreachable when
-                     registration is disabled (#462 route guard). -->
+                <!-- Sign-in when a stranger cannot create an account. -->
                 <router-link
-                  :to="{ name: configStore.auth.registrationEnabled ? 'register' : 'login' }"
+                  :to="{ name: isSelfSignupOpen(configStore.auth) ? 'register' : 'login' }"
                   class="px-4 py-2 rounded-lg border border-[var(--border)] txt-secondary text-sm font-medium hover:bg-[var(--bg-secondary)] transition-colors"
                 >
                   {{
-                    configStore.auth.registrationEnabled
+                    isSelfSignupOpen(configStore.auth)
                       ? $t('guest.createAccount')
                       : $t('auth.signIn')
                   }}
@@ -715,6 +714,7 @@ import { useConversationFilePreview } from '@/composables/useConversationFilePre
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useGuestStore } from '@/stores/guest'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 import { useUsageTaximeterStore } from '@/stores/usageTaximeter'
 import { useMemoriesStore } from '@/stores/userMemories'
 import { useFeedbackStore } from '@/stores/userFeedback'

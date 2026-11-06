@@ -71,7 +71,7 @@
           <!-- CTA buttons -->
           <div class="bg-white dark:bg-gray-900 px-8 pb-8 pt-2 space-y-3">
             <router-link
-              v-if="config.auth.registrationEnabled"
+              v-if="isSelfSignupOpen(config.auth)"
               to="/register"
               data-testid="guest-modal-register"
               class="group relative block w-full py-3 rounded-xl bg-brand text-white text-center font-semibold text-sm overflow-hidden transition-all duration-200 hover:shadow-lg hover:shadow-brand/30 active:scale-[0.98]"
@@ -96,6 +96,7 @@
 <script setup lang="ts">
 import { Icon } from '@iconify/vue'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 
 const config = useConfigStore()
 

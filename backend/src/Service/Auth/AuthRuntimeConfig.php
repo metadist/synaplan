@@ -61,6 +61,7 @@ final readonly class AuthRuntimeConfig implements RuntimeConfigContributorInterf
             'auth' => [
                 'registrationEnabled' => $this->registrationConfig->isEnabled(),
                 'registrationMode' => $this->registrationConfig->mode(),
+                'signupPaused' => $this->registrationConfig->isSignupPaused(),
                 'payFirst' => $this->payFirst->isActive(),
                 'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
                 'mailerConfigured' => $this->mailerConfig->isConfigured(),

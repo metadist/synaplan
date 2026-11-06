@@ -21,7 +21,7 @@
           {{ $t('guest.banner.remaining', { count: remaining }) }}
         </span>
 
-        <template v-if="config.auth.registrationEnabled">
+        <template v-if="isSelfSignupOpen(config.auth)">
           <span class="w-px h-3.5 bg-gray-400 dark:bg-gray-500" />
 
           <router-link
@@ -54,6 +54,7 @@
 import { computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 
 const config = useConfigStore()
 

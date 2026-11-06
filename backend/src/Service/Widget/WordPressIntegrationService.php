@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Service\Widget;
 
 use App\Entity\File;
@@ -26,17 +28,17 @@ final readonly class WordPressIntegrationService
     private const GROUP_KEY = 'WORDPRESS_WIZARD';
 
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
-        private readonly EntityManagerInterface $em,
-        private readonly UserRepository $userRepository,
-        private readonly WordPressApiKeyIssuer $apiKeyIssuer,
-        private readonly PromptRepository $promptRepository,
-        private readonly PromptService $promptService,
-        private readonly FileStorageService $fileStorageService,
-        private readonly FileProcessor $fileProcessor,
-        private readonly VectorizationService $vectorizationService,
-        private readonly WidgetService $widgetService,
-        private readonly LoggerInterface $logger,
+        private HttpClientInterface $httpClient,
+        private EntityManagerInterface $em,
+        private UserRepository $userRepository,
+        private WordPressApiKeyIssuer $apiKeyIssuer,
+        private PromptRepository $promptRepository,
+        private PromptService $promptService,
+        private FileStorageService $fileStorageService,
+        private FileProcessor $fileProcessor,
+        private VectorizationService $vectorizationService,
+        private WidgetService $widgetService,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -52,7 +54,6 @@ final readonly class WordPressIntegrationService
         $siteUrl = trim((string) ($payload['site_url'] ?? ''));
         $email = strtolower(trim((string) ($payload['email'] ?? '')));
         $password = (string) ($payload['password'] ?? '');
-        $language = $payload['language'] ?? 'en';
 
         if ('' === $verificationUrl || '' === $verificationToken || '' === $siteUrl) {
             throw new \InvalidArgumentException('Missing verification parameters');
@@ -68,62 +69,35 @@ final readonly class WordPressIntegrationService
 
         $existingUser = $this->userRepository->findByEmail($email);
 
-        if ($existingUser instanceof User) {
-            $hash = $existingUser->getPassword();
-            if ('' === $hash || !password_verify($password, $hash)) {
-                $this->logger->info('WordPress wizard: rejected an existing account without a matching password');
+        $dummyHash = '$2y$10$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
+        $hash = $existingUser instanceof User ? $existingUser->getPassword() : '';
+        $passwordMatched = password_verify($password, '' !== $hash ? $hash : $dummyHash) && '' !== $hash;
 
-                throw new \RuntimeException('WordPress site verification failed');
-            }
+        if (!$existingUser instanceof User || !$passwordMatched) {
+            $this->logger->info(
+                $existingUser instanceof User
+                    ? 'WordPress wizard: rejected an existing account without a matching password'
+                    : 'WordPress wizard: refused to create an account',
+            );
+
+            throw new \RuntimeException('WordPress site verification failed');
         }
 
         $this->verifyWordPressSite($verificationUrl, $verificationToken);
 
-        if ($existingUser instanceof User) {
-            $userDetails = $existingUser->getUserDetails();
-            $userDetails['wordpress_verified'] = true;
-            $userDetails['wordpress_site'] = $siteUrl;
-            $existingUser->setUserDetails($userDetails);
-            $this->em->flush();
-
-            return [
-                'success' => true,
-                'data' => [
-                    'user_id' => $existingUser->getId(),
-                    'email' => $existingUser->getMail(),
-                    'site_verified' => true,
-                    'existing_user' => true,
-                ],
-            ];
-        }
-
-        // Create new user
-        $user = new User();
-        $user->setMail($email);
-        $user->setPw(password_hash($password, PASSWORD_BCRYPT));
-        $user->setCreated(date('YmdHis'));
-        $user->setProviderId('local');
-        $user->setType('MAIL');
-        $user->setUserLevel('NEW');
-        // Not pre-verified. Key issuance requires a verified address, and this
-        // wizard used to skip that and hand back a usable key.
-        $user->setEmailVerified(false);
-        $user->setUserDetails([
-            'language' => $language,
-            'wordpress_verified' => true,
-            'wordpress_site' => $siteUrl,
-        ]);
-        $user->setPaymentDetails([]);
-
-        $this->em->persist($user);
+        $userDetails = $existingUser->getUserDetails();
+        $userDetails['wordpress_verified'] = true;
+        $userDetails['wordpress_site'] = $siteUrl;
+        $existingUser->setUserDetails($userDetails);
         $this->em->flush();
 
         return [
             'success' => true,
             'data' => [
-                'user_id' => $user->getId(),
-                'email' => $user->getMail(),
+                'user_id' => $existingUser->getId(),
+                'email' => $existingUser->getMail(),
                 'site_verified' => true,
+                'existing_user' => true,
             ],
         ];
     }

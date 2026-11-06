@@ -43,6 +43,27 @@ class WordPressIntegrationServiceTest extends TestCase
         ]);
     }
 
+    public function testAMissingAccountIsNotCreated(): void
+    {
+        $http = $this->createMock(HttpClientInterface::class);
+        $http->expects($this->never())->method('request');
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects($this->never())->method('persist');
+        $users = $this->createMock(UserRepository::class);
+        $users->method('findByEmail')->willReturn(null);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('WordPress site verification failed');
+
+        $this->service($http, $em, $users)->step1VerifyAndCreateUser([
+            'email' => 'stranger@example.com',
+            'password' => 'correct-horse',
+            'verification_token' => 'token',
+            'verification_url' => 'https://example.com/verify',
+            'site_url' => 'https://example.com',
+        ]);
+    }
+
     public function testVerificationTargetMustBeTheSamePublicHttpsHost(): void
     {
         $http = $this->createMock(HttpClientInterface::class);

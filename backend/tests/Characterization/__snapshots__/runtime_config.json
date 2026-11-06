@@ -12,7 +12,8 @@
                 "mailerConfigured": "bool",
                 "payFirst": "bool",
                 "registrationEnabled": "bool",
-                "registrationMode": "string"
+                "registrationMode": "string",
+                "signupPaused": "bool"
             },
             "billing": {
                 "enabled": "bool"
@@ -254,7 +255,8 @@
                 "mailerConfigured": "bool",
                 "payFirst": "bool",
                 "registrationEnabled": "bool",
-                "registrationMode": "string"
+                "registrationMode": "string",
+                "signupPaused": "bool"
             },
             "billing": {
                 "enabled": "bool"
@@ -496,7 +498,8 @@
                 "mailerConfigured": "bool",
                 "payFirst": "bool",
                 "registrationEnabled": "bool",
-                "registrationMode": "string"
+                "registrationMode": "string",
+                "signupPaused": "bool"
             },
             "billing": {
                 "enabled": "bool"

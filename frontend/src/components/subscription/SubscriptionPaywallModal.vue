@@ -216,6 +216,7 @@ import { Icon } from '@iconify/vue'
 import type { SubscriptionPlan } from '@/services/api/subscriptionApi'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 import { useSubscriptionPurchase } from '@/composables/useSubscriptionPurchase'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 import type { PaywallReason } from '@/composables/usePaywallPrompt'
@@ -341,9 +342,13 @@ function capitalize(str: string): string {
  */
 async function choosePlan(planId: string): Promise<void> {
   if (isGuest.value) {
-    setPendingRedirect(`/subscription?plan=${planId}`)
+    const redirect = `/subscription?plan=${planId}`
+    setPendingRedirect(redirect)
     close()
-    await router.push({ path: '/register', query: { redirect: `/subscription?plan=${planId}` } })
+    await router.push({
+      path: isSelfSignupOpen(config.auth) ? '/register' : '/login',
+      query: { redirect },
+    })
     return
   }
   await selectPlan(planId)

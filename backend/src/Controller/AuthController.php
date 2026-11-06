@@ -213,7 +213,7 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(response: 409, description: 'Email already registered')]
     #[OA\Response(response: 400, description: 'Validation error')]
-    #[OA\Response(response: 403, description: 'Registration is disabled on this instance (e.g. OIDC-only)')]
+    #[OA\Response(response: 403, description: 'Self-sign-up is off (SIGNUP_CLOSED). An existing account is not revealed.')]
     #[OA\Response(response: 429, description: 'Too many sign-ups from this connection (SIGNUP_RATE_LIMITED); Retry-After is set')]
     #[OA\Response(response: 503, description: 'Sign-up is paused by the operator and the request has no valid invitation code (SIGNUP_PAUSED)')]
     public function register(
@@ -222,10 +222,7 @@ class AuthController extends AbstractController
     ): JsonResponse {
         // #462: SSO-/OIDC-only instances refuse local sign-up server-side.
         if (!$this->registrationConfig->isEnabled()) {
-            return $this->json([
-                'error' => 'Registration is disabled on this instance.',
-                'code' => 'REGISTRATION_DISABLED',
-            ], Response::HTTP_FORBIDDEN);
+            return $this->signupBlocked(SignupBlockedException::closed());
         }
 
         // Human check (Turnstile or reCAPTCHA), then the signup limits and the
