@@ -115,6 +115,28 @@ engineering. Testing against the hosted service at `web.synaplan.com` is fine
 when it stays non-destructive and touches only your own account and data; for
 anything beyond that, ask first.
 
+## AI incidents
+
+A software weakness and an AI incident are different reports. Use the
+process above for a weakness in the code.
+
+An AI incident means the assistant discloses data it should not, a
+generated file is marked in a way that misleads people, or an answer causes
+harm that the organisation running Synaplan reports to us.
+
+1. Mail [privacy@synaplan.com](mailto:privacy@synaplan.com) with the subject
+   `AI incident`.
+2. Say what happened, when, which channel (mail, WhatsApp, Telegram, widget,
+   or the app), and who is affected. Do not send secrets you do not need to
+   send.
+3. We reply within 24 hours. The reply says what happened, who is affected,
+   and what we changed.
+4. If that reply is not enough, answer with the word `escalation`. The
+   management of metadist data management GmbH then sees the report.
+
+The public wording for buyers is on
+[www.synaplan.eu/trust](https://www.synaplan.eu/trust).
+
 ## Thanks
 
 Every report below made Synaplan safer for everyone who runs it.
