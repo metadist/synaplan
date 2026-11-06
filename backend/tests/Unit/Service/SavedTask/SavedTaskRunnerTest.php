@@ -235,6 +235,9 @@ final class SavedTaskRunnerTest extends TestCase
         $this->assertSame(11, $capturedOptions['saved_task_id'] ?? null);
         $this->assertSame('Katzenbild', $capturedOptions['saved_task_name'] ?? null);
         $this->assertArrayNotHasKey('fixed_task_prompt', $capturedOptions);
+        // A chat-saved schedule has no assistant, so the sorter still decides
+        // whether this rerun searches.
+        $this->assertArrayNotHasKey('schedule_search', $capturedOptions);
         // The incoming message must not stay stuck in "processing".
         $this->assertSame('complete', $captured->getStatus());
 
@@ -354,9 +357,150 @@ final class SavedTaskRunnerTest extends TestCase
 
         $this->assertSame('completed', $result['run']->getStatus(), 'run error: '.(string) $result['run']->getError());
         $this->assertSame('meetings', $capturedOptions['fixed_task_prompt'] ?? null);
+        $this->assertArrayNotHasKey('schedule_search', $capturedOptions);
         $this->assertTrue($capturedOptions['saved_task'] ?? false);
         $this->assertSame(12, $capturedOptions['saved_task_id'] ?? null);
         $this->assertSame('Meeting requests', $capturedOptions['saved_task_name'] ?? null);
+    }
+
+    public function testAnAssistantScheduleOrdersAWebSearch(): void
+    {
+        $task = new SavedTask(9, 4, 'Morning news');
+        $this->setId($task, 13);
+        $task->setChatId(77);
+        $task->setTrigger(SavedTask::TRIGGER_SCHEDULE, ['agentId' => 8, 'kind' => 'cron']);
+
+        $user = $this->createMock(User::class);
+        $user->method('isActive')->willReturn(true);
+        $user->method('getId')->willReturn(9);
+        $user->method('getMail')->willReturn('demo@synaplan.com');
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('isEnabled')->willReturn(true);
+        $prompt->method('getTopic')->willReturn('agent:news');
+        $prompt->method('getPrompt')->willReturn('The morning open-source briefing.');
+
+        $chat = $this->createMock(Chat::class);
+        $chat->method('getUserId')->willReturn(9);
+        $chat->method('getId')->willReturn(77);
+        $chats = $this->createMock(ChatRepository::class);
+        $chats->method('find')->willReturn($chat);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->method('findByIdAndOwner')->willReturn($task);
+        $config = $this->createMock(SavedTaskConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn($user);
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->willReturn($prompt);
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+
+        $capturedOptions = null;
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->method('process')->willReturnCallback(function (Message $message, array $options) use (&$capturedOptions): array {
+            $capturedOptions = $options;
+
+            return ['success' => true, 'response' => ['content' => 'ok', 'metadata' => []], 'classification' => []];
+        });
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('persist')->willReturnCallback(function (object $entity): void {
+            if ($entity instanceof Message && null === $entity->getId()) {
+                $ref = new \ReflectionProperty(Message::class, 'id');
+                $ref->setValue($entity, 3001);
+            }
+        });
+
+        $runner = new SavedTaskRunner(
+            $config,
+            $tasks,
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $users,
+            $chats,
+            $em,
+            $processor,
+            $rateLimits,
+            $this->createStub(TaskPlanStore::class),
+            $this->createStub(GeneratedFileRegistrar::class),
+            $this->createStub(InternalEmailService::class),
+            $this->createStub(LoggerInterface::class),
+        );
+
+        $result = $runner->run(9, 13, 'Websuche: briefing', 'schedule');
+
+        $this->assertSame('completed', $result['run']->getStatus(), 'run error: '.(string) $result['run']->getError());
+        $this->assertTrue($capturedOptions['schedule_search'] ?? false);
+        $this->assertSame(8, $capturedOptions['agentId'] ?? null);
+    }
+
+    public function testAnAssistantMailTriggerDoesNotOrderAWebSearch(): void
+    {
+        $task = new SavedTask(9, 4, 'Incoming mail');
+        $this->setId($task, 14);
+        $task->setChatId(77);
+        $task->setTrigger(SavedTask::TRIGGER_INBOUND_EMAIL, ['agentId' => 8]);
+
+        $user = $this->createMock(User::class);
+        $user->method('isActive')->willReturn(true);
+        $user->method('getId')->willReturn(9);
+        $user->method('getMail')->willReturn('demo@synaplan.com');
+
+        $prompt = $this->createMock(Prompt::class);
+        $prompt->method('isEnabled')->willReturn(true);
+        $prompt->method('getTopic')->willReturn('agent:mail');
+        $prompt->method('getPrompt')->willReturn('Read the mail.');
+
+        $chat = $this->createMock(Chat::class);
+        $chat->method('getUserId')->willReturn(9);
+        $chat->method('getId')->willReturn(77);
+        $chats = $this->createMock(ChatRepository::class);
+        $chats->method('find')->willReturn($chat);
+
+        $tasks = $this->createMock(SavedTaskRepository::class);
+        $tasks->method('findByIdAndOwner')->willReturn($task);
+        $config = $this->createMock(SavedTaskConfig::class);
+        $config->method('isEnabled')->willReturn(true);
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn($user);
+        $prompts = $this->createMock(PromptRepository::class);
+        $prompts->method('find')->willReturn($prompt);
+        $rateLimits = $this->createMock(RateLimitService::class);
+        $rateLimits->method('checkLimit')->willReturn(['allowed' => true]);
+
+        $capturedOptions = null;
+        $processor = $this->createMock(MessageProcessor::class);
+        $processor->method('process')->willReturnCallback(function (Message $message, array $options) use (&$capturedOptions): array {
+            $capturedOptions = $options;
+
+            return ['success' => true, 'response' => ['content' => '', 'metadata' => []], 'classification' => []];
+        });
+
+        $em = $this->createStub(EntityManagerInterface::class);
+
+        $runner = new SavedTaskRunner(
+            $config,
+            $tasks,
+            $this->createStub(SavedTaskRunRepository::class),
+            $prompts,
+            $users,
+            $chats,
+            $em,
+            $processor,
+            $rateLimits,
+            $this->createStub(TaskPlanStore::class),
+            $this->createStub(GeneratedFileRegistrar::class),
+            $this->createStub(InternalEmailService::class),
+            $this->createStub(LoggerInterface::class),
+        );
+
+        $result = $runner->run(9, 14, 'A new mail arrived', 'inbound_email');
+
+        $this->assertSame('completed', $result['run']->getStatus(), 'run error: '.(string) $result['run']->getError());
+        $this->assertArrayNotHasKey('schedule_search', $capturedOptions);
+        $this->assertSame(8, $capturedOptions['agentId'] ?? null);
     }
 
     private function setId(SavedTask $task, int $id): void
