@@ -101,6 +101,8 @@ how is it tested, how does an administrator remove it" from
 
 ## HP4 — Synamail
 
+Worked on since 2026-11-05. The owner moved this step ahead of HP1–HP3.
+
 `feat(plugins): Synamail profiles, with a link to install Outlook`
 
 Depends on D3, D6, D11, D13. Release class: backend-only for

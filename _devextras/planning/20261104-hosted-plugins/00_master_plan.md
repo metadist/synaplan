@@ -178,19 +178,19 @@ it.
 Ticked by the owner before the step that depends on it. The
 recommendation is the text of the row.
 
-- [ ] **D1 (all).** Two homes, as in §2. In-process plugins live under `plugins/<id>/`. Companions stay in their repositories. Synaplan links to them and tests the link.
+- [x] **D1 (all).** Two homes, as in §2. In-process plugins live under `plugins/<id>/`. Companions stay in their repositories. Synaplan links to them and tests the link. Owner, 2026-11-05: Synamail is the first import; the other rows stay in their own steps.
 - [ ] **D2 (HP1).** metadist/synaScriber stays archived. It is not deleted.
-- [ ] **D3 (every import).** Copy a reviewed snapshot. Do not import the other repository's git history, and do not add a submodule.
+- [x] **D3 (every import).** Copy a reviewed snapshot. Do not import the other repository's git history, and do not add a submodule. Owner, 2026-11-05, for the Synamail snapshot. Later imports still record their own SHA.
 - [ ] **D4 (HP6, HP7).** Do not import `_devextras/`, `.env`, or a script that holds a personal key. Rotate the Synaads script match if it is live.
 - [ ] **D5 (HP8).** Synasort enters this repository only after §6 is signed in STATUS. Only `sortx-plugin/`, id `sortx`. The Go sorter stays private.
-- [ ] **D6 (HP4).** The Outlook add-in stays in metadist/Synamail. `plugins/synamail` is the profile API, and its page always shows the install link.
+- [x] **D6 (HP4).** The Outlook add-in stays in metadist/Synamail. `plugins/synamail` is the profile API, and its page always shows the install link. Owner, 2026-11-05: this is the current step.
 - [ ] **D7 (HP5).** Desktop stays in metadist/synaplan-desktop. The Apps card links to the EXE and the DMG of the latest published release. The draft `v0.1.0` is not that link.
 - [ ] **D8 (HP9).** The WordPress plugin is rewritten in metadist/synaplan-ai-support-chat against `/api/v1` and the current widget. It does not create accounts. It is not placed under `plugins/`.
-- [ ] **D9 (rules).** A hosted plugin that we call an example meets [`01_rules.md`](./01_rules.md), including five locale files and the size bar, before its "example" line in `plugins/README.md` is checked. The import pull request may land the code earlier only when STATUS calls it `present, not yet an example` and names the step that finishes the bar.
+- [x] **D9 (rules).** A hosted plugin that we call an example meets [`01_rules.md`](./01_rules.md), including five locale files and the size bar, before its "example" line in `plugins/README.md` is checked. The import pull request may land the code earlier only when STATUS calls it `present, not yet an example` and names the step that finishes the bar. Owner, 2026-11-05: Synamail is held to this bar in HP4.
 - [ ] **D10 (HP2).** `PLUGINS_DISABLED` as in §7. Unset means every directory on disk is offered. Deleting a directory remains valid for a source build.
-- [ ] **D11 (HP3–HP7).** Shipping the code does not install it for every user. `DEFAULT_USER_PLUGINS` stays a deployment choice. The public default stays `[]`. openDesk's `synascriber` entry stays. Whether web.synaplan.com adds `synamail` is an owner choice in `synaplan-platform`, recorded in that repo, not smuggled into the public default.
+- [x] **D11 (HP3–HP7).** Shipping the code does not install it for every user. `DEFAULT_USER_PLUGINS` stays a deployment choice. The public default stays `[]`. openDesk's `synascriber` entry stays. Whether web.synaplan.com adds `synamail` is an owner choice in `synaplan-platform`, recorded in that repo, not smuggled into the public default. Owner, 2026-11-05: HP4 does not set the public default.
 - [ ] **D12 (HP3–HP7).** Row 24's static checks (PQ1) should be green before Synaform and Synaads merge, because those diffs are large. Synamail and synafastbill may merge earlier if the pull request itself is green under the checks that already exist, and the new PHP is formatted and at PHPStan level 5.
-- [ ] **D13 (each import).** `synaplan-docs` `docs/plugins.md` (and the companion page, when there is one) changes in the same step as the install instructions. The public docs stop saying "clone a second repository and copy the folder" for a plugin that is now in the image.
+- [x] **D13 (each import).** `synaplan-docs` `docs/plugins.md` (and the companion page, when there is one) changes in the same step as the install instructions. The public docs stop saying "clone a second repository and copy the folder" for a plugin that is now in the image. Owner, 2026-11-05, for Synamail. Later imports still update the docs in their own step.
 - [ ] **D14.** `plugins/brogent/` and metadist/Synabrogent stay out of this track.
 
 ## 9. Target shape
@@ -256,11 +256,12 @@ bullets are there. Rules are [`01_rules.md`](./01_rules.md).
 | HP9 | WordPress chat rewrite in metadist/synaplan-ai-support-chat, then a docs link | that repo; docs here are no-app-impact | D8, D13; row 28's account rule | support chat |
 | HP10 | `feat(plugins): SortX snapshot after the security pass` | backend-only | D5, §6 signed, D9 | sortx |
 
-Order: HP0, then HP1–HP3 in any order, then HP4 (smallest real import
-and the Outlook link), HP6, HP7, HP8. HP5 waits on a published Desktop
-release and can otherwise start any time. HP9 starts when someone is
-ready for a WordPress rewrite; it does not block the PHP plugins. HP10
-is last and stays blocked on the private security note.
+Order: HP0 is written. The owner moved **HP4 first** on 2026-11-05
+(Synamail profiles into this repository; the Outlook add-in stays in
+metadist/Synamail). HP1–HP3 follow. Then HP6, HP7, HP8. HP5 waits on a
+published Desktop release and can otherwise start any time. HP9 starts
+when someone is ready for a WordPress rewrite; it does not block the PHP
+plugins. HP10 is last and stays blocked on the private security note.
 
 ## 13. Other rows
 
