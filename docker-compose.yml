@@ -416,6 +416,7 @@ services:
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
+      WHATSAPP_DISPLAY_NUMBERS: ${WHATSAPP_DISPLAY_NUMBERS:-}
       # Telegram channel is off until TELEGRAM_ENABLED=true and talks to the
       # real Bot API. Start the `telegram-stub` profile and set
       # TELEGRAM_API_BASE_URL=http://telegram-stub:3998 on backend and worker
