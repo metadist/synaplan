@@ -65,11 +65,12 @@ final readonly class TurnWebSearch
         $messageText = $message->getText();
         $userRequestedSearch = $this->userRequestedSearch($options, $classification)
             || WebSearchTopicPolicy::isExplicitSearchRequest($messageText);
+        $scheduledAssistant = true === ($options['schedule_search'] ?? false);
         $widgetTurn = !empty($options['is_widget_mode']) || !empty($classification['is_widget_mode']);
-        $shouldSearch = !$widgetTurn && WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText);
+        $shouldSearch = !$widgetTurn && WebSearchTopicPolicy::shouldSearch($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $scheduledAssistant);
         $triggerReason = $widgetTurn
             ? 'widget_turn'
-            : $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch);
+            : $this->triggerReasonFor($topic, $userRequestedSearch, $promptToolInternet, $classifierVote, $messageText, $shouldSearch, $scheduledAssistant);
         $needsAttachmentContext = $shouldSearch && $message->hasFiles() && WebSearchTopicPolicy::refersToAttachment($messageText);
 
         $perfTimer?->start('url_read');
@@ -419,10 +420,14 @@ final readonly class TurnWebSearch
      * Why the decision went the way it did, in the precedence of
      * {@see WebSearchTopicPolicy::shouldSearch()}.
      */
-    private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch): string
+    private function triggerReasonFor(?string $topic, bool $userRequestedSearch, ?bool $promptToolInternet, ?bool $classifierVote, ?string $messageText, bool $shouldSearch, bool $scheduledAssistant = false): string
     {
         if ($shouldSearch) {
-            return $userRequestedSearch ? 'user_requested_search' : 'classifier_vote_search';
+            if ($userRequestedSearch) {
+                return 'user_requested_search';
+            }
+
+            return $scheduledAssistant ? 'scheduled_assistant' : 'classifier_vote_search';
         }
         if (false === $promptToolInternet) {
             return 'disabled_by_prompt_tool_internet';
