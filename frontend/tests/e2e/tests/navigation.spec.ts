@@ -256,6 +256,7 @@ test.describe('Navigation: User menu', () => {
     })
 
     await test.step('Assert: settings page lists its sections in the sidebar', async () => {
+      await expect(page).toHaveURL(/\/settings\/profile\/?$/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator(selectors.settings.page)).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })

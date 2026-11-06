@@ -313,7 +313,12 @@ test.describe('@ci @layout UI guard — chat surface', () => {
     const preferencesRow = sheet.locator(NAV.mobileMorePreferences)
     await preferencesRow.scrollIntoViewIfNeeded()
     await preferencesRow.tap()
-    await expect(page).toHaveURL(/\/settings/, { timeout: TIMEOUTS.STANDARD })
+    // Phone chrome keeps the section list at bare /settings. Desktop would
+    // land on /settings/profile.
+    await expect(page).toHaveURL(/\/settings\/?$/, { timeout: TIMEOUTS.STANDARD })
+    await expect(page.locator('[data-testid="nav-phone-settings"]')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
     await expect(page.locator(NAV.mobileDrawerScrim)).toHaveCount(0, { timeout: TIMEOUTS.SHORT })
   })
 
