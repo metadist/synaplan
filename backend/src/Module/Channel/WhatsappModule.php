@@ -50,6 +50,7 @@ final class WhatsappModule implements FeatureModuleInterface
             'WHATSAPP_ACCESS_TOKEN',
             'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
             'WHATSAPP_GRAPH_API_BASE_URL',
+            'WHATSAPP_DISPLAY_NUMBERS',
         );
     }
 

@@ -60,6 +60,11 @@ final readonly class ChannelsTab implements SystemConfigTab
                 description: 'Webhook verification token',
                 sensitive: true,
             ),
+            'WHATSAPP_DISPLAY_NUMBERS' => new FieldDefinition(
+                type: 'text',
+                description: 'E.164 numbers people write to for verification, comma-separated',
+                placeholder: '+4915116038214,+16282253244',
+            ),
         ]);
     }
 

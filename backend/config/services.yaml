@@ -186,6 +186,7 @@ parameters:
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
     env(WHATSAPP_ENABLED): 'false'
+    env(WHATSAPP_DISPLAY_NUMBERS): ''
     env(TELEGRAM_ENABLED): 'false'
     env(TELEGRAM_API_BASE_URL): 'https://api.telegram.org'
     env(TELEGRAM_WEBHOOK_BASE_URL): ''
@@ -697,6 +698,10 @@ services:
             $whatsappEnabled: '%env(bool:WHATSAPP_ENABLED)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
             $whatsappGraphApiBaseUrl: '%env(default::WHATSAPP_GRAPH_API_BASE_URL)%'
+
+    App\Service\WhatsApp\WhatsAppDisplayNumbers:
+        arguments:
+            $raw: '%env(string:WHATSAPP_DISPLAY_NUMBERS)%'
 
     App\Service\WhatsApp\Turn\WhatsAppIntake:
         arguments:

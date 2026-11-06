@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\WhatsApp\WhatsAppDisplayNumbers;
 use App\Service\WhatsApp\WhatsAppService;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
@@ -21,6 +22,7 @@ class PhoneVerificationController extends AbstractController
     public function __construct(
         private EntityManagerInterface $em,
         private WhatsAppService $whatsAppService,
+        private WhatsAppDisplayNumbers $displayNumbers,
         private LoggerInterface $logger,
     ) {
     }
@@ -49,6 +51,18 @@ class PhoneVerificationController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message', type: 'string', example: 'Verification code sent'),
+                new OA\Property(property: 'verification_code', type: 'string', example: 'S4C21'),
+                new OA\Property(
+                    property: 'inbound_numbers',
+                    type: 'array',
+                    items: new OA\Items(
+                        required: ['e164', 'wa_me'],
+                        properties: [
+                            new OA\Property(property: 'e164', type: 'string', example: '+4915116038214'),
+                            new OA\Property(property: 'wa_me', type: 'string', format: 'uri', example: 'https://wa.me/4915116038214'),
+                        ],
+                    ),
+                ),
             ]
         )
     )]
@@ -182,17 +196,11 @@ class PhoneVerificationController extends AbstractController
             'expires_in_seconds' => 300,
         ]);
 
-        return $this->json([
-            'success' => true,
-            'message' => 'Please send this verification code to one of our WhatsApp numbers.',
-            'phone_number' => $phoneNumber,
-            'verification_code' => $verificationCode,
-            'expires_at' => time() + 300,
-            'rate_limit' => [
-                'attempts_remaining' => 5 - $rateLimitData['count'],
-                'retry_after' => 30,
-            ],
-        ]);
+        return $this->json($this->issuedCodeResponse(
+            $phoneNumber,
+            $verificationCode,
+            5 - $rateLimitData['count'],
+        ));
     }
 
     #[Route('/confirm', name: 'confirm', methods: ['POST'])]
@@ -346,12 +354,37 @@ class PhoneVerificationController extends AbstractController
         ]);
     }
 
-    /**
-     * Get current phone verification status.
-     *
-     * GET /api/v1/user/verify-phone/status
-     */
     #[Route('/status', name: 'status', methods: ['GET'])]
+    #[OA\Get(
+        path: '/api/v1/user/verify-phone/status',
+        summary: 'Phone verification status',
+        description: 'Current verification state and the install WhatsApp numbers to write the code to',
+        security: [['Bearer' => []]],
+        tags: ['Phone Verification']
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Verification status',
+        content: new OA\JsonContent(
+            required: ['success', 'inbound_numbers'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'verified', type: 'boolean', example: false),
+                new OA\Property(
+                    property: 'inbound_numbers',
+                    type: 'array',
+                    items: new OA\Items(
+                        required: ['e164', 'wa_me'],
+                        properties: [
+                            new OA\Property(property: 'e164', type: 'string', example: '+4915116038214'),
+                            new OA\Property(property: 'wa_me', type: 'string', format: 'uri', example: 'https://wa.me/4915116038214'),
+                        ],
+                    ),
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 401, description: 'Not authenticated')]
     public function getStatus(
         #[CurrentUser] ?User $user,
     ): JsonResponse {
@@ -388,6 +421,7 @@ class PhoneVerificationController extends AbstractController
             'verified_at' => $verifiedAt,
             'pending_verification' => !empty($pendingVerification),
             'whatsapp_available' => $this->whatsAppService->isAvailable(),
+            'inbound_numbers' => $this->displayNumbers->list(),
         ];
 
         if ($pendingVerification) {
@@ -396,6 +430,33 @@ class PhoneVerificationController extends AbstractController
         }
 
         return $this->json($response);
+    }
+
+    /**
+     * @return array{
+     *     success: true,
+     *     message: string,
+     *     phone_number: string,
+     *     verification_code: string,
+     *     expires_at: int,
+     *     rate_limit: array{attempts_remaining: int, retry_after: int},
+     *     inbound_numbers: list<array{e164: string, wa_me: string}>
+     * }
+     */
+    private function issuedCodeResponse(string $phoneNumber, string $code, int $attemptsRemaining): array
+    {
+        return [
+            'success' => true,
+            'message' => 'Please send this verification code to one of our WhatsApp numbers.',
+            'phone_number' => $phoneNumber,
+            'verification_code' => $code,
+            'expires_at' => time() + 300,
+            'rate_limit' => [
+                'attempts_remaining' => $attemptsRemaining,
+                'retry_after' => 30,
+            ],
+            'inbound_numbers' => $this->displayNumbers->list(),
+        ];
     }
 
     /**
