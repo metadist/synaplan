@@ -21,6 +21,8 @@ use Symfony\Component\HttpFoundation\Request;
  */
 final readonly class ClientAddress
 {
+    private const RESOLVED_ATTRIBUTE = '_client_address';
+
     /**
      * Published Cloudflare edges (https://www.cloudflare.com/ips/).
      *
@@ -53,12 +55,19 @@ final readonly class ClientAddress
 
     public static function resolve(Request $request): ?string
     {
+        $cached = $request->attributes->get(self::RESOLVED_ATTRIBUTE);
+        if (is_string($cached) && '' !== $cached) {
+            return $cached;
+        }
+
         $cloudflare = self::trustedCloudflareIp($request);
         if (null !== $cloudflare) {
+            $request->attributes->set(self::RESOLVED_ATTRIBUTE, $cloudflare);
+
             return $cloudflare;
         }
 
-        $ip = $request->getClientIp();
+        $ip = self::safeClientIp($request);
 
         return is_string($ip) && '' !== $ip ? $ip : null;
     }
@@ -73,16 +82,25 @@ final readonly class ClientAddress
      */
     public static function align(Request $request): void
     {
+        $cloudflare = self::trustedCloudflareIp($request);
+        if (null === $cloudflare) {
+            return;
+        }
+
+        $request->attributes->set(self::RESOLVED_ATTRIBUTE, $cloudflare);
+
         if (0 === (Request::getTrustedHeaderSet() & Request::HEADER_X_FORWARDED_FOR)) {
             return;
         }
 
-        $cloudflare = self::trustedCloudflareIp($request);
-        if (null === $cloudflare || $request->headers->get('X-Forwarded-For') === $cloudflare) {
+        if ($request->headers->get('X-Forwarded-For') === $cloudflare) {
             return;
         }
 
         $request->headers->set('X-Forwarded-For', $cloudflare);
+        if (0 !== (Request::getTrustedHeaderSet() & Request::HEADER_FORWARDED) && $request->headers->has('Forwarded')) {
+            $request->headers->remove('Forwarded');
+        }
     }
 
     private static function trustedCloudflareIp(Request $request): ?string
@@ -94,7 +112,7 @@ final readonly class ClientAddress
         // The peer Symfony stops at is who spoke to the trusted proxies.
         // Caddy on 127.0.0.1 is trusted and forwards this header unchanged,
         // so a visitor can set it. Only a Cloudflare edge actually writes it.
-        $peer = $request->getClientIp();
+        $peer = self::safeClientIp($request);
         if (!is_string($peer) || !IpUtils::checkIp($peer, self::CLOUDFLARE_RANGES)) {
             return null;
         }
@@ -105,10 +123,26 @@ final readonly class ClientAddress
         }
 
         $header = trim($header);
-        if ('' === $header || str_contains($header, ',') || false === filter_var($header, FILTER_VALIDATE_IP)) {
+        if (
+            '' === $header
+            || str_contains($header, ',')
+            || false === filter_var($header, FILTER_VALIDATE_IP)
+            || IpUtils::checkIp($header, Request::getTrustedProxies())
+        ) {
             return null;
         }
 
         return $header;
+    }
+
+    private static function safeClientIp(Request $request): ?string
+    {
+        try {
+            return $request->getClientIp();
+        } catch (\Throwable) {
+            $remote = $request->server->get('REMOTE_ADDR');
+
+            return is_string($remote) && '' !== $remote ? $remote : null;
+        }
     }
 }

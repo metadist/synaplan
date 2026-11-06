@@ -15,6 +15,7 @@ use App\Realtime\Token\RealtimeSubject;
 use App\Realtime\Token\RealtimeTokenService;
 use App\Realtime\Token\WidgetVisitorAccess;
 use App\Realtime\Token\WidgetVisitorAccessChecker;
+use App\Service\Http\ClientAddress;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -142,7 +143,7 @@ final class RealtimeTokenController extends AbstractController
     public function issueWidgetToken(Request $request, string $widgetId, string $sessionId): JsonResponse
     {
         $limit = $this->realtimeWidgetTokenLimiter
-            ->create($request->getClientIp() ?? 'unknown')
+            ->create(ClientAddress::resolve($request) ?? 'unknown')
             ->consume();
         if (!$limit->isAccepted()) {
             return $this->json(['error' => 'too_many_requests'], Response::HTTP_TOO_MANY_REQUESTS);
@@ -227,7 +228,7 @@ final class RealtimeTokenController extends AbstractController
         // anonymous visitor path needs the per-IP brake.
         if (null === $user) {
             $limit = $this->realtimeSubscribeAnonLimiter
-                ->create($request->getClientIp() ?? 'unknown')
+                ->create(ClientAddress::resolve($request) ?? 'unknown')
                 ->consume();
             if (!$limit->isAccepted()) {
                 return $this->json(['error' => 'too_many_requests'], Response::HTTP_TOO_MANY_REQUESTS);

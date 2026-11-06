@@ -119,6 +119,33 @@ final class ClientAddressTest extends TestCase
         $this->assertSame('104.16.1.1', ClientAddress::resolve($request));
     }
 
+    public function testACloudflareHeaderNamingATrustedProxyIsIgnored(): void
+    {
+        Request::setTrustedProxies(['10.0.0.8', '127.0.0.1'], Request::HEADER_X_FORWARDED_FOR);
+        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 10.0.0.8');
+        $request->headers->set('CF-Connecting-IP', '10.0.0.8');
+
+        ClientAddress::align($request);
+
+        $this->assertSame('104.16.1.1', $request->getClientIp());
+        $this->assertSame('104.16.1.1', ClientAddress::resolve($request));
+    }
+
+    public function testAlignDoesNotCreateAConflictingForwardedHeader(): void
+    {
+        Request::setTrustedProxies(['10.0.0.8'], Request::HEADER_X_FORWARDED_FOR | Request::HEADER_FORWARDED);
+        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
+        $request->headers->set('X-Forwarded-For', '104.16.1.1');
+        $request->headers->set('Forwarded', 'for=104.16.1.1');
+        $request->headers->set('CF-Connecting-IP', '203.0.113.10');
+
+        ClientAddress::align($request);
+
+        $this->assertSame('203.0.113.10', $request->getClientIp());
+        $this->assertSame('203.0.113.10', ClientAddress::resolve($request));
+    }
+
     public function testTrustedCloudflareIpv6HopUsesTheConnectingHeader(): void
     {
         $this->trustProxy();
@@ -134,7 +161,7 @@ final class ClientAddressTest extends TestCase
         $request = $this->forwarded('104.16.1.1');
         $request->headers->set('CF-Connecting-IP', '203.0.113.10');
 
-        $kernel = $this->createMock(HttpKernelInterface::class);
+        $kernel = $this->createStub(HttpKernelInterface::class);
         (new ClientAddressSubscriber())->onRequest(new RequestEvent($kernel, $request, HttpKernelInterface::MAIN_REQUEST));
 
         $this->assertSame('203.0.113.10', $request->getClientIp());
@@ -156,8 +183,8 @@ final class ClientAddressTest extends TestCase
 
     private function guard(int $perIp, int $global): SignupGuard
     {
-        $config = $this->createMock(ConfigRepository::class);
-        $alert = $this->createMock(SignupAnomalyAlert::class);
+        $config = $this->createStub(ConfigRepository::class);
+        $alert = $this->createStub(SignupAnomalyAlert::class);
         $ipFactory = new RateLimiterFactory(['id' => 'signup_ip', 'policy' => 'sliding_window', 'limit' => $perIp, 'interval' => '1 hour'], new InMemoryStorage());
         $globalFactory = new RateLimiterFactory(['id' => 'signup_global', 'policy' => 'sliding_window', 'limit' => $global, 'interval' => '10 minutes'], new InMemoryStorage());
 

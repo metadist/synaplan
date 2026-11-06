@@ -172,7 +172,7 @@ final class SetupController extends AbstractController
         #[MapRequestPayload] SetupAdminRequest $dto,
         Request $request,
     ): JsonResponse {
-        if (!$this->setupAttemptLimiter->create($request->getClientIp() ?? 'unknown')->consume()->isAccepted()) {
+        if (!$this->setupAttemptLimiter->create(ClientAddress::resolve($request) ?? 'unknown')->consume()->isAccepted()) {
             return $this->json(['error' => 'too_many_requests'], Response::HTTP_TOO_MANY_REQUESTS);
         }
 

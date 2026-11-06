@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Mcp\McpAnonymousAccess;
 use App\Mcp\McpServerFactory;
 use App\Repository\DesktopDeviceRepository;
+use App\Service\Http\ClientAddress;
 use GuzzleHttp\Psr7\ServerRequest;
 use Mcp\Server;
 use Mcp\Server\Transport\Http\Middleware\DnsRebindingProtectionMiddleware;
@@ -70,7 +71,7 @@ class McpController extends AbstractController
                 return $this->unauthorized();
             }
 
-            $limit = $this->mcpDiscoveryAnonLimiter->create($request->getClientIp() ?? 'unknown')->consume();
+            $limit = $this->mcpDiscoveryAnonLimiter->create(ClientAddress::resolve($request) ?? 'unknown')->consume();
             if (!$limit->isAccepted()) {
                 return $this->tooManyRequests($limit->getRetryAfter());
             }
