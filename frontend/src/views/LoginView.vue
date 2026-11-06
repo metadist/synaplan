@@ -351,7 +351,7 @@
             </form>
 
             <p
-              v-if="config.auth.registrationEnabled"
+              v-if="config.auth.registrationEnabled && !config.auth.signupPaused"
               class="mt-[21px] -mb-[3px] sm:mt-6 sm:mb-0 text-center text-sm txt-secondary"
             >
               {{ $t('auth.noAccount') }}
@@ -363,7 +363,10 @@
                 {{ $t('auth.signUp') }}
               </router-link>
             </p>
-            <RegistrationClosedHint v-else />
+            <RegistrationClosedHint
+              v-else
+              :paused="config.auth.registrationEnabled && config.auth.signupPaused"
+            />
           </div>
         </template>
       </div>

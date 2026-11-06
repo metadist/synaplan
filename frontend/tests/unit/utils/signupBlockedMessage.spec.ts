@@ -8,6 +8,7 @@ describe('signupBlockedText', () => {
     expect(signupBlockedText(t, 'SIGNUP_PAUSED', 'Sign-up is paused')).toBe(
       't:auth.signupBlocked.paused'
     )
+    expect(signupBlockedText(t, 'signup_closed', 'closed')).toBe('t:auth.signupBlocked.closed')
   })
 
   it('never shows the raw busy body or transport texts', () => {

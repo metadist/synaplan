@@ -72,7 +72,9 @@
           backgroundColor: isDark ? 'rgba(15, 15, 16, 0.8)' : 'rgba(255, 255, 255, 0.95)',
         }"
       >
-        <div class="text-center mb-8">
+        <RegisterClosedPanel v-if="!signupOpen" :paused="signupPaused" />
+
+        <div v-else class="text-center mb-8">
           <div class="auth-accent-enter mb-5">
             <div class="w-10 h-[3px] bg-brand rounded-full mx-auto"></div>
           </div>
@@ -90,7 +92,7 @@
           </p>
         </div>
 
-        <div class="auth-form-enter">
+        <div v-if="signupOpen" class="auth-form-enter">
           <!-- Success State -->
           <Transition name="success-fade">
             <div
@@ -477,6 +479,8 @@ import { useSignupChallenge } from '../composables/useSignupChallenge'
 import { signupBlockedText } from '@/utils/signupBlockedMessage'
 import { usePasswordValidation, validateEmail } from '../composables/usePasswordValidation'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
+import RegisterClosedPanel from '@/components/auth/RegisterClosedPanel.vue'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { useSocialAuth } from '@/composables/useSocialAuth'
@@ -490,6 +494,8 @@ const { locale, t } = useI18n()
 const themeStore = useTheme()
 const { getToken: getChallengeToken } = useSignupChallenge()
 const config = useConfigStore()
+const signupOpen = computed(() => isSelfSignupOpen(config.auth))
+const signupPaused = computed(() => config.auth.registrationEnabled && config.auth.signupPaused)
 
 const isDark = themeStore.isDark
 

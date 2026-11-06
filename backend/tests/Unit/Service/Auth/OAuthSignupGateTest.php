@@ -7,9 +7,11 @@ namespace App\Tests\Unit\Service\Auth;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\OAuthSignupGate;
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupProtection;
+use App\Service\Iam\UserLifecycleService;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -151,6 +153,31 @@ final class OAuthSignupGateTest extends TestCase
         $this->gate()->assertAppleSignup('new-sub', 'new@example.com', [], '203.0.113.1', true);
     }
 
+    public function testANewAddressIsClosedWhenSelfSignUpIsOff(): void
+    {
+        $this->users->method('findOneBy')->willReturn(null);
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+        $this->protection->expects($this->never())->method('challengeRequired');
+
+        try {
+            $this->gate(false)->assertGoogleSignup('new@example.com', [], '203.0.113.1');
+            $this->fail('A new account must be refused when self-sign-up is off');
+        } catch (SignupBlockedException $e) {
+            $this->assertSame(SignupBlockedException::CODE_CLOSED, $e->getReasonCode());
+            $this->assertSame(403, $e->getHttpStatus());
+            $this->assertSame('signup_closed', $e->getErrorCodeParam());
+        }
+    }
+
+    public function testAnExistingAddressStillSignsInWhenSelfSignUpIsOff(): void
+    {
+        $this->users->method('findOneBy')->willReturn(new User());
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+
+        $this->gate(false)->assertGoogleSignup('known@example.com', ['nonce' => 'n1'], '203.0.113.1');
+        $this->addToAssertionCount(1);
+    }
+
     public function testCompleteNewUserInitialisesTheModelDefaults(): void
     {
         $user = $this->createMock(User::class);
@@ -190,13 +217,15 @@ final class OAuthSignupGateTest extends TestCase
             new NullLogger(),
             $admission,
             $em,
+            $this->registration(),
+            $this->createMock(UserLifecycleService::class),
         );
 
         $this->expectException(SignupBlockedException::class);
         $gate->finishSignIn($user, true, ['code' => 'ABCD2345']);
     }
 
-    private function gate(): OAuthSignupGate
+    private function gate(bool $registrationEnabled = true): OAuthSignupGate
     {
         $nonces = new RateLimiterFactory([
             'id' => 'oauth_signup_nonce',
@@ -208,6 +237,14 @@ final class OAuthSignupGateTest extends TestCase
         $admission = $this->createMock(SignupAdmission::class);
         $admission->method('resolve')->willReturn(null);
 
-        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, $nonces, new NullLogger(), $admission, $this->createMock(EntityManagerInterface::class));
+        return new OAuthSignupGate($this->protection, $this->users, $this->modelConfig, $nonces, new NullLogger(), $admission, $this->createMock(EntityManagerInterface::class), $this->registration($registrationEnabled), $this->createMock(UserLifecycleService::class));
+    }
+
+    private function registration(bool $enabled = true): RegistrationConfig
+    {
+        $registration = $this->createMock(RegistrationConfig::class);
+        $registration->method('isEnabled')->willReturn($enabled);
+
+        return $registration;
     }
 }

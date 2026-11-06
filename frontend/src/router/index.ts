@@ -19,7 +19,6 @@ import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
 import { aiLiteracyRoutes } from '@/router/aiLiteracyRoutes'
 import { codeSignupRoutes } from '@/router/codeSignupRoutes'
 import { loginLinkRoutes } from '@/router/loginLinkRoutes'
-import { resolveRegistrationRedirect } from '@/router/registrationGate'
 import {
   ensureWizardRequired,
   invalidateSetupWizardRequired,
@@ -74,21 +73,6 @@ const guardSubscription = (
   }
 }
 
-// #462: on SSO-/OIDC-only instances (REGISTRATION_ENABLED=false) the /register
-// route must be unreachable by direct URL, not just hidden from the login page.
-const guardRegistration = (
-  to: RouteLocationNormalized,
-  _from: RouteLocationNormalized,
-  next: NavigationGuardNext
-) => {
-  const redirect = resolveRegistrationRedirect(useConfigStore().auth.registrationEnabled, to.query)
-  if (redirect) {
-    next(redirect)
-    return
-  }
-  next()
-}
-
 /**
  * Build-time fallback brand name. The live name comes from the runtime branding
  * config (`useConfigStore().branding.name`, Epic 4); this constant only covers
@@ -123,7 +107,6 @@ const router = createRouter({
       path: '/register',
       name: 'register',
       component: () => import('@/views/RegisterView.vue'),
-      beforeEnter: guardRegistration,
       meta: { requiresAuth: false, public: true, titleKey: 'pageTitles.register', i18n: ['auth'] },
     },
     ...payFirstRoutes,

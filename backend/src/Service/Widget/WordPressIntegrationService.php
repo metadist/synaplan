@@ -52,7 +52,6 @@ final readonly class WordPressIntegrationService
         $siteUrl = trim((string) ($payload['site_url'] ?? ''));
         $email = strtolower(trim((string) ($payload['email'] ?? '')));
         $password = (string) ($payload['password'] ?? '');
-        $language = $payload['language'] ?? 'en';
 
         if ('' === $verificationUrl || '' === $verificationToken || '' === $siteUrl) {
             throw new \InvalidArgumentException('Missing verification parameters');
@@ -77,53 +76,27 @@ final readonly class WordPressIntegrationService
             }
         }
 
-        $this->verifyWordPressSite($verificationUrl, $verificationToken);
+        if (!$existingUser instanceof User) {
+            $this->logger->info('WordPress wizard: refused to create an account');
 
-        if ($existingUser instanceof User) {
-            $userDetails = $existingUser->getUserDetails();
-            $userDetails['wordpress_verified'] = true;
-            $userDetails['wordpress_site'] = $siteUrl;
-            $existingUser->setUserDetails($userDetails);
-            $this->em->flush();
-
-            return [
-                'success' => true,
-                'data' => [
-                    'user_id' => $existingUser->getId(),
-                    'email' => $existingUser->getMail(),
-                    'site_verified' => true,
-                    'existing_user' => true,
-                ],
-            ];
+            throw new \RuntimeException('WordPress site verification failed');
         }
 
-        // Create new user
-        $user = new User();
-        $user->setMail($email);
-        $user->setPw(password_hash($password, PASSWORD_BCRYPT));
-        $user->setCreated(date('YmdHis'));
-        $user->setProviderId('local');
-        $user->setType('MAIL');
-        $user->setUserLevel('NEW');
-        // Not pre-verified. Key issuance requires a verified address, and this
-        // wizard used to skip that and hand back a usable key.
-        $user->setEmailVerified(false);
-        $user->setUserDetails([
-            'language' => $language,
-            'wordpress_verified' => true,
-            'wordpress_site' => $siteUrl,
-        ]);
-        $user->setPaymentDetails([]);
+        $this->verifyWordPressSite($verificationUrl, $verificationToken);
 
-        $this->em->persist($user);
+        $userDetails = $existingUser->getUserDetails();
+        $userDetails['wordpress_verified'] = true;
+        $userDetails['wordpress_site'] = $siteUrl;
+        $existingUser->setUserDetails($userDetails);
         $this->em->flush();
 
         return [
             'success' => true,
             'data' => [
-                'user_id' => $user->getId(),
-                'email' => $user->getMail(),
+                'user_id' => $existingUser->getId(),
+                'email' => $existingUser->getMail(),
                 'site_verified' => true,
+                'existing_user' => true,
             ],
         ];
     }
