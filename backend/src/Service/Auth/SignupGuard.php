@@ -16,9 +16,9 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  *    per 10 minutes). Tripping it raises {@see SignupAnomalyAlert}.
  *
  * Both count attempts, not successes, so a script that keeps failing is
- * throttled too. The client IP is the one Symfony resolves behind the
- * configured trusted proxies; without them every request looks like the
- * load balancer and the per-IP window degrades into a second global one.
+ * throttled too. The client address comes from {@see \App\Service\Http\ClientAddress}.
+ * Without trusted proxies every request looks like the load balancer and
+ * the per-IP window degrades into a second global one.
  */
 final readonly class SignupGuard
 {

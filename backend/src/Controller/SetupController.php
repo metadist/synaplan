@@ -13,6 +13,7 @@ use App\Service\Auth\TokenService;
 use App\Service\Chat\GuestChatConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Email\MailerConfig;
+use App\Service\Http\ClientAddress;
 use App\Service\Iam\UserLifecycleService;
 use App\Service\Setup\SetupStateService;
 use OpenApi\Attributes as OA;
@@ -320,7 +321,7 @@ final class SetupController extends AbstractController
     private function signIn(User $user, Request $request): JsonResponse
     {
         $accessToken = $this->tokenService->generateAccessToken($user);
-        $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+        $refreshToken = $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request));
 
         $payload = [
             'success' => true,

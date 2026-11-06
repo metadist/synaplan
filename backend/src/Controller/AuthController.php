@@ -157,7 +157,7 @@ class AuthController extends AbstractController
         }
 
         $accessToken = $this->tokenService->generateAccessToken($user);
-        $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+        $refreshToken = $this->tokenService->generateRefreshToken($user, \App\Service\Http\ClientAddress::resolve($request));
 
         $this->logger->info('Native OAuth handoff exchanged', ['user_id' => $user->getId()]);
 
@@ -229,11 +229,11 @@ class AuthController extends AbstractController
 
         // Human check (Turnstile or reCAPTCHA), then the signup limits and the
         // operator's pause switch. Both answer with a stable code the UI maps.
-        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload($request->toArray()), 'register', $request->getClientIp())) {
+        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload($request->toArray()), 'register', \App\Service\Http\ClientAddress::resolve($request))) {
             return $this->json(['error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
         }
         try {
-            $this->signupProtection->assertSignupAllowed($request->getClientIp(), $dto->code);
+            $this->signupProtection->assertSignupAllowed(\App\Service\Http\ClientAddress::resolve($request), $dto->code);
         } catch (SignupBlockedException $e) {
             return $this->signupBlocked($e);
         }
@@ -245,7 +245,7 @@ class AuthController extends AbstractController
                 null !== $dto->language ? ['language' => $dto->language] : [],
                 $dto->plan,
                 $dto->code,
-                $request->getClientIp(),
+                \App\Service\Http\ClientAddress::resolve($request),
             );
         } catch (SignupBlockedException $e) {
             return $this->signupBlocked($e);
@@ -356,7 +356,7 @@ class AuthController extends AbstractController
         $email = $data['email'] ?? '';
         $password = $data['password'] ?? '';
 
-        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload(is_array($data) ? $data : []), 'login', $request->getClientIp())) {
+        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload(is_array($data) ? $data : []), 'login', \App\Service\Http\ClientAddress::resolve($request))) {
             return $this->json(['error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
         }
 
@@ -406,7 +406,7 @@ class AuthController extends AbstractController
 
         // Generate tokens
         $accessToken = $this->tokenService->generateAccessToken($user);
-        $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+        $refreshToken = $this->tokenService->generateRefreshToken($user, \App\Service\Http\ClientAddress::resolve($request));
 
         $this->logger->info('User logged in', ['user_id' => $user->getId()]);
 
@@ -1043,7 +1043,7 @@ class AuthController extends AbstractController
             return $this->json(['error' => 'Email required'], Response::HTTP_BAD_REQUEST);
         }
 
-        $result = $this->verificationResend->resend($email, $request->getClientIp());
+        $result = $this->verificationResend->resend($email, \App\Service\Http\ClientAddress::resolve($request));
 
         return match ($result->status) {
             VerificationResendStatus::Unconfigured => $this->json([

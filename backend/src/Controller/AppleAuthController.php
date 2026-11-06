@@ -13,6 +13,7 @@ use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\TokenService;
+use App\Service\Http\ClientAddress;
 use App\Service\OAuth\OAuthStateService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -141,7 +142,7 @@ class AppleAuthController extends AbstractController
 
             $claims = $this->identityTokenVerifier->verify($identityToken);
             $profile = $this->parseUserField($userField);
-            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $statePayload, $request->getClientIp());
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $statePayload, ClientAddress::resolve($request));
             $user = $this->findOrCreateUser(
                 $claims,
                 $profile,
@@ -211,14 +212,14 @@ class AppleAuthController extends AbstractController
 
         // MOBILE-APP SEAM: no browser challenge on the native sheet — only the signup limits and pause switch apply.
         try {
-            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $nativeAdmission = $this->nativeAdmission($body), $request->getClientIp(), true);
+            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $nativeAdmission = $this->nativeAdmission($body), ClientAddress::resolve($request), true);
             $user = $this->findOrCreateUser($claims, $profile, AccountLanguage::normalize($body['language'] ?? null), $nativeAdmission);
         } catch (SignupBlockedException $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus());
         }
 
         $accessToken = $this->tokenService->generateAccessToken($user);
-        $refreshToken = $this->tokenService->generateRefreshToken($user, $request->getClientIp());
+        $refreshToken = $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request));
 
         $this->logger->info('Apple native sign-in successful', ['user_id' => $user->getId()]);
 
