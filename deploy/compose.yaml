@@ -491,7 +491,7 @@ services:
   # the network. It runs as root so it can read the mode-0600 key; it does
   # not run the application.
   tls-proxy:
-    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    image: caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
     profiles: [local-tls]
     user: "0:0"
     ports:
