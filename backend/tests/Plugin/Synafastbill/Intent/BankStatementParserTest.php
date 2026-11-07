@@ -43,6 +43,14 @@ final class BankStatementParserTest extends TestCase
         self::assertSame('2026-07-28', $result['date']);
     }
 
+    public function testDebitKeepsItsSign(): void
+    {
+        $result = $this->parser->parse('Lastschrift -500.00 EUR am 28.07.2026');
+
+        self::assertSame(-500.0, $result['amount']);
+        self::assertSame('EUR', $result['currency']);
+    }
+
     public function testUnreadableTextYieldsNulls(): void
     {
         $result = $this->parser->parse('payment received, thanks');

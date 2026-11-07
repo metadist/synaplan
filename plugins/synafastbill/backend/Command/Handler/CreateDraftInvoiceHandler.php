@@ -42,7 +42,9 @@ final class CreateDraftInvoiceHandler implements CommandHandlerInterface
         if (CommandType::Confirm === $command->type) {
             return match ($context->step()) {
                 self::STEP_SELECT_CUSTOMER => $this->resumeSelection($command, $context),
-                self::STEP_CONFIRM_CREATE => $this->createDraft($context),
+                self::STEP_CONFIRM_CREATE => $command->consentsToWrite()
+                    ? $this->createDraft($context)
+                    : CommandResult::confirm($context->t->trans('create.say_yes')),
                 default => CommandResult::info($context->t->trans('create.none_in_progress')),
             };
         }

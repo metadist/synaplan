@@ -43,7 +43,9 @@ final class RegisterPaymentHandler implements CommandHandlerInterface
         if (CommandType::Confirm === $command->type) {
             return match ($context->step()) {
                 self::STEP_SELECT => $this->resumeSelection($command, $context),
-                self::STEP_CONFIRM => $this->registerPayment($context),
+                self::STEP_CONFIRM => $command->consentsToWrite()
+                    ? $this->registerPayment($context)
+                    : CommandResult::confirm($context->t->trans('pay.say_yes')),
                 default => CommandResult::info($context->t->trans('pay.none_in_progress')),
             };
         }
@@ -62,6 +64,9 @@ final class RegisterPaymentHandler implements CommandHandlerInterface
 
         if (null === $parsed['amount']) {
             return CommandResult::info($context->t->trans('pay.no_amount'));
+        }
+        if ($parsed['amount'] <= 0) {
+            return CommandResult::info($context->t->trans('pay.not_incoming'));
         }
 
         $paidDate = $parsed['date'] ?? $context->clock->today()->format('Y-m-d');

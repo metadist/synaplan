@@ -53,6 +53,7 @@ final class Translator
             'create.col.unitprice' => 'Unit price',
             'create.col.vat' => 'VAT',
             'create.net_total' => 'Net total ≈ **%s**. Reply `/fastbill yes` to create the draft, or `/fastbill no` to cancel.',
+            'create.say_yes' => 'Reply `/fastbill yes` to create the draft, or `/fastbill no` to cancel. A number does not confirm.',
             'create.incomplete' => 'The draft was incomplete, so nothing was created. Please start again.',
             'create.success' => 'Draft invoice **#%d** created for %s with %d line item(s). It stays a draft until you finalise it in FastBill.',
 
@@ -60,6 +61,8 @@ final class Translator
             'pay.none_in_progress' => 'There is no payment in progress. Paste the bank text after `/fastbill register payment`.',
             'pay.pick_number' => 'Please reply `/fastbill` and the number of the invoice this payment belongs to, or `/fastbill cancel`.',
             'pay.no_amount' => 'I could not read a payment amount from that text. Please paste the bank line including the amount.',
+            'pay.not_incoming' => 'That amount is zero or money going out. I only register payments that come in.',
+            'pay.say_yes' => 'Reply `/fastbill yes` to register the payment, or `/fastbill no` to cancel. A number does not confirm.',
             'pay.no_match' => 'I read a payment of %s%s but found no matching open invoice. Please check the amount or invoice number.',
             'pay.for_invoice' => ' for %s',
             'pay.confirm' => 'Register %s as paid on %s for invoice **%s** (open %s)? Reply `/fastbill yes` or `/fastbill no`.',
@@ -103,6 +106,7 @@ final class Translator
             'create.col.unitprice' => 'Einzelpreis',
             'create.col.vat' => 'MwSt',
             'create.net_total' => 'Nettosumme ≈ **%s**. Antworte `/fastbill ja`, um den Entwurf zu erstellen, oder `/fastbill nein`, um abzubrechen.',
+            'create.say_yes' => 'Antworte `/fastbill ja`, um den Entwurf zu erstellen, oder `/fastbill nein`, um abzubrechen. Eine Nummer bestätigt nicht.',
             'create.incomplete' => 'Der Entwurf war unvollständig, es wurde nichts erstellt. Bitte beginne erneut.',
             'create.success' => 'Rechnungsentwurf **#%d** für %s mit %d Position(en) erstellt. Er bleibt ein Entwurf, bis du ihn in FastBill finalisierst.',
 
@@ -110,6 +114,8 @@ final class Translator
             'pay.none_in_progress' => 'Es ist keine Zahlung in Bearbeitung. Füge den Banktext nach `/fastbill Zahlung erfassen` ein.',
             'pay.pick_number' => 'Bitte antworte mit `/fastbill` und der Nummer der Rechnung, zu der diese Zahlung gehört, oder `/fastbill abbrechen`.',
             'pay.no_amount' => 'Ich konnte in diesem Text keinen Zahlungsbetrag erkennen. Bitte füge die Bankzeile inklusive Betrag ein.',
+            'pay.not_incoming' => 'Dieser Betrag ist null oder Geld, das abgeht. Ich buche nur Zahlungseingänge.',
+            'pay.say_yes' => 'Antworte `/fastbill ja`, um die Zahlung zu buchen, oder `/fastbill nein`, um abzubrechen. Eine Nummer bestätigt nicht.',
             'pay.no_match' => 'Ich habe eine Zahlung über %s%s gelesen, aber keine passende offene Rechnung gefunden. Bitte prüfe den Betrag oder die Rechnungsnummer.',
             'pay.for_invoice' => ' für %s',
             'pay.confirm' => 'Zahlung über %s als bezahlt am %s für Rechnung **%s** (offen %s) buchen? Antworte `/fastbill ja` oder `/fastbill nein`.',

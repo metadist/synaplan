@@ -27,18 +27,25 @@ final class BankStatementParser
 
     private function extractAmount(string $text): ?float
     {
-        // Matches 1.190,00 / 1,190.00 / 1190.00 / 1190,00 / 99.99 optionally with a currency symbol.
-        // A date such as 28.07.2026 must not win as an amount. The match may
-        // not end in the middle of a longer dotted or comma-separated number.
-        $count = preg_match_all('/(?<![\w.,])(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})|\d+[.,]\d{2})(?![\w.,])/u', $text, $matches);
+        // Matches 1.190,00 / 1,190.00 / 1190.00 / 1190,00 / 99.99, with an
+        // optional leading minus so a debit stays negative. A date such as
+        // 28.07.2026 must not win as an amount. The match may not end in the
+        // middle of a longer dotted or comma-separated number.
+        $count = preg_match_all('/(?<![\w.,])(-?)(\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{2})|\d+[.,]\d{2})(?![\w.,])/u', $text, $matches);
         if (0 === $count || false === $count) {
             return null;
         }
 
         $best = null;
-        foreach ($matches[1] as $raw) {
+        foreach ($matches[2] as $index => $raw) {
             $value = $this->normalizeAmount($raw);
-            if (null !== $value && (null === $best || $value > $best)) {
+            if (null === $value) {
+                continue;
+            }
+            if ('-' === ($matches[1][$index] ?? '')) {
+                $value = -$value;
+            }
+            if (null === $best || abs($value) > abs($best)) {
                 $best = $value;
             }
         }

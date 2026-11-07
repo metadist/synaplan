@@ -25,4 +25,12 @@ final readonly class ParsedCommand
 
         return is_scalar($value) ? (string) $value : $default;
     }
+
+    /**
+     * A yes to the final summary. A numbered choice is not consent to write.
+     */
+    public function consentsToWrite(): bool
+    {
+        return CommandType::Confirm === $this->type && !\array_key_exists('selection', $this->params);
+    }
 }

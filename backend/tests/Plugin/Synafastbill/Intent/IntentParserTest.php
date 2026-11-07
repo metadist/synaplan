@@ -70,6 +70,8 @@ final class IntentParserTest extends TestCase
         self::assertSame(CommandType::Confirm, $byNumber->type);
         self::assertSame(2, $byNumber->params['selection']);
         self::assertSame(12, $this->parser->parse('12')->params['selection']);
+        self::assertArrayNotHasKey('selection', $this->parser->parse('500.00 EUR')->params);
+        self::assertArrayNotHasKey('selection', $this->parser->parse('/fastbill 500.00 EUR')->params);
 
         $byOrdinal = $this->parser->parse('take the first one');
         self::assertSame(CommandType::Confirm, $byOrdinal->type);

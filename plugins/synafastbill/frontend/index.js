@@ -206,8 +206,14 @@ function mount(root, context = {}) {
  */
 function makeApi(originUrl, apiRoot, request) {
   let refreshPromise = null
-  const routeFor = (path) =>
-    originUrl && apiRoot.startsWith(originUrl) ? apiRoot.slice(originUrl.length) + path : path
+  const routeFor = (path) => {
+    // Same-origin installs leave apiBaseUrl empty. The plugin path must stay,
+    // otherwise /config is requested at the site root.
+    if (!originUrl) {
+      return `${apiRoot}${path}`
+    }
+    return apiRoot.startsWith(originUrl) ? apiRoot.slice(originUrl.length) + path : path
+  }
 
   const refresh = async () => {
     if (refreshPromise) return refreshPromise

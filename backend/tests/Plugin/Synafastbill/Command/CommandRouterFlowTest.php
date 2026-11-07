@@ -212,6 +212,38 @@ final class CommandRouterFlowTest extends TestCase
         self::assertSame('2026-07-30', $invoice['PAID_DATE']);
     }
 
+    public function testANumberDoesNotRegisterThePayment(): void
+    {
+        $http = Scenario::httpClient();
+        $router = Scenario::router($http);
+
+        $router->dispatch('/fastbill register payment Received 500.00 EUR on 2026-07-30', self::KEY);
+        $number = $router->dispatch('/fastbill 2', self::KEY);
+        self::assertSame(ResultType::NeedsConfirmation, $number->type);
+        self::assertStringContainsString('/fastbill yes', $number->message);
+
+        $amount = $router->dispatch('/fastbill 500.00 EUR', self::KEY);
+        self::assertSame(ResultType::NeedsConfirmation, $amount->type);
+
+        $invoice = $http->invoice(5001);
+        self::assertNotNull($invoice);
+        self::assertSame('', $invoice['PAID_DATE']);
+    }
+
+    public function testADebitIsNotProposedAsAPayment(): void
+    {
+        $http = Scenario::httpClient();
+        $router = Scenario::router($http);
+
+        $result = $router->dispatch('/fastbill register payment Lastschrift -500.00 EUR am 28.07.2026', self::KEY);
+
+        self::assertSame(ResultType::Info, $result->type);
+        self::assertStringContainsString('money going out', strtolower($result->message));
+        $invoice = $http->invoice(5001);
+        self::assertNotNull($invoice);
+        self::assertSame('', $invoice['PAID_DATE']);
+    }
+
     public function testCancelAbortsAndClearsSession(): void
     {
         $router = Scenario::router(Scenario::httpClient());

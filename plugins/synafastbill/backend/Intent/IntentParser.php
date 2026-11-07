@@ -162,7 +162,9 @@ final class IntentParser
 
     private function detectSelection(string $normalized): ?int
     {
-        if (1 === preg_match('/^(?:take |use |the |number |option |nr\.? ?|#)*([1-9]\d*)(?:st|nd|rd|th)?\b/u', $normalized, $m)) {
+        // The number has to be the whole reply. "500.00 EUR" is a bank amount,
+        // not a choice of invoice 500, and must not confirm a pending write.
+        if (1 === preg_match('/^(?:(?:take|use|the|number|option|nr\.?|#)\s+)*([1-9]\d*)(?:st|nd|rd|th)?[.!?]*$/u', $normalized, $m)) {
             return (int) $m[1];
         }
         foreach (self::ORDINALS as $word => $index) {
