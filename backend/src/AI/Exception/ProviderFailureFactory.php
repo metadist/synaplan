@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\AI\Exception;
 
 use OpenAI\Exceptions\ErrorException;
+use OpenAI\Exceptions\RateLimitException;
+use Psr\Http\Message\ResponseInterface as PsrResponse;
 use Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 
@@ -34,7 +36,8 @@ final readonly class ProviderFailureFactory
         ];
 
         $prefix = $messagePrefix ?? (ucfirst($provider).' '.$stage.' error');
-        $message = $prefix.': '.$e->getMessage();
+        $detail = $extracted['message'] ?? $e->getMessage();
+        $message = $prefix.': '.$detail;
 
         return new ProviderException($message, $provider, $context, $status, $e);
     }
@@ -86,10 +89,23 @@ final readonly class ProviderFailureFactory
     }
 
     /**
-     * @return array{error_type: ?string, error_code: string|int|null, status_code: int}
+     * @return array{error_type: ?string, error_code: string|int|null, status_code: int, message?: string}
      */
     private function extractStructuredFields(\Throwable $e): array
     {
+        // openai-php 0.22 throws this before it parses the JSON body, so the
+        // HTTP status and the provider's error object would otherwise be lost.
+        if ($e instanceof RateLimitException) {
+            $parsed = $this->openAiErrorBody($e->response);
+
+            return [
+                'error_type' => $parsed['type'] ?? 'rate_limit_error',
+                'error_code' => $parsed['code'],
+                'status_code' => $e->response->getStatusCode(),
+                'message' => $parsed['message'] ?? $e->getMessage(),
+            ];
+        }
+
         if ($e instanceof ErrorException) {
             return [
                 'error_type' => $e->getErrorType(),
@@ -154,5 +170,40 @@ final readonly class ProviderFailureFactory
         }
 
         return null;
+    }
+
+    /**
+     * @return array{message: ?string, type: ?string, code: string|int|null}
+     */
+    private function openAiErrorBody(PsrResponse $response): array
+    {
+        $empty = ['message' => null, 'type' => null, 'code' => null];
+
+        try {
+            $body = $response->getBody();
+            if ($body->isSeekable()) {
+                $body->rewind();
+            }
+            $decoded = json_decode($body->getContents(), true);
+        } catch (\Throwable) {
+            return $empty;
+        }
+
+        if (!is_array($decoded)) {
+            return $empty;
+        }
+
+        $error = is_array($decoded['error'] ?? null) ? $decoded['error'] : $decoded;
+        $message = $error['message'] ?? null;
+        if (is_array($message)) {
+            $message = implode("\n", array_map(static fn (mixed $part): string => is_scalar($part) ? (string) $part : '', $message));
+        }
+        $code = $error['code'] ?? null;
+
+        return [
+            'message' => is_string($message) && '' !== $message ? $message : null,
+            'type' => isset($error['type']) && is_string($error['type']) ? $error['type'] : null,
+            'code' => is_string($code) || is_int($code) ? $code : null,
+        ];
     }
 }
