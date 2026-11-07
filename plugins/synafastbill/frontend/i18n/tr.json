@@ -1,0 +1,35 @@
+{
+  "title": "Synafastbill",
+  "subtitle": "FastBill hesabınla doğrudan sohbetten konuş.",
+  "settings": {
+    "heading": "FastBill bağlantısı",
+    "email": "Hesap e-postası",
+    "apiKey": "API anahtarı",
+    "apiKeyHint": "Kullanıcı başına saklanır ve maskelenir. Mevcut anahtarı korumak için boş bırakın.",
+    "currency": "Varsayılan para birimi",
+    "vat": "Varsayılan KDV %",
+    "unit": "Varsayılan birim",
+    "language": "Dil",
+    "save": "Kaydet",
+    "testConnection": "Bağlantıyı test et",
+    "saved": "Ayarlar kaydedildi.",
+    "testOk": "Bağlantı başarılı — {count} müşteri kaydına ulaşıldı.",
+    "testFailed": "Bağlantı başarısız. Hesap e-postasını ve API anahtarını kontrol edin.",
+    "officialSite": "Resmî FastBill web sitesi",
+    "apiDocs": "API anahtarımı nerede bulurum?"
+  },
+  "chat": {
+    "heading": "Burada dene",
+    "placeholder": "örn. XYZ müşterisi için yeni bir taslak fatura oluştur",
+    "send": "Gönder",
+    "hint": "Ayrıca Synaplan sohbetine doğrudan /fastbill … yazabilirsin."
+  },
+  "help": {
+    "heading": "Komutlar",
+    "createInvoice": "Yeni bir fatura oluştur (rehberli)",
+    "registerPayment": "Yapıştırılan banka metninden ödemeyi eşleştir ve kaydet",
+    "showOverdue": "Vadesi geçmiş faturaları listele",
+    "help": "Bu genel bakışı göster",
+    "safety": "Tüm yazma işlemleri önce onay ister. Faturalar taslak olarak oluşturulur."
+  }
+}

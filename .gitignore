@@ -83,12 +83,11 @@ _devextras/screenvideo/test-results/
 _devextras/screenvideo/playwright-report/
 _devextras/screenvideo/.narration-tmp/
 
-# Plugins (developed externally, copied to server manually)
+# Plugins still developed outside this repository and copied onto a server by hand.
+# synaform and synafastbill live in plugins/ and ship in the image.
 plugins/brogent/
-plugins/synaform/
 plugins/synasort/
 plugins/synaads/
-plugins/synafastbill/
 
 #local development stuff
 _devextras/local-ignore/
