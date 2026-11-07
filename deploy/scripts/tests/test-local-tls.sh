@@ -36,7 +36,7 @@ if grep -Fq 'Strict-Transport-Security' "$CADDYFILE"; then
 fi
 
 grep -Fq 'profiles: [local-tls]' "$COMPOSE" || fail "compose.yaml is missing the local-tls profile"
-grep -Fq 'caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5' "$COMPOSE" || fail "tls-proxy image is not pinned"
+grep -Fq 'caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee' "$COMPOSE" || fail "tls-proxy image is not pinned"
 grep -Fq '${SYNAPLAN_HTTP_BIND:-127.0.0.1}:${SYNAPLAN_HTTP_PORT:-8000}:80' "$COMPOSE" || fail "the application port default left 127.0.0.1"
 
 if grep -q 'is_private_ipv4' "$SCRIPT"; then
