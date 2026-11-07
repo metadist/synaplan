@@ -14,7 +14,6 @@ final class XmpDigitalSourceTest extends TestCase
     public function testPngGainsTheSourceTypeAndKeepsItsHeader(): void
     {
         $bytes = base64_decode(self::PNG, true);
-        self::assertIsString($bytes);
         $marked = (new XmpDigitalSource())->embed($bytes);
 
         self::assertIsString($marked);
