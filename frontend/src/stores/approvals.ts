@@ -37,6 +37,39 @@ export function parseChatContinuation(data: unknown): ChatContinuation | null {
   return { approvalId, chatId, outcome }
 }
 
+async function loadApprovalList(
+  status: 'pending' | 'decided',
+  loads: { pending: number; decided: number },
+  pending: { value: Approval[] },
+  decided: { value: Approval[] },
+  pendingCount: { value: number },
+  loading: { value: boolean }
+): Promise<void> {
+  if (!isApprovalsEnabled()) {
+    pending.value = []
+    decided.value = []
+    pendingCount.value = 0
+    return
+  }
+  loading.value = true
+  const request = ++loads[status]
+  try {
+    const data = await approvalsApi.list(status)
+    if (loads[status] !== request) return
+    pendingCount.value = data.pendingCount
+    if (status === 'pending') pending.value = data.approvals
+    else decided.value = data.approvals
+  } catch {
+    if (loads[status] !== request) return
+    if (status === 'pending') {
+      pending.value = []
+      pendingCount.value = 0
+    }
+  } finally {
+    if (loads[status] === request) loading.value = false
+  }
+}
+
 export const useApprovalsStore = defineStore('approvals', () => {
   const pending = ref<Approval[]>([])
   const decided = ref<Approval[]>([])
@@ -45,33 +78,12 @@ export const useApprovalsStore = defineStore('approvals', () => {
   let handle: { unsubscribe: () => void } | null = null
   const subscribedUserId = ref<number | null>(null)
   const continuationListeners = new Set<(continuation: ChatContinuation) => void>()
+  const loads = { pending: 0, decided: 0 }
 
   const hasPending = computed(() => pendingCount.value > 0)
 
   async function load(status: 'pending' | 'decided' = 'pending'): Promise<void> {
-    if (!isApprovalsEnabled()) {
-      pending.value = []
-      decided.value = []
-      pendingCount.value = 0
-      return
-    }
-    loading.value = true
-    try {
-      const data = await approvalsApi.list(status)
-      pendingCount.value = data.pendingCount
-      if (status === 'pending') {
-        pending.value = data.approvals
-      } else {
-        decided.value = data.approvals
-      }
-    } catch {
-      if (status === 'pending') {
-        pending.value = []
-        pendingCount.value = 0
-      }
-    } finally {
-      loading.value = false
-    }
+    await loadApprovalList(status, loads, pending, decided, pendingCount, loading)
   }
 
   function addFromStream(approval: Approval): void {

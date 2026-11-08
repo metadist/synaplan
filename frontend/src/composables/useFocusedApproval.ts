@@ -175,11 +175,19 @@ function adoptListed(
 ): Approval | null {
   if (focused === null) return null
   const decidedRow = decided.find((row) => row.id === focused.id)
-  if (decidedRow && decidedRow.status !== 'pending' && decidedRow.status !== focused.status) {
+  if (decidedRow && statusRank(decidedRow.status) > statusRank(focused.status)) {
     return decidedRow
   }
   const source = focused.status === 'pending' ? pending : decided
-  return source.find((row) => row.id === focused.id) ?? focused
+  const here = source.find((row) => row.id === focused.id)
+  if (here && statusRank(here.status) >= statusRank(focused.status)) return here
+  return focused
+}
+
+function statusRank(status: string): number {
+  if (status === 'pending') return 0
+  if (TERMINAL_STATUS.has(status)) return 2
+  return 1
 }
 
 function newerDecidedCopy(focused: Approval | null, decided: Approval[]): Approval | undefined {
