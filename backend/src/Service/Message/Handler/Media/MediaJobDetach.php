@@ -99,7 +99,7 @@ final readonly class MediaJobDetach
             'nodeId' => '' !== (string) $nodeId ? $nodeId : null,
             'trackId' => '' !== $trackId ? $trackId : null,
             'inputRef' => $inputRef,
-            'options' => $mediaOptions,
+            'options' => $mediaOptions + ['planMessageId' => $message->getId()],
         ]);
 
         if (!$this->mediaJobDispatcher->dispatch($job)) {

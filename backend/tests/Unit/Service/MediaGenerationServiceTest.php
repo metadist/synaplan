@@ -728,6 +728,7 @@ class MediaGenerationServiceTest extends TestCase
         $model = $this->createModel('Google', 'veo-3.1', 'Veo 3.1');
         $this->setUpModelResolution(45, $model);
 
+        $this->aiFacade->method('supportsAsyncVideo')->willReturn(true);
         $this->aiFacade->expects(self::once())
             ->method('startVideoGeneration')
             ->willReturn([
@@ -766,6 +767,7 @@ class MediaGenerationServiceTest extends TestCase
         ]);
         $this->setUpModelResolution(45, $model);
 
+        $this->aiFacade->method('supportsAsyncVideo')->willReturn(true);
         $this->aiFacade->expects(self::once())
             ->method('startVideoGeneration')
             ->willReturn([

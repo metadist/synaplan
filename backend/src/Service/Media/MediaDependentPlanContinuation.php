@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service\Media;
 
+use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Service\Multitask\Execution\DagExecutor;
+use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeContextRehydrator;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Plan\Capability;
@@ -14,6 +16,7 @@ use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * When a render another step needs has finished, run the rest of the plan
@@ -27,55 +30,75 @@ final readonly class MediaDependentPlanContinuation
         private NodeContextRehydrator $rehydrator,
         private DagExecutor $dag,
         private TaskPlanStore $plans,
+        private GeneratedFileRegistrar $files,
         private EntityManagerInterface $em,
+        private LockFactory $locks,
         private LoggerInterface $logger,
     ) {
     }
 
     public function continue(int $messageId, string $nodeId, string $jobKey): void
     {
-        $message = $this->messages->find($messageId);
-        if (null === $message || 'OUT' !== $message->getDirection()) {
-            return;
-        }
-        $definition = $message->getMeta(TaskPlanExecutor::PLAN_DEFINITION_META);
-        if (!is_string($definition) || '' === $definition) {
-            return;
-        }
-        $decoded = json_decode($definition, true);
-        if (!is_array($decoded)) {
-            return;
-        }
-        $plan = TaskPlan::fromArray($decoded);
-        if (!self::stepNeedsThisRender($plan, $nodeId)) {
-            return;
-        }
-
         $job = $this->jobs->findByKey($jobKey);
         if (null === $job || !$job->isTerminal()) {
             return;
         }
+        $visible = $this->messages->find($messageId);
+        if (!$visible instanceof Message) {
+            return;
+        }
+        $planMessageId = $this->planMessageId($job, $visible);
+        $lock = $this->locks->createLock('media-plan:'.$planMessageId, 120);
+        if (!$lock->acquire()) {
+            return;
+        }
+        try {
+            $this->continueLocked($visible, $planMessageId, $nodeId, $job);
+        } finally {
+            $lock->release();
+        }
+    }
 
-        $context = $this->rehydrator->fromMessage($message);
+    private function continueLocked(Message $visible, int $planMessageId, string $nodeId, MediaJob $job): void
+    {
+        $planMessage = $this->messages->find($planMessageId) ?? $visible;
+        $definition = $this->definition($visible, $planMessage);
+        if (null === $definition) {
+            return;
+        }
+        $plan = TaskPlan::fromArray($definition);
+        if (!self::stepNeedsThisRender($plan, $nodeId)) {
+            return;
+        }
+
+        $options = [];
+        $trackId = $job->getOptions()['track_id'] ?? null;
+        if (is_scalar($trackId) && '' !== (string) $trackId) {
+            $options['track_id'] = (string) $trackId;
+        }
+        $context = $this->rehydrator->fromMessage($planMessage, $options);
         $context->setResult($nodeId, $this->settled($job));
         $assembled = $this->dag->execute($plan, $context);
         $this->plans->persistWithStatuses(
-            $messageId,
+            $planMessageId,
             $plan,
             null,
             $assembled['node_statuses'],
             'pending',
             $assembled['node_job_keys'],
+            $this->cardResults($plan, $context),
         );
         $content = trim($assembled['content']);
-        if ('' !== $content) {
-            $message->setText($content);
+        if ('' !== $content && 'OUT' === $visible->getDirection()) {
+            $visible->setText($content);
         }
+        $this->attachFiles($visible, $assembled['files']);
         $this->em->flush();
         $this->logger->info('Media plan continued after the render finished', [
-            'message_id' => $messageId,
+            'message_id' => $visible->getId(),
+            'plan_message_id' => $planMessageId,
             'node_id' => $nodeId,
-            'job_key' => $jobKey,
+            'job_key' => $job->getJobKey(),
         ]);
     }
 
@@ -94,6 +117,81 @@ final readonly class MediaDependentPlanContinuation
         }
 
         return false;
+    }
+
+    private function planMessageId(MediaJob $job, Message $visible): int
+    {
+        $stored = $job->getOptions()['planMessageId'] ?? null;
+        if (is_int($stored) && $stored > 0) {
+            return $stored;
+        }
+        if (is_string($stored) && ctype_digit($stored)) {
+            return (int) $stored;
+        }
+        $id = $visible->getId();
+
+        return null !== $id ? $id : 0;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function definition(Message $visible, Message $planMessage): ?array
+    {
+        foreach ([$visible, $planMessage] as $message) {
+            $raw = $message->getMeta(TaskPlanExecutor::PLAN_DEFINITION_META);
+            if (!is_string($raw) || '' === $raw) {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, array{text?: ?string, url?: ?string, type?: ?string, error?: ?string}>
+     */
+    private function cardResults(TaskPlan $plan, NodeContext $context): array
+    {
+        $results = [];
+        foreach ($plan->nodes as $node) {
+            $result = $context->getResult($node->id);
+            if (null === $result) {
+                continue;
+            }
+            $file = $result->firstFile();
+            $results[$node->id] = [
+                'text' => $result->text,
+                'url' => is_array($file) && is_string($file['path'] ?? null) ? $file['path'] : null,
+                'type' => is_array($file) && is_string($file['type'] ?? null) ? $file['type'] : null,
+                'error' => $result->error,
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $files
+     */
+    private function attachFiles(Message $message, array $files): void
+    {
+        $messageId = $message->getId();
+        foreach ($files as $file) {
+            $path = $file['path'] ?? null;
+            if (!is_string($path) || '' === $path) {
+                continue;
+            }
+            $type = is_string($file['type'] ?? null) ? $file['type'] : 'file';
+            $registered = $this->files->register((int) $message->getUserId(), $path, $type, $messageId);
+            if (null !== $registered) {
+                $message->addFile($registered);
+            }
+        }
     }
 
     private function settled(MediaJob $job): NodeResult

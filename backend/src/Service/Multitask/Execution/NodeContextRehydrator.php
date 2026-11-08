@@ -62,7 +62,24 @@ final readonly class NodeContextRehydrator
             $text = $row['text'];
             $error = $row['error'];
             if ('done' === $status) {
-                $context->setResult($nodeId, NodeResult::ok($text));
+                $files = [];
+                $url = $row['url'] ?? null;
+                if (is_string($url) && '' !== $url) {
+                    $files[] = [
+                        'path' => $url,
+                        'type' => is_string($row['type'] ?? null) && '' !== $row['type'] ? $row['type'] : 'file',
+                    ];
+                }
+                $context->setResult($nodeId, NodeResult::ok($text, $files));
+                continue;
+            }
+            if ('running' === $status) {
+                $meta = [];
+                $jobKey = $row['jobKey'] ?? null;
+                if (is_string($jobKey) && '' !== $jobKey) {
+                    $meta['media_job'] = ['job_id' => $jobKey, 'state' => 'running'];
+                }
+                $context->setResult($nodeId, NodeResult::running($meta));
                 continue;
             }
             if ('failed' === $status) {

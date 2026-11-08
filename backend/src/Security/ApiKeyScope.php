@@ -503,6 +503,12 @@ final class ApiKeyScope
             return [self::ADDIN_CHATS, self::PLATFORM_CHAT];
         }
 
+        // A chat key that started a video with POST /media/generate must be
+        // able to poll that job. The service still checks the job owner.
+        if ('GET' === strtoupper($method) && 1 === preg_match('#^/api/v1/media/video/jobs/[a-f0-9]{32}$#', $path)) {
+            return [self::PLATFORM_CHAT];
+        }
+
         if (self::matchesPrefix($path, '/api/v1/rag')) {
             return [self::ADDIN_RAG, self::PLATFORM_RAG];
         }

@@ -97,6 +97,14 @@ final class RunMediaNodeCommand extends Command
             return $this->emit($output, ['ok' => false, 'error' => $e->getMessage()]);
         }
 
+        if ($result->isRunning()) {
+            return $this->emit($output, [
+                'ok' => true,
+                'running' => true,
+                'metadata' => $result->metadata,
+            ]);
+        }
+
         if (!$result->isSuccessful()) {
             return $this->emit($output, ['ok' => false, 'error' => $result->error ?? 'media node failed']);
         }

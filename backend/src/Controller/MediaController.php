@@ -282,7 +282,7 @@ final class MediaController extends AbstractController
 
         try {
             $result = $this->mediaService->generate($user, $prompt, $type, $modelId, $resolution);
-            if ('video' === $type) {
+            if (array_key_exists('jobId', $result)) {
                 return $this->json($result, Response::HTTP_ACCEPTED);
             }
 
