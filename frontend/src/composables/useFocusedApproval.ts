@@ -53,7 +53,10 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
       await store.load(tab.value)
       if (request !== focusRequest) return
       const source = tab.value === 'pending' ? store.pending : store.decided
-      focusedApproval.value = source.find((row) => row.id === approval.id) ?? approval
+      focusedApproval.value = preferFresh(
+        source.find((row) => row.id === approval.id),
+        approval
+      )
       await rereadIfDecidedElsewhere(book())
     } catch {
       if (request !== focusRequest) return
@@ -184,6 +187,11 @@ function adoptListed(
   return focused
 }
 
+function preferFresh(listed: Approval | undefined, fetched: Approval): Approval {
+  if (!listed || statusRank(listed.status) < statusRank(fetched.status)) return fetched
+  return listed
+}
+
 function statusRank(status: string): number {
   if (status === 'pending') return 0
   if (TERMINAL_STATUS.has(status)) return 2
@@ -235,13 +243,21 @@ export function inboxRows(
 ): Approval[] {
   const source = tab === 'pending' ? pending : decided
   const stored = focused ? source.find((row) => row.id === focused.id) : undefined
+  const focusedWins =
+    focused !== null &&
+    stored !== undefined &&
+    statusRank(focused.status) > statusRank(stored.status)
   const stalePending =
     tab === 'pending' &&
     focused !== null &&
     focused.status !== 'pending' &&
     stored?.status === 'pending'
-  const visible = stalePending ? source.filter((row) => row.id !== focused.id) : source
-  const head = stalePending ? focused : (stored ?? focused)
+  const withoutStale =
+    focused !== null && (focusedWins || stalePending)
+      ? source.filter((row) => row.id !== focused.id)
+      : source
+  const head = focusedWins || stalePending ? focused : (stored ?? focused)
+  const visible = withoutStale
   const onThisTab =
     head !== null && head !== undefined && (tab === 'pending') === (head.status === 'pending')
   const list = onThisTab ? [head, ...visible.filter((row) => row.id !== head.id)] : visible
