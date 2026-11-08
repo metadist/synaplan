@@ -109,6 +109,7 @@ const openContext = (approval: Approval) => {
 const onApprove = async (id: number, alwaysAllow = false) => {
   try {
     await store.approve(id, alwaysAllow)
+    if (focusedApproval.value?.id === id) focusedApproval.value = null
     success(t('approvals.approvedToast'))
   } catch {
     showError(t('approvals.decideFailed'))
@@ -118,6 +119,7 @@ const onApprove = async (id: number, alwaysAllow = false) => {
 const onReject = async (id: number, reason?: string) => {
   try {
     await store.reject(id, reason)
+    if (focusedApproval.value?.id === id) focusedApproval.value = null
     success(t('approvals.rejectedToast'))
   } catch {
     showError(t('approvals.decideFailed'))

@@ -170,7 +170,7 @@ final class ApprovalController extends AbstractController
     #[OA\Get(
         path: '/api/v1/approvals/{id}',
         summary: 'Read one approval the current user may open',
-        description: 'The owner receives the inbox card. An administrator who is not the owner receives the same card without the request body.',
+        description: 'The owner receives the inbox card. An administrator who is not the owner receives the tool and its outcome, without the argument preview or the request body.',
         tags: ['Approvals'],
         parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
         responses: [
