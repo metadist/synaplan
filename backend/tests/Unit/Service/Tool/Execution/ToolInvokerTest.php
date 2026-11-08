@@ -136,6 +136,38 @@ final class ToolInvokerTest extends TestCase
         $invoker->invoke($fallback, $this->call($this->request(), 'mcp__1__create_issue'));
     }
 
+    public function testAGrantedApprovalIsNamedOnTheAuditRow(): void
+    {
+        $gate = $this->createMock(ToolExecutionGate::class);
+        $write = new ToolDescriptor('create_ticket', 'Create ticket', '', [], SideEffect::Write, ToolSource::Custom, 7);
+        $gate->expects(self::once())->method('inspect')->willReturn([
+            'outcome' => PolicyOutcome::Auto,
+            'descriptor' => $write,
+            'approval' => null,
+            'refusal' => null,
+        ]);
+        $audit = $this->createMock(AuditLogWriter::class);
+        $audit->expects(self::once())->method('record')->with(
+            7,
+            'tool.executed',
+            'tool',
+            'create_ticket',
+            self::callback(static function (array $subject): bool {
+                return 12 === ($subject['approvalId'] ?? null)
+                    && !isset($subject['arguments'], $subject['result']);
+            }),
+        );
+        $invoker = new ToolInvoker([new RecordingExecutor()], gate: $gate, audit: $audit);
+        $call = new ToolInvocation(
+            'create_ticket',
+            ['title' => 'secret title'],
+            new ToolCaller(7, 'resume', approvalId: 12),
+            decision: $this->request(),
+            user: $this->request()->actor,
+        );
+        $invoker->invoke($write, $call);
+    }
+
     public function testDecideOnlyRunsTheGateAndSkipsTheExecutorAndTheCounter(): void
     {
         $gate = $this->createMock(ToolExecutionGate::class);

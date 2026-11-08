@@ -20,6 +20,15 @@
       <div v-if="loading && entries.length === 0" class="text-center py-12">
         <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
       </div>
+      <EmptyState
+        v-else-if="entries.length === 0 && selectedAction === 'tool.executed'"
+        bare
+        :title="t('people.audit.tool.empty')"
+        :action-label="approvalsOn ? t('people.audit.tool.emptyAction') : undefined"
+        :to="approvalsOn ? { name: 'approvals' } : undefined"
+        test-id="audit-empty"
+        action-test-id="audit-empty-approvals"
+      />
       <div
         v-else-if="entries.length === 0"
         class="text-center py-12 txt-secondary"
@@ -48,7 +57,25 @@
             <td class="py-3 px-3 txt-secondary text-sm whitespace-nowrap align-top">
               {{ formatWhen(entry.created) }}
             </td>
-            <td class="py-3 px-3 txt-primary text-sm">{{ rowSentence(entry) }}</td>
+            <td class="py-3 px-3 txt-primary text-sm" data-testid="audit-row-what">
+              <template v-if="toolRow(entry)">
+                {{ toolRow(entry)!.sentence }}
+                <router-link
+                  v-if="approvalsOn && toolRow(entry)!.approvalId !== null"
+                  :to="{
+                    name: 'approvals',
+                    query: { approval: String(toolRow(entry)!.approvalId) },
+                  }"
+                  class="ml-1 underline txt-brand"
+                  :data-testid="`audit-approval-${entry.id}`"
+                >
+                  {{
+                    t('people.audit.tool.approvalLink', { id: toolRow(entry)!.approvalId ?? '' })
+                  }}
+                </router-link>
+              </template>
+              <template v-else>{{ rowSentence(entry) }}</template>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -71,8 +98,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { iamApi, type IamAuditEntry } from '@/services/api/iamApi'
 import { gatewayAuditDetail } from '@/utils/auditGatewayChanges'
+import { toolCallSentence, type ToolCallSentence } from '@/utils/auditToolCall'
+import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useNotification } from '@/composables/useNotification'
 import { useDateFormat } from '@/composables/useDateFormat'
 
@@ -108,17 +138,25 @@ const ACTION_KEYS: Record<string, string> = {
   'messages_gateway.flags': 'people.audit.action.messages_gateway_flags',
   'messages_gateway.upstream': 'people.audit.action.messages_gateway_upstream',
   'messages_gateway.aliases': 'people.audit.action.messages_gateway_aliases',
+  'tool.executed': 'people.audit.action.tool_executed',
 }
 
 const selectedAction = ref<string | undefined>(undefined)
 const entries = ref<IamAuditEntry[]>([])
 const nextCursor = ref<number | null>(null)
 const loading = ref(false)
+const approvalsOn = computed(() => isApprovalsEnabled())
 
-const filterChips = computed(() => [
-  { action: undefined, label: t('people.audit.filterAll') },
-  ...Object.entries(ACTION_KEYS).map(([action, key]) => ({ action, label: t(key) })),
-])
+const filterChips = computed(() => {
+  const chips = Object.entries(ACTION_KEYS).map(([action, key]) => ({ action, label: t(key) }))
+  const toolCalls = chips.filter((chip) => chip.action === 'tool.executed')
+  const rest = chips.filter((chip) => chip.action !== 'tool.executed')
+  return [{ action: undefined, label: t('people.audit.filterAll') }, ...toolCalls, ...rest]
+})
+
+function toolRow(entry: IamAuditEntry): ToolCallSentence | null {
+  return toolCallSentence(entry, (key, values) => (values ? t(key, values) : t(key)))
+}
 
 function actionLabel(action: string): string {
   const key = ACTION_KEYS[action]

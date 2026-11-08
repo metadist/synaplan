@@ -26,7 +26,7 @@ onMounted(async () => {
   if (!isApprovalsEnabled()) {
     return
   }
-  await store.load('pending')
+  await openFocusedApproval()
   try {
     const setting = await approvalsApi.getNotifyMode()
     notifyMode.value = setting.mode
@@ -35,6 +35,27 @@ onMounted(async () => {
     // Setting is optional; inbox still works.
   }
 })
+
+const focusedApprovalId = computed(() => {
+  const raw = route.query.approval
+  if (typeof raw !== 'string' || raw === '') return null
+  const id = Number(raw)
+  return Number.isInteger(id) && id > 0 ? id : null
+})
+
+async function openFocusedApproval(): Promise<void> {
+  const id = focusedApprovalId.value
+  await store.load('pending')
+  if (id === null) return
+  if (store.pending.some((row) => row.id === id)) {
+    tab.value = 'pending'
+    return
+  }
+  await store.load('decided')
+  if (store.decided.some((row) => row.id === id)) {
+    tab.value = 'decided'
+  }
+}
 
 const taskFilter = computed(() => {
   const raw = route.query.task
@@ -177,7 +198,7 @@ const decidedLine = (row: Approval): string => {
     </p>
 
     <ul class="space-y-3">
-      <li v-for="row in rows" :key="row.id">
+      <li v-for="row in rows" :key="row.id" :data-testid="`approval-row-${row.id}`">
         <ApprovalCard
           v-if="tab === 'pending'"
           :approval="row"

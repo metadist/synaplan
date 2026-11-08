@@ -59,7 +59,7 @@ final readonly class ToolInvoker
         $outcome = new ToolOutcome(
             $execution->isError ? ToolOutcomeKind::Failed : ToolOutcomeKind::Done,
             ToolLimits::clamp($execution->text),
-            null,
+            $this->grantedApprovalId($invocation),
             $execution->document,
             0,
             null,
@@ -188,6 +188,13 @@ final readonly class ToolInvoker
         }
 
         return $observed;
+    }
+
+    private function grantedApprovalId(ToolInvocation $invocation): ?int
+    {
+        $id = $invocation->caller->approvalId;
+
+        return null !== $id && $id > 0 ? $id : null;
     }
 
     private function classified(ToolDescriptor $tool, SideEffect $effect): ToolDescriptor

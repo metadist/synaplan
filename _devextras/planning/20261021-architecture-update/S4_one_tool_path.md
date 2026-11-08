@@ -168,6 +168,17 @@ People › Audit     [ All ] [ Sharing ] [ Groups ] [ Tool calls ] …
 4. Empty state of the chip: one sentence and the link to Approvals (U5).
 5. Dark + V2 + 320 px (U9).
 
+### As delivered
+
+People → Audit gains a Tool calls chip, second after All. A row is one
+sentence from the tool name, the source and the outcome. A document edit
+says it edited a document. A connected-server write names the tool, not the
+`mcp__<id>__` prefix. An approval id on the row opens Approvals on that
+entry. The empty chip is one sentence and Open Approvals. Arguments and
+results stay off the row. A resumed approval now stores its id on the row,
+which the contract already named and the executed outcome had been leaving
+empty.
+
 ---
 
 ## AU26 — One agent loop for document chat and both gateways (backend-only)

@@ -1,7 +1,8 @@
 # Architecture update — one AI path, providers as units, central egress, one tool path, a runtime that does not wait
 
-**Status:** S0, S1, S2 and S3 (AU1–AU22) are on `main`. AU23 and AU24
-are on `main`. AU25 closes the tool-loop gaps: the gate runs on every
+**Status:** S0, S1, S2 and S3 (AU1–AU22) are on `main`. AU23, AU24 and
+AU25 are on `main`. AU25b puts those tool-call rows on People → Audit.
+AU25 closed the tool-loop gaps: the gate runs on every
 call, a write is audited, and the OpenAI loop gains a `TOOLS` row.
 `EGRESS.MODE` stays `off`. The production reading is one day, not a week: a worker is
 listed only when it reported in the last 24 hours. The vultr-cluster load test (M6) waits until

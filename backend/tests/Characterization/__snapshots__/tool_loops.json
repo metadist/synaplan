@@ -2082,6 +2082,7 @@
                     "id": "create_ticket",
                     "kind": "tool",
                     "subject": {
+                        "approvalId": 3,
                         "durationMs": 0,
                         "kind": "write",
                         "outcome": "done",
@@ -2126,6 +2127,7 @@
                     "id": "mcp__1__create_issue",
                     "kind": "tool",
                     "subject": {
+                        "approvalId": 3,
                         "durationMs": 0,
                         "kind": "write",
                         "outcome": "done",
