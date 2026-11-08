@@ -66,13 +66,14 @@ describe('toolCallSentence', () => {
         outcome: 'done',
         durationMs: 4,
         requestId: 'chat:0',
-        arguments: { cells: [{ value: 'secret-cell' }] },
-        result: 'secret-cell',
+        arguments: { cells: [{ value: 'secret-argument' }] },
+        result: 'secret-result',
       }),
       translate
     )
     expect(row?.sentence).toBe('Ben Weber edited a document with set_cells. Done.')
-    expect(row?.sentence).not.toContain('secret-cell')
+    expect(row?.sentence).not.toContain('secret-argument')
+    expect(row?.sentence).not.toContain('secret-result')
     expect(row?.approvalId).toBeNull()
   })
 

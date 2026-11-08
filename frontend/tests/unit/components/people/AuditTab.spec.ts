@@ -39,8 +39,8 @@ const documentEdit = {
     source: 'document',
     kind: 'write',
     outcome: 'done',
-    arguments: { value: 'secret-cell' },
-    result: 'secret-cell',
+    arguments: { value: 'secret-argument' },
+    result: 'secret-result',
   },
   ip: '',
   created: 1_700_000_000,
@@ -97,7 +97,8 @@ describe('AuditTab tool calls', () => {
     const text = wrapper.text()
     expect(text).toContain('Ben Weber edited a document with set_cells. Done.')
     expect(text).toContain('Ben Weber ran create_issue on a connected server. Done.')
-    expect(text).not.toContain('secret-cell')
+    expect(text).not.toContain('secret-argument')
+    expect(text).not.toContain('secret-result')
     expect(text).not.toContain('secret-issue')
     expect(text).not.toContain('mcp__1__')
 

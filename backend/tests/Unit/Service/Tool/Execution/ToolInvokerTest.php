@@ -66,7 +66,7 @@ final class ToolInvokerTest extends TestCase
                 return 'create_ticket' === $subject['tool']
                     && 'write' === $subject['kind']
                     && 'done' === $subject['outcome']
-                    && !isset($subject['arguments'], $subject['result']);
+                    && self::hidesPayload($subject);
             }),
         );
         $invoker = new ToolInvoker([new RecordingExecutor()], gate: $gate, audit: $audit);
@@ -129,7 +129,7 @@ final class ToolInvokerTest extends TestCase
             'tool.executed',
             'tool',
             'mcp__1__create_issue',
-            self::callback(static fn (array $subject): bool => 'write' === $subject['kind']),
+            self::callback(static fn (array $subject): bool => 'write' === $subject['kind'] && self::hidesPayload($subject)),
         );
         $fallback = new ToolDescriptor('mcp__1__create_issue', 'Create issue', '', [], SideEffect::Read, ToolSource::Mcp, 7);
         $invoker = new ToolInvoker([new RecordingExecutor()], gate: $gate, audit: $audit);
@@ -154,7 +154,7 @@ final class ToolInvokerTest extends TestCase
             'create_ticket',
             self::callback(static function (array $subject): bool {
                 return 12 === ($subject['approvalId'] ?? null)
-                    && !isset($subject['arguments'], $subject['result']);
+                    && self::hidesPayload($subject);
             }),
         );
         $invoker = new ToolInvoker([new RecordingExecutor()], gate: $gate, audit: $audit);
@@ -219,6 +219,17 @@ final class ToolInvokerTest extends TestCase
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('has no actor');
         $invoker->invoke($this->tool(), $this->call(new GateRequest(null, PolicyContext::Interactive, 'chat:0')));
+    }
+
+    /**
+     * isset() of two keys is false when either key is missing, so a leak of
+     * only the arguments or only the result would still pass.
+     *
+     * @param array<string, mixed> $subject
+     */
+    private static function hidesPayload(array $subject): bool
+    {
+        return !array_key_exists('arguments', $subject) && !array_key_exists('result', $subject);
     }
 
     private function tool(): ToolDescriptor

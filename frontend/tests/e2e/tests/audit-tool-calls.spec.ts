@@ -89,10 +89,12 @@ test.describe('@ci Audit tool calls', () => {
     )
     expect(listed.ok(), `audit ${listed.status()}`).toBeTruthy()
     const entries = (await listed.json()).entries as Array<{
-      subject?: { tool?: string; value?: string }
+      subject?: { tool?: string; arguments?: unknown; result?: unknown }
     }>
     const match = entries.find((row) => row.subject?.tool === 'memory_add')
     expect(match, 'tool.executed row for memory_add').toBeTruthy()
+    expect(match?.subject).not.toHaveProperty('arguments')
+    expect(match?.subject).not.toHaveProperty('result')
     expect(JSON.stringify(match)).not.toContain(secret)
 
     await login(page, CREDENTIALS.getAdminCredentials())
