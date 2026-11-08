@@ -36,7 +36,8 @@ if grep -Fq 'Strict-Transport-Security' "$CADDYFILE"; then
 fi
 
 grep -Fq 'profiles: [local-tls]' "$COMPOSE" || fail "compose.yaml is missing the local-tls profile"
-grep -Fq 'caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5' "$COMPOSE" || fail "tls-proxy image is not pinned"
+# Renovate moves the tag and the digest, so check the shape of the pin, not its value.
+grep -Eq '^[[:space:]]+image: caddy:[0-9]+\.[0-9]+\.[0-9]+-alpine@sha256:[0-9a-f]{64}$' "$COMPOSE" || fail "tls-proxy image is not pinned to a Caddy version and digest"
 grep -Fq '${SYNAPLAN_HTTP_BIND:-127.0.0.1}:${SYNAPLAN_HTTP_PORT:-8000}:80' "$COMPOSE" || fail "the application port default left 127.0.0.1"
 
 if grep -q 'is_private_ipv4' "$SCRIPT"; then
