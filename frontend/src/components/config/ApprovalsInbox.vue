@@ -72,9 +72,10 @@ const rows = computed(() => {
   const source = tab.value === 'pending' ? store.pending : store.decided
   const focused = focusedApproval.value
   const onThisTab = focused !== null && (tab.value === 'pending') === (focused.status === 'pending')
-  const list = onThisTab && focused !== null
-    ? [focused, ...source.filter((row) => row.id !== focused.id)]
-    : source
+  const list =
+    onThisTab && focused !== null
+      ? [focused, ...source.filter((row) => row.id !== focused.id)]
+      : source
   if (taskFilter.value === null) return list
   return list.filter((row) => row.requestedBy.taskId === taskFilter.value)
 })
