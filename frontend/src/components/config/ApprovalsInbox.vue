@@ -36,6 +36,8 @@ onMounted(async () => {
   }
 })
 
+const focusedApproval = ref<Approval | null>(null)
+
 const focusedApprovalId = computed(() => {
   const raw = route.query.approval
   if (typeof raw !== 'string' || raw === '') return null
@@ -47,13 +49,15 @@ async function openFocusedApproval(): Promise<void> {
   const id = focusedApprovalId.value
   await store.load('pending')
   if (id === null) return
-  if (store.pending.some((row) => row.id === id)) {
-    tab.value = 'pending'
-    return
-  }
-  await store.load('decided')
-  if (store.decided.some((row) => row.id === id)) {
-    tab.value = 'decided'
+  try {
+    const approval = await approvalsApi.get(id)
+    focusedApproval.value = approval
+    tab.value = approval.status === 'pending' ? 'pending' : 'decided'
+    if (tab.value === 'decided') {
+      await store.load('decided')
+    }
+  } catch {
+    focusedApproval.value = null
   }
 }
 
@@ -65,7 +69,15 @@ const taskFilter = computed(() => {
 })
 
 const rows = computed(() => {
-  const list = tab.value === 'pending' ? store.pending : store.decided
+  let list = tab.value === 'pending' ? store.pending : store.decided
+  const focused = focusedApproval.value
+  if (
+    focused &&
+    (tab.value === 'pending') === (focused.status === 'pending') &&
+    !list.some((row) => row.id === focused.id)
+  ) {
+    list = [focused, ...list]
+  }
   if (taskFilter.value === null) return list
   return list.filter((row) => row.requestedBy.taskId === taskFilter.value)
 })

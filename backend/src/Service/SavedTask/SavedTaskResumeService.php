@@ -119,6 +119,7 @@ final readonly class SavedTaskResumeService
             }
         }
 
+        $context->grantApproval($nodeId, $approvalId);
         $assembled = $this->dagExecutor->resume($plan, $context, $nodeId, $approval->getArgs() ?? []);
         $messageId = $run->getMessageId();
         $statuses = $assembled['node_statuses'];

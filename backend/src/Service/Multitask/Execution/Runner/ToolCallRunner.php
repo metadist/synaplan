@@ -123,7 +123,12 @@ final readonly class ToolCallRunner implements TaskRunner
                 new ToolInvocation(
                     $toolName,
                     $arguments,
-                    new ToolCaller((int) $userId, ToolChannel::SAVED_TASK, unattended: true),
+                    new ToolCaller(
+                        (int) $userId,
+                        ToolChannel::SAVED_TASK,
+                        unattended: true,
+                        approvalId: $context->grantedApprovalId($node->id),
+                    ),
                     decision: new GateRequest(
                         $actor instanceof User ? $actor : null,
                         PolicyContext::Unattended,

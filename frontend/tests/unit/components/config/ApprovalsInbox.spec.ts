@@ -4,17 +4,21 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ApprovalsInbox from '@/components/config/ApprovalsInbox.vue'
 
-const { mockList, mockApprove, mockReject, mockGetNotify, mockSetNotify } = vi.hoisted(() => ({
-  mockList: vi.fn(),
-  mockApprove: vi.fn(),
-  mockReject: vi.fn(),
-  mockGetNotify: vi.fn(),
-  mockSetNotify: vi.fn(),
-}))
+const { mockList, mockGetOne, mockApprove, mockReject, mockGetNotify, mockSetNotify } = vi.hoisted(
+  () => ({
+    mockList: vi.fn(),
+    mockGetOne: vi.fn(),
+    mockApprove: vi.fn(),
+    mockReject: vi.fn(),
+    mockGetNotify: vi.fn(),
+    mockSetNotify: vi.fn(),
+  })
+)
 
 vi.mock('@/services/api/approvalsApi', () => ({
   approvalsApi: {
     list: mockList,
+    get: mockGetOne,
     approve: mockApprove,
     reject: mockReject,
     getNotifyMode: mockGetNotify,
@@ -70,10 +74,8 @@ describe('ApprovalsInbox', () => {
       sideEffect: 'write' as const,
       canAlwaysAllow: false,
     }
-    mockList.mockImplementation(async (status: string) => {
-      if (status === 'decided') return { pendingCount: 0, approvals: [decided] }
-      return { pendingCount: 0, approvals: [] }
-    })
+    mockList.mockResolvedValue({ pendingCount: 0, approvals: [] })
+    mockGetOne.mockResolvedValue(decided)
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/approvals', component: { template: '<div />' } }],

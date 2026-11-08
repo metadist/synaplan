@@ -74,9 +74,9 @@ final readonly class ToolInvoker
      * (file work runs in the sidecar after the gate). A policy-only
      * check does not call this.
      */
-    public function recordRan(ToolDescriptor $tool, int $actorId, string $requestId, ToolOutcomeKind $kind, int $durationMs): void
+    public function recordRan(ToolDescriptor $tool, int $actorId, string $requestId, ToolOutcomeKind $kind, int $durationMs, ?int $approvalId = null): void
     {
-        $this->writeAudit($tool, $actorId, $requestId, $kind, $durationMs, null);
+        $this->writeAudit($tool, $actorId, $requestId, $kind, $durationMs, null !== $approvalId && $approvalId > 0 ? $approvalId : null);
     }
 
     /**

@@ -166,6 +166,45 @@ final class ApprovalController extends AbstractController
         return $this->json(['success' => true, 'approval' => $this->approvals->toArray($approval)]);
     }
 
+    #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[OA\Get(
+        path: '/api/v1/approvals/{id}',
+        summary: 'Read one approval the current user may open',
+        description: 'The owner receives the inbox card. An administrator who is not the owner receives the same card without the request body.',
+        tags: ['Approvals'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: 'Approval',
+                content: new OA\JsonContent(
+                    required: ['success', 'approval'],
+                    properties: [
+                        new OA\Property(property: 'success', type: 'boolean', example: true),
+                        new OA\Property(property: 'approval', ref: new Model(type: ApprovalResponse::class)),
+                    ]
+                )
+            ),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Not found or approvals disabled'),
+        ]
+    )]
+    public function show(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        $denied = $this->guard($user);
+        if (null !== $denied) {
+            return $denied;
+        }
+        \assert($user instanceof User);
+        try {
+            $approval = $this->approvals->findForViewer($user, $id);
+        } catch (ApprovalNotFoundException) {
+            return $this->json(['success' => false, 'error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        return $this->json(['success' => true, 'approval' => $approval]);
+    }
+
     #[Route('/notify-setting', name: 'notify_get', methods: ['GET'])]
     #[OA\Get(
         path: '/api/v1/approvals/notify-setting',

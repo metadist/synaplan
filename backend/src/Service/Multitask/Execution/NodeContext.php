@@ -88,6 +88,14 @@ final class NodeContext
     private array $approvedNodeIds = [];
 
     /**
+     * The approval that allowed one resumed node. Later nodes in the same
+     * run do not inherit it.
+     *
+     * @var array<string, int>
+     */
+    private array $grantedApprovalIds = [];
+
+    /**
      * @param array<int, Message|array{role: string, content: string}> $thread
      *                                                                                   Message entities in-process; plain `{role, content}`
      *                                                                                   snapshots inside a media-node subprocess (entities cannot
@@ -191,9 +199,28 @@ final class NodeContext
         $this->approvedNodeIds[$nodeId] = true;
     }
 
+    /**
+     * The resumed step may name this approval on its audit row.
+     * Other steps in the same run stay unmarked.
+     */
+    public function grantApproval(string $nodeId, int $approvalId): void
+    {
+        $this->markApproved($nodeId);
+        if ($approvalId > 0) {
+            $this->grantedApprovalIds[$nodeId] = $approvalId;
+        }
+    }
+
     public function isApproved(string $nodeId): bool
     {
         return isset($this->approvedNodeIds[$nodeId]);
+    }
+
+    public function grantedApprovalId(string $nodeId): ?int
+    {
+        $id = $this->grantedApprovalIds[$nodeId] ?? null;
+
+        return is_int($id) && $id > 0 ? $id : null;
     }
 
     /** Whether this turn may run one more widened read. */
