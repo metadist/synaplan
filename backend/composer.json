@@ -72,7 +72,6 @@
             "symfony/runtime": true,
             "codewithkyrian/platform-package-installer": true
         },
-        "bump-after-update": true,
         "sort-packages": true
     },
     "autoload": {

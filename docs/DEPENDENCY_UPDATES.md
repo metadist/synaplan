@@ -123,6 +123,7 @@ Renovate only bumps version numbers — it does not fix code, configuration, CI 
 - **Dockerfile base image:** If the upgrade requires a newer runtime, the base image must be rebuilt, retagged, and the Dockerfile updated (tag + digest).
 - **Framework meta-constraints:** Some tools use extra config fields to restrict versions globally (e.g. Symfony Flex's `extra.symfony.require`). Renovate does not update these.
 - **Lockfile consistency:** After rebasing across other merges, the lockfile can become inconsistent. Regenerate with `composer update --with-all-dependencies` or `npm install` in the correct runtime version.
+- **Composer `content-hash`:** `backend/composer.json` must not set `bump-after-update`. Renovate runs `composer update` but commits only its own `composer.json`, so Composer would hash raised constraints that never land and leave `composer.lock` out of date on `main`. Run `composer bump` by hand when the lower bounds should move.
 - **Security advisories:** Composer/npm may block packages with known CVEs. Check audit config if dependency resolution fails unexpectedly.
 - **Polyfill replace section:** When bumping the minimum PHP/Node version, add the corresponding polyfill to the `replace` section.
 
