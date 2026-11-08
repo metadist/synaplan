@@ -205,6 +205,52 @@ describe('ApprovalsInbox', () => {
     expect(wrapper.find('[data-testid="approval-row-812"]').exists()).toBe(false)
   })
 
+  it('drops a pending card once that approval is on the decided list', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Still waiting',
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: true,
+    }
+    const decided = {
+      ...pending,
+      status: 'executed',
+      preview: 'Already decided',
+      canAlwaysAllow: false,
+    }
+    let sawDecided = false
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'decided') {
+        sawDecided = true
+        return { pendingCount: 0, approvals: [decided] }
+      }
+      if (sawDecided) return { pendingCount: 0, approvals: [pending] }
+      return { pendingCount: 1, approvals: [pending] }
+    })
+    mockGetOne.mockResolvedValue(pending)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Still waiting')
+    await wrapper.get('[data-testid="approvals-tab-decided"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Already decided')
+    await wrapper.get('[data-testid="approvals-tab-pending"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="approval-row-4"]').exists()).toBe(false)
+  })
+
   it('still lists pending approvals when the linked approval cannot be loaded', async () => {
     const pending = {
       id: 4,

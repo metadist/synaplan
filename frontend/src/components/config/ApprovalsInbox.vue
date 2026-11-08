@@ -75,6 +75,23 @@ watch(focusedApprovalId, () => {
   void openFocusedApproval()
 })
 
+function adoptFresher(): void {
+  const focused = focusedApproval.value
+  if (focused === null) return
+  const decided = store.decided.find((row) => row.id === focused.id)
+  if (decided && decided.status !== 'pending' && focused.status === 'pending') {
+    focusedApproval.value = decided
+    return
+  }
+  const source = focused.status === 'pending' ? store.pending : store.decided
+  const here = source.find((row) => row.id === focused.id)
+  if (here) focusedApproval.value = here
+}
+
+watch([() => store.pending, () => store.decided], () => {
+  adoptFresher()
+})
+
 const taskFilter = computed(() => {
   const raw = route.query.task
   if (typeof raw !== 'string' || raw === '') return null
@@ -86,10 +103,16 @@ const rows = computed(() => {
   const source = tab.value === 'pending' ? store.pending : store.decided
   const focused = focusedApproval.value
   const stored = focused ? source.find((row) => row.id === focused.id) : undefined
-  const head = stored ?? focused
+  const stalePending =
+    tab.value === 'pending' &&
+    focused !== null &&
+    focused.status !== 'pending' &&
+    stored?.status === 'pending'
+  const visible = stalePending ? source.filter((row) => row.id !== focused.id) : source
+  const head = stalePending ? focused : (stored ?? focused)
   const onThisTab =
     head !== null && head !== undefined && (tab.value === 'pending') === (head.status === 'pending')
-  const list = onThisTab ? [head, ...source.filter((row) => row.id !== head.id)] : source
+  const list = onThisTab ? [head, ...visible.filter((row) => row.id !== head.id)] : visible
   if (taskFilter.value === null) return list
   return list.filter((row) => row.requestedBy.taskId === taskFilter.value)
 })
