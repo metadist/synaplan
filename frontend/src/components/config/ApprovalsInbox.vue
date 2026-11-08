@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
@@ -11,14 +11,15 @@ import { useNotification } from '@/composables/useNotification'
 import { approvalsApi, type Approval } from '@/services/api/approvalsApi'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
+import { useFocusedApproval } from '@/composables/useFocusedApproval'
 
 const { t, te } = useI18n()
 const { formatDateTime } = useDateFormat()
-const route = useRoute()
 const router = useRouter()
 const store = useApprovalsStore()
 const { success, error: showError } = useNotification()
 const tab = ref<'pending' | 'decided'>('pending')
+const { focusedApproval, openFocusedApproval, rows } = useFocusedApproval(tab)
 const notifyMode = ref<'instant' | 'digest'>('instant')
 const mailConfigured = ref(true)
 
@@ -34,87 +35,6 @@ onMounted(async () => {
   } catch {
     // Setting is optional; inbox still works.
   }
-})
-
-const focusedApproval = ref<Approval | null>(null)
-
-const focusedApprovalId = computed(() => {
-  const raw = route.query.approval
-  if (typeof raw !== 'string' || raw === '') return null
-  const id = Number(raw)
-  return Number.isInteger(id) && id > 0 ? id : null
-})
-
-let focusRequest = 0
-
-async function openFocusedApproval(): Promise<void> {
-  const request = ++focusRequest
-  const id = focusedApprovalId.value
-  if (id === null) {
-    focusedApproval.value = null
-    tab.value = 'pending'
-    await store.load('pending')
-    return
-  }
-  try {
-    const approval = await approvalsApi.get(id)
-    if (request !== focusRequest) return
-    tab.value = approval.status === 'pending' ? 'pending' : 'decided'
-    await store.load(tab.value)
-    if (request !== focusRequest) return
-    const source = tab.value === 'pending' ? store.pending : store.decided
-    focusedApproval.value = source.find((row) => row.id === approval.id) ?? approval
-  } catch {
-    if (request !== focusRequest) return
-    focusedApproval.value = null
-    await store.load(tab.value)
-  }
-}
-
-watch(focusedApprovalId, () => {
-  void openFocusedApproval()
-})
-
-function adoptFresher(): void {
-  const focused = focusedApproval.value
-  if (focused === null) return
-  const decided = store.decided.find((row) => row.id === focused.id)
-  if (decided && decided.status !== 'pending' && focused.status === 'pending') {
-    focusedApproval.value = decided
-    return
-  }
-  const source = focused.status === 'pending' ? store.pending : store.decided
-  const here = source.find((row) => row.id === focused.id)
-  if (here) focusedApproval.value = here
-}
-
-watch([() => store.pending, () => store.decided], () => {
-  adoptFresher()
-})
-
-const taskFilter = computed(() => {
-  const raw = route.query.task
-  if (typeof raw !== 'string' || raw === '') return null
-  const id = Number(raw)
-  return Number.isFinite(id) ? id : null
-})
-
-const rows = computed(() => {
-  const source = tab.value === 'pending' ? store.pending : store.decided
-  const focused = focusedApproval.value
-  const stored = focused ? source.find((row) => row.id === focused.id) : undefined
-  const stalePending =
-    tab.value === 'pending' &&
-    focused !== null &&
-    focused.status !== 'pending' &&
-    stored?.status === 'pending'
-  const visible = stalePending ? source.filter((row) => row.id !== focused.id) : source
-  const head = stalePending ? focused : (stored ?? focused)
-  const onThisTab =
-    head !== null && head !== undefined && (tab.value === 'pending') === (head.status === 'pending')
-  const list = onThisTab ? [head, ...visible.filter((row) => row.id !== head.id)] : visible
-  if (taskFilter.value === null) return list
-  return list.filter((row) => row.requestedBy.taskId === taskFilter.value)
 })
 
 const switchTab = async (next: 'pending' | 'decided') => {

@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import ApprovalsInbox from '@/components/config/ApprovalsInbox.vue'
+import { useApprovalsStore } from '@/stores/approvals'
 
 const { mockList, mockGetOne, mockApprove, mockReject, mockGetNotify, mockSetNotify } = vi.hoisted(
   () => ({
@@ -249,6 +250,117 @@ describe('ApprovalsInbox', () => {
     await wrapper.get('[data-testid="approvals-tab-pending"]').trigger('click')
     await flushPromises()
     expect(wrapper.find('[data-testid="approval-row-4"]').exists()).toBe(false)
+  })
+
+  it('keeps a pending approval that is older than the pending page', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Still waiting',
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: true,
+    }
+    mockGetOne.mockResolvedValue(pending)
+    mockList.mockResolvedValue({ pendingCount: 0, approvals: [] })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approvals-tab-pending"]').classes()).toContain('btn-primary')
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Still waiting')
+  })
+
+  it('drops approve and reject when another session already decided it', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Still waiting',
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: true,
+    }
+    const decided = {
+      ...pending,
+      status: 'executed',
+      preview: 'Already decided',
+      canAlwaysAllow: false,
+    }
+    let reads = 0
+    mockGetOne.mockImplementation(async () => {
+      reads += 1
+      return reads === 1 ? pending : decided
+    })
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'decided') return { pendingCount: 0, approvals: [decided] }
+      return { pendingCount: 0, approvals: [] }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approvals-tab-decided"]').classes()).toContain('btn-primary')
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Already decided')
+  })
+
+  it('refreshes a pending card when the pending list reloads without it', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Still waiting',
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: true,
+    }
+    const decided = {
+      ...pending,
+      status: 'executed',
+      preview: 'Already decided',
+      canAlwaysAllow: false,
+    }
+    mockGetOne.mockResolvedValue(pending)
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'pending') return { pendingCount: 1, approvals: [pending] }
+      return { pendingCount: 0, approvals: [] }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Still waiting')
+    mockGetOne.mockResolvedValue(decided)
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'decided') return { pendingCount: 0, approvals: [decided] }
+      return { pendingCount: 0, approvals: [] }
+    })
+    await useApprovalsStore().load('pending')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approvals-tab-decided"]').classes()).toContain('btn-primary')
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Already decided')
   })
 
   it('still lists pending approvals when the linked approval cannot be loaded', async () => {
