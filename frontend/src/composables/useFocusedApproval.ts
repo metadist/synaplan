@@ -16,57 +16,23 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
   let focusRequest = 0
   let statusRequest = 0
 
-  const focusedApprovalId = computed(() => {
-    const raw = route.query.approval
-    if (typeof raw !== 'string' || raw === '') return null
-    const id = Number(raw)
-    return Number.isInteger(id) && id > 0 ? id : null
-  })
-
-  const taskFilter = computed(() => {
-    const raw = route.query.task
-    if (typeof raw !== 'string' || raw === '') return null
-    const id = Number(raw)
-    return Number.isFinite(id) ? id : null
-  })
+  const focusedApprovalId = computed(() => positiveQueryId(route.query.approval))
+  const taskFilter = computed(() => numericQueryId(route.query.task))
 
   function adoptFresher(): void {
-    const focused = focusedApproval.value
-    if (focused === null) return
-    const decided = store.decided.find((row) => row.id === focused.id)
-    if (decided && decided.status !== 'pending' && focused.status === 'pending') {
-      focusedApproval.value = decided
-      return
-    }
-    const source = focused.status === 'pending' ? store.pending : store.decided
-    const here = source.find((row) => row.id === focused.id)
-    if (here) focusedApproval.value = here
+    focusedApproval.value = adoptListed(focusedApproval.value, store.pending, store.decided)
   }
 
   async function rereadIfDecidedElsewhere(): Promise<void> {
-    const focused = focusedApproval.value
     const openedAt = focusRequest
-    if (focused === null || focused.status !== 'pending') return
-    if (store.pending.some((row) => row.id === focused.id)) return
-    const decided = store.decided.find((row) => row.id === focused.id)
-    if (decided && decided.status !== 'pending') {
-      focusedApproval.value = decided
-      return
-    }
     const request = ++statusRequest
-    try {
-      const again = await approvalsApi.get(focused.id)
-      if (request !== statusRequest || openedAt !== focusRequest) return
-      if (focusedApproval.value?.id !== focused.id || focusedApproval.value.status !== 'pending') {
-        return
-      }
-      focusedApproval.value = again
-      if (again.status !== 'pending' && tab.value === 'pending') {
-        tab.value = 'decided'
-        await store.load('decided')
-      }
-    } catch {
-      // A failed refresh is not a decision. The card stays until the next load.
+    const again = await rereadPending(focusedApproval.value, store.pending, store.decided)
+    if (again === undefined || request !== statusRequest || openedAt !== focusRequest) return
+    if (focusedApproval.value?.id !== again.id || focusedApproval.value.status !== 'pending') return
+    focusedApproval.value = again
+    if (again.status !== 'pending' && tab.value === 'pending') {
+      tab.value = 'decided'
+      await store.load('decided')
     }
   }
 
@@ -99,7 +65,6 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
   watch(focusedApprovalId, () => {
     void openFocusedApproval()
   })
-
   watch(
     () => store.pending,
     () => {
@@ -107,7 +72,6 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
       void rereadIfDecidedElsewhere()
     }
   )
-
   watch(
     () => store.decided,
     () => {
@@ -115,25 +79,75 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
     }
   )
 
-  const rows = computed(() => {
-    const source = tab.value === 'pending' ? store.pending : store.decided
-    const focused = focusedApproval.value
-    const stored = focused ? source.find((row) => row.id === focused.id) : undefined
-    const stalePending =
-      tab.value === 'pending' &&
-      focused !== null &&
-      focused.status !== 'pending' &&
-      stored?.status === 'pending'
-    const visible = stalePending ? source.filter((row) => row.id !== focused.id) : source
-    const head = stalePending ? focused : (stored ?? focused)
-    const onThisTab =
-      head !== null &&
-      head !== undefined &&
-      (tab.value === 'pending') === (head.status === 'pending')
-    const list = onThisTab ? [head, ...visible.filter((row) => row.id !== head.id)] : visible
-    if (taskFilter.value === null) return list
-    return list.filter((row) => row.requestedBy.taskId === taskFilter.value)
-  })
+  const rows = computed(() =>
+    inboxRows(tab.value, store.pending, store.decided, focusedApproval.value, taskFilter.value)
+  )
 
   return { focusedApproval, openFocusedApproval, rows }
+}
+
+function positiveQueryId(raw: unknown): number | null {
+  if (typeof raw !== 'string' || raw === '') return null
+  const id = Number(raw)
+  return Number.isInteger(id) && id > 0 ? id : null
+}
+
+function numericQueryId(raw: unknown): number | null {
+  if (typeof raw !== 'string' || raw === '') return null
+  const id = Number(raw)
+  return Number.isFinite(id) ? id : null
+}
+
+function adoptListed(
+  focused: Approval | null,
+  pending: Approval[],
+  decided: Approval[]
+): Approval | null {
+  if (focused === null) return null
+  const decidedRow = decided.find((row) => row.id === focused.id)
+  if (decidedRow && decidedRow.status !== 'pending' && focused.status === 'pending') {
+    return decidedRow
+  }
+  const source = focused.status === 'pending' ? pending : decided
+  return source.find((row) => row.id === focused.id) ?? focused
+}
+
+async function rereadPending(
+  focused: Approval | null,
+  pending: Approval[],
+  decided: Approval[]
+): Promise<Approval | undefined> {
+  if (focused === null || focused.status !== 'pending') return undefined
+  if (pending.some((row) => row.id === focused.id)) return undefined
+  const decidedRow = decided.find((row) => row.id === focused.id)
+  if (decidedRow && decidedRow.status !== 'pending') return decidedRow
+  try {
+    return await approvalsApi.get(focused.id)
+  } catch {
+    // A failed refresh is not a decision. The card stays until the next load.
+    return undefined
+  }
+}
+
+export function inboxRows(
+  tab: 'pending' | 'decided',
+  pending: Approval[],
+  decided: Approval[],
+  focused: Approval | null,
+  taskId: number | null
+): Approval[] {
+  const source = tab === 'pending' ? pending : decided
+  const stored = focused ? source.find((row) => row.id === focused.id) : undefined
+  const stalePending =
+    tab === 'pending' &&
+    focused !== null &&
+    focused.status !== 'pending' &&
+    stored?.status === 'pending'
+  const visible = stalePending ? source.filter((row) => row.id !== focused.id) : source
+  const head = stalePending ? focused : (stored ?? focused)
+  const onThisTab =
+    head !== null && head !== undefined && (tab === 'pending') === (head.status === 'pending')
+  const list = onThisTab ? [head, ...visible.filter((row) => row.id !== head.id)] : visible
+  if (taskId === null) return list
+  return list.filter((row) => row.requestedBy.taskId === taskId)
 }
