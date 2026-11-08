@@ -88,4 +88,46 @@ describe('ApprovalsInbox', () => {
     expect(wrapper.get('[data-testid="approval-row-812"]').text()).toContain('Create the issue')
     expect(wrapper.get('[data-testid="approvals-tab-decided"]').classes()).toContain('btn-primary')
   })
+
+  it('puts a linked approval first even when it is already in the list', async () => {
+    const older = {
+      id: 1,
+      tool: 'other',
+      preview: 'Older decision',
+      status: 'executed',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+    }
+    const linked = {
+      id: 812,
+      tool: 'create_issue',
+      preview: null,
+      status: 'executed',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+    }
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'decided') return { pendingCount: 0, approvals: [older, linked] }
+      return { pendingCount: 0, approvals: [] }
+    })
+    mockGetOne.mockResolvedValue(linked)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=812')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    const rows = wrapper.findAll('[data-testid^="approval-row-"]')
+    expect(rows[0]?.attributes('data-testid')).toBe('approval-row-812')
+    expect(rows).toHaveLength(2)
+  })
 })
