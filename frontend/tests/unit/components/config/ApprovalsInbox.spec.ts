@@ -42,6 +42,8 @@ vi.mock('@/composables/useDialog', () => ({
 describe('ApprovalsInbox', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    mockList.mockReset()
+    mockGetOne.mockReset()
     mockList.mockResolvedValue({ pendingCount: 0, approvals: [] })
     mockGetNotify.mockResolvedValue({ mode: 'instant', mailConfigured: true })
   })
@@ -602,6 +604,41 @@ describe('ApprovalsInbox', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Now executed')
     expect(wrapper.get('[data-testid="approval-row-4"]').text()).not.toContain('Still waiting')
+  })
+
+  it('drops the open card when a reload fails', async () => {
+    const decided = {
+      id: 812,
+      tool: 'create_issue',
+      preview: 'Create the issue',
+      status: 'executed',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+      canDecide: true,
+    }
+    mockGetOne.mockResolvedValue(decided)
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'decided') return { pendingCount: 0, approvals: [decided] }
+      return { pendingCount: 0, approvals: [] }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=812')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-812"]').text()).toContain('Create the issue')
+    mockList.mockRejectedValue(new Error('down'))
+    await useApprovalsStore().load('decided')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="approval-row-812"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="approval-open-context"]').exists()).toBe(false)
   })
 
   it('still lists pending approvals when the linked approval cannot be loaded', async () => {

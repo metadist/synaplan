@@ -37,6 +37,9 @@ export function parseChatContinuation(data: unknown): ChatContinuation | null {
   return { approvalId, chatId, outcome }
 }
 
+/** Bumps when a list reload fails, so a mounted inbox can drop the previous card. */
+export const approvalListEpoch = ref(0)
+
 async function loadApprovalList(
   status: 'pending' | 'decided',
   loads: { pending: number; decided: number },
@@ -61,9 +64,12 @@ async function loadApprovalList(
     else decided.value = data.approvals
   } catch {
     if (loads[status] !== request) return
+    approvalListEpoch.value += 1
     if (status === 'pending') {
       pending.value = []
       pendingCount.value = 0
+    } else {
+      decided.value = []
     }
   } finally {
     if (loads[status] === request) loading.value = false

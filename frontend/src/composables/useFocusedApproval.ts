@@ -1,7 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { approvalsApi, type Approval } from '@/services/api/approvalsApi'
-import { useApprovalsStore } from '@/stores/approvals'
+import { approvalListEpoch, useApprovalsStore } from '@/stores/approvals'
 
 /**
  * The approval named in the address, kept in step with the inbox lists.
@@ -82,6 +82,9 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
       void rereadIfStillUnsettled(book())
     }
   )
+  watch(approvalListEpoch, () => {
+    focusedApproval.value = null
+  })
 
   const rows = computed(() =>
     inboxRows(tab.value, store.pending, store.decided, focusedApproval.value, taskFilter.value)

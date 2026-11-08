@@ -96,6 +96,16 @@ describe('approvals store', () => {
     expect(store.decided[0]?.preview).toBe('Now executed')
   })
 
+  it('clears decided rows when the reload fails', async () => {
+    mockList.mockResolvedValueOnce({ pendingCount: 0, approvals: [row] })
+    const store = useApprovalsStore()
+    await store.load('decided')
+    expect(store.decided).toHaveLength(1)
+    mockList.mockRejectedValueOnce(new Error('down'))
+    await store.load('decided')
+    expect(store.decided).toEqual([])
+  })
+
   it('ignores a duplicate stream card', () => {
     const store = useApprovalsStore()
     store.addFromStream(row)
