@@ -159,4 +159,79 @@ describe('ApprovalsInbox', () => {
     await flushPromises()
     expect(wrapper.get('[data-testid="approval-row-812"]').text()).toContain('Create the issue')
   })
+
+  it('returns to the pending list when the approval query is cleared', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Still waiting',
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+    }
+    const decided = {
+      id: 812,
+      tool: 'create_issue',
+      preview: 'Create the issue',
+      status: 'executed',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+    }
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'pending') return { pendingCount: 1, approvals: [pending] }
+      return { pendingCount: 1, approvals: [decided] }
+    })
+    mockGetOne.mockResolvedValue(decided)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=812')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approvals-tab-decided"]').classes()).toContain('btn-primary')
+    await router.push('/approvals')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approvals-tab-pending"]').classes()).toContain('btn-primary')
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Still waiting')
+    expect(wrapper.find('[data-testid="approval-row-812"]').exists()).toBe(false)
+  })
+
+  it('still lists pending approvals when the linked approval cannot be loaded', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Still waiting',
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+    }
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'pending') return { pendingCount: 1, approvals: [pending] }
+      return { pendingCount: 1, approvals: [] }
+    })
+    mockGetOne.mockRejectedValue(new Error('missing'))
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=999')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Still waiting')
+    expect(wrapper.find('[data-testid="approvals-empty"]').exists()).toBe(false)
+  })
 })

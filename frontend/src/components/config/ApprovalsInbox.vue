@@ -52,6 +52,7 @@ async function openFocusedApproval(): Promise<void> {
   const id = focusedApprovalId.value
   if (id === null) {
     focusedApproval.value = null
+    tab.value = 'pending'
     await store.load('pending')
     return
   }
@@ -66,6 +67,7 @@ async function openFocusedApproval(): Promise<void> {
   } catch {
     if (request !== focusRequest) return
     focusedApproval.value = null
+    await store.load(tab.value)
   }
 }
 
