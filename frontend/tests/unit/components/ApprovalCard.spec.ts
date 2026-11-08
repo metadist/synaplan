@@ -10,6 +10,7 @@ vi.mock('@/composables/useDialog', () => ({
 }))
 
 function approval(overrides: Partial<Approval> = {}): Approval {
+  const { canDecide, ...rest } = overrides
   return {
     id: 3,
     tool: 'mcp:1:create_ticket',
@@ -20,7 +21,8 @@ function approval(overrides: Partial<Approval> = {}): Approval {
     created: Math.floor(Date.now() / 1000),
     requestedBy: { kind: 'chat', chatId: 12, messageId: 99 },
     canAlwaysAllow: true,
-    ...overrides,
+    ...rest,
+    canDecide: canDecide ?? true,
   }
 }
 
