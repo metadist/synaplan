@@ -90,6 +90,15 @@ describe('toolCallSentence', () => {
     expect(row?.sentence).not.toContain('mcp__1__')
   })
 
+  it('strips the colon form of a connected-server name', () => {
+    const row = toolCallSentence(
+      entry({ tool: 'mcp:1:create_issue', source: 'mcp', kind: 'write', outcome: 'done' }),
+      translate
+    )
+    expect(row?.sentence).toBe('Ben Weber ran create_issue on a connected server. Done.')
+    expect(row?.sentence).not.toContain('mcp:1:')
+  })
+
   it('uses one sentence per source', () => {
     const cases: Array<[string, string]> = [
       ['custom', 'Ben Weber called create_ticket. Done.'],

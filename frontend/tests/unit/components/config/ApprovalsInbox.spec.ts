@@ -104,7 +104,7 @@ describe('ApprovalsInbox', () => {
     const linked = {
       id: 812,
       tool: 'create_issue',
-      preview: null,
+      preview: 'From the list',
       status: 'executed',
       expiresAt: 1,
       created: 1,
@@ -116,7 +116,7 @@ describe('ApprovalsInbox', () => {
       if (status === 'decided') return { pendingCount: 0, approvals: [older, linked] }
       return { pendingCount: 0, approvals: [] }
     })
-    mockGetOne.mockResolvedValue(linked)
+    mockGetOne.mockResolvedValue({ ...linked, preview: null, status: 'approved' })
     const router = createRouter({
       history: createMemoryHistory(),
       routes: [{ path: '/approvals', component: { template: '<div />' } }],
@@ -128,6 +128,35 @@ describe('ApprovalsInbox', () => {
     await flushPromises()
     const rows = wrapper.findAll('[data-testid^="approval-row-"]')
     expect(rows[0]?.attributes('data-testid')).toBe('approval-row-812')
+    expect(rows[0]?.text()).toContain('From the list')
     expect(rows).toHaveLength(2)
+  })
+
+  it('loads a new approval when the query changes without remounting', async () => {
+    const linked = {
+      id: 812,
+      tool: 'create_issue',
+      preview: 'Create the issue',
+      status: 'executed',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+    }
+    mockGetOne.mockResolvedValue(linked)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="approval-row-812"]').exists()).toBe(false)
+    await router.push('/approvals?approval=812')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-812"]').text()).toContain('Create the issue')
   })
 })

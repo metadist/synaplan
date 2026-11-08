@@ -51,7 +51,7 @@ function toolLabel(
   const named = entry.resourceName?.trim()
   if (named) return named
   const raw = stringField(subject, 'tool') || entry.resourceId.trim()
-  const mcp = /^mcp__\d+__(.+)$/.exec(raw)
+  const mcp = /^(?:mcp__\d+__|mcp:\d+:)(.+)$/.exec(raw)
   const label = (mcp?.[1] ?? raw).trim()
   return label === '' ? translate('people.audit.tool.unnamed') : label
 }

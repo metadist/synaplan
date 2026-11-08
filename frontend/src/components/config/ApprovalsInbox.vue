@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
@@ -45,21 +45,33 @@ const focusedApprovalId = computed(() => {
   return Number.isInteger(id) && id > 0 ? id : null
 })
 
+let focusRequest = 0
+
 async function openFocusedApproval(): Promise<void> {
+  const request = ++focusRequest
   const id = focusedApprovalId.value
-  await store.load('pending')
-  if (id === null) return
+  if (id === null) {
+    focusedApproval.value = null
+    await store.load('pending')
+    return
+  }
   try {
     const approval = await approvalsApi.get(id)
-    focusedApproval.value = approval
+    if (request !== focusRequest) return
     tab.value = approval.status === 'pending' ? 'pending' : 'decided'
-    if (tab.value === 'decided') {
-      await store.load('decided')
-    }
+    await store.load(tab.value)
+    if (request !== focusRequest) return
+    const source = tab.value === 'pending' ? store.pending : store.decided
+    focusedApproval.value = source.find((row) => row.id === approval.id) ?? approval
   } catch {
+    if (request !== focusRequest) return
     focusedApproval.value = null
   }
 }
+
+watch(focusedApprovalId, () => {
+  void openFocusedApproval()
+})
 
 const taskFilter = computed(() => {
   const raw = route.query.task
@@ -71,11 +83,11 @@ const taskFilter = computed(() => {
 const rows = computed(() => {
   const source = tab.value === 'pending' ? store.pending : store.decided
   const focused = focusedApproval.value
-  const onThisTab = focused !== null && (tab.value === 'pending') === (focused.status === 'pending')
-  const list =
-    onThisTab && focused !== null
-      ? [focused, ...source.filter((row) => row.id !== focused.id)]
-      : source
+  const stored = focused ? source.find((row) => row.id === focused.id) : undefined
+  const head = stored ?? focused
+  const onThisTab =
+    head !== null && head !== undefined && (tab.value === 'pending') === (head.status === 'pending')
+  const list = onThisTab ? [head, ...source.filter((row) => row.id !== head.id)] : source
   if (taskFilter.value === null) return list
   return list.filter((row) => row.requestedBy.taskId === taskFilter.value)
 })
