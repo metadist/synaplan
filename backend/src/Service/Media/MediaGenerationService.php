@@ -68,7 +68,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     /**
      * Generate media (image or video) from a text prompt.
      *
-     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}
+     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}|array{success: true, status: 'processing', jobId: string, provider: string, model: string, resolution: string|null}
      *
      * @throws \InvalidArgumentException  on bad input
      * @throws RateLimitExceededException when user exceeds quota
@@ -88,9 +88,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $resolvedModelId = $resolved['modelId'];
 
         if ('video' === $type) {
-            $resolution = $this->normalizeResolution($resolution, $modelConfig);
-        } else {
-            $resolution = null;
+            return VideoGenerationStart::accepted($this->startVideoGeneration($user, $prompt, $modelId, $resolution));
         }
 
         $this->logger->info('Media generation request', [
@@ -99,10 +97,10 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             'provider' => $provider,
             'model' => $modelName,
             'prompt_length' => strlen($prompt),
-            'resolution' => $resolution,
+            'resolution' => null,
         ]);
 
-        $result = $this->callProvider($prompt, $type, $user, $provider, $modelName, $modelConfig, $resolution);
+        $result = $this->callProvider($prompt, $type, $user, $provider, $modelName, $modelConfig, null);
         $mediaUrl = $this->extractMediaUrl($result, $type);
 
         if (null === $mediaUrl) {

@@ -112,15 +112,9 @@ final readonly class MediaGenerationRunner implements TaskRunner
             $handlerOptions['node_id'] = $node->id;
         }
 
-        // Force synchronous (blocking) generation when another node depends on
-        // this media node's file: the downstream `file_analysis`/`compose_reply`
-        // needs the bytes in-turn, which an async detach could never deliver
-        // (#1218). A terminal media node keeps the async detach for a
-        // non-blocking "generating…" UX. The options flag is the parallel path's
-        // carrier: the media subprocess rebuilds a fresh NodeContext (without the
-        // inline-set), so DagExecutor::mediaRequest() forwards the decision via
-        // options instead.
-        if ($context->mustRunMediaInline($node->id) || !empty($context->options['force_inline_media'])) {
+        // Incognito turns must not queue a job. Every other render, including
+        // one a later step needs, detaches. The plan continues on the worker.
+        if (!empty($context->options['force_inline_media'])) {
             $handlerOptions['force_inline_media'] = true;
         }
 

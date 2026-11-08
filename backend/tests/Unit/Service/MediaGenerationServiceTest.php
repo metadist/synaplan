@@ -728,20 +728,23 @@ class MediaGenerationServiceTest extends TestCase
         $model = $this->createModel('Google', 'veo-3.1', 'Veo 3.1');
         $this->setUpModelResolution(45, $model);
 
-        $mp4Data = str_repeat("\0", 100);
-        $b64 = base64_encode($mp4Data);
         $this->aiFacade->expects(self::once())
-            ->method('generateVideo')
+            ->method('startVideoGeneration')
             ->willReturn([
-                'videos' => ['data:video/mp4;base64,'.$b64],
+                'operationName' => 'ops/123',
                 'provider' => 'google',
                 'model' => 'veo-3.1',
+                'duration' => 8,
+                'resolution' => '1080p',
             ]);
+        $this->expectVideoJobCached();
 
         $result = $this->service->generate($this->createUser(), 'a timelapse', 'video', 45);
 
         self::assertTrue($result['success']);
-        self::assertSame('video', $result['file']['type']);
+        self::assertSame('processing', $result['status']);
+        self::assertArrayHasKey('jobId', $result);
+        self::assertArrayNotHasKey('file', $result);
     }
 
     public function testGenerateVideoExposesUsedResolutionInResponseEvenWhenVideosArrayIsStringUrl(): void
@@ -763,20 +766,21 @@ class MediaGenerationServiceTest extends TestCase
         ]);
         $this->setUpModelResolution(45, $model);
 
-        $mp4Data = str_repeat("\0", 100);
-        $b64 = base64_encode($mp4Data);
         $this->aiFacade->expects(self::once())
-            ->method('generateVideo')
+            ->method('startVideoGeneration')
             ->willReturn([
-                'videos' => ['data:video/mp4;base64,'.$b64],
+                'operationName' => 'ops/123',
                 'provider' => 'google',
                 'model' => 'veo-3.1',
+                'duration' => 8,
                 'resolution' => '1080p',
             ]);
+        $this->expectVideoJobCached();
 
         $result = $this->service->generate($this->createUser(), 'a wide shot', 'video', 45, '1080p');
 
         self::assertSame('1080p', $result['resolution']);
+        self::assertSame('processing', $result['status']);
     }
 
     public function testGenerateImageDoesNotIncludeResolutionInResponse(): void
@@ -1016,5 +1020,14 @@ class MediaGenerationServiceTest extends TestCase
         } finally {
             @unlink($tmpFile);
         }
+    }
+
+    private function expectVideoJobCached(): void
+    {
+        $cacheItem = $this->createMock(\Psr\Cache\CacheItemInterface::class);
+        $cacheItem->method('set')->willReturnSelf();
+        $cacheItem->method('expiresAfter')->willReturnSelf();
+        $this->cache->method('getItem')->willReturn($cacheItem);
+        $this->cache->method('save')->willReturn(true);
     }
 }
