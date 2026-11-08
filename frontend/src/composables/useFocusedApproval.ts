@@ -23,6 +23,15 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
     focusedApproval.value = adoptListed(focusedApproval.value, store.pending, store.decided)
   }
 
+  async function rereadIfStillUnsettled(): Promise<void> {
+    const openedAt = focusRequest
+    const request = ++statusRequest
+    const again = await rereadUnsettled(focusedApproval.value, store.decided)
+    if (again === undefined || request !== statusRequest || openedAt !== focusRequest) return
+    if (focusedApproval.value?.id !== again.id) return
+    focusedApproval.value = again
+  }
+
   async function rereadIfDecidedElsewhere(): Promise<void> {
     const openedAt = focusRequest
     const request = ++statusRequest
@@ -76,6 +85,7 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
     () => store.decided,
     () => {
       adoptFresher()
+      void rereadIfStillUnsettled()
     }
   )
 
@@ -105,11 +115,27 @@ function adoptListed(
 ): Approval | null {
   if (focused === null) return null
   const decidedRow = decided.find((row) => row.id === focused.id)
-  if (decidedRow && decidedRow.status !== 'pending' && focused.status === 'pending') {
+  if (decidedRow && decidedRow.status !== 'pending' && decidedRow.status !== focused.status) {
     return decidedRow
   }
   const source = focused.status === 'pending' ? pending : decided
   return source.find((row) => row.id === focused.id) ?? focused
+}
+
+async function rereadUnsettled(
+  focused: Approval | null,
+  decided: Approval[]
+): Promise<Approval | undefined> {
+  if (focused === null || focused.status !== 'approved') return undefined
+  const listed = decided.find((row) => row.id === focused.id)
+  if (listed && listed.status !== focused.status) return listed
+  if (listed) return undefined
+  try {
+    const again = await approvalsApi.get(focused.id)
+    return again.status === focused.status ? undefined : again
+  } catch {
+    return undefined
+  }
 }
 
 async function rereadPending(
