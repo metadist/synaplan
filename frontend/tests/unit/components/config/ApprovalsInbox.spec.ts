@@ -497,6 +497,35 @@ describe('ApprovalsInbox', () => {
     expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Now executed')
   })
 
+  it('hides approve and reject when the viewer cannot decide', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: null,
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+      canDecide: false,
+    }
+    mockGetOne.mockResolvedValue(pending)
+    mockList.mockResolvedValue({ pendingCount: 0, approvals: [] })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('memory_add')
+    expect(wrapper.find('[data-testid="approval-approve"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="approval-reject"]').exists()).toBe(false)
+  })
+
   it('still lists pending approvals when the linked approval cannot be loaded', async () => {
     const pending = {
       id: 4,

@@ -191,6 +191,7 @@ final readonly class ApprovalService
             $row['resolvedRequest'] = null;
             $row['preview'] = null;
             $row['canAlwaysAllow'] = false;
+            $row['canDecide'] = false;
         }
 
         return $row;
@@ -217,6 +218,7 @@ final readonly class ApprovalService
             'resolvedRequest' => $this->resolvedRequest($approval),
             'requestedBy' => $reference->toArray(),
             'canAlwaysAllow' => $approval->isPending() && $this->canAlwaysAllow($approval),
+            'canDecide' => true,
         ];
     }
 

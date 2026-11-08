@@ -24,6 +24,7 @@ final class ApprovalServiceFindForViewerTest extends TestCase
         self::assertSame('Send secret-preview', $row['preview']);
         self::assertSame('secret-body', $row['resolvedRequest']['body']);
         self::assertTrue($row['canAlwaysAllow']);
+        self::assertTrue($row['canDecide']);
         self::assertStringNotContainsString('secret-argument', (string) json_encode($row));
     }
 
@@ -37,6 +38,7 @@ final class ApprovalServiceFindForViewerTest extends TestCase
         self::assertNull($row['preview']);
         self::assertNull($row['resolvedRequest']);
         self::assertFalse($row['canAlwaysAllow']);
+        self::assertFalse($row['canDecide']);
         self::assertStringNotContainsString('secret-preview', $encoded);
         self::assertStringNotContainsString('secret-body', $encoded);
         self::assertStringNotContainsString('secret-argument', $encoded);

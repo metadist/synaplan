@@ -169,7 +169,7 @@ const decidedLine = (row: Approval): string => {
     <ul class="space-y-3">
       <li v-for="row in rows" :key="row.id" :data-testid="`approval-row-${row.id}`">
         <ApprovalCard
-          v-if="tab === 'pending'"
+          v-if="tab === 'pending' && row.canDecide !== false"
           :approval="row"
           :can-always-allow="row.canAlwaysAllow"
           show-open-context
