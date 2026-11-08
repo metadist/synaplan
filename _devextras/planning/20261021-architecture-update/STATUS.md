@@ -103,7 +103,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | merged (`39a07233d`) | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
 | 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936) | merged (`926d7e4e3`) | Every loop and runner calls `ToolInvoker`. `tool_loops.json` matches the merged AU23 snapshot. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
 | 2026-11-04 | AU25 | [#2980](https://github.com/metadist/synaplan/pull/2980) | merged (`2026-11-04`) | The gate runs on every call. Writes are audited. The OpenAI loop and custom HTTP gain `TOOLS`. Own-file edits stay allowed |
-| 2026-11-08 | AU25b | open on `feat/au25b-audit-tool-calls` | open | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
+| 2026-11-08 | AU25b | [#3035](https://github.com/metadist/synaplan/pull/3035) | open | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
 
 ## 2026-11-08 — AU25b: tool calls in the audit log
 
