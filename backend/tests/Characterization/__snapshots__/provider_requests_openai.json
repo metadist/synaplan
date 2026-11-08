@@ -1551,7 +1551,7 @@
                 "status_code": 429
             },
             "message": "OpenAI streaming error: Rate limit reached.",
-            "previous": "ErrorException",
+            "previous": "RateLimitException",
             "provider": "openai",
             "upstream_status": 429
         },
