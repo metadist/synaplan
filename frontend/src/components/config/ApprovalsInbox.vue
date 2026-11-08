@@ -184,6 +184,7 @@ const decidedLine = (row: Approval): string => {
             {{ decidedLine(row) || statusLabel(row.status) }}
           </p>
           <button
+            v-if="row.canDecide !== false"
             type="button"
             class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="approval-open-context"

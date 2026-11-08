@@ -524,6 +524,50 @@ describe('ApprovalsInbox', () => {
     expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('memory_add')
     expect(wrapper.find('[data-testid="approval-approve"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="approval-reject"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="approval-open-context"]').exists()).toBe(false)
+  })
+
+  it('keeps a finished approval when an older read arrives later', async () => {
+    const approved = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Approved and waiting',
+      status: 'approved',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+      canDecide: true,
+    }
+    const executed = { ...approved, status: 'executed', preview: 'Now executed' }
+    const stale = { ...approved, status: 'pending', preview: 'Still waiting', canDecide: true }
+    const later = deferredApproval()
+    mockGetOne.mockResolvedValueOnce(approved).mockReturnValueOnce(later.promise)
+    let decidedRows: Array<typeof executed> = []
+    mockList.mockImplementation(async (status: string) => ({
+      pendingCount: 0,
+      approvals: status === 'decided' ? decidedRows : [],
+    }))
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    const reloading = useApprovalsStore().load('decided')
+    await flushPromises()
+    decidedRows = [executed]
+    await useApprovalsStore().load('decided')
+    await flushPromises()
+    later.resolve(stale)
+    await reloading
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Now executed')
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).not.toContain('Still waiting')
   })
 
   it('still lists pending approvals when the linked approval cannot be loaded', async () => {

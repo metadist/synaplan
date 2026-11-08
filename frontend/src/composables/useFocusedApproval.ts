@@ -110,7 +110,7 @@ async function rereadIfStillUnsettled(state: FocusState): Promise<void> {
   const again = await readChangedStatus(focused)
   if (again === undefined || !state.isCurrent(request, state.openedAt)) return
   if (state.focused.value?.id !== again.id) return
-  state.focused.value = again
+  state.focused.value = keepTerminal(state.focused.value, again)
 }
 
 async function rereadIfDecidedElsewhere(state: FocusState): Promise<void> {
@@ -135,11 +135,25 @@ async function rereadIfDecidedElsewhere(state: FocusState): Promise<void> {
   }
   if (!state.isCurrent(request, state.openedAt)) return
   if (state.focused.value?.id !== again.id || state.focused.value.status !== 'pending') return
-  state.focused.value = again
+  state.focused.value = keepTerminal(state.focused.value, again)
   if (again.status !== 'pending' && state.tab.value === 'pending') {
     state.tab.value = 'decided'
     await state.load('decided')
   }
+}
+
+const TERMINAL_STATUS = new Set(['executed', 'failed', 'rejected', 'expired'])
+
+function keepTerminal(current: Approval | null, incoming: Approval): Approval {
+  if (
+    current !== null &&
+    current.id === incoming.id &&
+    TERMINAL_STATUS.has(current.status) &&
+    !TERMINAL_STATUS.has(incoming.status)
+  ) {
+    return current
+  }
+  return incoming
 }
 
 function positiveQueryId(raw: unknown): number | null {
