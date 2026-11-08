@@ -23,25 +23,16 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
     focusedApproval.value = adoptListed(focusedApproval.value, store.pending, store.decided)
   }
 
-  async function rereadIfStillUnsettled(): Promise<void> {
-    const openedAt = focusRequest
-    const request = ++statusRequest
-    const again = await rereadUnsettled(focusedApproval.value, store.decided)
-    if (again === undefined || request !== statusRequest || openedAt !== focusRequest) return
-    if (focusedApproval.value?.id !== again.id) return
-    focusedApproval.value = again
-  }
-
-  async function rereadIfDecidedElsewhere(): Promise<void> {
-    const openedAt = focusRequest
-    const request = ++statusRequest
-    const again = await rereadPending(focusedApproval.value, store.pending, store.decided)
-    if (again === undefined || request !== statusRequest || openedAt !== focusRequest) return
-    if (focusedApproval.value?.id !== again.id || focusedApproval.value.status !== 'pending') return
-    focusedApproval.value = again
-    if (again.status !== 'pending' && tab.value === 'pending') {
-      tab.value = 'decided'
-      await store.load('decided')
+  function book(): FocusState {
+    return {
+      tab,
+      focused: focusedApproval,
+      pending: store.pending,
+      decided: store.decided,
+      load: (status) => store.load(status),
+      openedAt: focusRequest,
+      beginRead: () => ++statusRequest,
+      isCurrent: (request, openedAt) => request === statusRequest && openedAt === focusRequest,
     }
   }
 
@@ -63,7 +54,7 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
       if (request !== focusRequest) return
       const source = tab.value === 'pending' ? store.pending : store.decided
       focusedApproval.value = source.find((row) => row.id === approval.id) ?? approval
-      await rereadIfDecidedElsewhere()
+      await rereadIfDecidedElsewhere(book())
     } catch {
       if (request !== focusRequest) return
       focusedApproval.value = null
@@ -78,14 +69,14 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
     () => store.pending,
     () => {
       adoptFresher()
-      void rereadIfDecidedElsewhere()
+      void rereadIfDecidedElsewhere(book())
     }
   )
   watch(
     () => store.decided,
     () => {
       adoptFresher()
-      void rereadIfStillUnsettled()
+      void rereadIfStillUnsettled(book())
     }
   )
 
@@ -94,6 +85,61 @@ export function useFocusedApproval(tab: Ref<'pending' | 'decided'>) {
   )
 
   return { focusedApproval, openFocusedApproval, rows }
+}
+
+interface FocusState {
+  tab: Ref<'pending' | 'decided'>
+  focused: Ref<Approval | null>
+  pending: Approval[]
+  decided: Approval[]
+  load: (status: 'pending' | 'decided') => Promise<void>
+  openedAt: number
+  beginRead: () => number
+  isCurrent: (request: number, openedAt: number) => boolean
+}
+
+async function rereadIfStillUnsettled(state: FocusState): Promise<void> {
+  const focused = state.focused.value
+  const listed = newerDecidedCopy(focused, state.decided)
+  if (listed) {
+    state.focused.value = listed
+    return
+  }
+  if (focused === null || !approvedAndMissing(focused, state.decided)) return
+  const request = state.beginRead()
+  const again = await readChangedStatus(focused)
+  if (again === undefined || !state.isCurrent(request, state.openedAt)) return
+  if (state.focused.value?.id !== again.id) return
+  state.focused.value = again
+}
+
+async function rereadIfDecidedElsewhere(state: FocusState): Promise<void> {
+  const known = decidedCopyOfPending(state.focused.value, state.pending, state.decided)
+  if (known === 'skip') return
+  if (known !== 'fetch') {
+    state.focused.value = known
+    if (known.status !== 'pending' && state.tab.value === 'pending') {
+      state.tab.value = 'decided'
+      await state.load('decided')
+    }
+    return
+  }
+  const focused = state.focused.value
+  if (focused === null) return
+  const request = state.beginRead()
+  let again: Approval
+  try {
+    again = await approvalsApi.get(focused.id)
+  } catch {
+    return
+  }
+  if (!state.isCurrent(request, state.openedAt)) return
+  if (state.focused.value?.id !== again.id || state.focused.value.status !== 'pending') return
+  state.focused.value = again
+  if (again.status !== 'pending' && state.tab.value === 'pending') {
+    state.tab.value = 'decided'
+    await state.load('decided')
+  }
 }
 
 function positiveQueryId(raw: unknown): number | null {
@@ -122,14 +168,22 @@ function adoptListed(
   return source.find((row) => row.id === focused.id) ?? focused
 }
 
-async function rereadUnsettled(
-  focused: Approval | null,
-  decided: Approval[]
-): Promise<Approval | undefined> {
+function newerDecidedCopy(focused: Approval | null, decided: Approval[]): Approval | undefined {
   if (focused === null || focused.status !== 'approved') return undefined
   const listed = decided.find((row) => row.id === focused.id)
   if (listed && listed.status !== focused.status) return listed
-  if (listed) return undefined
+  return undefined
+}
+
+function approvedAndMissing(focused: Approval | null, decided: Approval[]): boolean {
+  return (
+    focused !== null &&
+    focused.status === 'approved' &&
+    !decided.some((row) => row.id === focused.id)
+  )
+}
+
+async function readChangedStatus(focused: Approval): Promise<Approval | undefined> {
   try {
     const again = await approvalsApi.get(focused.id)
     return again.status === focused.status ? undefined : again
@@ -138,21 +192,16 @@ async function rereadUnsettled(
   }
 }
 
-async function rereadPending(
+function decidedCopyOfPending(
   focused: Approval | null,
   pending: Approval[],
   decided: Approval[]
-): Promise<Approval | undefined> {
-  if (focused === null || focused.status !== 'pending') return undefined
-  if (pending.some((row) => row.id === focused.id)) return undefined
+): Approval | 'fetch' | 'skip' {
+  if (focused === null || focused.status !== 'pending') return 'skip'
+  if (pending.some((row) => row.id === focused.id)) return 'skip'
   const decidedRow = decided.find((row) => row.id === focused.id)
   if (decidedRow && decidedRow.status !== 'pending') return decidedRow
-  try {
-    return await approvalsApi.get(focused.id)
-  } catch {
-    // A failed refresh is not a decision. The card stays until the next load.
-    return undefined
-  }
+  return 'fetch'
 }
 
 export function inboxRows(

@@ -397,6 +397,106 @@ describe('ApprovalsInbox', () => {
     )
   })
 
+  function deferredApproval() {
+    let resolve: (approval: {
+      id: number
+      tool: string
+      preview: string
+      status: string
+      expiresAt: number
+      created: number
+      requestedBy: { kind: 'chat' }
+      sideEffect: 'write'
+      canAlwaysAllow: boolean
+    }) => void = () => undefined
+    const promise = new Promise<Parameters<typeof resolve>[0]>((done) => {
+      resolve = done
+    })
+    return { promise, resolve }
+  }
+
+  it('applies a pending refresh when a decided refresh overlaps it', async () => {
+    const pending = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Still waiting',
+      status: 'pending',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: true,
+    }
+    const executed = {
+      ...pending,
+      status: 'executed',
+      preview: 'Now executed',
+      canAlwaysAllow: false,
+    }
+    const later = deferredApproval()
+    mockGetOne.mockResolvedValueOnce(pending).mockReturnValueOnce(later.promise)
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'pending') return { pendingCount: 1, approvals: [pending] }
+      return { pendingCount: 0, approvals: [] }
+    })
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    mockList.mockImplementation(async (status: string) => {
+      if (status === 'pending') return { pendingCount: 0, approvals: [] }
+      return { pendingCount: 0, approvals: [] }
+    })
+    const reloading = useApprovalsStore().load('pending')
+    await flushPromises()
+    await useApprovalsStore().load('decided')
+    await flushPromises()
+    later.resolve(executed)
+    await reloading
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Now executed')
+  })
+
+  it('applies an approved refresh when a pending refresh overlaps it', async () => {
+    const approved = {
+      id: 4,
+      tool: 'memory_add',
+      preview: 'Approved and waiting',
+      status: 'approved',
+      expiresAt: 1,
+      created: 1,
+      requestedBy: { kind: 'chat' as const },
+      sideEffect: 'write' as const,
+      canAlwaysAllow: false,
+    }
+    const executed = { ...approved, status: 'executed', preview: 'Now executed' }
+    const later = deferredApproval()
+    mockGetOne.mockResolvedValueOnce(approved).mockReturnValueOnce(later.promise)
+    mockList.mockImplementation(async () => ({ pendingCount: 0, approvals: [] }))
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/approvals', component: { template: '<div />' } }],
+    })
+    await router.push('/approvals?approval=4')
+    const wrapper = mount(ApprovalsInbox, {
+      global: { plugins: [router], stubs: { Icon: true } },
+    })
+    await flushPromises()
+    const reloading = useApprovalsStore().load('decided')
+    await flushPromises()
+    await useApprovalsStore().load('pending')
+    await flushPromises()
+    later.resolve(executed)
+    await reloading
+    await flushPromises()
+    expect(wrapper.get('[data-testid="approval-row-4"]').text()).toContain('Now executed')
+  })
+
   it('still lists pending approvals when the linked approval cannot be loaded', async () => {
     const pending = {
       id: 4,
