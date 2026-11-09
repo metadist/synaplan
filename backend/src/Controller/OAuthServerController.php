@@ -6,7 +6,6 @@ namespace App\Controller;
 
 use App\Entity\PlatformInstance;
 use App\Service\OAuth\Server\AccessTokenValidator;
-use App\Service\OAuth\Server\ClientAssertionContext;
 use App\Service\OAuth\Server\ClientAssertionVerifier;
 use App\Service\OAuth\Server\ClientRegistrationService;
 use App\Service\OAuth\Server\CloudLinkService;
@@ -45,7 +44,6 @@ final class OAuthServerController extends AbstractController
     public function __construct(
         private readonly OAuthServerFactory $servers,
         private readonly ClientAssertionVerifier $assertions,
-        private readonly ClientAssertionContext $assertionContext,
         private readonly ClientRegistrationService $registrations,
         private readonly AccessTokenValidator $accessTokens,
         private readonly CloudLinkService $links,
@@ -162,18 +160,10 @@ final class OAuthServerController extends AbstractController
         if (!$this->platformLinks->isEnabled(null)) {
             return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
         }
-        $instance = $this->authenticateClient($request, '/oauth/token');
-        if (!$instance instanceof PlatformInstance) {
-            return $this->invalidClient();
-        }
-        $body = $request->request->all();
-        $body['client_id'] = $instance->getInstanceId();
         try {
-            $response = $this->servers->create()->respondToAccessTokenRequest(Psr7::request($request, $body), Psr7::response());
+            $response = $this->servers->create()->respondToAccessTokenRequest(Psr7::request($request, $request->request->all()), Psr7::response());
         } catch (OAuthServerException $e) {
             $response = $e->generateHttpResponse(Psr7::response());
-        } finally {
-            $this->assertionContext->reset();
         }
 
         return Psr7::toSymfony($response);
@@ -191,7 +181,6 @@ final class OAuthServerController extends AbstractController
             return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
         }
         $instance = $this->authenticateClient($request, '/oauth/revoke');
-        $this->assertionContext->reset();
         if (!$instance instanceof PlatformInstance) {
             return $this->invalidClient();
         }
@@ -254,7 +243,6 @@ final class OAuthServerController extends AbstractController
         if ('' !== $claimed && $claimed !== $instance->getInstanceId()) {
             return null;
         }
-        $this->assertionContext->verified($instance->getInstanceId());
 
         return $instance;
     }

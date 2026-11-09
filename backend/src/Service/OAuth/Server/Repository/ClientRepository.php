@@ -6,21 +6,19 @@ namespace App\Service\OAuth\Server\Repository;
 
 use App\Entity\PlatformInstance;
 use App\Repository\PlatformInstanceRepository;
-use App\Service\OAuth\Server\ClientAssertionContext;
 use App\Service\OAuth\Server\Entity\Client;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
 
 /**
- * Only an approved cloud is a client. Client authentication happened before
- * league runs (private_key_jwt); a request without a verified assertion for
- * this client is refused here.
+ * Only an approved cloud is a client. Clients authenticate with
+ * private_key_jwt inside the grants ({@see \App\Service\OAuth\Server\Grant\AuthenticatesWithClientAssertion});
+ * none has a secret, so secret validation always fails.
  */
 final readonly class ClientRepository implements ClientRepositoryInterface
 {
     public function __construct(
         private PlatformInstanceRepository $instances,
-        private ClientAssertionContext $assertion,
     ) {
     }
 
@@ -36,7 +34,6 @@ final readonly class ClientRepository implements ClientRepositoryInterface
 
     public function validateClient(string $clientIdentifier, ?string $clientSecret, ?string $grantType): bool
     {
-        return $this->assertion->isVerified($clientIdentifier)
-            && (null === $grantType || in_array($grantType, Client::GRANTS, true));
+        return false;
     }
 }

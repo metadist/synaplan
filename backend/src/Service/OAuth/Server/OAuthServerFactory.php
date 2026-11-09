@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\OAuth\Server;
 
+use App\Service\OAuth\Server\Grant\AuthCodeGrant;
+use App\Service\OAuth\Server\Grant\RefreshTokenGrant;
 use App\Service\OAuth\Server\Repository\AccessTokenRepository;
 use App\Service\OAuth\Server\Repository\AuthCodeRepository;
 use App\Service\OAuth\Server\Repository\ClientRepository;
@@ -11,8 +13,6 @@ use App\Service\OAuth\Server\Repository\RefreshTokenRepository;
 use App\Service\OAuth\Server\Repository\ScopeRepository;
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\CryptKey;
-use League\OAuth2\Server\Grant\AuthCodeGrant;
-use League\OAuth2\Server\Grant\RefreshTokenGrant;
 
 /**
  * Synaplan's OAuth2 authorization server for clouds: authorization code
@@ -32,7 +32,9 @@ final readonly class OAuthServerFactory
         private AuthCodeRepository $authCodes,
         private RefreshTokenRepository $refreshTokens,
         private AccessTokenKeyStore $keys,
+        private ClientAssertionVerifier $assertions,
         private string $secret,
+        private string $issuer,
     ) {
     }
 
@@ -50,10 +52,11 @@ final readonly class OAuthServerFactory
             new CryptKey($this->keys->privateKeyPem(), null, false),
             $this->encryptionKey(),
         );
-        $authCode = new AuthCodeGrant($this->authCodes, $this->refreshTokens, new \DateInterval(self::AUTH_CODE_TTL));
+        $tokenEndpoint = rtrim($this->issuer, '/').'/oauth/token';
+        $authCode = new AuthCodeGrant($this->authCodes, $this->refreshTokens, new \DateInterval(self::AUTH_CODE_TTL), $this->assertions, $tokenEndpoint);
         $authCode->setRefreshTokenTTL(new \DateInterval(self::REFRESH_TOKEN_TTL));
         $server->enableGrantType($authCode, new \DateInterval(self::ACCESS_TOKEN_TTL));
-        $refresh = new RefreshTokenGrant($this->refreshTokens);
+        $refresh = new RefreshTokenGrant($this->refreshTokens, $this->assertions, $tokenEndpoint);
         $refresh->setRefreshTokenTTL(new \DateInterval(self::REFRESH_TOKEN_TTL));
         $server->enableGrantType($refresh, new \DateInterval(self::ACCESS_TOKEN_TTL));
 

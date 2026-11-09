@@ -45,7 +45,7 @@ final readonly class Client implements ClientEntityInterface
 
     public function isConfidential(): bool
     {
-        return false;
+        return true;
     }
 
     public function supportsGrantType(string $grantType): bool
