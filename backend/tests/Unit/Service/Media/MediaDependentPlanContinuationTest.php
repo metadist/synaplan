@@ -17,6 +17,8 @@ use App\Service\Multitask\Execution\NodeContextRehydrator;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanStore;
+use App\Service\RAG\RagScopeResolver;
+use App\Service\Runtime\RuntimeProfile;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -93,7 +95,10 @@ final class MediaDependentPlanContinuationTest extends TestCase
         self::assertTrue($continued);
         self::assertInstanceOf(NodeContext::class, $seen);
         self::assertSame('track-1', $seen->options['track_id'] ?? null);
-        self::assertSame(['instructions' => 'be brief'], $seen->options['runtime_profile'] ?? null);
+        self::assertInstanceOf(RuntimeProfile::class, $seen->options['runtime_profile'] ?? null);
+        self::assertSame('tools:support', $seen->options['runtime_profile']->promptTopic);
+        self::assertFalse($seen->options['runtime_profile']->includeUserFiles);
+        self::assertSame(RagScopeResolver::sharedPickerKey(4, 'handbook'), $seen->options['runtime_profile']->primaryRagGroupKey());
         self::assertSame(41, $seen->classification['model_id'] ?? null);
     }
 
@@ -106,7 +111,18 @@ final class MediaDependentPlanContinuationTest extends TestCase
                 'planMessageId' => 1001,
                 'plan_resume' => [
                     'classification' => ['model_id' => 41, 'language' => 'en'],
-                    'runtime_profile' => ['instructions' => 'be brief'],
+                    'runtime_profile' => json_decode((string) json_encode(new RuntimeProfile(
+                        promptId: 9,
+                        promptTopic: 'tools:support',
+                        systemPrompt: 'Use only the folder.',
+                        modelIds: ['chat' => 12],
+                        ragScopes: [['ownerId' => 4, 'groupKey' => 'handbook']],
+                        toolFlags: [],
+                        skillAllow: null,
+                        skillDeny: null,
+                        parameters: [],
+                        viewerId: 7,
+                    )), true),
                 ],
             ])
             ->setResult(['file' => ['url' => '/api/v1/files/uploads/a.png', 'type' => 'image']]);

@@ -14,6 +14,7 @@ use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\TaskPlanExecutor;
 use App\Service\Multitask\TaskPlanStore;
+use App\Service\Runtime\RuntimeProfile;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
@@ -151,12 +152,23 @@ final readonly class MediaDependentPlanContinuation
             if (is_array($stored['classification'] ?? null)) {
                 $classification = $stored['classification'];
             }
-            if (is_array($stored['runtime_profile'] ?? null)) {
-                $options['runtime_profile'] = $stored['runtime_profile'];
+            $profile = self::profile($stored['runtime_profile'] ?? null)
+                ?? self::profile($classification['runtime_profile'] ?? null);
+            if (null !== $profile) {
+                $options['runtime_profile'] = $profile;
+                $classification['runtime_profile'] = $profile;
             }
         }
 
         return [$options, $classification];
+    }
+
+    /**
+     * @param mixed $stored a profile encoded for the job record
+     */
+    private static function profile(mixed $stored): ?RuntimeProfile
+    {
+        return is_array($stored) ? RuntimeProfile::fromArray($stored) : null;
     }
 
     /**
