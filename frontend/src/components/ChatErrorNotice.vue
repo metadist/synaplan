@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
-import { useAuthStore } from '@/stores/auth'
+import AdminErrorDetails from '@/components/AdminErrorDetails.vue'
 import { chatErrorReasonKey, chatErrorSuggestsOtherModel } from '@/utils/chatErrorDisplay'
 
 interface RetryModelOption {
@@ -31,8 +31,6 @@ const emit = defineEmits<{
 }>()
 
 const { t, te } = useI18n()
-const authStore = useAuthStore()
-const detailsOpen = ref(false)
 
 const suggestsOtherModel = computed(() => chatErrorSuggestsOtherModel(props.errorReason))
 const showRetry = computed(() => {
@@ -41,7 +39,6 @@ const showRetry = computed(() => {
   }
   return props.canRetryModel !== false
 })
-const canSeeDebug = computed(() => authStore.isAdmin && !!props.errorDebug)
 
 const explanation = computed(() => {
   const streamed = props.errorMessage?.trim() ?? ''
@@ -118,7 +115,7 @@ const retry = () => {
         <h3 class="text-sm font-semibold alert-error-text" data-testid="chat-error-title">
           {{ t('chatError.title') }}
         </h3>
-        <p class="text-sm txt-primary" data-testid="chat-error-body">
+        <p class="text-sm txt-primary whitespace-pre-wrap" data-testid="chat-error-body">
           {{ explanation }}
         </p>
         <p v-if="showPartialDraft" class="text-sm txt-secondary" data-testid="chat-error-partial">
@@ -156,26 +153,10 @@ const retry = () => {
       </button>
     </div>
 
-    <div v-if="canSeeDebug" class="pt-2 border-t border-light-border/30 dark:border-dark-border/20">
-      <button
-        type="button"
-        class="flex items-center gap-2 text-xs font-semibold alert-error-text hover:opacity-80"
-        data-testid="btn-chat-error-details"
-        @click="detailsOpen = !detailsOpen"
-      >
-        <Icon :icon="detailsOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'" class="w-4 h-4" />
-        {{ t('chatError.showDetails') }}
-        <span
-          class="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-black/5 dark:bg-white/10 alert-error-text tracking-wider"
-        >
-          {{ t('error.adminOnly') }}
-        </span>
-      </button>
-      <pre
-        v-if="detailsOpen"
-        class="mt-2 text-xs txt-primary font-mono bg-black/5 dark:bg-white/5 p-3 rounded break-words whitespace-pre-wrap"
-        data-testid="chat-error-debug"
-        >{{ errorDebug }}</pre>
-    </div>
+    <AdminErrorDetails
+      :debug="errorDebug"
+      details-test-id="btn-chat-error-details"
+      debug-test-id="chat-error-debug"
+    />
   </div>
 </template>

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Media;
 
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Service\AiFacade;
 use App\Service\Message\Handler\MediaErrorMessageBuilder;
 use Psr\Log\LoggerInterface;
@@ -78,15 +79,25 @@ final readonly class MediaJobReaper
 
             try {
                 $this->cancelProvider($job);
+                $pastDeadline = $job->isPastDeadline($now);
+                $workerStopped = new \RuntimeException(
+                    $pastDeadline
+                        ? 'Media job exceeded the platform wait budget'
+                        : 'Render worker stopped responding',
+                );
+                $job->rememberFailure(
+                    ChatFailureReason::Timeout->value,
+                    $this->errorBuilder->diagnostics($workerStopped),
+                );
                 $timedOut = $this->jobService->markTimedOut(
                     $job,
-                    $job->isPastDeadline($now)
+                    $pastDeadline
                         ? $this->errorBuilder->buildTimeoutMessage(
                             $job->getType(),
                             $this->jobService->langFromJob($job),
                         )
                         : $this->errorBuilder->buildErrorMessage(
-                            new \RuntimeException('Render worker stopped responding'),
+                            $workerStopped,
                             $job->getType(),
                             $this->jobService->langFromJob($job),
                         ),

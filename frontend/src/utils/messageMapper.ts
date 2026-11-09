@@ -1,7 +1,6 @@
 import type {
   Message,
   MessageFile,
-  MediaJobInfo,
   Part,
   TaskPlanState,
   TaskCardKind,
@@ -25,6 +24,15 @@ import {
   isVideoFileType,
 } from '@/utils/mediaTypes'
 import { i18n } from '@/i18n'
+import { stripStoredAdminDiagnostics } from '@/utils/storedAdminDiagnostics'
+import {
+  adoptPersistedFailure,
+  mediaFailureSentence,
+  mediaJobFailure,
+  parseMediaJobPayload,
+} from '@/utils/mediaFailureNotice'
+
+export { parseMediaJobPayload }
 
 /**
  * Issue #1070: single authoritative mapping from the persisted API row
@@ -53,6 +61,7 @@ export interface MediaJobUpdate {
   state: string
   percent?: number | null
   error?: string | null
+  error_reason?: string | null
   file?: { url: string; type?: string } | null
 }
 
@@ -79,7 +88,7 @@ export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobU
         card.state = update.state
       }
       if (update.error) {
-        card.error = update.error
+        card.error = stripStoredAdminDiagnostics(update.error)
       }
       if (update.file?.url) {
         card.url = normalizeMediaUrl(update.file.url)
@@ -94,7 +103,7 @@ export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobU
     jobId: update.job_id,
     type: update.type,
     state: update.state,
-    ...(update.error != null ? { error: update.error } : {}),
+    ...mediaJobFailure(update),
     ...(update.percent != null ? { percent: update.percent } : {}),
   }
 
@@ -128,38 +137,6 @@ function appendGeneratedMediaPart(message: Message, url: string, type: string): 
       url: normalized,
       generated: true,
     })
-  }
-}
-
-/** Normalize a media_job payload from API rows or SSE metadata. */
-export function parseMediaJobPayload(raw: unknown): MediaJobInfo | null {
-  if (!raw || typeof raw !== 'object') return null
-  const row = raw as Record<string, unknown>
-  const jobId = row.job_id ?? row.jobId
-  const type = row.type
-  const state = row.state
-  if (typeof jobId !== 'string' || jobId === '') return null
-  if (typeof type !== 'string' || type === '') return null
-  const error = row.error
-  const percent = row.percent
-  return {
-    jobId,
-    type,
-    state: typeof state === 'string' ? state : 'running',
-    error: typeof error === 'string' ? error : undefined,
-    percent: typeof percent === 'number' ? percent : undefined,
-    elapsedSeconds:
-      typeof row.elapsed_seconds === 'number'
-        ? row.elapsed_seconds
-        : typeof row.elapsedSeconds === 'number'
-          ? row.elapsedSeconds
-          : undefined,
-    maxWaitSeconds:
-      typeof row.max_wait_seconds === 'number'
-        ? row.max_wait_seconds
-        : typeof row.maxWaitSeconds === 'number'
-          ? row.maxWaitSeconds
-          : undefined,
   }
 }
 
@@ -343,6 +320,7 @@ export interface ApiLoadedMessageRow extends MessageEffort {
         url?: string
         type?: string
         error?: string
+        errorDebug?: string
         job_id?: string
         /** Compact web-search summary fields (search cards only) */
         query?: string
@@ -368,6 +346,7 @@ export interface ApiLoadedMessageRow extends MessageEffort {
     type: string
     state: string
     error?: string
+    error_reason?: string
   } | null
   /** Per-message token/cost usage for the taximeter (assistant messages). */
   usage?: {
@@ -418,7 +397,8 @@ function askUserFrom(value: unknown): import('@/stores/history').TaskCard['askUs
 
 export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
   const role = m.direction === 'IN' ? 'user' : 'assistant'
-  const parts = parseContentWithThinking(m.text || '', role, m.thinking_seconds ?? null)
+  const text = stripStoredAdminDiagnostics(m.text || '')
+  const parts = parseContentWithThinking(text, role, m.thinking_seconds ?? null)
 
   // A generated file becomes a media part. partId keeps the player mounted
   // across re-parses (#625). Kind and extension both count (#955), and
@@ -514,7 +494,10 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
         text: c.text ?? '',
         url: cardUrl,
         mediaType: c.type,
-        error: c.error,
+        error: typeof c.error === 'string' ? stripStoredAdminDiagnostics(c.error) : c.error,
+        ...(typeof c.errorDebug === 'string' && c.errorDebug !== ''
+          ? { errorDebug: c.errorDebug }
+          : {}),
         query: c.query,
         resultsCount: c.resultsCount,
         usedWorkspace: c.used_workspace === true || c.usedWorkspace === true,
@@ -593,6 +576,7 @@ export function mapApiMessageRow(m: ApiLoadedMessageRow): Message {
     errorReason: role === 'assistant' ? (m.errorReason ?? null) : null,
     canRetryModel: role === 'assistant' ? (m.canRetryModel ?? undefined) : undefined,
     errorDebug: role === 'assistant' ? (m.errorDebug ?? null) : null,
+    errorMessage: mediaFailureSentence(role, text, m.errorReason, parseMediaJobPayload(m.mediaJob)),
     voiceReplyFailed:
       role === 'assistant' &&
       (m.voiceReplyFailed === 'provider_error' ||
@@ -677,7 +661,9 @@ export function mapInProgressTurn(turn: ApiInProgressTurn): Message {
     state: isTaskCardState(c.state) ? c.state : ('running' as TaskCardState),
     text: typeof c.text === 'string' ? c.text : '',
     ...(typeof c.url === 'string' && c.url ? { url: c.url } : {}),
-    ...(typeof c.error === 'string' && c.error ? { error: c.error } : {}),
+    ...(typeof c.error === 'string' && c.error
+      ? { error: stripStoredAdminDiagnostics(c.error) }
+      : {}),
     ...(typeof c.query === 'string' && c.query ? { query: c.query } : {}),
     ...(typeof c.resultsCount === 'number' && c.resultsCount > 0
       ? { resultsCount: c.resultsCount }
@@ -825,6 +811,7 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
     local.canRetryModel = persisted.canRetryModel
     local.errorDebug = persisted.errorDebug ?? null
   }
+  adoptPersistedFailure(local, persisted)
   if (persisted.voiceReplyFailed) {
     local.voiceReplyFailed = persisted.voiceReplyFailed
   }

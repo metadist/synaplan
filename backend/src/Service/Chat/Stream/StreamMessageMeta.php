@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Chat\Stream;
 
+use App\AI\Exception\ChatFailureReason;
 use App\Entity\Message;
 use App\Service\Message\ChatErrorView;
 use App\Service\Multitask\TaskPlanExecutor;
@@ -222,6 +223,59 @@ final readonly class StreamMessageMeta
         // separately would only create a second source of truth to keep in sync.
         $outgoing->setMeta('error_reason', $view->reason->value);
         $outgoing->setMeta('error_debug', $view->rawMessage);
+    }
+
+    /**
+     * A media failure that still completed as a normal reply. The sentence is
+     * the message text; the reason and the raw dump follow the chat-error meta
+     * so the red notice can open them for an admin.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    public function persistMediaFailure(Message $outgoing, array $metadata): void
+    {
+        $reason = $metadata['chat_error_reason'] ?? null;
+        if (!is_string($reason) || null === ChatFailureReason::tryFrom($reason)) {
+            return;
+        }
+
+        $outgoing->setMeta('error_reason', $reason);
+        $debug = $metadata['chat_error_debug'] ?? null;
+        if (is_string($debug) && '' !== trim($debug)) {
+            $outgoing->setMeta('error_debug', mb_substr(trim($debug), 0, 4000));
+        }
+    }
+
+    /**
+     * Fields for the `complete` event. `$includeDebug` is true only for the
+     * signed-in admin who is looking at their own turn — never a widget
+     * visitor or a guest, even when the shared processing user is an admin.
+     *
+     * @return array<string, mixed>
+     */
+    public function chatErrorSseFields(Message $outgoing, bool $includeDebug): array
+    {
+        $reasonRaw = $outgoing->getMeta('error_reason');
+        if (!is_string($reasonRaw) || null === ChatFailureReason::tryFrom($reasonRaw)) {
+            return [];
+        }
+
+        $reason = ChatFailureReason::from($reasonRaw);
+        $fields = [
+            'error' => $outgoing->getText(),
+            'errorReason' => $reason->value,
+            'canRetryModel' => $reason->suggestsOtherModel(),
+        ];
+        if (!$includeDebug) {
+            return $fields;
+        }
+
+        $debug = $outgoing->getMeta('error_debug');
+        if (is_string($debug) && '' !== $debug) {
+            $fields['errorDebug'] = $debug;
+        }
+
+        return $fields;
     }
 
     /**

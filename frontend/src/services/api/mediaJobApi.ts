@@ -10,6 +10,7 @@ const MediaJobStatusSchema = z.object({
   provider_status: z.string().nullable().optional(),
   elapsed_seconds: z.number(),
   error: z.string().nullable().optional(),
+  error_reason: z.string().nullable().optional(),
   file: z
     .object({
       url: z.string(),

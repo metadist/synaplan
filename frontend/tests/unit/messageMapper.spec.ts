@@ -103,6 +103,30 @@ describe('messageMapper (issue #1070)', () => {
       })
     })
 
+    it('maps a failed video onto the red notice and drops a stored provider dump', () => {
+      const message = mapApiMessageRow(
+        baseRow({
+          text: 'Das Video konnte leider nicht erstellt werden.\n\n---\n**Admin-Diagnose (nur für dich sichtbar)**\nProvider: google',
+          errorReason: 'model_unavailable',
+          errorDebug: 'Provider: google',
+          mediaJob: {
+            job_id: 'job-abc',
+            type: 'video',
+            state: 'failed',
+            error:
+              'Das Video konnte leider nicht erstellt werden.\n\n**Admin-Diagnose (nur für dich sichtbar)**\nProvider: google',
+            error_reason: 'model_unavailable',
+          },
+        })
+      )
+
+      expect(message.errorMessage).toBe('Das Video konnte leider nicht erstellt werden.')
+      expect(message.errorReason).toBe('model_unavailable')
+      expect(message.errorDebug).toBe('Provider: google')
+      expect(message.mediaJob?.error).toBe('Das Video konnte leider nicht erstellt werden.')
+      expect(message.mediaJob?.errorReason).toBe('model_unavailable')
+    })
+
     it('rebuilds taskPlan cards from persisted render state (DAG reload #1070)', () => {
       const message = mapApiMessageRow(
         baseRow({

@@ -73,7 +73,12 @@ final class MediaGenerationRunTest extends TestCase
         $answer = $this->generation(fails: new \RuntimeException('Provider rejected the request'))
             ->execute($this->request('image'), null, $this->stream(...), null);
 
-        self::assertSame('Provider rejected the request', $answer['metadata']['error']);
+        self::assertSame(
+            'Sorry, the image could not be generated right now. Please try again or use a different model.',
+            $answer['metadata']['error'],
+        );
+        self::assertSame('unknown', $answer['metadata']['chat_error_reason']);
+        self::assertStringContainsString('Provider rejected the request', $answer['metadata']['chat_error_debug']);
         self::assertSame(['ai generateImage', 'stream'], array_map(static fn (array $entry): string => $entry[0], $this->log));
     }
 

@@ -45,6 +45,15 @@ final readonly class StreamCaller
     }
 
     /**
+     * Provider dumps belong to the signed-in admin on their own turn.
+     * A widget visitor and a guest stream as someone else.
+     */
+    public function seesProviderDiagnostics(): bool
+    {
+        return !$this->isWidget() && !$this->isGuest() && $this->user->isAdmin();
+    }
+
+    /**
      * The channel recorded with usage: WIDGET, GUEST or WEB.
      */
     public function source(): string

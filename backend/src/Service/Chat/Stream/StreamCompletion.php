@@ -72,6 +72,9 @@ final readonly class StreamCompletion
         }
 
         $event = $this->completeEvent($turn, $classification, $metadata, $reply, $usage, $chatTitle);
+        foreach ($this->meta->chatErrorSseFields($reply->outgoing, $turn->caller->seesProviderDiagnostics()) as $key => $value) {
+            $event->set($key, $value);
+        }
         if (null !== $thinkingSeconds) {
             $event->set('thinking_seconds', $thinkingSeconds);
         }
