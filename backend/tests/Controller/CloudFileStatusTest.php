@@ -119,8 +119,7 @@ final class CloudFileStatusTest extends WebTestCase
 
         $this->client->request('POST', '/api/v1/platform-links/sources/events', server: [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_INSTANCE_ID' => $cloud['instance_id'],
-            'HTTP_X_INSTANCE_SECRET' => $cloud['secret'],
+            ...$cloud['server'],
         ], content: (string) json_encode(['events' => [
             ['id' => 'shared', 'event' => 'changed', 'version' => '"next"', 'path' => ''],
             ['id' => 'move', 'event' => 'moved', 'version' => '', 'path' => 'Specs/renamed.txt'],

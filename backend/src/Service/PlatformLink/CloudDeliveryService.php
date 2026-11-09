@@ -111,7 +111,7 @@ final readonly class CloudDeliveryService
             'identity_id' => (int) $identity->getId(),
         ]);
 
-        $answer = $instance instanceof PlatformInstance ? $this->notifier->delivery($instance, $id) : null;
+        $answer = $instance instanceof PlatformInstance ? $this->notifier->delivery($instance, $id, $identity->getExternalId()) : null;
         if (!is_array($answer)) {
             return $this->pending($delivery);
         }
@@ -122,27 +122,27 @@ final readonly class CloudDeliveryService
     /**
      * @return array<string, mixed>
      */
-    public function claim(PlatformInstance $instance, int $id): array
+    public function claim(CloudCaller $caller, int $id): array
     {
-        $this->guardRate($instance);
-        $delivery = $this->requireOwn($instance, $id);
+        $this->guardRate($caller);
+        $delivery = $this->requireOwn($caller, $id);
         if (CloudDelivery::STATE_QUEUED !== $delivery->getState()) {
-            $this->fail($instance);
+            $this->fail($caller);
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'already_claimed');
         }
         if (time() - $delivery->getCreated() > $this->ttl()) {
             $this->redis->getAndDelete(self::TICKET_PREFIX.$id);
-            $this->fail($instance);
+            $this->fail($caller);
             throw new CloudDeliveryException(Response::HTTP_GONE, 'expired');
         }
         if (!$this->deliveries->claimIfQueued($id)) {
-            $this->fail($instance);
+            $this->fail($caller);
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'already_claimed');
         }
         $delivery->markClaimed();
         $ticket = $this->redis->getAndDelete(self::TICKET_PREFIX.$id);
-        if ($ticket !== $instance->getInstanceId()) {
-            $this->fail($instance);
+        if ($ticket !== $caller->instanceId()) {
+            $this->fail($caller);
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'already_claimed');
         }
         $file = $this->files->find($delivery->getFileId());
@@ -172,12 +172,12 @@ final readonly class CloudDeliveryService
      *
      * @return array{path: string, name: string, mime: string}
      */
-    public function download(PlatformInstance $instance, int $id, string $ticket, bool $withBody = true): array
+    public function download(CloudCaller $caller, int $id, string $ticket, bool $withBody = true): array
     {
         if (!$withBody) {
             throw new CloudDeliveryException(Response::HTTP_METHOD_NOT_ALLOWED, 'method_not_allowed');
         }
-        $delivery = $this->requireOwn($instance, $id);
+        $delivery = $this->requireOwn($caller, $id);
         $stored = $this->redis->get(self::DOWNLOAD_PREFIX.$id);
         if (!is_string($stored) || !hash_equals($stored, $ticket)) {
             throw new CloudDeliveryException(Response::HTTP_GONE, 'expired');
@@ -217,9 +217,9 @@ final readonly class CloudDeliveryService
      *
      * @return array{state: string}
      */
-    public function result(PlatformInstance $instance, int $id, array $body): array
+    public function result(CloudCaller $caller, int $id, array $body): array
     {
-        $delivery = $this->requireOwn($instance, $id);
+        $delivery = $this->requireOwn($caller, $id);
         $status = is_string($body['status'] ?? null) ? $body['status'] : '';
         if (CloudDelivery::STATE_DELIVERED === $status) {
             $this->rememberDelivered($delivery, $body);
@@ -375,38 +375,51 @@ final readonly class CloudDeliveryService
         return is_string($value) && '' !== $value ? $value : DestinationFailureCode::Unreachable->value;
     }
 
-    private function requireOwn(PlatformInstance $instance, int $id): CloudDelivery
+    private function requireOwn(CloudCaller $caller, int $id): CloudDelivery
     {
         $delivery = $this->deliveries->find($id);
-        if (!$delivery instanceof CloudDelivery) {
-            $this->fail($instance);
+        $identity = $delivery instanceof CloudDelivery ? $this->identities->find($delivery->getIdentityId()) : null;
+        if (!$delivery instanceof CloudDelivery
+            || !$identity instanceof ExternalIdentity
+            || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()
+            || $identity->getInstanceId() !== $caller->instanceId()
+            || $identity->getUserId() !== $delivery->getOwnerId()) {
+            $this->fail($caller);
             throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
         }
-        $identity = $this->identities->find($delivery->getIdentityId());
-        if (!$identity instanceof ExternalIdentity
-            || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()
-            || $identity->getInstanceId() !== $instance->getInstanceId()) {
-            $this->fail($instance);
-            throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'wrong_instance');
+        try {
+            $caller->requireOwner($delivery->getOwnerId(), 'unknown_delivery');
+        } catch (CloudDeliveryException $e) {
+            $this->fail($caller);
+            throw $e;
         }
 
         return $delivery;
     }
 
-    private function guardRate(PlatformInstance $instance): void
+    /**
+     * Failed claims count per person and cloud: one person probing ids slows
+     * down only themselves, not everyone on the same cloud.
+     */
+    private function guardRate(CloudCaller $caller): void
     {
-        $current = $this->redis->get(self::FAIL_PREFIX.$instance->getInstanceId());
+        $current = $this->redis->get(self::failKey($caller));
         if (is_string($current) && (int) $current >= self::FAIL_LIMIT) {
             throw new CloudDeliveryException(Response::HTTP_TOO_MANY_REQUESTS, 'rate_limited');
         }
     }
 
-    private function fail(PlatformInstance $instance): void
+    private function fail(CloudCaller $caller): void
     {
-        $count = $this->redis->increment(self::FAIL_PREFIX.$instance->getInstanceId());
+        $count = $this->redis->increment(self::failKey($caller));
         if (1 === $count) {
-            $this->redis->expire(self::FAIL_PREFIX.$instance->getInstanceId(), 60);
+            $this->redis->expire(self::failKey($caller), 60);
         }
+    }
+
+    private static function failKey(CloudCaller $caller): string
+    {
+        return self::FAIL_PREFIX.$caller->instanceId().':'.$caller->userId;
     }
 
     private function ttl(): int

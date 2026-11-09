@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\DTO\CloudCallerError;
 use App\Entity\User;
-use App\Security\PlatformInstancePrincipal;
+use App\Exception\CloudDeliveryException;
 use App\Service\File\CloudFileRequestException;
 use App\Service\File\CloudFilesConfig;
 use App\Service\File\CloudFileStatus;
 use App\Service\File\CloudSourceEvents;
+use App\Service\PlatformLink\CloudCallerResolver;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,6 +27,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class CloudFileController extends AbstractController
 {
     public function __construct(
+        private readonly CloudCallerResolver $callers,
         private readonly CloudFilesConfig $cloudFiles,
         private readonly CloudFileStatus $status,
         private readonly CloudSourceEvents $events,
@@ -110,26 +114,28 @@ final class CloudFileController extends AbstractController
         operationId: 'cloudSourceEvents',
         summary: 'A cloud reports that files changed, moved, were deleted or came back',
         tags: ['Cloud files'],
-        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
+        security: [['Bearer' => []], ['ApiKey' => []]],
         responses: [
             new OA\Response(response: 200, description: 'How many events applied, and which copies should be uploaded again'),
             new OA\Response(response: 400, description: 'The event list is empty, too long, or malformed'),
-            new OA\Response(response: 401, description: 'Invalid instance credentials, or missing or wrong instance credential'),
-            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
-            new OA\Response(response: 404, description: 'Cloud file state is turned off, or unknown instance (unknown_instance)'),
-            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
+            new OA\Response(response: 401, description: CloudCallerError::UNAUTHORIZED, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 403, description: CloudCallerError::FORBIDDEN, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 404, description: 'Cloud file state is turned off'),
+            new OA\Response(response: 409, description: CloudCallerError::AMBIGUOUS, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
         ],
     )]
-    public function events(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
+    public function events(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $absent = $this->absent();
         if ($absent instanceof JsonResponse) {
             return $absent;
         }
         try {
-            $answer = $this->events->apply($caller->instance, $this->body($request), $request->getClientIp() ?? '');
+            $answer = $this->events->apply($this->callers->resolve($request, $user), $this->body($request), $request->getClientIp() ?? '');
         } catch (CloudFileRequestException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
+        } catch (CloudDeliveryException $e) {
+            return $this->json(['error' => $e->errorCode], $e->status);
         }
 
         return $this->json($answer);

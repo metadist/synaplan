@@ -26,6 +26,6 @@ final readonly class WatchPublisher
             return;
         }
         $this->cache->bumpUser($identity->getUserId());
-        $this->queue->add($identity->getInstanceId());
+        $this->queue->add($identity->getInstanceId(), $identity->getExternalId());
     }
 }

@@ -43,7 +43,7 @@ security:
         # X-Instance-Secret). A firewall of its own, so a person's cookie,
         # bearer or key can never stand in for the instance on these paths.
         platform_instance:
-            pattern: ^/api/v1/platform-links/(instances/self$|deliveries/|pickups/|read-scope$|sources/events$|watches$|lifecycle$)
+            pattern: ^/api/v1/platform-links/(instances/self$|lifecycle$)
             stateless: true
             entry_point: App\Security\PlatformInstanceAuthenticator
             custom_authenticators:
@@ -178,11 +178,6 @@ security:
 
         # The platform_instance firewall: PlatformInstanceAuthenticator.
         - { path: ^/api/v1/platform-links/instances/self$, roles: ROLE_PLATFORM_INSTANCE }
-        - { path: ^/api/v1/platform-links/deliveries/, roles: ROLE_PLATFORM_INSTANCE }
-        - { path: ^/api/v1/platform-links/pickups/, roles: ROLE_PLATFORM_INSTANCE }
-        - { path: ^/api/v1/platform-links/read-scope$, roles: ROLE_PLATFORM_INSTANCE }
-        - { path: ^/api/v1/platform-links/sources/events$, roles: ROLE_PLATFORM_INSTANCE }
-        - { path: ^/api/v1/platform-links/watches$, roles: ROLE_PLATFORM_INSTANCE }
         - { path: ^/api/v1/platform-links/lifecycle$, roles: ROLE_PLATFORM_INSTANCE }
 
         # Partner handshake. The invite preview and the signed connect call

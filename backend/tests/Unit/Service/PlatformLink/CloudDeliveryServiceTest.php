@@ -19,6 +19,7 @@ use App\Service\Destination\ShareableFile;
 use App\Service\File\FileStorageService;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Infrastructure\RedisService;
+use App\Service\PlatformLink\CloudCaller;
 use App\Service\PlatformLink\CloudDeliveryService;
 use App\Service\PlatformLink\DeliveryNotifier;
 use App\Service\PlatformLink\PlatformLinksConfig;
@@ -94,7 +95,7 @@ final class CloudDeliveryServiceTest extends TestCase
 
         $service = $this->service($deliveries, $identities, files: $files, redis: $redis);
         $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE);
-        $claim = $service->claim($instance, 9);
+        $claim = $service->claim(new CloudCaller($instance, 7), 9);
 
         self::assertSame('notes.txt', $claim['name']);
         self::assertStringStartsWith('/api/v1/platform-links/deliveries/9/file?ticket=', $claim['download_path']);
@@ -103,7 +104,21 @@ final class CloudDeliveryServiceTest extends TestCase
 
         $this->expectException(CloudDeliveryException::class);
         $this->expectExceptionMessage('already_claimed');
-        $service->claim($instance, 9);
+        $service->claim(new CloudCaller($instance, 7), 9);
+    }
+
+    public function testAnotherPersonOfTheSameCloudCannotClaimTheCopy(): void
+    {
+        $deliveries = $this->createStub(CloudDeliveryRepository::class);
+        $deliveries->method('find')->willReturn($this->delivery(9, 4));
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('find')->willReturn($this->identity(4, 7, 'pi_abc'));
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('get')->willReturn('0');
+
+        $this->expectException(CloudDeliveryException::class);
+        $this->expectExceptionMessage('unknown_delivery');
+        $this->service($deliveries, $identities, redis: $redis)->claim($this->caller(userId: 8), 9);
     }
 
     public function testAnotherCloudCannotClaimTheCopy(): void
@@ -116,9 +131,9 @@ final class CloudDeliveryServiceTest extends TestCase
         $redis->expects(self::once())->method('increment');
 
         $this->expectException(CloudDeliveryException::class);
-        $this->expectExceptionMessage('wrong_instance');
+        $this->expectExceptionMessage('unknown_delivery');
         $this->service($deliveries, $identities, redis: $redis)->claim(
-            new PlatformInstance('nextcloud', 'pi_other', 'other.example.org', null, PlatformInstance::STATUS_ACTIVE),
+            new CloudCaller(new PlatformInstance('nextcloud', 'pi_other', 'other.example.org', null, PlatformInstance::STATUS_ACTIVE), 7),
             9,
         );
     }
@@ -133,7 +148,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $deliveries->expects(self::never())->method('save');
 
         $state = $this->service($deliveries, $this->identities())->result(
-            $this->instance(),
+            $this->caller(),
             9,
             ['status' => 'delivered', 'remote_path' => 'Synaplan/Documents/notes.txt', 'open_url' => 'https://files.example.org/f/1'],
         );
@@ -150,7 +165,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $deliveries = $this->ledger($delivery);
 
         $state = $this->service($deliveries, $this->identities())->result(
-            $this->instance(),
+            $this->caller(),
             9,
             ['status' => 'delivered', 'remote_path' => 'Synaplan/Documents/notes.txt', 'open_url' => 'https://files.example.org/f/1'],
         );
@@ -177,7 +192,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $identities->method('find')->willReturn($this->identity(4, 7, 'pi_abc'));
 
         $state = $this->service($deliveries, $identities)->result(
-            new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE),
+            new CloudCaller(new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE), 7),
             9,
             [],
         );
@@ -209,7 +224,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $deliveries->expects(self::never())->method('claimIfQueued');
 
         try {
-            $this->service($deliveries, $this->identities())->claim($this->instance(), 9);
+            $this->service($deliveries, $this->identities())->claim($this->caller(), 9);
             self::fail('An expired copy was claimed.');
         } catch (CloudDeliveryException $e) {
             self::assertSame('expired', $e->errorCode);
@@ -227,7 +242,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $this->expectException(CloudDeliveryException::class);
         $this->expectExceptionMessage('rate_limited');
         $this->service($deliveries, redis: $redis)->claim(
-            new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE),
+            new CloudCaller(new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE), 7),
             9,
         );
     }
@@ -243,7 +258,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $identities->method('find')->willReturn($this->identity(4, 7, 'pi_abc'));
 
         $state = $this->service($deliveries, $identities)->result(
-            new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE),
+            new CloudCaller(new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE), 7),
             9,
             ['status' => 'failed', 'error_code' => 'conflict'],
         );
@@ -255,7 +270,7 @@ final class CloudDeliveryServiceTest extends TestCase
     {
         $delivery = $this->delivery(9, 4);
         $state = $this->service($this->ledger($delivery), $this->identities())->result(
-            $this->instance(),
+            $this->caller(),
             9,
             ['status' => 'delivered', 'remote_path' => 'Synaplan/Documents/notes.txt'],
         );
@@ -269,7 +284,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $delivery = $this->delivery(9, 4);
         $delivery->markClaimed();
         $state = $this->service($this->ledger($delivery), $this->identities())->result(
-            $this->instance(),
+            $this->caller(),
             9,
             ['status' => 'delivered', 'remote_path' => 'Synaplan/Documents/notes.txt'],
         );
@@ -283,7 +298,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $delivery = $this->delivery(9, 4);
         $delivery->markClaimed();
         $state = $this->service($this->ledger($delivery), $this->identities())->result(
-            $this->instance(),
+            $this->caller(),
             9,
             ['status' => 'failed', 'error_code' => 'not_found'],
         );
@@ -296,7 +311,7 @@ final class CloudDeliveryServiceTest extends TestCase
     {
         $delivery = $this->delivery(9, 4);
         $state = $this->service($this->ledger($delivery), $this->identities())->result(
-            $this->instance(),
+            $this->caller(),
             9,
             ['status' => 'failed', 'error_code' => 'quota'],
         );
@@ -325,8 +340,8 @@ final class CloudDeliveryServiceTest extends TestCase
             $storage->method('getAbsolutePath')->willReturn($path);
 
             $service = $this->service($this->ledger($delivery), $this->identities(), files: $files, redis: $redis, storage: $storage);
-            $downloaded = $service->download($this->instance(), 9, 'ticket');
-            $state = $service->result($this->instance(), 9, [
+            $downloaded = $service->download($this->caller(), 9, 'ticket');
+            $state = $service->result($this->caller(), 9, [
                 'status' => 'delivered',
                 'remote_path' => 'Synaplan/Documents/notes.txt',
             ]);
@@ -351,7 +366,7 @@ final class CloudDeliveryServiceTest extends TestCase
         $redis->expects(self::never())->method('getAndDelete');
 
         try {
-            $this->service($deliveries, redis: $redis)->download($this->instance(), 9, 'ticket', false);
+            $this->service($deliveries, redis: $redis)->download($this->caller(), 9, 'ticket', false);
             self::fail('A header-only request took the download.');
         } catch (CloudDeliveryException $e) {
             self::assertSame(405, $e->status);
@@ -379,7 +394,7 @@ final class CloudDeliveryServiceTest extends TestCase
 
         try {
             $this->service($deliveries, $this->identities(), files: $files, redis: $redis, storage: $storage)
-                ->download($this->instance(), 9, 'ticket');
+                ->download($this->caller(), 9, 'ticket');
             self::fail('A missing file was downloaded.');
         } catch (CloudDeliveryException $e) {
             self::assertSame('unknown_delivery', $e->errorCode);
@@ -485,7 +500,7 @@ final class CloudDeliveryServiceTest extends TestCase
         });
 
         $state = $this->service($deliveries, $this->identities())->result(
-            $this->instance(),
+            $this->caller(),
             9,
             ['status' => 'delivered', 'remote_path' => 'the-loser.txt'],
         );
@@ -501,11 +516,11 @@ final class CloudDeliveryServiceTest extends TestCase
         $delivery->markDownloaded();
         $service = $this->service($this->ledger($delivery), $this->identities());
 
-        $first = $service->result($this->instance(), 9, [
+        $first = $service->result($this->caller(), 9, [
             'status' => 'delivered',
             'remote_path' => 'Synaplan/Documents/notes.txt',
         ]);
-        $second = $service->result($this->instance(), 9, [
+        $second = $service->result($this->caller(), 9, [
             'status' => 'failed',
             'error_code' => 'conflict',
         ]);
@@ -554,6 +569,11 @@ final class CloudDeliveryServiceTest extends TestCase
         $links->method('isEnabled')->willReturn(true);
 
         return $links;
+    }
+
+    private function caller(string $instanceId = 'pi_abc', int $userId = 7): CloudCaller
+    {
+        return new CloudCaller($this->instance($instanceId), $userId);
     }
 
     private function instance(string $instanceId = 'pi_abc'): PlatformInstance

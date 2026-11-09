@@ -30,20 +30,24 @@ final readonly class SignedNotificationClient
     /**
      * @return array<string, mixed>|null
      */
-    public function post(PlatformInstance $instance, string $type, string $id): ?array
+    public function post(PlatformInstance $instance, string $type, string $id, ?string $externalId = null): ?array
     {
         $url = $instance->getDeliveryUrl();
         if (null === $url || '' === $url || !$this->origins->accepts($instance, $url)) {
             return null;
         }
         $signing = $this->keys->signingKey();
-        $body = $this->signer->signBody([
+        $fields = [
             'type' => $type,
             'id' => $id,
             'instance_id' => $instance->getInstanceId(),
             'ts' => time(),
             'kid' => $this->signer->fingerprint($signing['publicKey']),
-        ], $signing['secretKey']);
+        ];
+        if (null !== $externalId) {
+            $fields['external_id'] = $externalId;
+        }
+        $body = $this->signer->signBody($fields, $signing['secretKey']);
 
         try {
             $response = $this->http->request('POST', $url, [

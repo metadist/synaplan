@@ -7,9 +7,11 @@ namespace App\Controller;
 use App\Entity\ApiKey;
 use App\Entity\PlatformInstance;
 use App\Entity\User;
+use App\Exception\CloudDeliveryException;
 use App\Repository\ApiKeyRepository;
 use App\Security\OidcBearerAuthenticator;
 use App\Security\PlatformInstancePrincipal;
+use App\Service\PlatformLink\CloudCallerResolver;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
 use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
@@ -49,6 +51,7 @@ final class PlatformLinkController extends AbstractController
         private readonly PlatformLifecycleService $lifecycle,
         private readonly InstanceCredential $instanceCredential,
         private readonly ApiKeyRepository $apiKeys,
+        private readonly CloudCallerResolver $callers,
     ) {
     }
 
@@ -217,9 +220,7 @@ final class PlatformLinkController extends AbstractController
         summary: 'Whether this person is bound to the cloud',
         tags: ['Platform Links'],
         parameters: [
-            new OA\Parameter(name: 'external_id', in: 'query', required: true, schema: new OA\Schema(type: 'string'), description: 'The platform user id.'),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'external_id', in: 'query', required: false, schema: new OA\Schema(type: 'string'), description: 'The platform user id: the token subject (default) or its preferred_username.'),
         ],
         responses: [
             new OA\Response(
@@ -246,7 +247,8 @@ final class PlatformLinkController extends AbstractController
         }
 
         try {
-            $status = $this->sso->status($user, $this->credential($request), (string) $request->query->get('external_id', ''));
+            [$instance, $externalId] = $this->ssoTarget($request, $user, (string) $request->query->get('external_id', ''));
+            $status = $this->sso->status($user, $instance, $externalId);
         } catch (PlatformSsoException $e) {
             return $this->ssoError($e);
         }
@@ -259,18 +261,13 @@ final class PlatformLinkController extends AbstractController
         path: '/api/v1/platform-links/sso/bind',
         operationId: 'platformSsoBind',
         summary: 'Bind this person to the cloud through organisation login',
-        description: 'Requires the person\'s live bearer token and the instance credential. The token\'s azp must be the client registered for the instance. A second call answers 200.',
+        description: 'Requires the person\'s live bearer token. The cloud follows from the token\'s azp; the platform user is the token\'s subject or its preferred_username. A second call answers 200.',
         tags: ['Platform Links'],
-        parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
-                required: ['external_id'],
                 properties: [
-                    new OA\Property(property: 'external_id', type: 'string', example: 'ada', description: 'The platform user id.'),
+                    new OA\Property(property: 'external_id', type: 'string', example: 'ada', description: 'The platform user id: the token subject (default) or its preferred_username.'),
                 ]
             )
         ),
@@ -304,11 +301,12 @@ final class PlatformLinkController extends AbstractController
         $body = $this->jsonBody($request);
 
         try {
+            [$instance, $externalId] = $this->ssoTarget($request, $user, is_string($body['external_id'] ?? null) ? $body['external_id'] : '');
             $result = $this->sso->bind(
                 $user,
                 $this->azp($request),
-                $this->credential($request),
-                is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
+                $instance,
+                $externalId,
                 $request->getClientIp() ?? '',
             );
         } catch (PlatformSsoException $e) {
@@ -334,7 +332,7 @@ final class PlatformLinkController extends AbstractController
             content: new OA\JsonContent(
                 required: ['external_id'],
                 properties: [
-                    new OA\Property(property: 'external_id', type: 'string', example: 'ada', description: 'The platform user id.'),
+                    new OA\Property(property: 'external_id', type: 'string', example: 'ada', description: 'The platform user id: the token subject (default) or its preferred_username.'),
                 ]
             )
         ),
@@ -510,6 +508,31 @@ final class PlatformLinkController extends AbstractController
             throw new PlatformSsoException(Response::HTTP_UNAUTHORIZED, 'unauthorized', 'Invalid instance credentials.');
         } catch (PlatformInstanceNotActiveException) {
             throw new PlatformSsoException(Response::HTTP_FORBIDDEN, 'instance_pending', 'This platform is waiting for approval by the Synaplan administrator.');
+        }
+    }
+
+    /**
+     * The cloud and the platform user id for an organisation-login call. With
+     * the instance credential the body names the user, as before. Without it
+     * the cloud follows from the bearer's client and the user is the token's
+     * subject, so a token holder can only ever bind themselves.
+     *
+     * @return array{0: PlatformInstance, 1: string}
+     */
+    /**
+     * The cloud follows from the bearer's client and the platform user from
+     * its claims; the instance secret plays no part in a person's binding.
+     *
+     * @return array{0: PlatformInstance, 1: string}
+     */
+    private function ssoTarget(Request $request, User $user, string $requested): array
+    {
+        try {
+            $caller = $this->callers->resolve($request, $user);
+
+            return [$caller->instance, $this->callers->externalId($request, $requested)];
+        } catch (CloudDeliveryException $e) {
+            throw new PlatformSsoException($e->status, $e->errorCode, 'This login does not belong to a connected cloud.');
         }
     }
 

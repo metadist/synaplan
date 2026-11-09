@@ -14,7 +14,6 @@ use App\Entity\SavedPrompt;
 use App\Entity\SavedTask;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
-use App\Service\CloudWatch\WatchIndexCursor;
 use App\Service\CloudWatch\WatchLifecycleEffect;
 use App\Service\File\CloudFilesConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
@@ -266,41 +265,6 @@ final class CloudWatchTest extends WebTestCase
         self::assertSame('waiting', $this->json()['state']);
         self::assertNull($this->json()['reason']);
         self::assertSame($before + 1, $this->deliveriesFor($identityId));
-    }
-
-    public function testTheIndexPagesChangesAndExpiresACursor(): void
-    {
-        $this->enable();
-        $cloud = $this->cloud('index');
-        $this->client->request('POST', '/api/v1/cloud/watches', server: $cloud['server'] + ['CONTENT_TYPE' => 'application/json'], content: '{"target_kind":"folder","target_id":"a","target_path":"A","preset":"keep_searchable"}');
-        $first = $this->json()['id'];
-        $this->client->request('POST', '/api/v1/cloud/watches', server: $cloud['server'] + ['CONTENT_TYPE' => 'application/json'], content: '{"target_kind":"folder","target_id":"b","target_path":"B","preset":"keep_searchable"}');
-        $headers = ['HTTP_X_INSTANCE_ID' => $cloud['instance_id'], 'HTTP_X_INSTANCE_SECRET' => $cloud['secret']];
-
-        $this->client->request('GET', '/api/v1/platform-links/watches?limit=1', server: $headers);
-        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
-        $page = $this->json();
-        self::assertCount(1, $page['items']);
-        $cursor = $page['next_cursor'];
-        $this->client->request('GET', '/api/v1/platform-links/watches?limit=1&cursor='.rawurlencode((string) $cursor), server: $headers);
-        $second = $this->json();
-        self::assertCount(1, $second['items']);
-        self::assertNotSame($page['items'][0]['id'], $second['items'][0]['id']);
-
-        $this->client->request('GET', '/api/v1/platform-links/watches?limit=1&cursor='.rawurlencode((string) $second['next_cursor']), server: $headers);
-        $done = $this->json();
-        self::assertSame([], $done['items']);
-        $since = $done['next_cursor'];
-        $this->client->request('GET', '/api/v1/platform-links/watches?since='.rawurlencode((string) $since), server: $headers);
-        self::assertResponseStatusCodeSame(Response::HTTP_NOT_MODIFIED);
-
-        $this->client->request('DELETE', '/api/v1/cloud/watches/'.$first, server: $cloud['server']);
-        $this->client->request('GET', '/api/v1/platform-links/watches?since='.rawurlencode((string) $since), server: $headers);
-        self::assertContains($first, $this->json()['tombstones']);
-
-        $expired = WatchIndexCursor::since(time() - WatchIndexCursor::TTL_SECONDS - 5, 0);
-        $this->client->request('GET', '/api/v1/platform-links/watches?since='.rawurlencode($expired), server: $headers);
-        self::assertResponseStatusCodeSame(Response::HTTP_GONE);
     }
 
     public function testDisablingTheCloudPausesTheWatch(): void

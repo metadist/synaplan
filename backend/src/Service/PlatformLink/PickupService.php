@@ -89,7 +89,7 @@ final readonly class PickupService
             'folder' => (string) ($selector['folder_path'] ?? ''),
             'mode' => $mode,
         ]);
-        $this->notifier->pickup($instance, $id);
+        $this->notifier->pickup($instance, $id, $identity->getExternalId());
 
         return ['ok' => true, 'error' => '', 'pickup_id' => $id, 'sentence' => ''];
     }
@@ -97,9 +97,9 @@ final readonly class PickupService
     /**
      * @return array<string, mixed>
      */
-    public function claim(PlatformInstance $instance, int $id): array
+    public function claim(CloudCaller $caller, int $id): array
     {
-        $pickup = $this->requireOwn($instance, $id);
+        $pickup = $this->requireOwn($caller, $id);
         if (CloudPickup::STATE_QUEUED !== $pickup->getState()) {
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'already_claimed');
         }
@@ -107,7 +107,7 @@ final readonly class PickupService
             throw new CloudDeliveryException(Response::HTTP_GONE, 'expired');
         }
         $ticket = $this->redis->getAndDelete(self::TICKET_PREFIX.$id);
-        if ($ticket !== $instance->getInstanceId()) {
+        if ($ticket !== $caller->instanceId()) {
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'already_claimed');
         }
         $pickup->markClaimed();
@@ -134,21 +134,21 @@ final readonly class PickupService
      *
      * @return array{upload: list<string>, reuse: list<array{id: string, file_id: int}>, skip: list<array{id: string, reason: string}>}
      */
-    public function listing(PlatformInstance $instance, int $id, array $items): array
+    public function listing(CloudCaller $caller, int $id, array $items): array
     {
-        $pickup = $this->requireClaimed($instance, $id);
+        $pickup = $this->requireClaimed($caller, $id);
 
-        return $this->em->wrapInTransaction(function () use ($pickup, $instance, $id, $items): array {
+        return $this->em->wrapInTransaction(function () use ($pickup, $caller, $id, $items): array {
             $this->em->lock($pickup, LockMode::PESSIMISTIC_WRITE);
             $this->em->refresh($pickup);
 
-            return $this->listingLocked($pickup, $instance, $id, $items);
+            return $this->listingLocked($pickup, $caller->instance, $id, $items);
         });
     }
 
-    public function storeFile(PlatformInstance $instance, int $id, string $remoteId, string $version, string $bytes, string $name, string $mime): int
+    public function storeFile(CloudCaller $caller, int $id, string $remoteId, string $version, string $bytes, string $name, string $mime): int
     {
-        $pickup = $this->requireClaimed($instance, $id);
+        $pickup = $this->requireClaimed($caller, $id);
         if (CloudPickup::MODE_LIST === $pickup->getMode()) {
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'not_requested');
         }
@@ -157,7 +157,7 @@ final readonly class PickupService
         if (strlen($remoteId) > 255 || strlen($version) > 255 || null === $reserved) {
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'not_requested');
         }
-        $existing = $this->reusable($pickup, $instance, $remoteId, $version);
+        $existing = $this->reusable($pickup, $caller->instance, $remoteId, $version);
         if (null !== $existing) {
             return $existing;
         }
@@ -173,7 +173,7 @@ final readonly class PickupService
             $pickup->addAccepted(0, $extra);
         }
 
-        return $this->placeCopy($pickup, $instance, $remoteId, $version, $bytes, $name, $mime);
+        return $this->placeCopy($pickup, $caller->instance, $remoteId, $version, $bytes, $name, $mime);
     }
 
     /**
@@ -181,9 +181,9 @@ final readonly class PickupService
      *
      * @return array{state: string}
      */
-    public function result(PlatformInstance $instance, int $id, array $body): array
+    public function result(CloudCaller $caller, int $id, array $body): array
     {
-        $pickup = $this->requireOwn($instance, $id);
+        $pickup = $this->requireOwn($caller, $id);
         if ($this->isSettled($pickup)) {
             return ['state' => $pickup->getState()];
         }
@@ -242,18 +242,19 @@ final readonly class PickupService
     /**
      * @param array<mixed> $folders
      */
-    public function reportScope(PlatformInstance $instance, string $externalId, string $mode, array $folders): void
+    public function reportScope(CloudCaller $caller, string $externalId, string $mode, array $folders): void
     {
         if (!in_array($mode, ['watched', 'allowed', 'all'], true)) {
             throw new CloudDeliveryException(Response::HTTP_UNPROCESSABLE_ENTITY, 'invalid_scope');
         }
         $identity = $this->identities->findOneBy([
-            'instanceId' => $instance->getInstanceId(),
+            'instanceId' => $caller->instanceId(),
             'externalId' => $externalId,
         ]);
         if (!$identity instanceof ExternalIdentity || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()) {
             throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_identity');
         }
+        $caller->requireOwner($identity->getUserId(), 'unknown_identity');
         $clean = [];
         foreach ($folders as $folder) {
             if (!is_array($folder)) {
@@ -433,22 +434,21 @@ final readonly class PickupService
         return 1 === preg_match($regex, $name);
     }
 
-    private function requireOwn(PlatformInstance $instance, int $id): CloudPickup
+    private function requireOwn(CloudCaller $caller, int $id): CloudPickup
     {
         $pickup = $this->pickups->find($id);
         if (!$pickup instanceof CloudPickup) {
             throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
         }
-        if (!$instance->isActive() || $pickup->getInstanceId() !== $instance->getInstanceId()) {
-            throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'wrong_instance');
-        }
         $identity = $this->identities->find($pickup->getIdentityId());
-        if (!$identity instanceof ExternalIdentity
+        if (!$caller->instance->isActive() || $pickup->getInstanceId() !== $caller->instanceId()
+            || !$identity instanceof ExternalIdentity
             || $identity->getUserId() !== $pickup->getOwnerId()
-            || $identity->getInstanceId() !== $instance->getInstanceId()
+            || $identity->getInstanceId() !== $caller->instanceId()
             || ExternalIdentity::STATUS_ACTIVE !== $identity->getStatus()) {
-            throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'wrong_instance');
+            throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
         }
+        $caller->requireOwner($pickup->getOwnerId(), 'unknown_delivery');
 
         return $pickup;
     }
@@ -758,9 +758,9 @@ final readonly class PickupService
         }
     }
 
-    private function requireClaimed(PlatformInstance $instance, int $id): CloudPickup
+    private function requireClaimed(CloudCaller $caller, int $id): CloudPickup
     {
-        $pickup = $this->requireOwn($instance, $id);
+        $pickup = $this->requireOwn($caller, $id);
         if (CloudPickup::STATE_CLAIMED !== $pickup->getState()) {
             throw new CloudDeliveryException(Response::HTTP_CONFLICT, 'already_claimed');
         }

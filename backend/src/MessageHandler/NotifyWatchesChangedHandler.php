@@ -25,6 +25,6 @@ final readonly class NotifyWatchesChangedHandler
         if (!$instance instanceof PlatformInstance) {
             return;
         }
-        $this->client->post($instance, 'watches_changed', $message->instanceId);
+        $this->client->post($instance, 'watches_changed', $message->instanceId, $message->externalId);
     }
 }

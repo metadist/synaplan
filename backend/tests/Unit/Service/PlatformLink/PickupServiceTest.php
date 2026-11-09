@@ -17,6 +17,7 @@ use App\Repository\PlatformInstanceRepository;
 use App\Service\File\FileStorageService;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Infrastructure\RedisService;
+use App\Service\PlatformLink\CloudCaller;
 use App\Service\PlatformLink\DeliveryNotifier;
 use App\Service\PlatformLink\PickupService;
 use App\Service\PlatformLink\PlatformLinksConfig;
@@ -77,6 +78,18 @@ final class PickupServiceTest extends TestCase
         self::assertSame('rate_limited', $result['error']);
     }
 
+    public function testAnotherPersonOfTheSameCloudCannotClaimThePickup(): void
+    {
+        $pickups = $this->createStub(CloudPickupRepository::class);
+        $pickups->method('find')->willReturn($this->pickup(9));
+        $identities = $this->createStub(ExternalIdentityRepository::class);
+        $identities->method('find')->willReturn($this->identity());
+
+        $this->expectException(CloudDeliveryException::class);
+        $this->expectExceptionMessage('unknown_delivery');
+        $this->service($pickups, $identities)->claim($this->caller(userId: 8), 9);
+    }
+
     public function testClaimHandsTheSelectorOnceAndAReplayIsRefused(): void
     {
         $pickup = $this->pickup(9);
@@ -88,13 +101,13 @@ final class PickupServiceTest extends TestCase
         $redis->method('getAndDelete')->willReturnOnConsecutiveCalls('pi_abc', null);
 
         $service = $this->service($pickups, $identities, redis: $redis);
-        $claim = $service->claim($this->instance(), 9);
+        $claim = $service->claim($this->caller(), 9);
 
         self::assertSame('ada', $claim['external_id']);
         self::assertSame('fetch', $claim['mode']);
         self::assertSame(50, $claim['limits']['max_files']);
         try {
-            $service->claim($this->instance(), 9);
+            $service->claim($this->caller(), 9);
             self::fail('A second claim must be refused.');
         } catch (CloudDeliveryException $e) {
             self::assertSame(409, $e->status);
@@ -108,10 +121,11 @@ final class PickupServiceTest extends TestCase
         $pickups->method('find')->willReturn($this->pickup(9));
 
         try {
-            $this->service($pickups)->claim($this->instance('pi_other'), 9);
+            $this->service($pickups)->claim($this->caller('pi_other'), 9);
             self::fail('Another instance must not claim this pickup.');
         } catch (CloudDeliveryException $e) {
-            self::assertSame(403, $e->status);
+            self::assertSame(404, $e->status);
+            self::assertSame('unknown_delivery', $e->errorCode);
         }
     }
 
@@ -121,7 +135,7 @@ final class PickupServiceTest extends TestCase
         $pickups->method('find')->willReturn($this->pickup(9, created: time() - 700));
 
         try {
-            $this->service($pickups)->claim($this->instance(), 9);
+            $this->service($pickups)->claim($this->caller(), 9);
             self::fail('An expired pickup must be refused.');
         } catch (CloudDeliveryException $e) {
             self::assertSame(410, $e->status);
@@ -152,14 +166,14 @@ final class PickupServiceTest extends TestCase
         $redis = $this->createStub(RedisService::class);
         $redis->method('set')->willReturn(true);
 
-        $reused = $this->service(pickups: $same, held: $held, storage: $storage, em: $em, redis: $redis)->listing($this->instance(), 3, [
+        $reused = $this->service(pickups: $same, held: $held, storage: $storage, em: $em, redis: $redis)->listing($this->caller(), 3, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
         ]);
         $otherIdentity = $this->identity();
         $otherIdentity->setInstanceId('pi_other');
         $otherIdentities = $this->createStub(ExternalIdentityRepository::class);
         $otherIdentities->method('find')->willReturn($otherIdentity);
-        $uploaded = $this->service(pickups: $other, identities: $otherIdentities, held: $held, storage: $storage, em: $em, redis: $redis)->listing($this->instance('pi_other'), 4, [
+        $uploaded = $this->service(pickups: $other, identities: $otherIdentities, held: $held, storage: $storage, em: $em, redis: $redis)->listing($this->caller('pi_other'), 4, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
         ]);
 
@@ -176,7 +190,7 @@ final class PickupServiceTest extends TestCase
         $pickups = $this->createStub(CloudPickupRepository::class);
         $pickups->method('find')->willReturn($pickup);
 
-        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+        $answer = $this->service($pickups)->listing($this->caller(), 3, [
             ['id' => 'big', 'version' => 'v1', 'name' => 'big.pdf', 'size' => PickupService::MAX_FILE_BYTES + 1],
         ]);
 
@@ -190,11 +204,11 @@ final class PickupServiceTest extends TestCase
         $pickup = $this->pickup(3);
         $pickup->markClaimed();
         $service = $this->service($this->ledger($pickup));
-        $service->listing($this->instance(), 3, [
+        $service->listing($this->caller(), 3, [
             ['id' => 'big', 'version' => 'v1', 'name' => 'big.pdf', 'size' => PickupService::MAX_FILE_BYTES + 1],
         ]);
 
-        $service->result($this->instance(), 3, ['status' => 'partial', 'skipped' => [
+        $service->result($this->caller(), 3, ['status' => 'partial', 'skipped' => [
             ['id' => 'big', 'reason' => 'too_large'],
             ['id' => 'remote-2', 'reason' => 'unreadable'],
         ]]);
@@ -212,8 +226,8 @@ final class PickupServiceTest extends TestCase
         $pickup->markClaimed();
         $service = $this->service($this->ledger($pickup));
 
-        $first = $service->result($this->instance(), 3, ['status' => 'done', 'listed' => 1, 'sent' => 1, 'skipped' => []]);
-        $second = $service->result($this->instance(), 3, ['status' => 'failed', 'error_code' => 'unreachable']);
+        $first = $service->result($this->caller(), 3, ['status' => 'done', 'listed' => 1, 'sent' => 1, 'skipped' => []]);
+        $second = $service->result($this->caller(), 3, ['status' => 'failed', 'error_code' => 'unreachable']);
 
         self::assertSame('done', $first['state']);
         self::assertSame('done', $second['state']);
@@ -229,7 +243,7 @@ final class PickupServiceTest extends TestCase
         $redis->method('get')->willReturn('[]');
 
         try {
-            $this->service($pickups, redis: $redis)->storeFile($this->instance(), 3, 'remote-9', 'v1', 'hi', 'a.txt', 'text/plain');
+            $this->service($pickups, redis: $redis)->storeFile($this->caller(), 3, 'remote-9', 'v1', 'hi', 'a.txt', 'text/plain');
             self::fail('An id outside the upload list must be refused.');
         } catch (CloudDeliveryException $e) {
             self::assertSame(409, $e->status);
@@ -267,7 +281,7 @@ final class PickupServiceTest extends TestCase
         $held->expects(self::once())->method('insertIgnore')->willReturn(true);
 
         $fileId = $this->service($pickups, held: $held, storage: $storage, em: $em, redis: $redis)
-            ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+            ->storeFile($this->caller(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
 
         self::assertSame(42, $fileId);
         self::assertSame([42], $pickup->fileIds());
@@ -336,7 +350,7 @@ final class PickupServiceTest extends TestCase
         $firstLedger = $this->createStub(CloudPickupRepository::class);
         $firstLedger->method('find')->willReturn($firstPickup);
         $first = $this->service($firstLedger, held: $held, storage: $storage, em: $em, redis: $redis)
-            ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+            ->storeFile($this->caller(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
 
         $secondPickup = $this->pickup(4, 'pi_other');
         $secondPickup->markClaimed();
@@ -347,10 +361,10 @@ final class PickupServiceTest extends TestCase
         $otherIdentities = $this->createStub(ExternalIdentityRepository::class);
         $otherIdentities->method('find')->willReturn($otherIdentity);
         $second = $this->service($secondLedger, identities: $otherIdentities, held: $held, storage: $storage, em: $em, redis: $redis)
-            ->storeFile($this->instance('pi_other'), 4, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+            ->storeFile($this->caller('pi_other'), 4, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
 
         $again = $this->service($firstLedger, held: $held, storage: $storage, em: $em, redis: $redis)
-            ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+            ->storeFile($this->caller(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
 
         self::assertSame(42, $first);
         self::assertSame(43, $second);
@@ -381,7 +395,7 @@ final class PickupServiceTest extends TestCase
         $pickups = $this->createStub(CloudPickupRepository::class);
         $pickups->method('find')->willReturn($pickup);
 
-        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+        $answer = $this->service($pickups)->listing($this->caller(), 3, [
             ['id' => '1027191588', 'version' => 'v1', 'name' => 'inv-0101.txt', 'size' => 76],
         ]);
 
@@ -439,7 +453,7 @@ final class PickupServiceTest extends TestCase
         $service = $this->service($this->ledger($pickup));
 
         $service->giveUp(9);
-        $answer = $service->result($this->instance(), 9, ['status' => 'done', 'listed' => 1, 'sent' => 1]);
+        $answer = $service->result($this->caller(), 9, ['status' => 'done', 'listed' => 1, 'sent' => 1]);
 
         self::assertSame(CloudPickup::STATE_FAILED, $answer['state']);
         self::assertSame('unconfirmed', $pickup->getErrorCode());
@@ -467,8 +481,8 @@ final class PickupServiceTest extends TestCase
         $service = $this->service($pickups, redis: $this->memoryRedis($store));
         $items = [['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10]];
 
-        $first = $service->listing($this->instance(), 3, $items);
-        $second = $service->listing($this->instance(), 3, $items);
+        $first = $service->listing($this->caller(), 3, $items);
+        $second = $service->listing($this->caller(), 3, $items);
 
         self::assertSame($first, $second);
         self::assertSame([], $first['upload']);
@@ -483,7 +497,7 @@ final class PickupServiceTest extends TestCase
         $pickups = $this->createStub(CloudPickupRepository::class);
         $pickups->method('find')->willReturn($pickup);
 
-        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+        $answer = $this->service($pickups)->listing($this->caller(), 3, [
             ['id' => 'remote-9', 'version' => 'v1', 'name' => 'b.pdf', 'size' => 10],
         ]);
 
@@ -505,8 +519,8 @@ final class PickupServiceTest extends TestCase
             ['id' => 'big', 'version' => 'v1', 'name' => 'big.pdf', 'size' => PickupService::MAX_FILE_BYTES + 1],
         ];
 
-        $first = $service->listing($this->instance(), 3, $two);
-        $second = $service->listing($this->instance(), 3, $two);
+        $first = $service->listing($this->caller(), 3, $two);
+        $second = $service->listing($this->caller(), 3, $two);
 
         self::assertSame(['1027191588', 'remote-2'], $first['upload']);
         self::assertSame([['id' => 'big', 'reason' => 'too_large']], $first['skip']);
@@ -519,7 +533,7 @@ final class PickupServiceTest extends TestCase
         self::assertSame(10, $reserved['1027191588'] ?? null);
         self::assertSame(20, $reserved['remote-2'] ?? null);
 
-        $third = $service->listing($this->instance(), 3, [
+        $third = $service->listing($this->caller(), 3, [
             ...$two,
             ['id' => 'remote-3', 'version' => 'v1', 'name' => 'c.pdf', 'size' => 5],
         ]);
@@ -531,7 +545,7 @@ final class PickupServiceTest extends TestCase
         self::assertSame(['a.pdf', 'b.pdf', 'c.pdf'], $pickup->names());
         self::assertCount(1, $pickup->skipped());
 
-        $duplicate = $service->listing($this->instance(), 3, [
+        $duplicate = $service->listing($this->caller(), 3, [
             ['id' => 'remote-3', 'version' => 'v1', 'name' => 'c.pdf', 'size' => 5],
             ['id' => 'remote-3', 'version' => 'v1', 'name' => 'c.pdf', 'size' => 5],
         ]);
@@ -554,8 +568,8 @@ final class PickupServiceTest extends TestCase
             ['id' => '1', 'version' => 'v1', 'name' => 'b.pdf', 'size' => 20],
         ];
 
-        $first = $service->listing($this->instance(), 3, $both);
-        $second = $service->listing($this->instance(), 3, [
+        $first = $service->listing($this->caller(), 3, $both);
+        $second = $service->listing($this->caller(), 3, [
             ['id' => '0', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
         ]);
 
@@ -579,7 +593,7 @@ final class PickupServiceTest extends TestCase
         $pickups = $this->createStub(CloudPickupRepository::class);
         $pickups->method('find')->willReturn($pickup);
 
-        $answer = $this->service($pickups)->listing($this->instance(), 3, [
+        $answer = $this->service($pickups)->listing($this->caller(), 3, [
             ['id' => '0', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
             ['id' => '1', 'version' => 'v1', 'name' => 'big.pdf', 'size' => PickupService::MAX_FILE_BYTES + 1],
         ]);
@@ -601,7 +615,7 @@ final class PickupServiceTest extends TestCase
         $redis->method('set')->willReturn(false);
 
         try {
-            $this->service($pickups, redis: $redis)->listing($this->instance(), 3, [
+            $this->service($pickups, redis: $redis)->listing($this->caller(), 3, [
                 ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
             ]);
             self::fail('A failed reservation must not look like a successful listing.');
@@ -625,7 +639,7 @@ final class PickupServiceTest extends TestCase
         $em->expects(self::once())->method('refresh')->with($pickup);
         $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $work): mixed => $work());
 
-        $answer = $this->service($pickups, em: $em)->listing($this->instance(), 3, [
+        $answer = $this->service($pickups, em: $em)->listing($this->caller(), 3, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
         ]);
 
@@ -651,8 +665,8 @@ final class PickupServiceTest extends TestCase
         $service = $this->service($pickups, held: $held, storage: $storage, em: $em, redis: $this->memoryRedis($store));
         $items = [['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10]];
 
-        $first = $service->listing($this->instance(), 3, $items);
-        $second = $service->listing($this->instance(), 3, $items);
+        $first = $service->listing($this->caller(), 3, $items);
+        $second = $service->listing($this->caller(), 3, $items);
 
         self::assertSame([['id' => 'remote-1', 'file_id' => 99]], $first['reuse']);
         self::assertSame($first, $second);
@@ -675,7 +689,7 @@ final class PickupServiceTest extends TestCase
         $em->method('find')->willReturn(null);
         $em->method('wrapInTransaction')->willReturnCallback(static fn (callable $work): mixed => $work());
 
-        $answer = $this->service(pickups: $pickups, held: $held, em: $em)->listing($this->instance(), 3, [
+        $answer = $this->service(pickups: $pickups, held: $held, em: $em)->listing($this->caller(), 3, [
             ['id' => 'remote-1', 'version' => 'v1', 'name' => 'a.pdf', 'size' => 10],
         ]);
 
@@ -727,7 +741,7 @@ final class PickupServiceTest extends TestCase
         $redis->method('get')->willReturn('["remote-1"]');
 
         $fileId = $this->service($pickups, held: $held, storage: $storage, em: $em, redis: $redis)
-            ->storeFile($this->instance(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
+            ->storeFile($this->caller(), 3, 'remote-1', 'v1', 'hi', 'a.txt', 'text/plain');
 
         self::assertSame(77, $fileId);
     }
@@ -846,6 +860,11 @@ final class PickupServiceTest extends TestCase
         $identity->setExternalId('ada');
 
         return $identity;
+    }
+
+    private function caller(string $instanceId = 'pi_abc', int $userId = 7): CloudCaller
+    {
+        return new CloudCaller($this->instance($instanceId), $userId);
     }
 
     private function instance(string $instanceId = 'pi_abc'): PlatformInstance

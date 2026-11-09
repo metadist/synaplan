@@ -375,6 +375,7 @@ final class ApiKeyScope
      *   POST /v1/chat/completions → also chat (exact routes, PLATFORM_ROUTES)
      *   POST /api/v1/platform-links/identities/adopt → chat, files or rag
      *   POST /api/v1/cloud/status, GET /api/v1/cloud/files → files
+     *   /api/v1/platform-links/deliveries, /pickups, PUT read-scope, POST sources/events → files
      *   /api/v1/cloud/watches (not from-message), POST /api/v1/cloud/trials → cloud:watch
      *   POST /api/v1/cloud/watches/from-message → no key (session only)
      *   GET /api/v1/config/memory-service/check → chat OR memories
@@ -483,11 +484,7 @@ final class ApiKeyScope
             return [self::PLATFORM_WATCH];
         }
 
-        if ('POST' === strtoupper($method) && '/api/v1/cloud/status' === $path) {
-            return [self::PLATFORM_FILES];
-        }
-
-        if ('GET' === strtoupper($method) && self::matchesPrefix($path, '/api/v1/cloud/files')) {
+        if (self::isPlatformFiles(strtoupper($method), $path)) {
             return [self::PLATFORM_FILES];
         }
 
@@ -541,6 +538,16 @@ final class ApiKeyScope
     }
 
     /** `$prefix` itself, or anything below `$prefix/` — never `$prefix<other-chars>`. */
+    private static function isPlatformFiles(string $method, string $path): bool
+    {
+        return ('POST' === $method && '/api/v1/cloud/status' === $path)
+            || ('GET' === $method && self::matchesPrefix($path, '/api/v1/cloud/files'))
+            || self::matchesPrefix($path, '/api/v1/platform-links/deliveries')
+            || self::matchesPrefix($path, '/api/v1/platform-links/pickups')
+            || ('PUT' === $method && '/api/v1/platform-links/read-scope' === $path)
+            || ('POST' === $method && '/api/v1/platform-links/sources/events' === $path);
+    }
+
     private static function matchesPrefix(string $path, string $prefix): bool
     {
         return $path === $prefix || str_starts_with($path, $prefix.'/');

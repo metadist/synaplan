@@ -5,27 +5,29 @@ declare(strict_types=1);
 namespace App\Service\CloudWatch;
 
 /**
- * Notices waiting until the request has committed. One cloud is told once,
- * not once per watch, and not while the identity row is still locked.
+ * Notices waiting until the request has committed. Each person on a cloud is
+ * told once, not once per watch, and not while the identity row is still
+ * locked. The cloud reads that person's watches with the person's own
+ * credential; there is no cloud-wide index to refresh.
  */
 final class WatchChangeQueue
 {
-    /** @var array<string, true> */
-    private array $instances = [];
+    /** @var array<string, array{instanceId: string, externalId: string}> */
+    private array $changes = [];
 
-    public function add(string $instanceId): void
+    public function add(string $instanceId, string $externalId): void
     {
-        if ('' !== $instanceId) {
-            $this->instances[$instanceId] = true;
+        if ('' !== $instanceId && '' !== $externalId) {
+            $this->changes[$instanceId."\0".$externalId] = ['instanceId' => $instanceId, 'externalId' => $externalId];
         }
     }
 
-    /** @return list<string> */
+    /** @return list<array{instanceId: string, externalId: string}> */
     public function pull(): array
     {
-        $ids = array_keys($this->instances);
-        $this->instances = [];
+        $changes = array_values($this->changes);
+        $this->changes = [];
 
-        return $ids;
+        return $changes;
     }
 }
