@@ -87,7 +87,7 @@ final readonly class AssistantDocumentSource implements SearchDocumentSourceInte
                 continue;
             }
             $id = (string) $agent->getId();
-            $resolved[$id] = new ResolvedItem(title: $agent->getName(), route: '/ai/assistants/'.$id);
+            $resolved[$id] = new ResolvedItem(title: $agent->getName(), route: '/ai/agents/'.$id);
         }
 
         return $resolved;

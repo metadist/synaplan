@@ -349,8 +349,8 @@
       "aiModel": "Modèle IA",
       "aiModelHelp": "Sélectionnez le modèle IA à utiliser pour cette instruction. Les modèles sont groupés selon leurs fonctions.",
       "automated": "Automatique (meilleur modèle)",
-      "availableTools": "Agents disponibles",
-      "availableToolsHelp": "Activez les agents qui seront disponibles avec cette instruction",
+      "availableTools": "Outils",
+      "availableToolsHelp": "Activez les outils qui seront disponibles avec cette instruction",
       "internetSearch": {
         "label": "Recherche Internet",
         "help": "L’IA ne cherche sur le Web que lorsqu’un message a besoin d’informations actuelles, comme la météo, les prix ou l’actualité. Pour un seul message, utilisez Outils → Recherche Web dans le chat. « Désactivé » désactive la recherche Web pour cette instruction.",

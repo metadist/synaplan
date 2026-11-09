@@ -54,13 +54,13 @@ describe('AssistantGallery', () => {
     setActivePinia(createPinia())
   })
 
-  it('shows the empty state and Create assistant', () => {
+  it('shows the empty state and Create agent', () => {
     const { wrapper } = mountGallery()
 
     expect(wrapper.get('[data-testid="state-gallery-empty"]').text()).toContain(
-      'You have not created an assistant yet.'
+      'You have not created an agent yet.'
     )
-    expect(wrapper.get('[data-testid="btn-create-assistant"]').text()).toBe('Create assistant')
+    expect(wrapper.get('[data-testid="btn-create-assistant"]').text()).toBe('Create agent')
   })
 
   it('emits start-chat with the card id', async () => {

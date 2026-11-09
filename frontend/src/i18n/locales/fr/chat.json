@@ -41,7 +41,7 @@
     "examplePrompt": "Expliquez-moi en gros les fonctionnalités",
     "helpCommand": {
       "label": "Aide",
-      "description": "Demander ce que cet assistant IA peut faire ici"
+      "description": "Demander ce que cet IA peut faire ici"
     },
     "docPill": {
       "tooltip": "Ouvrir dans la documentation",
@@ -426,7 +426,7 @@
       "filterPlaceholder": "Filtrer les modèles…",
       "clearFilter": "Effacer le filtre",
       "noMatch": "Aucun modèle ne correspond à « {query} ».",
-      "assistants": "Assistants"
+      "assistants": "Agents"
     },
     "defaultModelOffer": {
       "body": "{name} a été injoignable {count} fois au cours de la dernière heure.",
@@ -466,10 +466,10 @@
     "messageDetails": "Détails du message",
     "whatWasSent": "Ce qui a été envoyé",
     "whatWasSentTitle": "Ce qui a été envoyé",
-    "whatWasSentBody": "Votre question, les messages précédents et les instructions données à votre assistant.",
+    "whatWasSentBody": "Votre question, les messages précédents et les instructions données à votre agent.",
     "whatWasSentInstructions": "Instructions",
     "whatWasSentYou": "Vous",
-    "whatWasSentAssistant": "Assistant",
+    "whatWasSentAssistant": "Agent",
     "whatWasSentQuestion": "Votre question",
     "whatWasSentHistory": "Messages précédents",
     "whatWasSentAfter": "Envoyé après votre question",
@@ -1071,22 +1071,22 @@
   },
   "approvals": {
     "title": "Approbations",
-    "subtitle": "Avant qu’un assistant ou une tâche n’envoie un mail, n’écrive dans un calendrier, n’enregistre un fichier ou n’appelle un outil externe, il peut attendre ici votre accord. Une demande de partage d’un assistant avec tout le monde attend ici aussi.",
+    "subtitle": "Avant qu’un agent ou une tâche n’envoie un mail, n’écrive dans un calendrier, n’enregistre un fichier ou n’appelle un outil externe, il peut attendre ici votre accord. Une demande de partage d’un agent avec tout le monde attend ici aussi.",
     "pending": "En attente",
     "decided": "Décidées",
-    "emptyPending": "Rien n’attend votre accord. Des cartes apparaissent ici lorsqu’une tâche enregistrée ou un chat veut modifier quelque chose, ou lorsqu’un assistant attend d’être partagé avec tout le monde.",
+    "emptyPending": "Rien n’attend votre accord. Des cartes apparaissent ici lorsqu’une tâche enregistrée ou un chat veut modifier quelque chose, ou lorsqu’un agent attend d’être partagé avec tout le monde.",
     "emptyDecided": "Aucune décision précédente pour le moment.",
     "approve": "Approuver",
     "reject": "Refuser",
     "sendBack": "Renvoyer",
-    "sendBackReason": "Que doivent-ils modifier ? L’assistant reste chez cette personne jusqu’à votre accord.",
+    "sendBackReason": "Que doivent-ils modifier ? L’agent reste chez cette personne jusqu’à votre accord.",
     "shareAssistant": "Partager {name} avec tout le monde. Ils peuvent l’utiliser, mais pas le modifier. Rien n’est partagé tant que vous n’avez pas accepté.",
     "shareAssistantWaiting": "{name} n’est pas encore partagé. Les autres pourront l’utiliser, mais pas le modifier, dès qu’une autre personne avec un accès administrateur aura accepté.",
     "sharedWithEveryone": "Partagé avec tout le monde. Ils peuvent l’utiliser, mais pas le modifier.",
-    "sentBackToast": "Renvoyée. L’assistant reste chez la personne qui l’a créé. Rien n’a été partagé.",
-    "waitingForAnotherAdmin": "Une autre personne avec un accès administrateur doit accepter. Vous ne pouvez pas approuver votre propre assistant.",
+    "sentBackToast": "Renvoyée. L’agent reste chez la personne qui l’a créé. Rien n’a été partagé.",
+    "waitingForAnotherAdmin": "Une autre personne avec un accès administrateur doit accepter. Vous ne pouvez pas approuver votre propre agent.",
     "sharingOff": "Le partage avec tout le monde est désactivé, donc rien n’a été partagé.",
-    "alwaysAllow": "Toujours autoriser pour cet assistant",
+    "alwaysAllow": "Toujours autoriser pour cet agent",
     "rejectReason": "Pourquoi refusez-vous ceci ?",
     "rejectReasonPlaceholder": "Note facultative",
     "expired": "Cette demande a expiré",

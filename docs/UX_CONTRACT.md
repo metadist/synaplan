@@ -52,11 +52,11 @@ shipped, even if the API is green.
 Synaplan is a **user-centric, easy application**. Power lives behind a
 clean UI.
 
-1. The rail is **Chats · Library · Assistants · Apps · Admin** — one home
+1. The rail is **Chats · Library · Agents · Apps · Admin** — one home
    per job (UX overhaul, [#2431](https://github.com/metadist/synaplan/pull/2431)).
    Everyday work stays in Chats and Library.
 2. What a user builds or decides (assistants, shortcuts, tasks, approvals,
-   AI settings) lives under **Assistants**; everything connected from
+   AI settings) lives under **Agents**; everything connected from
    outside is an **App**.
 3. Installation-wide controls live in **Admin**, administrators only.
 4. Personal settings stay in the account menu.
@@ -125,8 +125,8 @@ Required on every kind that opens this dialog:
 | ---- | ---------- | --------- | ---------------------------- | ------------------ |
 | Conversation | Open read-only | Continue as my copy | "They will find it under Incoming chats." | Incoming chats + the chat list's shared filter |
 | Knowledge folder | See the folder | The AI may use these files | "It appears in their Library as shared." | Library, shared folders |
-| Assistant | See the card, clone | Start a chat | "They will find it under Assistants → Shared with me." | Assistants, Shared chip |
-| Task / template | See the card | Make their own copy | "They can use it as a template under Tasks." | Assistants → Tasks, shared |
+| Agent | See the card, clone | Start a chat | "They will find it under Agents → Shared with me." | Agents, Shared chip |
+| Task / template | See the card | Make their own copy | "They can use it as a template under Tasks." | Agents → Tasks, shared |
 | Widget | Open read-only | — | "They will find it under Chat Widgets." | Apps → Chat widgets, shared |
 | Custom tool | — | The AI may call it (your credential stays yours) | "It appears in their tool list as shared." | Custom tools, Shared chip — no share entry point yet (`_devextras/planning/ROADMAP.md` row 12) |
 
@@ -146,7 +146,7 @@ Pattern proven by Incoming chats + Library Incoming:
   filter so the item is also findable in context.
 - Opening the item answers U7 without opening Share.
 
-Approvals reuse this: the badge sits on Assistants → Approvals, the inbox
+Approvals reuse this: the badge sits on Agents → Approvals, the inbox
 is `/approvals`, and every item deep-links back to the chat or run.
 
 ### 4.3 Decide in context, recover in the inbox

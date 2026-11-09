@@ -12,7 +12,7 @@ const TITLES = {
     login: /Anmelden/,
     files: /Bibliothek/,
     memories: /Erinnerungen/,
-    assistants: /Assistenten/,
+    assistants: /Agenten/,
     widgets: /Chat-Widgets/,
     settings: /Einstellungen/,
     admin: /Betrieb/,
@@ -21,7 +21,7 @@ const TITLES = {
     login: /Connexion/,
     files: /Bibliothèque/,
     memories: /Mémoires/,
-    assistants: /Assistants/,
+    assistants: /Agents/,
     widgets: /Widgets de chat/,
     settings: /Préférences/,
     admin: /Administration/,
@@ -77,7 +77,7 @@ test.describe('i18n namespace split', () => {
     const checks: Array<['de', string, RegExp]> = [
       ['de', '/files', TITLES.de.files],
       ['de', '/memories', TITLES.de.memories],
-      ['de', '/ai/assistants', TITLES.de.assistants],
+      ['de', '/ai/agents', TITLES.de.assistants],
       ['de', '/channels/widgets', TITLES.de.widgets],
       ['de', '/settings', TITLES.de.settings],
     ]

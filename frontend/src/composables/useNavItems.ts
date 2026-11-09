@@ -253,7 +253,7 @@ export function useNavItems() {
           ? [
               {
                 key: 'assistants',
-                path: '/ai/assistants',
+                path: '/ai/agents',
                 label: t('nav.assistants'),
                 icon: IdentificationIcon,
                 ...grouped('assistants', assistants),

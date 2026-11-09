@@ -11,7 +11,7 @@ test.describe('@ci Assistant template gallery', () => {
   }) => {
     test.skip(!(await isAgentsEnabled(request, credentials)), 'AGENTS.ENABLED is off')
 
-    await page.goto('/ai/assistants/new')
+    await page.goto('/ai/agents/new')
     await expect(page.getByTestId('card-template-offer-writer')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })

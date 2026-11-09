@@ -530,11 +530,11 @@
         "BRAVE_SEARCH_ENABLED": "Enable web search",
         "BRAVE_SEARCH_API_KEY": "Brave Search API key",
         "BRAVE_SEARCH_COUNT": "Results per search",
-        "MEDIA_ASYNC_JOBS_ENABLED": "Run image, video and audio generation in the background so chat is never blocked. The assistant shows a live status and a toast when it finishes. When off, the turn waits until the file is ready. Needs the worker container.",
-        "COMPUTE_ENABLED": "Let the assistant do short file work (Python or Node) on copies of files you chose. Needs the compute sidecar (COMPUTE_URL + COMPUTE_TOKEN). A local docker compose up starts that sidecar and turns this on.",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Run image, video and audio generation in the background so chat is never blocked. The AI shows a live status and a toast when it finishes. When off, the turn waits until the file is ready. Needs the worker container.",
+        "COMPUTE_ENABLED": "Let the AI do short file work (Python or Node) on copies of files you chose. Needs the compute sidecar (COMPUTE_URL + COMPUTE_TOKEN). A local docker compose up starts that sidecar and turns this on.",
         "COMPUTE_REQUIRE_TIER": "Minimum isolation the sidecar must report before file work turns on: Standard (plain Docker), Strong isolation (gVisor), or Virtual machine (microVM). Synaplan Cloud requires Strong isolation.",
-        "COMPUTE_WORKSPACES_ENABLED": "Keep a folder between file-work runs so the assistant can continue earlier work. Files → Workspace shows what is in it. Also needs file work itself to be on.",
-        "COMPUTE_EGRESS_ENABLED": "Let a file-work run fetch from a short list of public websites the assistant named. Off by default — runs stay offline. Private or local addresses are always refused. Can only be switched on when the sidecar offers website access.",
+        "COMPUTE_WORKSPACES_ENABLED": "Keep a folder between file-work runs so the AI can continue earlier work. Files → Workspace shows what is in it. Also needs file work itself to be on.",
+        "COMPUTE_EGRESS_ENABLED": "Let a file-work run fetch from a short list of public websites the AI named. Off by default — runs stay offline. Private or local addresses are always refused. Can only be switched on when the sidecar offers website access.",
         "COMPUTE_EGRESS_REQUIRES_APPROVAL": "When a run will fetch from the web, ask the owner first even if everyday file work would run automatically. On by default.",
         "COMPUTE_EGRESS_MAX_HOSTS": "How many websites one file-work run may list. Default 8.",
         "COMPUTE_DEFAULT_TIMEOUT_SEC": "Default seconds a file-work run may take.",
@@ -543,8 +543,8 @@
         "COMPUTE_DEFAULT_PIDS": "Default process cap for a file-work run.",
         "COMPUTE_DEFAULT_OUTPUT_MB": "Default size cap in megabytes for files the run may create.",
         "COMPUTE_MAX_TIMEOUT_SEC": "Hard ceiling in seconds for a file-work run.",
-        "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An assistant cannot loosen this.",
-        "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An assistant cannot loosen this.",
+        "COMPUTE_POLICY_INTERACTIVE": "When the owner is present (chat or a live API call): run file work automatically, ask first, or never run it. An agent cannot loosen this.",
+        "COMPUTE_POLICY_UNATTENDED": "When a saved task runs file work on its own: ask the owner first (default), run automatically, or never run it. An agent cannot loosen this.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "How many days a file-work folder may sit unused before cleanup can remove it. Default 90.",
         "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, under Apps › Synaplan Desktop. A paired computer can chat in the app and pick up waiting tasks. When this is off, that page is hidden, pairing stops, the app cannot chat, and waiting tasks are not picked up until you turn it on. There is no installer yet — the app is built from the source repository.",
         "FEATURE_SEARCH_AI_ENABLED": "AI help in the search palette (Ctrl/Cmd+K): for a question in plain words, the tools model picks the best matching result and says why in one sentence. It never changes anything by itself. Each use is one short AI call. Off keeps keyword and meaning search."
@@ -1110,7 +1110,7 @@
       "resourceKind": {
         "conversation": "Chat",
         "knowledge_folder": "Folder",
-        "assistant": "AI assistant",
+        "assistant": "Topic",
         "saved_task": "Saved task",
         "widget": "Chat widget",
         "agent": "Agent",
@@ -1294,12 +1294,12 @@
         "WORKFLOWS_BUILDER_ENABLED": "Task steps editor",
         "CHAT_EXPORT_ENABLED": "Export chats",
         "CHAT_SHARE_ENABLED": "Share chats",
-        "AGENTS_PUBLISH_REVIEW": "Review before an assistant is shared with everyone"
+        "AGENTS_PUBLISH_REVIEW": "Review before an agent is shared with everyone"
       }
     },
     "intro": {
       "users": "Everyone with an account here. Change a level, verify an address or turn an account off.",
-      "groups": "Groups bundle users so you can share assistants and set rules once for all of them.",
+      "groups": "Groups bundle users so you can share agents and set rules once for all of them.",
       "policies": "Policies decide what a group may use, for example which features or models.",
       "moderation": "Content users reported. Review it, then keep or remove it.",
       "audit": "A record of who changed what on this server, newest first.",
@@ -1356,14 +1356,14 @@
     "owner": "Owner",
     "fileUnavailable": "This file is no longer available.",
     "kind": {
-      "assistant": "AI assistant",
+      "assistant": "Topic",
       "saved_task": "Saved task",
       "widget": "Chat widget"
     },
     "runCopy": "Run as my copy",
     "runCopyConfirm": "Create your own copy of this saved task? It will run only when you start it.",
-    "assistantNotShared": "This task's AI assistant is not shared with you.",
-    "assistantNotSharedNamed": "The AI assistant “{name}” is not shared with you. Ask the owner to share it, then try again.",
+    "assistantNotShared": "This task's agent is not shared with you.",
+    "assistantNotSharedNamed": "The agent “{name}” is not shared with you. Ask the owner to share it, then try again.",
     "sharedBy": "From {name}",
     "continueAsCopy": "Continue as my copy",
     "continueFailed": "Couldn't create your copy. Please try again.",
@@ -1377,9 +1377,9 @@
         "sourceDirect": "This folder belongs to {owner}. It was shared with you personally."
       },
       "assistant": {
-        "sourceGroup": "This assistant belongs to {owner}. It reached you through the group \"{name}\".",
-        "sourceEveryone": "This assistant belongs to {owner}. It was shared with everyone who has an account.",
-        "sourceDirect": "This assistant belongs to {owner}. It was shared with you personally."
+        "sourceGroup": "This agent belongs to {owner}. It reached you through the group \"{name}\".",
+        "sourceEveryone": "This agent belongs to {owner}. It was shared with everyone who has an account.",
+        "sourceDirect": "This agent belongs to {owner}. It was shared with you personally."
       },
       "saved_task": {
         "sourceGroup": "This saved task belongs to {owner}. It reached you through the group \"{name}\".",
@@ -1439,8 +1439,8 @@
         },
         "assistant": {
           "read": "Can view — they can see the card and clone it.",
-          "use": "Can use — they can start a chat with this assistant.",
-          "edit": "Can edit — they can change this assistant."
+          "use": "Can use — they can start a chat with this agent.",
+          "edit": "Can edit — they can change this agent."
         },
         "saved_task": {
           "read": "Can view — they can see the card.",
@@ -1455,7 +1455,7 @@
       "find": {
         "conversation": "They will find it under Incoming chats.",
         "knowledge_folder": "It appears in their Sources as shared.",
-        "assistant": "They will find it under Assistants → Shared with me.",
+        "assistant": "They will find it under Agents → Shared with me.",
         "saved_task": "They can use it as a template under Automations.",
         "widget": "They will find it under Chat Widgets."
       }

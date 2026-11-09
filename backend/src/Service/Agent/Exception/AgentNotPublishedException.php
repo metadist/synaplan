@@ -8,6 +8,6 @@ final class AgentNotPublishedException extends \RuntimeException
 {
     public static function forId(int $agentId): self
     {
-        return new self(sprintf('Assistant %d is not published', $agentId));
+        return new self(sprintf('Agent %d is not published', $agentId));
     }
 }

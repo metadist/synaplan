@@ -31,7 +31,7 @@ final readonly class AgentPublisher
     {
         $agentId = $agent->getId();
         if (null === $agentId) {
-            throw new \InvalidArgumentException('Assistant must be persisted before publish');
+            throw new \InvalidArgumentException('Agent must be persisted before publish');
         }
 
         $definition = $this->validator->validate($agent->getDraft());

@@ -93,16 +93,16 @@
     "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
   },
   "channels": {
-    "whatsappAssistant": "Assistent für WhatsApp",
-    "whatsappAssistantHint": "Eingehende WhatsApp-Nachrichten beantwortet dieser veröffentlichte Assistent.",
-    "whatsappAssistantNone": "Kein Assistent — gewöhnlicher Chat",
+    "whatsappAssistant": "Agent für WhatsApp",
+    "whatsappAssistantHint": "Eingehende WhatsApp-Nachrichten beantwortet dieser veröffentlichte Agent.",
+    "whatsappAssistantNone": "Kein Agent — gewöhnlicher Chat",
     "aiNoticeLabel": "KI-Hinweis",
     "aiNoticeHelp": "Menschen erfahren, dass sie mit einer KI sprechen. Du kannst den Satz ändern. Leer lassen geht nicht.",
     "aiNoticeSave": "KI-Hinweis speichern",
     "aiNoticeSaved": "KI-Hinweis gespeichert",
     "aiNoticeFailed": "Der KI-Hinweis wurde nicht gespeichert.",
-    "whatsappAssistantSaved": "WhatsApp nutzt jetzt diesen Assistenten",
-    "whatsappAssistantFailed": "Der WhatsApp-Assistent konnte nicht gespeichert werden",
+    "whatsappAssistantSaved": "WhatsApp nutzt jetzt diesen Agenten",
+    "whatsappAssistantFailed": "Der WhatsApp-Agent konnte nicht gespeichert werden",
     "keywordSaved": "E-Mail-Keyword erfolgreich gespeichert",
     "keywordPlaceholder": "Keyword",
     "apiDocumentation": {
@@ -145,7 +145,7 @@
       "whoElseLabel": "Wer sonst",
       "connectedWhoElse": "Nur Ihr Telegram-Konto. Alle anderen bekommen einen Satz, und es wird nichts gespeichert.",
       "touchesLabel": "Was es berührt",
-      "connectedTouches": "Nachrichten, Fotos, Dateien, Sprachnachrichten, Videos und Standorte in diesem Chat. Ihr KI-Assistent beantwortet sie wie im Web-Chat, schickt erstellte Bilder, Videos, Audios und Dokumente zurück, und alles zählt zu Ihren Limits. Dateien werden in Ihren Synaplan-Dateien gespeichert.",
+      "connectedTouches": "Nachrichten, Fotos, Dateien, Sprachnachrichten, Videos und Standorte in diesem Chat. Ihr KI-Agent beantwortet sie wie im Web-Chat, schickt erstellte Bilder, Videos, Audios und Dokumente zurück, und alles zählt zu Ihren Limits. Dateien werden in Ihren Synaplan-Dateien gespeichert.",
       "stopLabel": "Wie Sie es stoppen",
       "connectedStop": "Trennen Sie auf dieser Karte. Der Bot antwortet nicht mehr. Ihr Chatverlauf bleibt.",
       "fromLabel": "Woher es kommt",
@@ -182,9 +182,9 @@
     "smtpConfig": "SMTP-Konfiguration (Weiterleitung)",
     "enableSmtp": "SMTP für E-Mail-Weiterleitung aktivieren",
     "required": "Erforderlich",
-    "assistant": "Assistent",
-    "assistantHint": "Passende E-Mails beantwortet dieser Assistent. Die Nachricht wird trotzdem weitergeleitet.",
-    "assistantNone": "Kein Assistent — nur weiterleiten",
+    "assistant": "Agent",
+    "assistantHint": "Passende E-Mails beantwortet dieser Agent. Die Nachricht wird trotzdem weitergeleitet.",
+    "assistantNone": "Kein Agent — nur weiterleiten",
     "smtpConfigHelp": "Konfigurieren Sie SMTP-Einstellungen, um verarbeitete E-Mails über Ihren eigenen Mailserver an Abteilungen weiterzuleiten. SMTP-Konfiguration ist erforderlich für E-Mail-Weiterleitung.",
     "smtpServer": "SMTP-Server:",
     "smtpServerPlaceholder": "smtp.gmail.com",
@@ -286,14 +286,14 @@
     "title": "MCP-Server",
     "description": "Verbinde jeden MCP-fähigen Tool-Server — ein CRM, Wiki, Ticketsystem, eine Automatisierungsplattform oder einen Dienst, den du selbst hostest. Die entdeckten Tools stehen dem Task-Planner zur Verfügung.",
     "clientOnTitle": "MCP-Aufrufe sind an",
-    "clientOnText": "Der Assistent kann verbundene Server in jeder Aufgabe nutzen, die MCP-Datenquellen erlaubt.",
+    "clientOnText": "Die KI kann verbundene Server in jeder Aufgabe nutzen, die MCP-Datenquellen erlaubt.",
     "clientOffTitle": "MCP-Aufrufe sind aus",
-    "clientOffAdminText": "Gespeicherte Server bleiben erhalten, aber der Assistent ruft sie nicht auf, bis du das für diese Installation einschaltest.",
+    "clientOffAdminText": "Gespeicherte Server bleiben erhalten, aber die KI ruft sie nicht auf, bis du das für diese Installation einschaltest.",
     "clientOffUserText": "Ein Administrator muss das für diese Installation einschalten. Gespeicherte Server bleiben bis dahin erhalten.",
     "clientAdminLink": "In der Systemkonfiguration öffnen",
     "clientEnable": "MCP-Aufrufe einschalten",
     "clientToggle": "MCP-Aufrufe erlauben",
-    "clientEnabledNotice": "Der Assistent kann verbundene MCP-Server jetzt aufrufen",
+    "clientEnabledNotice": "Die KI kann verbundene MCP-Server jetzt aufrufen",
     "clientDisabledNotice": "MCP-Aufrufe sind aus — gespeicherte Server bleiben erhalten",
     "clientUpdateFailed": "Die MCP-Einstellung konnte nicht aktualisiert werden",
     "listTitle": "Verbundene Server",
@@ -341,11 +341,11 @@
     "deleted": "Server entfernt",
     "deleteFailed": "Server konnte nicht entfernt werden",
     "deleteTitle": "MCP-Server entfernen",
-    "deleteMessage": "Verbindung \"{name}\" entfernen? Der Assistent kann dessen Tools dann nicht mehr nutzen.",
+    "deleteMessage": "Verbindung \"{name}\" entfernen? Die KI kann dessen Tools dann nicht mehr nutzen.",
     "loadFailed": "MCP-Server konnten nicht geladen werden",
     "usageTitle": "Welche Aufgaben dürfen diese Server nutzen",
-    "usageDescription": "Jede Aufgabe entscheidet selbst, ob der Assistent beim Antworten Daten aus deinen verbundenen Servern abrufen darf. Aktiviere es für jede Aufgabe, die sie nutzen soll — für normale Chat-Fragen ist das \"General Chat\".",
-    "usageNotUsedWarning": "Deine verbundenen Server werden noch nicht genutzt: Keine Aufgabe erlaubt MCP-Datenquellen. Aktiviere unten mindestens eine Aufgabe, sonst ruft der Assistent diese Server nie auf.",
+    "usageDescription": "Jede Aufgabe entscheidet selbst, ob die KI beim Antworten Daten aus deinen verbundenen Servern abrufen darf. Aktiviere es für jede Aufgabe, die sie nutzen soll — für normale Chat-Fragen ist das \"General Chat\".",
+    "usageNotUsedWarning": "Deine verbundenen Server werden noch nicht genutzt: Keine Aufgabe erlaubt MCP-Datenquellen. Aktiviere unten mindestens eine Aufgabe, sonst ruft die KI diese Server nie auf.",
     "usageOn": "Erlaubt",
     "usageOff": "Aus",
     "usageEnabled": "MCP-Datenquellen für diese Aufgabe aktiviert",
@@ -370,7 +370,7 @@
       "n8n": {
         "name": "n8n",
         "summary": "Automatisierungs-Workflows",
-        "hint": "Verbinde einen n8n-MCP-Server, damit der Assistent deine Automatisierungs-Workflows einsehen oder auslösen kann. Trage die MCP-Endpunkt-URL und das Zugriffstoken aus deiner n8n-Instanz ein."
+        "hint": "Verbinde einen n8n-MCP-Server, damit die KI deine Automatisierungs-Workflows einsehen oder auslösen kann. Trage die MCP-Endpunkt-URL und das Zugriffstoken aus deiner n8n-Instanz ein."
       },
       "notion": {
         "name": "Notion",
@@ -426,7 +426,7 @@
     },
     "savedSignInNotStarted": "„{name}“ wurde gespeichert. Die Anmeldung hat nicht begonnen: {reason}",
     "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
-    "allowWriteHint": "Wenn aktiviert, darf der Assistent auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
+    "allowWriteHint": "Wenn aktiviert, darf die KI auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
     "writeBadge": "Schreiben erlaubt"
   },
   "messagesGateway": {
@@ -462,7 +462,7 @@
     "saveKeyError": "API-Schlüssel konnte nicht gespeichert werden",
     "clearKeySuccess": "API-Schlüssel entfernt",
     "clearKeyError": "API-Schlüssel konnte nicht entfernt werden",
-    "webSearchLabel": "Websuche für verbundene KI-Assistenten",
+    "webSearchLabel": "Websuche für verbundene KI-Tools",
     "webSearchModeAuto": "Automatisch (empfohlen)",
     "webSearchModeSynaplan": "Immer die Websuche von Synaplan verwenden",
     "webSearchModePassthrough": "Anfrage an den KI-Anbieter weiterreichen",
@@ -479,7 +479,7 @@
     "knowledgeToolsAll": "Jeder Schlüssel am Coding-Gateway",
     "knowledgeToolsOff": "Keine Ordnersuche",
     "knowledgeToolsHint": "Wenn ein Wissensordner angeheftet ist, kann das Modell darin weiter suchen und eine Datei öffnen, falls die ersten Textstellen nicht reichen. Nur Desktop ist die empfohlene Einstellung.",
-    "visionLabel": "Bildverständnis für verbundene KI-Assistenten",
+    "visionLabel": "Bildverständnis für verbundene KI-Tools",
     "visionModeAuto": "Automatisch (empfohlen)",
     "visionModeSynaplan": "Immer das Bildmodell von Synaplan verwenden",
     "visionModePassthrough": "Bilder an den KI-Anbieter weiterreichen",
@@ -509,7 +509,7 @@
         },
         "tools": {
           "title": "Werkzeugaufrufe",
-          "description": "Was verbundene KI-Assistenten außer Antworten noch dürfen: die Werkzeuge Ihres Arbeitsbereichs nutzen und im Web suchen."
+          "description": "Was verbundene KI-Tools außer Antworten noch dürfen: die Werkzeuge Ihres Arbeitsbereichs nutzen und im Web suchen."
         },
         "vision": {
           "title": "Bilder",
@@ -526,8 +526,8 @@
       },
       "activeTools": {
         "title": "Läuft gerade in Ihrem Auftrag",
-        "empty": "Synaplan führt keine eigenen Tools aus. Verbundene KI-Assistenten erhalten nur die Tools, die ihr eigenes Programm mitbringt.",
-        "hint": "Eine einzelne Nachricht kann eines davon trotzdem auslassen: Bringt ein Programm ein eigenes Tool mit demselben Namen mit, behält es dieses, und die Websuche läuft nur, wenn der Assistent danach fragt. Das Lesen von Seiten endet am Seitenlimit. Die Ordnersuche läuft nur, solange ein Wissensordner angeheftet ist.",
+        "empty": "Synaplan führt keine eigenen Tools aus. Verbundene KI-Tools erhalten nur die Tools, die ihr eigenes Programm mitbringt.",
+        "hint": "Eine einzelne Nachricht kann eines davon trotzdem auslassen: Bringt ein Programm ein eigenes Tool mit demselben Namen mit, behält es dieses, und die Websuche läuft nur, wenn das KI-Tool danach fragt. Das Lesen von Seiten endet am Seitenlimit. Die Ordnersuche läuft nur, solange ein Wissensordner angeheftet ist.",
         "mcpServers": "dazu die Tools von 1 verbundenen Tool-Server | dazu die Tools von {count} verbundenen Tool-Servern",
         "tools": {
           "web_search": "Websuche",
@@ -546,25 +546,25 @@
         "description": "Nutzerinnen und Nutzer ohne eigenen Anthropic-Schlüssel verwenden dann den Schlüssel dieser Instanz; die Kosten laufen gegen ihr Synaplan-Budget."
       },
       "mcpTools": {
-        "label": "KI-Assistenten Ihre Werkzeuge nutzen lassen",
-        "description": "Synaplan führt die Werkzeuge Ihrer verbundenen Werkzeug-Server selbst aus und gibt das Ergebnis an den Assistenten zurück.",
+        "label": "KI-Tools Ihre Werkzeuge nutzen lassen",
+        "description": "Synaplan führt die Werkzeuge Ihrer verbundenen Werkzeug-Server selbst aus und gibt das Ergebnis an das KI-Tool zurück.",
         "noneConfigured": "Es ist noch kein Werkzeug-Server verbunden. Sie können einen unter Apps › Tool-Server (MCP) hinzufügen."
       },
       "mcpWithClientTools": {
         "label": "Eigene Werkzeuge auch anbieten, wenn das Agenten-Tool eigene mitbringt",
-        "description": "Claude Code bringt bereits einen vollständigen Satz Werkzeuge mit. Schalten Sie dies nur ein, wenn Ihre Werkzeuge zusätzlich angeboten werden sollen — eine sehr lange Werkzeugliste macht einen Assistenten ungenauer."
+        "description": "Claude Code bringt bereits einen vollständigen Satz Werkzeuge mit. Schalten Sie dies nur ein, wenn Ihre Werkzeuge zusätzlich angeboten werden sollen — eine sehr lange Werkzeugliste macht ein KI-Tool ungenauer."
       },
       "toolRounds": {
         "label": "Maximale Werkzeugrunden pro Nachricht",
-        "description": "Wie oft ein KI-Assistent ein Werkzeug nutzen und erneut nachdenken darf, bevor er antworten muss. Höhere Werte erlauben gründlicheres Arbeiten und kosten mehr."
+        "description": "Wie oft ein KI-Tool ein Werkzeug nutzen und erneut nachdenken darf, bevor er antworten muss. Höhere Werte erlauben gründlicheres Arbeiten und kosten mehr."
       },
       "webSearchRounds": {
         "label": "Websuchen vor der Antwort",
-        "description": "Nach so vielen Suchen in einer Nachricht antwortet der Assistent aus dem, was er gefunden hat, und nennt jede Quelle. 2 reicht für eine kurze Frage. Erhöhen Sie den Wert, wenn die ersten Treffer nicht genügen."
+        "description": "Nach so vielen Suchen in einer Nachricht antwortet das KI-Tool aus dem, was es gefunden hat, und nennt jede Quelle. 2 reicht für eine kurze Frage. Erhöhen Sie den Wert, wenn die ersten Treffer nicht genügen."
       },
       "webFetchPages": {
         "label": "Seiten in einer Nachricht",
-        "description": "Nach so vielen Seiten in einer Nachricht hört der Assistent auf, weitere zu öffnen, und antwortet aus dem Gelesenen. 3 reicht für eine normale Frage. 0 bedeutet, dass keine Seite geöffnet wird."
+        "description": "Nach so vielen Seiten in einer Nachricht hört das KI-Tool auf, weitere zu öffnen, und antwortet aus dem Gelesenen. 3 reicht für eine normale Frage. 0 bedeutet, dass keine Seite geöffnet wird."
       },
       "imageDetail": {
         "label": "Bildqualität",
@@ -581,11 +581,11 @@
       },
       "contextInjection": {
         "label": "Wissen aus Ihrem Arbeitsbereich ergänzen",
-        "description": "Synaplan fügt jeder Anfrage passende Informationen aus Ihrem Arbeitsbereich hinzu, damit der KI-Assistent Ihren Kontext kennt."
+        "description": "Synaplan fügt jeder Anfrage passende Informationen aus Ihrem Arbeitsbereich hinzu, damit das KI-Tool Ihren Kontext kennt."
       },
       "budgetNotice": {
         "label": "Warnen, wenn das Budget knapp wird",
-        "description": "Der KI-Assistent erhält einen kurzen Hinweis in seiner Antwort, sobald Ihr Synaplan-Budget fast aufgebraucht ist."
+        "description": "Das KI-Tool erhält einen kurzen Hinweis in seiner Antwort, sobald Ihr Synaplan-Budget fast aufgebraucht ist."
       },
       "sessionSummary": {
         "label": "Zusammenfassung jeder Sitzung behalten",
@@ -697,7 +697,7 @@
     "kindHints": {
       "email_search": "Schaut ins verbundene Postfach.",
       "summarize": "Kürzt das vorherige Ergebnis.",
-      "chat": "Nutzt den Assistenten dieser Aufgabe.",
+      "chat": "Nutzt die KI dieser Aufgabe.",
       "email_me": "Schickt dir eine E-Mail.",
       "tool_call": "Führt ein bereits verbundenes Werkzeug aus.",
       "condition": "Stoppt spätere Schritte, wenn der Wert nicht passt.",
@@ -723,7 +723,7 @@
     "useTemplate": "Vorlage verwenden",
     "useTemplateConfirm": "Eigene Kopie anlegen? Sie bleibt aus, bis Sie sie einschalten. Eine neue Adresse wird erzeugt, wenn ein anderes System diese Aufgabe starten kann.",
     "useTemplateDone": "Kopie erstellt. Sie ist aus, bis Sie sie einschalten.",
-    "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Assistenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten.",
+    "useTemplateNeedsSetup": "Kopie erstellt und ausgeschaltet. Verbinden Sie den fehlenden Agenten, das Werkzeug oder die Verbindung, bevor Sie sie einschalten.",
     "useTemplateNeedsSetupItems": "Kopie erstellt und ausgeschaltet. Noch nötig: {items}.",
     "notionPage": "Notion-Seite",
     "notionPageHint": "Füge den Link der Seite ein. Jeder Lauf legt darunter eine neue Seite an.",
@@ -741,7 +741,7 @@
     "chats": {
       "rail": {
         "title": "Die Bereiche",
-        "body": "Diese Symbole wechseln den Bereich: Chats, Bibliothek, Assistenten und Apps. Admin sieht nur, wer die Instanz verwaltet. Ein Klick öffnet daneben das Menü."
+        "body": "Diese Symbole wechseln den Bereich: Chats, Bibliothek, Agenten und Apps. Admin sieht nur, wer die Instanz verwaltet. Ein Klick öffnet daneben das Menü."
       },
       "new": {
         "title": "Ein neuer Chat",
@@ -757,17 +757,17 @@
       },
       "model": {
         "title": "Welches Modell antwortet",
-        "body": "Der Name hier ist das Modell dieser Antwort. Tippe darauf, wenn du ein anderes willst. Was für alle gilt, stellst du unter Assistenten bei den KI-Einstellungen ein."
+        "body": "Der Name hier ist das Modell dieser Antwort. Tippe darauf, wenn du ein anderes willst. Was für alle gilt, stellst du unter Agenten bei den KI-Einstellungen ein."
       },
       "search": {
         "title": "Etwas wiederfinden",
-        "body": "Dieses Feld durchsucht Chats, Dateien, Assistenten und Seiten. Dieselbe Suche öffnest du von überall mit Strg+K oder ⌘K."
+        "body": "Dieses Feld durchsucht Chats, Dateien, Agenten und Seiten. Dieselbe Suche öffnest du von überall mit Strg+K oder ⌘K."
       }
     },
     "chatsGuest": {
       "rail": {
         "title": "Was du öffnen kannst",
-        "body": "Als Gast bist du in Chats. Bibliothek, Assistenten und Apps bleiben zu, bis du ein Konto mit einem Plan oder einem Einladungscode hast. Deshalb funktioniert nicht jedes Symbol."
+        "body": "Als Gast bist du in Chats. Bibliothek, Agenten und Apps bleiben zu, bis du ein Konto mit einem Plan oder einem Einladungscode hast. Deshalb funktioniert nicht jedes Symbol."
       },
       "input": {
         "title": "Einfach fragen",
@@ -783,7 +783,7 @@
       },
       "plan": {
         "title": "Ein Konto, dann ein Plan",
-        "body": "Ein Konto braucht einen Plan oder einen Einladungscode. Damit kommen Bibliothek, Assistenten und Apps dazu."
+        "body": "Ein Konto braucht einen Plan oder einen Einladungscode. Damit kommen Bibliothek, Agenten und Apps dazu."
       }
     },
     "library": {
@@ -802,12 +802,12 @@
     },
     "assistants": {
       "create": {
-        "title": "Einen Assistenten anlegen",
-        "body": "Ein Assistent merkt sich Anweisungen, Dateien und Werkzeuge. Du legst das einmal fest. Jeder Chat mit ihm kennt es dann."
+        "title": "Einen Agenten anlegen",
+        "body": "Ein Agent merkt sich Anweisungen, Dateien und Werkzeuge. Du legst das einmal fest. Jeder Chat mit ihm kennt es dann."
       },
       "gallery": {
         "title": "Die Liste",
-        "body": "Hier liegen die Assistenten, die es schon gibt. Einen öffnest du zum Chatten, zum Ändern oder zum Teilen mit deinem Team."
+        "body": "Hier liegen die Agenten, die es schon gibt. Einen öffnest du zum Chatten, zum Ändern oder zum Teilen mit deinem Team."
       },
       "more": {
         "title": "Noch in diesem Menü",
@@ -845,7 +845,7 @@
       },
       "add": {
         "title": "Jemanden hinzufügen",
-        "body": "Ein Konto braucht einen Plan oder einen Einladungscode. Danach erscheint die Person hier und kann Bibliothek, Assistenten und Apps nutzen."
+        "body": "Ein Konto braucht einen Plan oder einen Einladungscode. Danach erscheint die Person hier und kann Bibliothek, Agenten und Apps nutzen."
       },
       "menu": {
         "title": "Die Seiten unter Admin",
@@ -867,8 +867,8 @@
           "where": "Ein Dokument oder ein Foto, aus dem die KI später antworten kann."
         },
         "assistant": {
-          "title": "Assistenten erstellen",
-          "where": "Anweisungen, Dateien und Werkzeuge einmal festlegen. Jeder Chat mit diesem Assistenten kennt sie dann."
+          "title": "Agenten erstellen",
+          "where": "Anweisungen, Dateien und Werkzeuge einmal festlegen. Jeder Chat mit diesem Agenten kennt sie dann."
         },
         "app": {
           "title": "App verbinden",
@@ -934,19 +934,19 @@
     "items": {
       "telegram": {
         "name": "Telegram",
-        "tagline": "Chatte in Telegram mit deinem Assistenten.",
-        "about": "Dein eigener Telegram-Bot antwortet mit deinem Assistenten. Nur deine Nachrichten erreichen Synaplan, niemand sonst kann den Bot nutzen.",
+        "tagline": "Chatte in Telegram mit deinem Agenten.",
+        "about": "Dein eigener Telegram-Bot antwortet mit deinem Agenten. Nur deine Nachrichten erreichen Synaplan, niemand sonst kann den Bot nutzen.",
         "stop": "Unten trennen. Der Bot antwortet sofort nicht mehr."
       },
       "whatsapp": {
         "name": "WhatsApp",
         "tagline": "Frag Synaplan direkt aus WhatsApp.",
-        "about": "Bestätige deine Telefonnummer und schreibe dann der Synaplan-Nummer. Es antwortet der Assistent, den du unten wählst.",
-        "stop": "Wähle unten keinen Assistenten oder entferne deine bestätigte Nummer."
+        "about": "Bestätige deine Telefonnummer und schreibe dann der Synaplan-Nummer. Es antwortet der Agent, den du unten wählst.",
+        "stop": "Wähle unten keinen Agenten oder entferne deine bestätigte Nummer."
       },
       "widgets": {
         "name": "Chat-Widgets",
-        "tagline": "Bring einen KI-Assistenten auf deine Website."
+        "tagline": "Bring einen KI-Chat auf deine Website."
       },
       "email": {
         "name": "E-Mail an Synaplan",
@@ -962,7 +962,7 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Outlook-Mail und -Kalender für deinen Assistenten.",
+        "tagline": "Outlook-Mail und -Kalender für deinen Agenten.",
         "about": "Nach der Anmeldung bei Microsoft kann die KI deine Outlook-Mails lesen, Termine in deinen Kalender eintragen und Ergebnisse aus deinem eigenen Postfach senden.",
         "stop": "Entferne die Verbindung unten. Der Zugriff endet sofort."
       },
@@ -980,19 +980,19 @@
       },
       "nextcloud": {
         "name": "Synaplan in Nextcloud",
-        "tagline": "Nutze deine Assistenten direkt in Nextcloud.",
+        "tagline": "Nutze deine Agenten direkt in Nextcloud.",
         "about": "Installiere die Synaplan-App in Nextcloud und melde dich dort an. Nextcloud nutzt dann dieses Konto; du kopierst nie einen Schlüssel.",
         "stop": "Trenne den Server in der Liste unten."
       },
       "owncloud": {
         "name": "Synaplan in ownCloud",
-        "tagline": "Nutze deine Assistenten direkt in ownCloud.",
+        "tagline": "Nutze deine Agenten direkt in ownCloud.",
         "about": "Installiere die Synaplan-App in ownCloud und melde dich dort an. ownCloud nutzt dann dieses Konto; du kopierst nie einen Schlüssel.",
         "stop": "Trenne den Server in der Liste unten."
       },
       "outlook": {
         "name": "Synaplan in Outlook",
-        "tagline": "Beantworte Mails und fasse sie mit deinem Assistenten in Outlook zusammen.",
+        "tagline": "Beantworte Mails und fasse sie mit deinem Agenten in Outlook zusammen.",
         "about": "Füge in Outlook das Synaplan-Add-in hinzu und melde dich dort an. Das Add-in nutzt dann dieses Konto.",
         "stop": "Trenne es in der Liste unten."
       },
@@ -1029,7 +1029,7 @@
       },
       "desktop": {
         "name": "Synaplan Desktop",
-        "tagline": "Lass deinen Assistenten mit Dateien auf deinem Computer arbeiten.",
+        "tagline": "Lass deinen Agenten mit Dateien auf deinem Computer arbeiten.",
         "about": "Kopple die Desktop-App mit einem Code. Sie führt Aufträge aus dem Chat auf deinem eigenen Rechner aus.",
         "stop": "Entferne das Gerät unten. Laufende Aufträge werden abgebrochen."
       },

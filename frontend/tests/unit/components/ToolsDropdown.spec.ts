@@ -166,7 +166,7 @@ describe('ToolsDropdown /help', () => {
 
     const help = wrapper.get('[data-testid="btn-tool-help"]')
     expect(help.text()).toContain('Help')
-    expect(help.text()).toContain('Ask what this AI assistant can do here')
+    expect(help.text()).toContain('Ask what this AI can do here')
   })
 })
 

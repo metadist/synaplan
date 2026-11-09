@@ -51,7 +51,7 @@ describe('FilesTabs', () => {
   it('says on Browse that searchable files can be used, in one uncut line', () => {
     const wrapper = mountHeader()
     expect(wrapper.get('[data-testid="subtitle"]').text()).toBe(
-      'Files marked Searchable by AI can be used in chats and assistants.'
+      'Files marked Searchable by AI can be used in chats and agents.'
     )
     expect(wrapper.get('[data-testid="subtitle"]').text()).not.toContain(
       'Add files to your sources'

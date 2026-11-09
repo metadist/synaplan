@@ -74,7 +74,7 @@ const openContext = (approval: Approval) => {
     return
   }
   if (ref.kind === 'agent_publish' && ref.agentId) {
-    void router.push({ path: `/ai/assistants/${ref.agentId}` })
+    void router.push({ path: `/ai/agents/${ref.agentId}` })
   }
 }
 

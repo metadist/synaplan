@@ -117,7 +117,7 @@ final readonly class FeaturesTab implements SystemConfigTab
             ),
             'FEATURE_AGENTS_ROUTABLE_ENABLED' => new FieldDefinition(
                 type: 'boolean',
-                description: 'Assistants in routing: let the message sorter pick an assistant that was marked "reachable from chat" as the answer for a matching request. Off keeps assistants reachable only by explicit selection.',
+                description: 'Agents in routing: let the message sorter pick an agent that was marked "reachable from chat" as the answer for a matching request. Off keeps agents reachable only by explicit selection.',
                 default: 'true',
                 row: new DatabaseRow(AgentConfig::CONFIG_GROUP, AgentConfig::KEY_ROUTABLE_ENABLED),
             ),

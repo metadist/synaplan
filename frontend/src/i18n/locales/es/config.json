@@ -495,7 +495,7 @@
       "aiModel": "Modelo de IA",
       "aiModelHelp": "Selecciona qué modelo de IA usar para este prompt. Los modelos están agrupados por sus capacidades.",
       "automated": "Automático (Mejor Modelo)",
-      "availableTools": "Herramientas Disponibles",
+      "availableTools": "Herramientas",
       "availableToolsHelp": "Habilita herramientas que estarán disponibles al usar este prompt",
       "internetSearch": {
         "label": "Búsqueda en Internet",

@@ -566,7 +566,7 @@ export const selectors = {
     noResults: '[data-testid="apps-no-results"]',
   },
   assistants: {
-    /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */
+    /** Gallery rendered by /ai/agents (and by /ai/instructions while AGENTS.ENABLED is on) */
     gallery: '[data-testid="section-assistant-gallery"]',
     builder: '[data-testid="section-assistant-builder"]',
     name: '[data-testid="input-assistant-name"]',

@@ -50,7 +50,7 @@ describe('GettingStartedChecklist', () => {
     expect(httpClient.mock.calls[0][0]).toBe('/api/v1/getting-started')
     expect(item(wrapper, 'file').attributes('data-done')).toBe('true')
     expect(item(wrapper, 'assistant').attributes('data-done')).toBe('false')
-    expect(item(wrapper, 'assistant').attributes('href')).toBe('/ai/assistants')
+    expect(item(wrapper, 'assistant').attributes('href')).toBe('/ai/agents')
     expect(item(wrapper, 'file').text()).toContain('A document or a photo')
     expect(item(wrapper, 'provider').exists()).toBe(false)
     expect(wrapper.get('[data-testid="text-getting-started-progress"]').text()).toContain('1 of 3')

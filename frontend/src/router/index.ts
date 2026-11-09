@@ -415,7 +415,7 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.prompts', i18n: ['chat'] },
     },
     {
-      path: '/ai/assistants',
+      path: '/ai/agents',
       name: 'ai-assistants',
       component: () => import('@/views/AssistantsView.vue'),
       meta: {
@@ -427,11 +427,17 @@ const router = createRouter({
       beforeEnter: assistantsRouteGuard,
     },
     {
-      path: '/ai/assistants/:id',
+      path: '/ai/agents/:id',
       name: 'ai-assistant-builder',
       component: () => import('@/views/AssistantsView.vue'),
       meta: { requiresAuth: true, titleKey: 'pageTitles.assistantBuilder', i18n: ['assistants'] },
       beforeEnter: assistantsRouteGuard,
+    },
+    // Assistants were renamed to Agents (2026-11); keep old bookmarks working.
+    { path: '/ai/assistants', redirect: '/ai/agents' },
+    {
+      path: '/ai/assistants/:id',
+      redirect: (to) => ({ path: `/ai/agents/${String(to.params.id)}`, query: to.query }),
     },
     // --- Redirects from the 2026-06 tree (UX overhaul; keep ≥ 2 releases) ---
     { path: '/channels', redirect: '/apps' },

@@ -10,7 +10,7 @@ test.describe('@ci Assistants knowledge upload', () => {
     )
 
     // This spec does not need the chat composer (openApp would wait for it).
-    await page.goto('/ai/assistants')
+    await page.goto('/ai/agents')
     await expect(page.locator('[data-testid="view-assistants"]')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })

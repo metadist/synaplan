@@ -8,6 +8,6 @@ final class AgentArchivedException extends \RuntimeException
 {
     public static function forId(int $agentId): self
     {
-        return new self(sprintf('Assistant %d is archived', $agentId));
+        return new self(sprintf('Agent %d is archived', $agentId));
     }
 }

@@ -753,7 +753,7 @@ ON DUPLICATE KEY UPDATE BVALUE = '1';
 ### Publishing an assistant to a group
 
 1. Turn groups and sharing on (both flags above).
-2. Create a custom assistant under **AI → Assistants** (**AI → Instructions**
+2. Create a custom agent under **AI → Agents** (**AI → Instructions**
    while `FEATURE_AGENTS_ENABLED` is off). System assistants with owner `0`
    cannot be shared — everyone can already use them.
 3. Open **Share** and grant **Can use** to the group (for example Sales).
