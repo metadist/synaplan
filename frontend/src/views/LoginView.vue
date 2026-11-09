@@ -1,6 +1,6 @@
 <template>
   <div
-    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-6 sm:py-12 relative"
     :style="
       isNativeApp() ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)' } : undefined
     "
@@ -62,7 +62,7 @@
     -->
     <div
       class="w-full max-w-sm auth-card-enter relative z-10"
-      :class="{ 'my-auto': !isNativeApp() }"
+      :class="{ 'sm:my-auto': !isNativeApp() }"
       data-testid="section-card"
     >
       <div
