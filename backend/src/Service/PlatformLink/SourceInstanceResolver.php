@@ -9,6 +9,7 @@ use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
+use App\Security\OAuthBearerAuthenticator;
 use App\Security\OidcBearerAuthenticator;
 use Symfony\Component\HttpFoundation\Request;
 
@@ -26,6 +27,10 @@ final readonly class SourceInstanceResolver
 
     public function fromRequest(Request $request): ?string
     {
+        $client = $request->attributes->get(OAuthBearerAuthenticator::CLIENT_ATTRIBUTE);
+        if (is_string($client) && '' !== $client) {
+            return $client;
+        }
         $key = $request->attributes->get('api_key');
         if ($key instanceof ApiKey) {
             $identity = $this->identities->findOneByApiKeyId((int) $key->getId());
