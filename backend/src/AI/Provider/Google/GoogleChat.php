@@ -6,6 +6,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Provider\ChatStopReason;
+use App\AI\Stream\GeminiStreamDecoder;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use Psr\Log\LoggerInterface;
@@ -190,21 +191,18 @@ final class GoogleChat
         $sawFunctionCall = false;
         $toolIndex = 0;
 
+        $decoder = new GeminiStreamDecoder();
         foreach ($this->api->stream($response) as $chunk) {
             if ($chunk->isLast()) {
                 break;
             }
 
-            $content = $chunk->getContent();
-
-            // Parse SSE format: data: {...}
-            if (str_starts_with($content, 'data: ')) {
-                $jsonData = substr($content, 6);
-                $data = json_decode($jsonData, true);
-
-                if ($data) {
-                    $this->api->checkFinishReason($data);
+            foreach ($decoder->feed($chunk->getContent()) as $piece) {
+                $data = $piece->data;
+                if (!is_array($data)) {
+                    continue;
                 }
+                $this->api->checkFinishReason($data);
 
                 if (isset($data['usageMetadata']) && \is_array($data['usageMetadata'])) {
                     $usage = GoogleUsage::fromMetadata($data['usageMetadata']);

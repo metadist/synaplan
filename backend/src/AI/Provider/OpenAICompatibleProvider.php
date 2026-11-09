@@ -13,6 +13,8 @@ use App\AI\Interface\ImageGenerationProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\Provider\Concerns\OpenAiCompatibleStreamRequest;
+use App\AI\Stream\OpenAiChatCompletionsDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -40,6 +42,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface
 {
     use ChatCompletionsToolSupport;
+    use OpenAiCompatibleStreamRequest;
 
     /**
      * Local diffusion (FLUX on CPU) blocks until the PNG is done. 180s matches
@@ -453,29 +456,20 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
         $stream = $client->chat()->createStreamed($request);
         $usage = $this->normalizeUsage([]);
         $finishReason = null;
+        $decoder = new OpenAiChatCompletionsDecoder();
 
         foreach ($stream as $response) {
             // A chunk has already reached the caller once this iteration
             // starts. Do not replay the stream after that.
             $delivered = true;
             $arr = $response->toArray();
-
-            if (isset($arr['usage'])) {
-                $usage = $this->normalizeUsage($arr['usage']);
-            }
-
-            $chunkFinish = $arr['choices'][0]['finish_reason'] ?? null;
-            if (null !== $chunkFinish) {
-                $finishReason = $chunkFinish;
-            }
-
-            // o-series uses reasoning_content. Ollama's OpenAI-compatible API
-            // puts Qwen3 thinking in delta.reasoning. Read the raw payload:
-            // the SDK object drops fields it does not know.
-            $delta = is_array($arr['choices'][0]['delta'] ?? null) ? $arr['choices'][0]['delta'] : [];
-            $reasoning = $delta['reasoning_content'] ?? $delta['reasoning'] ?? null;
-            if (is_string($reasoning) && '' !== $reasoning) {
-                $callback(['type' => 'reasoning', 'content' => self::toUtf8($reasoning)]);
+            foreach ($decoder->accept($arr) as $piece) {
+                if ('reasoning' === $piece->kind && is_string($piece->data)) {
+                    $callback(['type' => 'reasoning', 'content' => $piece->data]);
+                }
+                if ('tool_choice' === $piece->kind) {
+                    $this->emitChatCompletionsToolDeltas($piece->data, $callback);
+                }
             }
 
             if (isset($response->choices[0]->delta->content)) {
@@ -484,9 +478,11 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
                     $callback($content);
                 }
             }
-
-            $this->emitChatCompletionsToolDeltas($arr['choices'][0] ?? [], $callback);
         }
+        if ([] !== $decoder->usage()) {
+            $usage = $this->normalizeUsage($decoder->usage());
+        }
+        $finishReason = $decoder->finishReason();
 
         if (null !== $finishReason) {
             $callback(['type' => 'finish', 'finish_reason' => $finishReason]);

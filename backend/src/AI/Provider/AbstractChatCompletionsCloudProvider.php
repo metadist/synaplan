@@ -11,6 +11,7 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\Stream\OpenAiChatCompletionsDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -183,17 +184,16 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
 
             $usage = $this->parseUsage([]);
             $finishReason = null;
+            $decoder = new OpenAiChatCompletionsDecoder(false);
 
             foreach ($stream as $response) {
                 $responseArray = $response->toArray();
-
-                if (isset($responseArray['usage'])) {
-                    $usage = $this->parseUsage($responseArray['usage']);
+                $decoder->accept($responseArray);
+                if ([] !== $decoder->usage()) {
+                    $usage = $this->parseUsage($decoder->usage());
                 }
-
-                $chunkFinishReason = $responseArray['choices'][0]['finish_reason'] ?? null;
-                if (null !== $chunkFinishReason) {
-                    $finishReason = $chunkFinishReason;
+                if (null !== $decoder->finishReason()) {
+                    $finishReason = $decoder->finishReason();
                 }
 
                 $reasoning = $this->streamedReasoning($responseArray);

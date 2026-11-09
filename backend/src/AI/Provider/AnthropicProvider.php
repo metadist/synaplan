@@ -9,6 +9,7 @@ use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Messages\MessagesUsage;
+use App\AI\Stream\AnthropicStreamDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -1320,193 +1321,31 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
      * instead of being streamed to the user as answer text (with a schema
      * they still ARE the answer — see chat()).
      */
+    public function streamDecoder(bool $toolArgumentsAreCalls = false): AnthropicStreamDecoder
+    {
+        return new AnthropicStreamDecoder($toolArgumentsAreCalls, $this->logger);
+    }
+
     private function parseSSEStream(ResponseInterface $response, callable $callback, ?ToolCallAccumulator $toolCalls = null): array
     {
-        $buffer = '';
-        $currentBlockType = null;
-        $inputTokens = 0;
-        $outputTokens = 0;
-        $cacheCreationTokens = 0;
-        $cacheCreation1hTokens = 0;
-        $cacheReadTokens = 0;
-        $finishReason = null;
-
+        $decoder = $this->streamDecoder(null !== $toolCalls);
         foreach ($this->httpClient->stream($response) as $chunk) {
             if ($chunk->isLast()) {
                 break;
             }
-
-            $content = $chunk->getContent();
-            $buffer .= $content;
-
-            // Process complete SSE events (terminated by \n\n)
-            while (($pos = strpos($buffer, "\n\n")) !== false) {
-                $eventData = substr($buffer, 0, $pos);
-                $buffer = substr($buffer, $pos + 2);
-
-                $event = $this->parseSSEEvent($eventData);
-
-                if (!$event || !isset($event['type'])) {
-                    continue;
+            foreach ($decoder->feed($chunk->getContent()) as $piece) {
+                $event = $piece->data;
+                if (is_array($event) && 'tool_call_delta' === ($event['type'] ?? null)) {
+                    $toolCalls?->addDelta($event);
                 }
-
-                // Process different event types
-                switch ($event['type']) {
-                    case 'message_start':
-                        $msgUsage = $event['data']['message']['usage'] ?? [];
-                        $inputTokens = $msgUsage['input_tokens'] ?? 0;
-                        $cacheCreationTokens = $msgUsage['cache_creation_input_tokens'] ?? 0;
-                        $cacheCreation1hTokens = MessagesUsage::extractCacheCreation1hTokens($msgUsage);
-                        $cacheReadTokens = $msgUsage['cache_read_input_tokens'] ?? 0;
-                        break;
-
-                    case 'content_block_start':
-                        $currentBlockType = $event['data']['content_block']['type'] ?? null;
-
-                        if ('thinking' === $currentBlockType) {
-                            $this->logger->info('🧠 Anthropic: Thinking block started');
-                        } elseif ('tool_use' === $currentBlockType) {
-                            $block = is_array($event['data']['content_block'] ?? null) ? $event['data']['content_block'] : [];
-                            $chunk = [
-                                'type' => 'tool_call_delta',
-                                'index' => (int) ($event['data']['index'] ?? 0),
-                                'id' => isset($block['id']) && is_string($block['id']) && '' !== $block['id'] ? $block['id'] : null,
-                                'name' => isset($block['name']) && is_string($block['name']) && '' !== $block['name'] ? $block['name'] : null,
-                                'arguments' => '',
-                            ];
-                            $toolCalls?->addDelta($chunk);
-                            $callback($chunk);
-                        }
-                        break;
-
-                    case 'content_block_delta':
-                        $delta = $event['data']['delta'] ?? [];
-                        $deltaType = $delta['type'] ?? '';
-
-                        if ('text_delta' === $deltaType) {
-                            $callback([
-                                'type' => 'content',
-                                'content' => $delta['text'] ?? '',
-                            ]);
-                        } elseif ('thinking_delta' === $deltaType) {
-                            $callback([
-                                'type' => 'reasoning',
-                                'content' => $delta['thinking'] ?? '',
-                            ]);
-                        } elseif ('input_json_delta' === $deltaType && null !== $toolCalls) {
-                            // Native tool calling (see chatStream()): these
-                            // fragments are the arguments of a REAL tool call.
-                            // Folded here for this method's caller and passed
-                            // on for stream consumers that fold themselves.
-                            $chunk = [
-                                'type' => 'tool_call_delta',
-                                'index' => (int) ($event['data']['index'] ?? 0),
-                                'id' => null,
-                                'name' => null,
-                                'arguments' => is_string($delta['partial_json'] ?? null) ? $delta['partial_json'] : '',
-                            ];
-                            $toolCalls->addDelta($chunk);
-                            $callback($chunk);
-                        } elseif ('input_json_delta' === $deltaType) {
-                            // Structured-output tool-forcing (see chat()): the tool's
-                            // `input` streams as incremental JSON fragments here instead
-                            // of `text_delta`. Forward them as ordinary content chunks so
-                            // they concatenate into the same complete JSON string the
-                            // non-streaming path returns in `content`.
-                            $callback([
-                                'type' => 'content',
-                                'content' => $delta['partial_json'] ?? '',
-                            ]);
-                        }
-                        // signature_delta carries integrity data only — no forwarding needed
-                        break;
-
-                    case 'content_block_stop':
-                        if ('thinking' === $currentBlockType) {
-                            $this->logger->info('🧠 Anthropic: Thinking block completed');
-                        }
-                        $currentBlockType = null;
-                        break;
-
-                    case 'message_delta':
-                        $deltaUsage = $event['data']['usage'] ?? [];
-                        $outputTokens = $deltaUsage['output_tokens'] ?? $outputTokens;
-
-                        // Anthropic sends stop_reason in message_delta ("end_turn" or "max_tokens")
-                        $stopReason = $event['data']['delta']['stop_reason'] ?? null;
-                        if (null !== $stopReason) {
-                            $finishReason = match ($stopReason) {
-                                'max_tokens' => 'length',
-                                'end_turn' => 'stop',
-                                'tool_use' => 'tool_calls',
-                                default => $stopReason,
-                            };
-                        }
-                        break;
-
-                    case 'message_stop':
-                        break;
-
-                    case 'error':
-                        $errorMessage = $event['data']['error']['message'] ?? 'Unknown error';
-                        throw new \Exception($errorMessage);
-                    case 'ping':
-                        break;
-                }
+                $callback($event);
             }
         }
-
-        if (null !== $finishReason) {
-            $callback(['type' => 'finish', 'finish_reason' => $finishReason]);
+        foreach ($decoder->finish() as $piece) {
+            $callback($piece->data);
         }
 
-        return [
-            'prompt_tokens' => $inputTokens + $cacheCreationTokens + $cacheReadTokens,
-            'completion_tokens' => $outputTokens,
-            'total_tokens' => $inputTokens + $outputTokens + $cacheCreationTokens + $cacheReadTokens,
-            'cached_tokens' => $cacheReadTokens,
-            'cache_creation_tokens' => $cacheCreationTokens,
-            'cache_creation_1h_tokens' => $cacheCreation1hTokens,
-        ];
-    }
-
-    /**
-     * Parse a single SSE event.
-     *
-     * Format:
-     * event: message_start
-     * data: {"type":"message_start","message":{...}}
-     */
-    private function parseSSEEvent(string $eventData): ?array
-    {
-        $lines = explode("\n", $eventData);
-        $event = [
-            'type' => null,
-            'data' => null,
-        ];
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-
-            if (str_starts_with($line, 'event:')) {
-                $event['type'] = trim(substr($line, 6));
-            } elseif (str_starts_with($line, 'data:')) {
-                $jsonData = trim(substr($line, 5));
-
-                if ($jsonData) {
-                    $decoded = json_decode($jsonData, true);
-                    if (null !== $decoded) {
-                        // Use the 'type' from JSON if event type not set
-                        if (!$event['type'] && isset($decoded['type'])) {
-                            $event['type'] = $decoded['type'];
-                        }
-                        $event['data'] = $decoded;
-                    }
-                }
-            }
-        }
-
-        return $event['type'] ? $event : null;
+        return $decoder->usage();
     }
 
     /**
