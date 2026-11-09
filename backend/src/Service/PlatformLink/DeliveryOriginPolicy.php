@@ -31,11 +31,12 @@ final readonly class DeliveryOriginPolicy
         }
         $host = strtolower(trim($parts['host'], '[]'));
         $scheme = strtolower($parts['scheme']);
-        if ($this->redirects->isDev() && $this->redirects->isLocalDevHost($host) && in_array($scheme, ['http', 'https'], true)) {
-            return true;
-        }
+        $devHost = $this->redirects->isDev() && $this->redirects->isLocalDevHost($host) && in_array($scheme, ['http', 'https'], true);
         if ($this->oidcCloud->isThisCloud($instance)) {
-            return $this->oidcCloud->allowsDelivery($instance, $url) && !$this->isLoopbackOrLinkLocal($host);
+            return $this->oidcCloud->allowsDelivery($instance, $url) && ($devHost || !$this->isLoopbackOrLinkLocal($host));
+        }
+        if ($devHost) {
+            return true;
         }
         if (in_array($scheme, ['http', 'https'], true) && in_array($host, $instance->getApprovedHosts(), true)) {
             return !$this->isLoopbackOrLinkLocal($host);
