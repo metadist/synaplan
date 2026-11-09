@@ -164,9 +164,12 @@ $KCADM create clients -r synaplan \
   -s enabled=true \
   -s publicClient=false \
   -s secret="${EXCHANGE_CLIENT_SECRET}" \
-  -s standardFlowEnabled=false \
+  -s standardFlowEnabled=true \
   -s directAccessGrantsEnabled=false \
-  -s serviceAccountsEnabled=true
+  -s serviceAccountsEnabled=false \
+  -s "redirectUris=[\"${OC_ORIGIN}/*\",\"${OC_DEV_ORIGIN}/*\"]" \
+  -s "webOrigins=[\"${OC_ORIGIN}\",\"${OC_DEV_ORIGIN}\"]" \
+  -s 'attributes={"pkce.code.challenge.method":"S256"}'
 
 # Configure token exchange permissions using kcadm.sh.
 # (SYNAPLAN_CLIENT_UUID was resolved earlier when creating the audience mapper.)
@@ -204,6 +207,26 @@ $KCADM update "clients/${REALM_MGMT_UUID}/authz/resource-server/permission/scope
   -s "policies=[\"${POLICY_UUID}\"]"
 
 echo "Token exchange permission configured for ${EXCHANGE_CLIENT_ID} -> ${CLIENT_ID}"
+
+# The synaplan-opencloud service also exchanges a person's token for the
+# opencloud client, to call OpenCloud as that person while they are away.
+$KCADM update "clients/${OC_CLIENT_UUID}/management/permissions" -r synaplan \
+  -s enabled=true
+
+OC_PERM_NAME="token-exchange.permission.client.${OC_CLIENT_UUID}"
+OC_EXCHANGE_PERM=$($KCADM get "clients/${REALM_MGMT_UUID}/authz/resource-server/permission?name=${OC_PERM_NAME}" -r synaplan --fields id | json_field id)
+
+if [ -z "${OC_EXCHANGE_PERM}" ]; then
+  echo "ERROR: Could not resolve token-exchange permission for ${OC_CLIENT_ID}" >&2
+  exit 1
+fi
+
+$KCADM update "clients/${REALM_MGMT_UUID}/authz/resource-server/permission/scope/${OC_EXCHANGE_PERM}" -r synaplan \
+  -s "name=${OC_PERM_NAME}" \
+  -s decisionStrategy=AFFIRMATIVE \
+  -s "policies=[\"${POLICY_UUID}\"]"
+
+echo "Token exchange permission configured for ${EXCHANGE_CLIENT_ID} -> ${OC_CLIENT_ID}"
 
 echo "OpenCloud integration clients provisioned"
 echo "  OpenCloud client: ${OC_CLIENT_ID}"
