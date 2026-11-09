@@ -6,7 +6,7 @@ import { getApiUrl, TIMEOUTS } from '../config/config'
 
 const SEL = selectors.assistants
 
-test.describe('@ci Assistants builder name autosave', () => {
+test.describe('@ci Agents builder name autosave', () => {
   test('an empty name does not discard a greeting typed in the same save', async ({
     page,
     request,

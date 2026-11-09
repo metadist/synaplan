@@ -2,7 +2,7 @@ import { test, expect } from '../test-setup'
 import { isAgentsEnabled } from '../helpers/features'
 import { TIMEOUTS } from '../config/config'
 
-test.describe('@ci Assistants knowledge upload', () => {
+test.describe('@ci Agents knowledge upload', () => {
   test('Add a file does not scroll the app shell', async ({ page, request, credentials }) => {
     test.skip(
       !(await isAgentsEnabled(request, credentials)),
@@ -20,7 +20,7 @@ test.describe('@ci Assistants knowledge upload', () => {
       timeout: TIMEOUTS.STANDARD,
     })
     await page.getByTestId('card-template-empty').click()
-    await expect(page).toHaveURL(/\/ai\/assistants\/\d+/, { timeout: TIMEOUTS.STANDARD })
+    await expect(page).toHaveURL(/\/ai\/agents\/\d+/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.getByTestId('section-builder-knowledge')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
     })

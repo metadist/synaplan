@@ -6,7 +6,7 @@ import { getApiUrl, TIMEOUTS } from '../config/config'
 
 const CHAT = selectors.chat
 
-test.describe('@ci Assistants first chat message', () => {
+test.describe('@ci Agents first chat message', () => {
   test('the first and second messages keep the assistant from Start chat', async ({
     page,
     request,

@@ -3,7 +3,7 @@ import { getAuthHeaders } from '../helpers/auth'
 import { isAgentsEnabled } from '../helpers/features'
 import { getApiUrl, TIMEOUTS } from '../config/config'
 
-test.describe('@ci Assistant template gallery', () => {
+test.describe('@ci Agent template gallery', () => {
   test('installing the offer writer shows what is still needed', async ({
     page,
     request,
@@ -18,9 +18,9 @@ test.describe('@ci Assistant template gallery', () => {
     await page.getByTestId('card-template-offer-writer').click()
     await expect(page.getByTestId('section-template-detail')).toBeVisible()
     await page.getByTestId('btn-template-install').click()
-    await expect(page).toHaveURL(/\/ai\/assistants\/\d+/, { timeout: TIMEOUTS.STANDARD })
+    await expect(page).toHaveURL(/\/ai\/agents\/\d+/, { timeout: TIMEOUTS.STANDARD })
 
-    const agentId = page.url().match(/\/ai\/assistants\/(\d+)/)?.[1]
+    const agentId = page.url().match(/\/ai\/agents\/(\d+)/)?.[1]
     expect(agentId).toBeTruthy()
 
     try {
