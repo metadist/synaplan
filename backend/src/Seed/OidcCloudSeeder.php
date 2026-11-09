@@ -14,7 +14,7 @@ use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 /**
  * Brings the cloud configured by environment variables (OidcCloud) into its
  * fixed row `oidc-cloud` on every container start, after the platform-links
- * defaults. Nothing happens when PLATFORM_LINKS_OIDC_CLOUD is empty; a row
+ * defaults. Nothing happens when PLATFORM_LINKS_OIDC_CLOUD_TYPE is empty; a row
  * from an earlier configuration then stays as it is.
  */
 #[AsTaggedItem(priority: -10)]
@@ -43,7 +43,7 @@ final readonly class OidcCloudSeeder implements SeederInterface
         if (!$this->cloud->isEnabled()) {
             return new SeedResult('oidc_cloud', inserted: 0, skipped: 1);
         }
-        $host = $this->redirects->normalizeHost($this->cloud->host);
+        $host = $this->redirects->normalizeHost($this->cloud->url);
         $instance = $this->instances->findByInstanceId(PlatformInstance::OIDC_CLOUD_ID);
         $created = !$instance instanceof PlatformInstance;
         if (!$instance instanceof PlatformInstance) {
@@ -53,7 +53,7 @@ final readonly class OidcCloudSeeder implements SeederInterface
         $instance->setClient($this->cloud->client);
         $instance->setHost($host);
         $instance->setStatus(PlatformInstance::STATUS_ACTIVE);
-        $instance->setOidcClientId($this->cloud->peopleClient);
+        $instance->setOidcClientId($this->cloud->clientId);
         $instance->setAppCapabilities($this->cloud->capabilities);
         $instance->setDeliveryUrl($this->cloud->deliveryUrl);
         $this->instances->save($instance);
