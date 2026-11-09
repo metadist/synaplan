@@ -35,6 +35,6 @@ final readonly class NotifyIdentityRevokedHandler
         if (!$instance instanceof PlatformInstance) {
             return;
         }
-        $this->client->post($instance, 'identity_revoked', $message->identityId);
+        $this->client->post($instance, 'identity_revoked', $message->identityId, '' !== $message->externalId ? $message->externalId : $identity->getExternalId());
     }
 }

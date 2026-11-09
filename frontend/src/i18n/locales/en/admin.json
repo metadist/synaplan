@@ -86,6 +86,7 @@
     "loading": "Checking your session…",
     "confirmPrompt": "Connect {client} at {host} as {uid}?",
     "connectButton": "Connect {client}",
+    "denyButton": "Deny",
     "scopesNote": "Grants access to chats, files and search. The key stays on the platform — you do not type it.",
     "connecting": "Connecting…",
     "successTitle": "Connected.",

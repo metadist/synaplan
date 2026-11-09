@@ -6,9 +6,9 @@ namespace CloudFixture;
 
 /**
  * Calls Synaplan the way an app does: on the internal address, with the
- * instance credential in `X-Instance-Id` / `X-Instance-Secret` for calls
- * about the cloud, or with a person's own key (`asPerson`) for everything
- * done for that person.
+ * access token Synaplan issued for a person (`asPerson`) for everything done
+ * for that person. Calls about the cloud itself carry no credential, or a
+ * client assertion the caller adds.
  */
 final class Synaplan
 {
@@ -16,19 +16,16 @@ final class Synaplan
 
     public function __construct(
         private readonly string $base,
-        private readonly string $instanceId,
-        private readonly string $secret,
-        private readonly string $personKey = '',
+        private readonly string $accessToken = '',
     ) {
     }
 
     /**
-     * The same client, acting for one person with that person's key. The
-     * instance credential is not sent along.
+     * The same client, acting for one person with their access token.
      */
-    public function asPerson(string $key): self
+    public function asPerson(string $accessToken): self
     {
-        return new self($this->base, $this->instanceId, $this->secret, $key);
+        return new self($this->base, $accessToken);
     }
 
     /**
@@ -36,13 +33,7 @@ final class Synaplan
      */
     public static function from(array $state): self
     {
-        $instance = is_array($state['instance'] ?? null) ? $state['instance'] : [];
-
-        return new self(
-            (string) ($state['synaplan_url'] ?? ''),
-            (string) ($instance['id'] ?? ''),
-            (string) ($instance['secret'] ?? ''),
-        );
+        return new self((string) ($state['synaplan_url'] ?? ''));
     }
 
     /**
@@ -61,6 +52,25 @@ final class Synaplan
             $options[CURLOPT_POSTFIELDS] = json_encode($body, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         }
         [$status, $raw] = $this->send($path, $options);
+        $decoded = json_decode($raw, true);
+
+        return ['status' => $status, 'body' => is_array($decoded) ? $decoded : []];
+    }
+
+    /**
+     * A form post (the OAuth2 token and revocation endpoints).
+     *
+     * @param array<string, string> $fields
+     *
+     * @return array{status: int, body: array<mixed>}
+     */
+    public function form(string $path, array $fields): array
+    {
+        [$status, $raw] = $this->send($path, [
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Accept: application/json', 'Content-Type: application/x-www-form-urlencoded'],
+            CURLOPT_POSTFIELDS => http_build_query($fields),
+        ]);
         $decoded = json_decode($raw, true);
 
         return ['status' => $status, 'body' => is_array($decoded) ? $decoded : []];
@@ -111,11 +121,8 @@ final class Synaplan
     private function headers(array $base, array $extra): array
     {
         $headers = $base;
-        if ('' !== $this->personKey) {
-            $headers[] = 'X-API-Key: '.$this->personKey;
-        } elseif ('' !== $this->instanceId) {
-            $headers[] = 'X-Instance-Id: '.$this->instanceId;
-            $headers[] = 'X-Instance-Secret: '.$this->secret;
+        if ('' !== $this->accessToken && !isset($extra['Authorization'])) {
+            $headers[] = 'Authorization: Bearer '.$this->accessToken;
         }
         foreach ($extra as $name => $value) {
             $headers[] = $name.': '.$value;

@@ -86,6 +86,7 @@
     "loading": "Comprobando tu sesión…",
     "confirmPrompt": "¿Conectar {client} en {host} como {uid}?",
     "connectButton": "Conectar {client}",
+    "denyButton": "Rechazar",
     "scopesNote": "Concede acceso a chats, archivos y búsqueda. La clave permanece en la plataforma: no la escribes aquí.",
     "connecting": "Conectando…",
     "successTitle": "Conectado.",

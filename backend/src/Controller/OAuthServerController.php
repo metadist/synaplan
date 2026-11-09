@@ -13,7 +13,6 @@ use App\Service\OAuth\Server\CloudLinkService;
 use App\Service\OAuth\Server\OAuthServerFactory;
 use App\Service\OAuth\Server\Psr7;
 use App\Service\OAuth\Server\RegistrationException;
-use App\Service\OAuth\Server\RegistrationPolicy;
 use App\Service\OAuth\Server\Repository\ScopeRepository;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use Defuse\Crypto\Crypto;
@@ -51,7 +50,6 @@ final class OAuthServerController extends AbstractController
         private readonly AccessTokenValidator $accessTokens,
         private readonly CloudLinkService $links,
         private readonly PlatformLinksConfig $platformLinks,
-        private readonly RegistrationPolicy $policy,
         #[Autowire(service: 'cache.app')]
         private readonly CacheItemPoolInterface $cache,
         #[Autowire('%env(APP_URL)%')]
@@ -82,7 +80,7 @@ final class OAuthServerController extends AbstractController
             'token_endpoint_auth_methods_supported' => ['private_key_jwt'],
             'token_endpoint_auth_signing_alg_values_supported' => ['RS256', 'ES256'],
             'revocation_endpoint_auth_methods_supported' => ['private_key_jwt'],
-            'registration_policy' => $this->policy->mode,
+            'registration_policy' => $this->registrations->policyMode(),
         ]);
         $response->setPublic();
         $response->setMaxAge(300);

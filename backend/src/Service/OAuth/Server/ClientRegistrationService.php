@@ -82,6 +82,11 @@ final readonly class ClientRegistrationService
         return $this->describe($instance) + ['client_id_issued_at' => time()];
     }
 
+    public function policyMode(): string
+    {
+        return $this->policy->mode;
+    }
+
     /**
      * @return array<string, mixed>
      */

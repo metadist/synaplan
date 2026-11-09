@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace CloudFixture;
 
 /**
- * Links a person the way the Nextcloud app does: send the browser to
- * Synaplan's confirm page, take the one-time code it returns, and exchange it
- * server to server. The person's key is not kept: the fixture only needs to
- * know that the person is linked, and to which Synaplan account.
+ * Connects a person the way the Nextcloud app does: send the browser to
+ * Synaplan's authorization endpoint (code flow with PKCE, naming the person
+ * here as external_id), and exchange the returned code for the person's
+ * tokens with this cloud's client assertion.
  */
 final class Link
 {
@@ -17,83 +17,57 @@ final class Link
         $person = Store::person($person);
         $state = $store->state();
         if ('' === $state['instance']['id']) {
-            throw new FixtureException(409, 'not_registered', 'Register the fixture first (POST /control/register or /control/credential).');
+            throw new FixtureException(409, 'not_registered', 'Register the fixture first (POST /control/register).');
+        }
+        if ('' === (string) $state['issuer']) {
+            Control::refreshKeys($store);
+            $state = $store->state();
         }
         $nonce = bin2hex(random_bytes(16));
-        $store->update(static function (array $s) use ($nonce, $person): array {
-            $s['pending'][$nonce] = $person;
+        $authorize = OAuth::authorizeUrl($state, $person, $nonce);
+        $store->update(static function (array $s) use ($nonce, $person, $authorize): array {
+            $s['pending'][$nonce] = ['person' => $person, 'verifier' => $authorize['verifier']];
 
             return $s;
         });
 
-        return Response::redirect($state['public_url'].'/connect/platform?'.http_build_query([
-            'client' => $state['client'],
-            'instance_id' => $state['instance']['id'],
-            'external_id' => $person,
-            'redirect_uri' => $state['fixture_url'].'/link/callback',
-            'state' => $nonce,
-        ]));
+        return Response::redirect($authorize['url']);
     }
 
-    public static function callback(Store $store, string $code, string $nonce): Response
+    public static function callback(Store $store, string $code, string $nonce, string $error = ''): Response
     {
-        $person = $store->state()['pending'][$nonce] ?? null;
-        if (!is_string($person) || '' === $code) {
-            return Response::html(400, 'Not linked', 'This link was not started here, or it was already used.');
-        }
-        $state = $store->update(static function (array $s) use ($nonce): array {
+        $pending = $store->state()['pending'][$nonce] ?? null;
+        $store->update(static function (array $s) use ($nonce): array {
             unset($s['pending'][$nonce]);
 
             return $s;
         });
-        $answer = Synaplan::from($state)->json('POST', '/api/v1/platform-links/exchange', [
-            'instance_id' => $state['instance']['id'],
-            'instance_secret' => $state['instance']['secret'],
-            'code' => $code,
-        ]);
-        if (200 !== $answer['status']) {
-            return Response::html(502, 'Not linked', 'Synaplan refused the code: '.($answer['body']['error'] ?? 'HTTP '.$answer['status']).'.');
+        if (!is_array($pending) || !is_string($pending['person'] ?? null)) {
+            return Response::html(400, 'Not connected', 'This connection was not started here, or it was already used.');
         }
-        $body = $answer['body'];
-        $user = is_array($body['user'] ?? null) ? $body['user'] : [];
-        $key = is_array($body['api_key'] ?? null) ? $body['api_key'] : [];
-        $store->update(static function (array $s) use ($person, $body, $user, $key): array {
-            $s['links'][$person] = [
-                'link_id' => (string) ($body['link_id'] ?? ''),
-                'email' => (string) ($user['email'] ?? ''),
-                'key_id' => $key['id'] ?? null,
-                // The app acts for the person with this key. A real app keeps
-                // it encrypted; the fixture is a development stand-in.
-                'key' => (string) ($key['key'] ?? ''),
-                'scopes' => $key['scopes'] ?? [],
-                'linked_at' => time(),
-            ];
+        if ('' !== $error || '' === $code) {
+            return Response::html(200, 'Not connected', 'Synaplan answered: '.('' !== $error ? $error : 'no code').'.');
+        }
+        $answer = OAuth::exchangeCode($store, $pending['person'], $code, (string) $pending['verifier']);
+        if (200 !== $answer['status']) {
+            return Response::html(502, 'Not connected', 'Synaplan refused the code: '.($answer['body']['error'] ?? 'HTTP '.$answer['status']).'.');
+        }
 
-            return $s;
-        });
-
-        return Response::html(200, 'Linked', $person.' is linked to '.($user['email'] ?? 'Synaplan').'. You can close this page.');
+        return Response::html(200, 'Connected', $pending['person'].' is connected to Synaplan. You can close this page.');
     }
 
     /**
-     * Synaplan revoked a link: forget it, so this person is no longer linked.
+     * Synaplan ended a person's link: forget their tokens.
      *
      * @return array<string, mixed>
      */
-    public static function revoked(Store $store, string $linkId): array
+    public static function revoked(Store $store, string $person): array
     {
-        $dropped = [];
-        $store->update(static function (array $s) use ($linkId, &$dropped): array {
-            foreach ($s['links'] as $person => $link) {
-                if (is_array($link) && (string) ($link['link_id'] ?? '') === $linkId) {
-                    $dropped[] = $person;
-                    unset($s['links'][$person]);
-                }
-            }
+        if ('' === $person) {
+            return ['status' => 'ok', 'unlinked' => []];
+        }
+        OAuth::forget($store, $person);
 
-            return $s;
-        });
-
-        return ['status' => 'ok', 'unlinked' => $dropped];
+        return ['status' => 'ok', 'unlinked' => [$person]];
     }
 }

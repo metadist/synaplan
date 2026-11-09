@@ -4,11 +4,12 @@ import {
   ApprovePlatformInstanceHostResponseSchema,
   ApprovePlatformInstanceResponseSchema,
   ConnectOutlookAddinResponseSchema,
-  CreatePlatformLinkCodeResponseSchema,
   DisconnectMyPlatformLinkResponseSchema,
   GetPlatformInstancePublicResponseSchema,
   ListAdminPlatformInstancesResponseSchema,
   ListMyPlatformLinksResponseSchema,
+  OauthConsentDecideResponseSchema,
+  OauthConsentShowResponseSchema,
   RemovePlatformInstanceHostResponseSchema,
   RevokePlatformInstanceResponseSchema,
 } from '@/generated/api-schemas'
@@ -20,6 +21,13 @@ export type PlatformLink = NonNullable<
 export type AdminPlatformInstance = NonNullable<
   z.infer<typeof ListAdminPlatformInstancesResponseSchema>['instances']
 >[number]
+
+export interface CloudConsent {
+  client: string
+  host: string
+  externalId: string
+  scopes: string[]
+}
 
 export type OutlookConnectResult = z.infer<typeof ConnectOutlookAddinResponseSchema>
 export type OutlookSignInPayload = OutlookConnectResult['payload']
@@ -54,25 +62,28 @@ export const platformLinksApi = {
     return { client: data.client ?? '', host: data.host ?? '' }
   },
 
-  async createLinkCode(payload: {
-    instanceId: string
-    externalId: string
-    redirectUri: string
-    state: string
-    withMemories?: boolean
-  }): Promise<{ redirect: string }> {
-    const data = await httpClient('/api/v1/platform-links/codes', {
-      method: 'POST',
-      body: JSON.stringify({
-        instance_id: payload.instanceId,
-        external_id: payload.externalId,
-        redirect_uri: payload.redirectUri,
-        state: payload.state,
-        with_memories: payload.withMemories ?? false,
-      }),
-      schema: CreatePlatformLinkCodeResponseSchema,
+  /** What a cloud asks for, parked by /oauth/authorize under `request`. */
+  async getCloudConsent(request: string): Promise<CloudConsent> {
+    const data = await httpClient(`/api/v1/oauth/consent/${request}`, {
+      method: 'GET',
+      schema: OauthConsentShowResponseSchema,
     })
-    return { redirect: data.redirect ?? '' }
+    return {
+      client: data.client,
+      host: data.host,
+      externalId: data.external_id,
+      scopes: data.scopes,
+    }
+  },
+
+  /** Allow or deny; the answer is where the browser goes next (back to the cloud). */
+  async decideCloudConsent(request: string, approve: boolean): Promise<{ redirect: string }> {
+    const data = await httpClient(`/api/v1/oauth/consent/${request}`, {
+      method: 'POST',
+      body: JSON.stringify({ approve }),
+      schema: OauthConsentDecideResponseSchema,
+    })
+    return { redirect: data.redirect }
   },
 
   async listMine(): Promise<PlatformLink[]> {

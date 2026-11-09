@@ -45,7 +45,7 @@ final class Inbound
         // A copy or a folder read is done for the person the notification
         // names, with that person's own key; without one nobody here may act.
         $person = is_string($body['sub'] ?? null) ? $body['sub'] : '';
-        $key = Store::personKey($state, $person);
+        $key = OAuth::accessToken($store, $person);
         if (in_array($type, ['delivery', 'pickup'], true) && '' === $key) {
             return self::refuse($store, $type, $id, 'not_linked');
         }
@@ -53,7 +53,7 @@ final class Inbound
         $answer = match ($type) {
             'delivery' => (new Deliveries($store, $synaplan))->handle($id, $person),
             'pickup' => (new Pickups($store, $synaplan))->handle($id, $person),
-            'identity_revoked' => Link::revoked($store, $id),
+            'identity_revoked' => Link::revoked($store, $person),
             default => ['status' => 'failed', 'error_code' => 'unsupported'],
         };
         $store->log(['type' => $type, 'id' => $id, 'outcome' => 'handled', 'answer' => $answer]);

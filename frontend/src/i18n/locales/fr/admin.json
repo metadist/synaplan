@@ -86,6 +86,7 @@
     "loading": "Vérification de votre session…",
     "confirmPrompt": "Connecter {client} sur {host} en tant que {uid} ?",
     "connectButton": "Connecter {client}",
+    "denyButton": "Refuser",
     "scopesNote": "Accorde l’accès aux discussions, fichiers et recherche. La clé reste sur la plateforme — vous ne la saisissez pas.",
     "connecting": "Connexion…",
     "successTitle": "Connecté.",

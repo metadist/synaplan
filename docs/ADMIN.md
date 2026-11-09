@@ -878,17 +878,15 @@ entry makes it invent a capability.
 ### Linked platforms
 
 A **linked platform** is a Nextcloud, ownCloud or OpenCloud server whose users
-sign in to Synaplan with the account they already have, instead of the partner
-app minting a fresh Synaplan account per user. The partner instance registers
-once; each of its users then links once, in the browser, while signed in to
-Synaplan. The result is a scoped API key (`chat`, `files`, `rag`, optionally
-`memories`) that the partner app stores and that the user can revoke at any
-time. The Outlook add-in (Synamail) uses the same bridge page and is always on.
+work with Synaplan from the cloud, with their own Synaplan account. No cloud
+holds a credential of its own that reaches anyone's data: everything a cloud
+does for a person, it does with that person's token. The Outlook add-in
+(Synamail) uses its own bridge page and is always on.
 
-Everything under `/api/v1/platform-links/*` and `/api/v1/me/platform-links*`
-is gated by `PLATFORM_LINKS.ENABLED` (on by default — **Features → Platforms
-& desktop**, `FEATURE_PLATFORM_LINKS_ENABLED`); with the flag off those routes
-answer **404** and nothing in the UI changes.
+Everything under `/api/v1/platform-links/*`, `/api/v1/me/platform-links*` and
+`/oauth/*` is gated by `PLATFORM_LINKS.ENABLED` (on by default — **Features →
+Platforms & desktop**, `FEATURE_PLATFORM_LINKS_ENABLED`); with the flag off
+those routes answer **404** and nothing in the UI changes.
 
 ```sql
 INSERT INTO BCONFIG (BOWNERID, BGROUP, BSETTING, BVALUE)
@@ -896,35 +894,51 @@ VALUES (0, 'PLATFORM_LINKS', 'ENABLED', '1')
 ON DUPLICATE KEY UPDATE BVALUE = '1';
 ```
 
-Rollback is the same statement with `'0'`. Rows in `BPLATFORMINSTANCES` and
-`BEXTERNALIDENTITIES` stay; issued keys keep working until revoked.
+**Clouds with their own accounts (Nextcloud, ownCloud): OAuth2.** Synaplan is
+an OAuth2 authorization server for them (metadata at
+`/.well-known/oauth-authorization-server`). A cloud registers itself by
+dynamic client registration (RFC 7591, `POST /oauth/register`) with its
+address, redirect URIs, the public keys it signs with, and where Synaplan may
+notify it. It authenticates with signed client assertions (`private_key_jwt`)
+only: Synaplan stores public keys, never a client secret. Each person connects
+once: the cloud sends them to Synaplan, they sign in and allow the cloud
+(`/connect/cloud`), and the cloud receives that person's access and refresh
+tokens (code flow with PKCE, refresh tokens rotate). Registering grants no
+access to anyone's data.
 
-**Approving instances.** A partner instance registered by a signed-in
-administrator is `active` immediately. One registered anonymously or by a
-regular user is `pending` and cannot issue link codes until an administrator
-approves it under **Admin → Users → Platform instances** (host, client,
-status, last seen; *Approve* / *Revoke*). Anonymous registration is limited to
-10 per hour per address. Revoking an instance also revokes every key it
-issued.
+Who may register is set by `PLATFORM_LINKS_REGISTRATION`:
+
+| Value | Effect |
+| ----- | ------ |
+| `pending` (default) | Anyone may register; the client waits until an administrator approves it under **Admin → Users → Platform instances** |
+| `open` | Anyone may register and is active at once (every person still consents on their own) |
+| `token` | Only with the initial access token in `PLATFORM_LINKS_REGISTRATION_TOKEN` |
+
+A registration that presents `PLATFORM_LINKS_REGISTRATION_TOKEN` is active at
+once in every mode. Registrations without it are limited to 10 per hour per
+address. Revoking an instance ends every person's link and every token it
+holds.
+
+**A cloud that shares Synaplan's identity provider (OpenCloud with the same
+Keycloak)** needs no registration: `PLATFORM_LINKS_OIDC_CLOUD*` configure it
+(see `backend/.env.example`). People's tokens are exchanged in Keycloak; a
+person's link is created on their first call through the cloud.
 
 **What a user sees.** **Channels & integrations → Linked platforms** lists the
-user's own links (platform, host, external id, key name) with *Disconnect*,
-which revokes that key. API keys minted this way carry a *linked platform*
-badge on the API-keys page. Link codes live five minutes, are single-use, and
-a user may issue at most 20 per hour.
+user's own links (platform, host, external id) with *Disconnect*, which ends
+the link and the cloud's tokens for that person. A cloud ends a link the same
+way when the person leaves there (RFC 7009 revocation).
 
-**Security model.** Redirect targets are prefix-matched against the URIs the
-instance registered (HTTPS only outside dev, same host, same port, no
-wildcard hosts). A rejected redirect is audited as
-`platform_link.redirect_rejected`; every register, approve, revoke, link and
-disconnect writes a Users → Audit row. Re-linking an external id that already
-belonged to another Synaplan account revokes the old key and moves the link to
-the new account (`platform_link.reassigned`, audited under both) — one external
-user is never two Synaplan accounts at once.
+**Security model.** Redirect URIs are matched exactly against the URIs the
+client registered (HTTPS only outside dev, same host as the client). Every
+register, approve, revoke, link and disconnect writes a Users → Audit row.
+Linking a cloud account that already belonged to another Synaplan account ends
+the old account's grant and moves the link to the new account
+(`platform_link.linked` with the previous user id) — one external user is never
+two Synaplan accounts at once.
 
-Acceptance script: `_devextras/testing/platform-links/fake-instance.sh`
-(`--flag-off` proves the 404 contract). Endpoint reference:
-[Swagger UI](http://localhost:8000/api/doc) → tag *Platform Links*.
+Endpoint reference: [Swagger UI](http://localhost:8000/api/doc) → tag
+*Platform Links*; the OAuth2 endpoints are described by the server metadata.
 
 ### AI plugs (S1–S5)
 
