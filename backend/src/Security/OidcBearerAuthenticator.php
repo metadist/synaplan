@@ -4,6 +4,7 @@ namespace App\Security;
 
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcTokenService;
+use App\Service\OAuth\Server\AccessTokenValidator;
 use App\Service\OidcUserService;
 use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
 use App\Service\PlatformLink\PlatformBearerAttribution;
@@ -40,13 +41,14 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         private OidcUserService $oidcUserService,
         private LoggerInterface $logger,
         private PlatformBearerAttribution $attribution,
+        private AccessTokenValidator $ownTokens,
     ) {
     }
 
     public function supports(Request $request): ?bool
     {
         $token = BearerToken::jwtFromRequest($request);
-        if (null === $token) {
+        if (null === $token || $this->ownTokens->isOurs($token)) {
             return false;
         }
 

@@ -119,6 +119,13 @@ final class OAuthServerFlowTest extends WebTestCase
         self::assertSame('at+jwt', $header['typ']);
         self::assertSame([$this->issuer(), $clientId, (string) $user->getId()], [$payload['iss'], $payload['client_id'], $payload['sub']]);
 
+        $bearer = ['HTTP_AUTHORIZATION' => 'Bearer '.$tokens['access_token']];
+        $this->client->request('GET', '/api/v1/files', server: $bearer);
+        self::assertResponseIsSuccessful((string) $this->client->getResponse()->getContent());
+        $this->client->request('GET', '/api/v1/apikeys', server: $bearer);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN, 'outside the scopes the person allowed');
+        self::assertSame('insufficient_scope', $this->json()['error']);
+
         $this->tokenRequest($assertion, ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'a client assertion is good for one request');
 
@@ -138,6 +145,8 @@ final class OAuthServerFlowTest extends WebTestCase
         self::assertSame(ExternalIdentity::STATUS_REVOKED, $ended?->getStatus());
         $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $rotated['refresh_token']]);
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);
+        $this->client->request('GET', '/api/v1/files', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$rotated['access_token']]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'the access token ended with the grant');
     }
 
     public function testAuthorizeNeedsPkceAndTheCloudsAccountName(): void

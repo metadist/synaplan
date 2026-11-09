@@ -51,6 +51,12 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
         }
 
         $request = $event->getRequest();
+        $oauthScopes = $request->attributes->get(OAuthBearerAuthenticator::SCOPES_ATTRIBUTE);
+        if (is_array($oauthScopes)) {
+            $this->enforceOAuth($event, array_values(array_filter($oauthScopes, 'is_string')));
+
+            return;
+        }
         $apiKey = $request->attributes->get('api_key');
 
         // No API key on the request → session / OIDC user, or anonymous. Not
@@ -87,6 +93,37 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
         }
 
         $this->deny($event, $apiKey, $path, $method, $scopes);
+    }
+
+    /**
+     * An access token a cloud got for a person reaches only what the person
+     * allowed, with the same path rules as a linked person's API key. The
+     * scopes are never empty: the token endpoint always grants at least one.
+     *
+     * @param list<string> $scopes
+     */
+    private function enforceOAuth(RequestEvent $event, array $scopes): void
+    {
+        $request = $event->getRequest();
+        $path = $request->getPathInfo();
+        $method = $request->getMethod();
+        if (!ApiKeyScope::isSessionOnly($method, $path) && [] !== $scopes && ApiKeyScope::allows($scopes, $path, $method)) {
+            return;
+        }
+        $required = ApiKeyScope::requiredScopesForPath($path, $method);
+        $this->logger->warning('Access token blocked by insufficient scope', [
+            'client' => $request->attributes->get(OAuthBearerAuthenticator::CLIENT_ATTRIBUTE),
+            'path' => $path,
+            'required' => $required,
+            'granted' => $scopes,
+        ]);
+        $event->setResponse(new JsonResponse([
+            'success' => false,
+            'error' => 'insufficient_scope',
+            'code' => 'insufficient_scope',
+            'message' => 'This access token is not permitted to access this resource.',
+            'required' => $required,
+        ], Response::HTTP_FORBIDDEN, ['WWW-Authenticate' => 'Bearer error="insufficient_scope"']));
     }
 
     /**

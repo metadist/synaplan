@@ -22,6 +22,7 @@ security:
             user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
+                - App\Security\OAuthBearerAuthenticator
                 - App\Security\OidcBearerAuthenticator
                 - App\Security\ApiKeyAuthenticator
 
@@ -36,6 +37,7 @@ security:
             user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\McpAuthenticationEntryPoint
             custom_authenticators:
+                - App\Security\OAuthBearerAuthenticator
                 - App\Security\OidcBearerAuthenticator
                 - App\Security\ApiKeyAuthenticator
 
@@ -61,6 +63,7 @@ security:
             entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
                 - App\Security\CookieTokenAuthenticator
+                - App\Security\OAuthBearerAuthenticator
                 - App\Security\OidcBearerAuthenticator
                 - App\Security\QueryTokenAuthenticator
                 - App\Security\ApiKeyAuthenticator
