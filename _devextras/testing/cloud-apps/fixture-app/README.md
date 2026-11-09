@@ -7,9 +7,10 @@ row 45, brief E-9). Development only: nothing here asks for a login.
 
 It answers like an app:
 
-- `POST /inbound` takes Synaplan's signed notifications. Anything that is not
-  signed by Synaplan for this instance, addressed to it, and at most five
-  minutes old is refused with `401` (the five vectors in
+- `POST /inbound` takes Synaplan's notifications, signed JWTs. Anything that
+  is not signed with a key from Synaplan's JWK Set, issued by the Synaplan
+  `/.well-known/synaplan-configuration` names, addressed to this instance and
+  inside its five-minute window is refused with `401` (the vectors in
   `backend/tests/Fixtures/cloud-apps-contract/notify-vectors.json`).
 - **Copies** (Copy to cloud, CF3.1): claim, download, write into the person's
   files, report the result. A copy with no folder lands in the kind folder
@@ -72,7 +73,7 @@ the `nextcloud` channel, so the planner sees two distinct folder channels.
 | Call | What it does |
 | ---- | ------------ |
 | `GET /control/state` | Profile, client, credential (secret shown as `set`), switches, scopes, linked people |
-| `POST /control/register` `{client?, admin_key?}` | Register with Synaplan, announce the inbound address and the capabilities (`deliveries`, `pickups`), read the notify keys. `admin_key` is used for this call only |
+| `POST /control/register` `{client?, admin_key?}` | Register with Synaplan, announce the inbound address and the capabilities (`deliveries`, `pickups`), read the issuer and the JWK Set. `admin_key` is used for this call only |
 | `POST /control/credential` `{instance_id, instance_secret, client?}` | Use an instance registered elsewhere; announces and reads keys like `register` |
 | `POST /control/scope` `{person, mode, folders}` | `mode` is `watched`, `allowed` or `all`; folders are paths |
 | `POST /control/sso-status` `{external_id, bearer}` | Asks Synaplan whether this platform user is bound. The answer is Synaplan's |

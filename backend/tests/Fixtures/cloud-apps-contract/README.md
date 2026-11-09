@@ -20,6 +20,11 @@ Source: `synaplan-nextcloud` 1.6.0 (`a80e2d8`) and `synaplan-owncloud-online`
 The folder becomes the frozen contract v1 of the cloud file sharing plan
 (`_devextras/planning/20261013-cloud-file-sharing/`, step CF5.10).
 
-`notify-vectors.json` is the signed-notification fixture for Copy to cloud.
-Each cloud app verifies those five bodies in its own language. The PHP check
-is `NotifyVectorTest`.
+`notify-vectors.json` is the signed-notification fixture. A notification is a
+JSON Web Token in compact JWS form (`typ: synaplan-notification+jwt`), EdDSA
+(Ed25519) with a key from Synaplan's JWK Set (`/.well-known/jwks.json`),
+claims `iss` (Synaplan's public URL), `aud` (instance id), `sub` (person),
+`type`, `id`, `iat`, `exp`, `jti`. A cloud reads the issuer it expects from
+`/.well-known/synaplan-configuration` at the address it reaches Synaplan by,
+and never fetches keys from a URL inside a token. Each cloud app verifies the
+tokens in its own language. The PHP check is `NotifyVectorTest`.

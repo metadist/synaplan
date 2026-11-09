@@ -90,6 +90,8 @@ security:
         # Anchored so a future route under /mcp/ does not become public too.
         - { path: ^/\.well-known/oauth-protected-resource, roles: PUBLIC_ACCESS }
         - { path: ^/\.well-known/synaplan-federation, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/jwks\.json$, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/synaplan-configuration$, roles: PUBLIC_ACCESS }
         - { path: ^/mcp$, roles: PUBLIC_ACCESS }
         - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 
