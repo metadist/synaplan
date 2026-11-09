@@ -9,6 +9,7 @@ use App\Entity\PlatformInstance;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Service\OAuth\Server\AccessTokenValidator;
+use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -40,7 +41,7 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
     ) {
     }
 
-    public function supports(Request $request): ?bool
+    public function supports(Request $request): bool
     {
         $token = BearerToken::jwtFromRequest($request);
 
@@ -80,7 +81,7 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
         return null;
     }
 
-    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
+    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         if ($exception instanceof PlatformDisconnectedException) {
             return new JsonResponse([

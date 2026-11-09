@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Entity\CloudDelivery;
 use App\Entity\CloudPickup;
 use App\Entity\ExternalIdentity;
+use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Auth\OidcTokenService;
@@ -45,33 +46,52 @@ final class PlatformPersonTokensTest extends WebTestCase
         $this->em->flush();
     }
 
-    public function testAPersonBindsWithoutTheInstanceSecretAsTheTokenSubject(): void
+    public function testAPersonsFirstCallLinksThemAsTheTokenSubject(): void
     {
         $person = $this->person();
         $this->installTokens(['ada.token.value' => $person]);
         $instance = $this->register();
 
-        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('ada.token.value') + ['CONTENT_TYPE' => 'application/json'], content: '{}');
-        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $this->use('ada.token.value');
 
         $row = $this->row($instance, $person['sub']);
         self::assertSame($person['id'], $row->getUserId());
+        self::assertSame(ExternalIdentity::MODE_SSO, $row->getMode());
         self::assertSame(ExternalIdentity::STATUS_ACTIVE, $row->getStatus());
-
-        $this->client->request('GET', '/api/v1/platform-links/sso/status', server: $this->bearer('ada.token.value'));
-        self::assertResponseIsSuccessful();
-        self::assertTrue($this->json()['bound']);
     }
 
-    public function testAPersonCannotBindAnotherUserId(): void
+    public function testACloudAccountLinkedToSomeoneElseIsNotTakenOver(): void
+    {
+        $ada = $this->person();
+        $bob = $this->person();
+        $this->installTokens(['ada.token.value' => ['sub' => $bob['sub']] + $ada]);
+        $instance = $this->register();
+        $this->em->persist((new ExternalIdentity())
+            ->setUserId($bob['id'])
+            ->setSource('opencloud')
+            ->setInstanceId($instance)
+            ->setExternalId($bob['sub'])
+            ->setMode(ExternalIdentity::MODE_SSO));
+        $this->em->flush();
+
+        $this->use('ada.token.value');
+
+        self::assertSame($bob['id'], $this->row($instance, $bob['sub'])->getUserId());
+    }
+
+    public function testALinkThePersonEndedIsNotCreatedAgain(): void
     {
         $person = $this->person();
         $this->installTokens(['ada.token.value' => $person]);
-        $this->register();
+        $instance = $this->register();
+        $this->use('ada.token.value');
+        $row = $this->row($instance, $person['sub']);
+        $row->setStatus(ExternalIdentity::STATUS_REVOKED);
+        $this->em->flush();
 
-        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('ada.token.value') + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'somebody-else']));
+        $this->client->request('GET', '/api/v1/auth/me', server: $this->bearer('ada.token.value'));
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
-        self::assertSame('external_id_mismatch', $this->json()['error']);
+        self::assertSame(ExternalIdentity::STATUS_REVOKED, $this->row($instance, $person['sub'])->getStatus());
     }
 
     public function testATokenOfAnUnregisteredClientReachesNoCloud(): void
@@ -80,7 +100,7 @@ final class PlatformPersonTokensTest extends WebTestCase
         $this->installTokens(['other.token.value' => $person + ['azp' => 'someone-else']]);
         $this->register();
 
-        $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('other.token.value') + ['CONTENT_TYPE' => 'application/json'], content: '{}');
+        $this->client->request('POST', '/api/v1/platform-links/deliveries/1/claim', server: $this->bearer('other.token.value'));
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         self::assertSame('platform_disconnected', $this->json()['error']);
     }
@@ -92,8 +112,7 @@ final class PlatformPersonTokensTest extends WebTestCase
         $this->installTokens(['ada.token.value' => $ada, 'bob.token.value' => $bob]);
         $instance = $this->register();
         foreach (['ada.token.value', 'bob.token.value'] as $token) {
-            $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer($token) + ['CONTENT_TYPE' => 'application/json'], content: '{}');
-            self::assertResponseIsSuccessful();
+            $this->use($token);
         }
 
         $this->client->request('PUT', '/api/v1/platform-links/read-scope', server: $this->bearer('ada.token.value') + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => $ada['sub'], 'mode' => 'all', 'folders' => []]));
@@ -112,8 +131,7 @@ final class PlatformPersonTokensTest extends WebTestCase
         $this->installTokens(['ada.token.value' => $ada, 'bob.token.value' => $bob]);
         $instance = $this->register();
         foreach (['ada.token.value', 'bob.token.value'] as $token) {
-            $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer($token) + ['CONTENT_TYPE' => 'application/json'], content: '{}');
-            self::assertResponseIsSuccessful();
+            $this->use($token);
         }
         $bobsRow = $this->row($instance, $bob['sub']);
         $delivery = new CloudDelivery($bob['id'], 1, (int) $bobsRow->getId(), CloudDelivery::TARGET_KIND_FOLDER, null, CloudDelivery::CONFLICT_RENAME);
@@ -157,16 +175,6 @@ final class PlatformPersonTokensTest extends WebTestCase
         self::assertSame('platform_disconnected', $this->json()['error']);
     }
 
-    public function testAPersonsTokenOpensNoInstanceRoute(): void
-    {
-        $person = $this->person();
-        $this->installTokens(['ada.token.value' => $person]);
-        $this->register();
-
-        $this->client->request('GET', '/api/v1/platform-links/instances/self', server: $this->bearer('ada.token.value'));
-        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
-    }
-
     /**
      * @return array{id: int, sub: string, email: string}
      */
@@ -194,38 +202,17 @@ final class PlatformPersonTokensTest extends WebTestCase
     }
 
     /**
-     * Registers an active cloud and announces the OIDC client, the way the
-     * cloud's admin does it.
+     * An active cloud whose people sign in with the client self::AZP.
      */
     private function register(): string
     {
-        $admin = (new User())
-            ->setMail('pt-admin-'.bin2hex(random_bytes(4)).'@synaplan.internal')
-            ->setType('WEB')
-            ->setProviderId('local')
-            ->setUserLevel('ADMIN');
-        $admin->setCreated(date('YmdHis'));
-        $admin->setEmailVerified(true);
-        $this->em->persist($admin);
-        $this->em->flush();
-        $this->authenticateClient($this->client, $admin);
         $host = 'pt-'.bin2hex(random_bytes(4)).'.example.com';
-        $this->client->request('POST', '/api/v1/platform-links/instances', server: ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode([
-            'client' => 'opencloud',
-            'host' => 'https://'.$host,
-            'redirect_uris' => ['https://'.$host.'/callback'],
-        ]));
-        self::assertResponseStatusCodeSame(Response::HTTP_CREATED, (string) $this->client->getResponse()->getContent());
-        $instance = $this->json();
-        $this->client->getCookieJar()->clear();
-        $this->client->request('PATCH', '/api/v1/platform-links/instances/self', server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_INSTANCE_ID' => (string) $instance['instance_id'],
-            'HTTP_X_INSTANCE_SECRET' => (string) $instance['instance_secret'],
-        ], content: (string) json_encode(['oidc_client_id' => self::AZP]));
-        self::assertResponseIsSuccessful((string) $this->client->getResponse()->getContent());
+        $instance = new PlatformInstance('opencloud', 'pi_'.bin2hex(random_bytes(12)), $host, ['https://'.$host.'/callback'], PlatformInstance::STATUS_ACTIVE);
+        $instance->setOidcClientId(self::AZP);
+        $this->em->persist($instance);
+        $this->em->flush();
 
-        return (string) $instance['instance_id'];
+        return $instance->getInstanceId();
     }
 
     /**
@@ -254,6 +241,15 @@ final class PlatformPersonTokensTest extends WebTestCase
             }
         );
         static::getContainer()->set(OidcTokenService::class, $tokens);
+    }
+
+    /**
+     * Any call with the person's token; the first one links them.
+     */
+    private function use(string $token): void
+    {
+        $this->client->request('GET', '/api/v1/auth/me', server: $this->bearer($token));
+        self::assertResponseIsSuccessful((string) $this->client->getResponse()->getContent());
     }
 
     /**

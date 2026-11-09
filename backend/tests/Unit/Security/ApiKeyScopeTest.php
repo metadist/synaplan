@@ -450,8 +450,6 @@ final class ApiKeyScopeTest extends TestCase
 
     public function testCloudWatchScopeIsExactAndFromMessageIsSessionOnly(): void
     {
-        self::assertSame(['files', 'rag', 'cloud:watch'], ApiKeyScope::backgroundKeyScopes());
-
         self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/watches', 'GET'));
         self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/watches', 'POST'));
         self::assertFalse(ApiKeyScope::allows(['files'], '/api/v1/cloud/trials', 'POST'));
@@ -467,7 +465,7 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows(['chat'], '/api/v1/cloud/status', 'POST'));
 
         $fromMessage = '/api/v1/cloud/watches/from-message/12';
-        foreach ([[], ['*'], ['files'], ['cloud:watch'], ['chat'], ['rag'], ApiKeyScope::backgroundKeyScopes(), ApiKeyScope::platformLinkScopes(true)] as $scopes) {
+        foreach ([[], ['*'], ['files'], ['cloud:watch'], ['chat'], ['rag'], ApiKeyScope::platformLinkScopes(true)] as $scopes) {
             self::assertFalse(ApiKeyScope::allows($scopes, $fromMessage, 'POST'));
             self::assertTrue(ApiKeyScope::isSessionOnly('POST', $fromMessage));
         }

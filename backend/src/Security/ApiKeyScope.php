@@ -110,7 +110,6 @@ final class ApiKeyScope
         'POST /api/v1/media/generate' => [self::PLATFORM_CHAT],
         'POST /v1/chat/completions' => [self::PLATFORM_CHAT],
         'GET /api/v1/config/memory-service/check' => [self::PLATFORM_CHAT, self::PLATFORM_MEMORIES],
-        'POST /api/v1/platform-links/identities/adopt' => [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG],
         'POST /api/v1/cloud/status' => [self::PLATFORM_FILES],
         'POST /api/v1/cloud/trials' => [self::PLATFORM_WATCH],
     ];
@@ -251,17 +250,6 @@ final class ApiKeyScope
     public static function provisionedPlatformScopes(): array
     {
         return [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG, self::PLATFORM_WATCH];
-    }
-
-    /**
-     * The only scopes a background key carries: upload watched files and
-     * run the person's watches. No chat, no memories.
-     *
-     * @return list<string>
-     */
-    public static function backgroundKeyScopes(): array
-    {
-        return [self::PLATFORM_FILES, self::PLATFORM_RAG, self::PLATFORM_WATCH];
     }
 
     /**

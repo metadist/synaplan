@@ -10,6 +10,7 @@ use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Service\Admin\AdminUserProvisioningService;
+use App\Service\PlatformLink\PlatformLifecycleService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,17 +43,15 @@ final class PlatformLifecycleTest extends WebTestCase
     public function testASoleProvisionedAccountIsDeletedAndARepeatIsHarmless(): void
     {
         $instance = $this->register();
-        $user = $this->provision($instance, 'sole');
+        $userId = $this->provision($instance, 'sole')->getId();
 
-        $this->post($instance, 'sole', 'deleted');
-        self::assertResponseStatusCodeSame(Response::HTTP_OK);
-        self::assertSame('deleted', $this->json()['account']);
+        $answer = $this->post($instance, 'sole', 'deleted');
+        self::assertSame('deleted', $answer['account']);
         $this->em->clear();
-        self::assertNull($this->em->find(User::class, $user->getId()));
+        self::assertNull($this->em->find(User::class, $userId));
 
-        $this->post($instance, 'sole', 'deleted');
-        self::assertResponseStatusCodeSame(Response::HTTP_OK);
-        self::assertSame('absent', $this->json()['account']);
+        $answer = $this->post($instance, 'sole', 'deleted');
+        self::assertSame('absent', $answer['account']);
     }
 
     public function testAnUnboundKeyDoesNotKeepASoleProvisionedAccount(): void
@@ -63,8 +62,8 @@ final class PlatformLifecycleTest extends WebTestCase
         $row->setApiKeyId(null);
         $this->em->flush();
 
-        $this->post($instance, 'unbound', 'deleted');
-        self::assertSame('deleted', $this->json()['account']);
+        $answer = $this->post($instance, 'unbound', 'deleted');
+        self::assertSame('deleted', $answer['account']);
         $this->em->clear();
         self::assertNull($this->em->find(User::class, $user->getId()));
     }
@@ -74,9 +73,9 @@ final class PlatformLifecycleTest extends WebTestCase
         $instance = $this->register();
 
         $withPassword = $this->provision($instance, 'pw', 'password-1');
-        $this->post($instance, 'pw', 'deleted');
-        self::assertSame('kept', $this->json()['account']);
-        self::assertStringContainsString('password', $this->json()['message']);
+        $answer = $this->post($instance, 'pw', 'deleted');
+        self::assertSame('kept', $answer['account']);
+        self::assertStringContainsString('password', $answer['message']);
         $this->em->clear();
         self::assertInstanceOf(User::class, $this->em->find(User::class, $withPassword->getId()));
         self::assertSame(ExternalIdentity::STATUS_REVOKED, $this->identity($instance, 'pw')->getStatus());
@@ -84,9 +83,9 @@ final class PlatformLifecycleTest extends WebTestCase
         $admin = $this->provision($instance, 'adm');
         $admin->setUserLevel('ADMIN');
         $this->em->flush();
-        $this->post($instance, 'adm', 'deleted');
-        self::assertSame('kept', $this->json()['account']);
-        self::assertStringContainsString('administrator', $this->json()['message']);
+        $answer = $this->post($instance, 'adm', 'deleted');
+        self::assertSame('kept', $answer['account']);
+        self::assertStringContainsString('administrator', $answer['message']);
 
         $shared = $this->provision($instance, 'two');
         $other = (new ExternalIdentity())
@@ -98,9 +97,9 @@ final class PlatformLifecycleTest extends WebTestCase
             ->setStatus(ExternalIdentity::STATUS_ACTIVE);
         $this->em->persist($other);
         $this->em->flush();
-        $this->post($instance, 'two', 'deleted');
-        self::assertSame('kept', $this->json()['account']);
-        self::assertStringContainsString('also used from', $this->json()['message']);
+        $answer = $this->post($instance, 'two', 'deleted');
+        self::assertSame('kept', $answer['account']);
+        self::assertStringContainsString('also used from', $answer['message']);
         $this->em->clear();
         self::assertInstanceOf(User::class, $this->em->find(User::class, $shared->getId()));
     }
@@ -110,19 +109,19 @@ final class PlatformLifecycleTest extends WebTestCase
         $instance = $this->register();
         $linked = $this->localPerson('linked');
         $this->attach($linked, $instance, 'linked', ExternalIdentity::MODE_LINK);
-        $this->post($instance, 'linked', 'deleted');
-        self::assertSame('kept', $this->json()['account']);
+        $answer = $this->post($instance, 'linked', 'deleted');
+        self::assertSame('kept', $answer['account']);
         self::assertSame(ExternalIdentity::STATUS_REVOKED, $this->identity($instance, 'linked')->getStatus());
         self::assertInstanceOf(User::class, $this->em->find(User::class, $linked->getId()));
 
         $sso = $this->localPerson('sso');
         $this->attach($sso, $instance, 'sso', ExternalIdentity::MODE_SSO);
-        $this->post($instance, 'sso', 'disabled');
-        self::assertSame(ExternalIdentity::STATUS_SUSPENDED, $this->json()['status']);
-        $this->post($instance, 'sso', 'enabled');
-        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $this->json()['status']);
-        $this->post($instance, 'sso', 'enabled');
-        self::assertSame('unchanged', $this->json()['account']);
+        $answer = $this->post($instance, 'sso', 'disabled');
+        self::assertSame(ExternalIdentity::STATUS_SUSPENDED, $answer['status']);
+        $answer = $this->post($instance, 'sso', 'enabled');
+        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $answer['status']);
+        $answer = $this->post($instance, 'sso', 'enabled');
+        self::assertSame('unchanged', $answer['account']);
         self::assertInstanceOf(User::class, $this->em->find(User::class, $sso->getId()));
     }
 
@@ -167,12 +166,12 @@ final class PlatformLifecycleTest extends WebTestCase
         $minted = static::getContainer()->get(AdminUserProvisioningService::class)->mintApiKeyForUser($user, 'cloud', ['files'], $entity);
         $secret = $minted['plainKey'];
 
-        $this->post($instance, 'paused', 'disabled');
+        $answer = $this->post($instance, 'paused', 'disabled');
         $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $secret]);
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
         self::assertSame('platform_disconnected', $this->json()['code']);
 
-        $this->post($instance, 'paused', 'enabled');
+        $answer = $this->post($instance, 'paused', 'enabled');
         $this->client->request('GET', '/api/v1/auth/me', server: ['HTTP_X_API_KEY' => $secret]);
         self::assertResponseStatusCodeSame(Response::HTTP_OK);
     }
@@ -185,9 +184,9 @@ final class PlatformLifecycleTest extends WebTestCase
         $row->setMode(ExternalIdentity::MODE_LINK);
         $this->em->flush();
 
-        $this->post($instance, 'linked-mode', 'deleted');
-        self::assertSame('kept', $this->json()['account']);
-        self::assertStringContainsString('not created for this cloud', $this->json()['message']);
+        $answer = $this->post($instance, 'linked-mode', 'deleted');
+        self::assertSame('kept', $answer['account']);
+        self::assertStringContainsString('not created for this cloud', $answer['message']);
         $this->em->clear();
         self::assertInstanceOf(User::class, $this->em->find(User::class, $user->getId()));
     }
@@ -198,6 +197,7 @@ final class PlatformLifecycleTest extends WebTestCase
         $email = 'legacy-'.bin2hex(random_bytes(3)).'@synaplan.internal';
         $created = static::getContainer()->get(AdminUserProvisioningService::class)->provision('nextcloud', 'legacy-person', $email);
         $user = $created['user'];
+        $userId = $user->getId();
         $admin = $this->localPerson('legacy-admin');
         $admin->setUserLevel('ADMIN');
         $secret = 'sk_'.bin2hex(random_bytes(29));
@@ -214,18 +214,7 @@ final class PlatformLifecycleTest extends WebTestCase
         $this->client->request('DELETE', '/api/v1/admin/users/'.$encoded, server: ['HTTP_X_API_KEY' => $secret]);
         self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
         $this->em->clear();
-        self::assertNull($this->em->find(User::class, $user->getId()));
-    }
-
-    public function testInstancesSelfAdvertisesLifecycle(): void
-    {
-        $instance = $this->register();
-        $this->client->request('GET', '/api/v1/platform-links/instances/self', server: [
-            'HTTP_X_INSTANCE_ID' => $instance['instance_id'],
-            'HTTP_X_INSTANCE_SECRET' => $instance['instance_secret'],
-        ]);
-        self::assertResponseStatusCodeSame(Response::HTTP_OK);
-        self::assertContains('lifecycle', $this->json()['capabilities']);
+        self::assertNull($this->em->find(User::class, $userId));
     }
 
     public function testTurnOffAndCloudDisableDoNotUndoEachOther(): void
@@ -240,7 +229,7 @@ final class PlatformLifecycleTest extends WebTestCase
         $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/turn-off');
         self::assertResponseStatusCodeSame(Response::HTTP_OK);
         $this->client->getCookieJar()->clear();
-        $this->post($instance, 'split', 'enabled');
+        $answer = $this->post($instance, 'split', 'enabled');
         self::assertSame(ExternalIdentity::STATUS_PAUSED, $this->identity($instance, 'split')->getStatus());
 
         $this->asPerson($userId);
@@ -249,7 +238,7 @@ final class PlatformLifecycleTest extends WebTestCase
         self::assertSame(ExternalIdentity::STATUS_ACTIVE, $this->identity($instance, 'split')->getStatus());
         $this->client->getCookieJar()->clear();
 
-        $this->post($instance, 'split', 'disabled');
+        $answer = $this->post($instance, 'split', 'disabled');
         self::assertSame(ExternalIdentity::STATUS_SUSPENDED, $this->identity($instance, 'split')->getStatus());
         $this->asPerson($userId);
         $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/resume');
@@ -263,7 +252,7 @@ final class PlatformLifecycleTest extends WebTestCase
         self::assertSame(ExternalIdentity::STATUS_SUSPENDED, $this->identity($instance, 'split')->getStatus());
         $this->client->getCookieJar()->clear();
 
-        $this->post($instance, 'split', 'deleted');
+        $answer = $this->post($instance, 'split', 'deleted');
         $this->asPerson($userId);
         $this->client->request('POST', '/api/v1/me/platform-links/'.$linkId.'/resume');
         self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
@@ -271,42 +260,39 @@ final class PlatformLifecycleTest extends WebTestCase
     }
 
     /**
-     * @param array{instance_id: string, instance_secret: string} $instance
+     * The lifecycle rules the admin-key delete applies, called directly: no
+     * cloud reports lifecycle over HTTP any more (it revokes the person's
+     * OAuth grant instead).
+     *
+     * @param array{instance_id: string} $instance
+     *
+     * @return array{success: bool, account: string, status: string, message: string}
      */
-    private function post(array $instance, string $uid, string $event): void
+    private function post(array $instance, string $uid, string $event): array
     {
-        $this->client->request('POST', '/api/v1/platform-links/lifecycle', server: [
-            'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_INSTANCE_ID' => $instance['instance_id'],
-            'HTTP_X_INSTANCE_SECRET' => $instance['instance_secret'],
-        ], content: (string) json_encode(['external_id' => $uid, 'event' => $event]));
-        self::assertResponseStatusCodeSame(Response::HTTP_OK, (string) $this->client->getResponse()->getContent());
+        $entity = $this->em->getRepository(PlatformInstance::class)->findOneBy(['instanceId' => $instance['instance_id']]);
+        self::assertInstanceOf(PlatformInstance::class, $entity);
+        $answer = static::getContainer()->get(PlatformLifecycleService::class)->apply($entity, $uid, $event, '127.0.0.1');
+        $this->em->clear();
+
+        return $answer;
     }
 
     /**
-     * @return array{instance_id: string, instance_secret: string}
+     * @return array{instance_id: string}
      */
     private function register(): array
     {
-        $admin = $this->localPerson('registrar');
-        $admin->setUserLevel('ADMIN');
-        $this->em->flush();
-        $this->authenticateClient($this->client, $admin);
         $host = 'cf24-'.bin2hex(random_bytes(3)).'.example.com';
-        $this->client->request('POST', '/api/v1/platform-links/instances', server: ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode([
-            'client' => 'nextcloud',
-            'host' => 'https://'.$host,
-            'redirect_uris' => ['https://'.$host.'/callback'],
-        ]));
-        self::assertResponseStatusCodeSame(Response::HTTP_CREATED, (string) $this->client->getResponse()->getContent());
-        $body = $this->json();
-        $this->client->getCookieJar()->clear();
+        $instance = new PlatformInstance('nextcloud', 'pi_'.bin2hex(random_bytes(12)), $host, ['https://'.$host.'/callback'], PlatformInstance::STATUS_ACTIVE);
+        $this->em->persist($instance);
+        $this->em->flush();
 
-        return ['instance_id' => (string) $body['instance_id'], 'instance_secret' => (string) $body['instance_secret']];
+        return ['instance_id' => $instance->getInstanceId()];
     }
 
     /**
-     * @param array{instance_id: string, instance_secret: string} $instance
+     * @param array{instance_id: string} $instance
      */
     private function provision(array $instance, string $uid, ?string $password = null): User
     {
@@ -346,7 +332,7 @@ final class PlatformLifecycleTest extends WebTestCase
     }
 
     /**
-     * @param array{instance_id: string, instance_secret: string} $instance
+     * @param array{instance_id: string} $instance
      */
     private function attach(User $user, array $instance, string $uid, string $mode): void
     {
@@ -362,7 +348,7 @@ final class PlatformLifecycleTest extends WebTestCase
     }
 
     /**
-     * @param array{instance_id: string, instance_secret: string} $instance
+     * @param array{instance_id: string} $instance
      */
     private function identity(array $instance, string $uid): ExternalIdentity
     {

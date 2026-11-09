@@ -10,7 +10,8 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Synaplan as OAuth2 authorization server for clouds: one table for issued
  * tokens, codes and seen client assertions, and the public keys a cloud
- * authenticates with (private_key_jwt) on its client row.
+ * authenticates with (private_key_jwt) on its client row. The instance
+ * secret goes: no cloud authenticates with a shared secret any more.
  *
  * Galera-safe: raw addSql only, IF NOT EXISTS, no Schema API, no foreign
  * keys (see docs/MIGRATIONS.md).
@@ -19,7 +20,7 @@ final class Version20261110100000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Create BOAUTHTOKENS and add BJWKS to BPLATFORMINSTANCES (OAuth2 for clouds)';
+        return 'Create BOAUTHTOKENS, add BJWKS and drop BSECRETHASH on BPLATFORMINSTANCES (OAuth2 for clouds)';
     }
 
     public function isTransactional(): bool
@@ -45,11 +46,13 @@ final class Version20261110100000 extends AbstractMigration
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE = InnoDB
         SQL);
         $this->addSql('ALTER TABLE BPLATFORMINSTANCES ADD COLUMN IF NOT EXISTS BJWKS LONGTEXT NULL');
+        $this->addSql('ALTER TABLE BPLATFORMINSTANCES DROP COLUMN IF EXISTS BSECRETHASH');
     }
 
     public function down(Schema $schema): void
     {
         $this->addSql('DROP TABLE IF EXISTS BOAUTHTOKENS');
         $this->addSql('ALTER TABLE BPLATFORMINSTANCES DROP COLUMN IF EXISTS BJWKS');
+        $this->addSql("ALTER TABLE BPLATFORMINSTANCES ADD COLUMN IF NOT EXISTS BSECRETHASH VARCHAR(255) NOT NULL DEFAULT ''");
     }
 }
