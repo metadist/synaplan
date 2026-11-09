@@ -1290,7 +1290,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-09-12T10:28:18+00:00"
+            "time": "2026-09-12T10:28:18+00:00",
+            "published-time": "2026-09-12T12:23:30+00:00"
         },
         {
             "name": "carbonphp/carbon-doctrine-types",
@@ -6978,7 +6979,8 @@
                 "issues": "https://github.com/php-fig/clock/issues",
                 "source": "https://github.com/php-fig/clock/tree/1.0.0"
             },
-            "time": "2022-11-25T14:36:26+00:00"
+            "time": "2022-11-25T14:36:26+00:00",
+            "published-time": "2022-11-25T14:59:22+00:00"
         },
         {
             "name": "psr/container",
@@ -7783,7 +7785,8 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-09-12T19:02:49+00:00"
+            "time": "2026-09-12T19:02:49+00:00",
+            "published-time": "2026-09-12T19:03:18+00:00"
         },
         {
             "name": "stripe/stripe-php",
@@ -13709,16 +13712,16 @@
         },
         {
             "name": "web-token/jwt-library",
-            "version": "4.2.4",
+            "version": "4.2.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/web-token/jwt-library.git",
-                "reference": "21631c1db4f534aaf571716c41a2c67278cdbd49"
+                "reference": "2ff6e4bac74e8921e07bd1336ebae82a1c5478c6"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/web-token/jwt-library/zipball/21631c1db4f534aaf571716c41a2c67278cdbd49",
-                "reference": "21631c1db4f534aaf571716c41a2c67278cdbd49",
+                "url": "https://api.github.com/repos/web-token/jwt-library/zipball/2ff6e4bac74e8921e07bd1336ebae82a1c5478c6",
+                "reference": "2ff6e4bac74e8921e07bd1336ebae82a1c5478c6",
                 "shasum": ""
             },
             "require": {
@@ -13782,7 +13785,7 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/web-token/jwt-library/tree/4.2.4"
+                "source": "https://github.com/web-token/jwt-library/tree/4.2.5"
             },
             "funding": [
                 {
@@ -13794,7 +13797,8 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2026-10-30T22:08:19+00:00"
+            "time": "2026-11-05T19:58:51+00:00",
+            "published-time": "2026-11-05T20:03:13+00:00"
         },
         {
             "name": "webklex/php-imap",
