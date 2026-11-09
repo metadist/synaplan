@@ -1002,6 +1002,10 @@
       "title": "Cerebras API key",
       "message": "Create an API key in the Cerebras Cloud dashboard (API Keys), then paste it here. This unlocks GPT OSS 120B and Qwen 3.8 27B with very fast answers. Prompts are processed by Cerebras in the US."
     },
+    "scaleway": {
+      "title": "Scaleway API key",
+      "message": "Create a secret key in the Scaleway console (IAM → API keys), then paste it here. This unlocks Generative APIs hosted in Paris. Prompts are processed by Scaleway in France."
+    },
     "huggingface": {
       "title": "HuggingFace API token",
       "message": "Create an access token in your HuggingFace settings, then paste it here to use HuggingFace Inference models."

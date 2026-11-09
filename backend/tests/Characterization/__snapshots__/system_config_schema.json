@@ -1842,6 +1842,16 @@
                 "tab": "routing",
                 "type": "boolean"
             },
+            "SCALEWAY_API_KEY": {
+                "default": "",
+                "description": "Scaleway secret key for Generative APIs (Paris). Create it under IAM → API keys. The same value Scaleway calls SCW_SECRET_KEY.",
+                "managedBy": "ai-infrastructure",
+                "section": "cloud",
+                "sensitive": true,
+                "source": "database",
+                "tab": "ai",
+                "type": "password"
+            },
             "SIGNUP_PAUSED": {
                 "dbGroup": "SIGNUP",
                 "dbKey": "PAUSED",
@@ -2139,6 +2149,7 @@
                             "TRUSTEDTOKENS_API_KEY",
                             "A2AGENT_API_KEY",
                             "HUGGINGFACE_API_KEY",
+                            "SCALEWAY_API_KEY",
                             "GOOGLE_VERTEX_ACCESS_TOKEN"
                         ],
                         "id": "cloud",
@@ -3784,6 +3795,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "SCALEWAY_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
+            },
             "SIGNUP_PAUSED": {
                 "isMasked": false,
                 "isSet": false,
@@ -5118,6 +5135,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SCALEWAY_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "SIGNUP_PAUSED": {
                 "isMasked": false,
@@ -7377,6 +7400,16 @@
                 "tab": "routing",
                 "type": "boolean"
             },
+            "SCALEWAY_API_KEY": {
+                "default": "",
+                "description": "Scaleway secret key for Generative APIs (Paris). Create it under IAM → API keys. The same value Scaleway calls SCW_SECRET_KEY.",
+                "managedBy": "ai-infrastructure",
+                "section": "cloud",
+                "sensitive": true,
+                "source": "database",
+                "tab": "ai",
+                "type": "password"
+            },
             "SIGNUP_PAUSED": {
                 "dbGroup": "SIGNUP",
                 "dbKey": "PAUSED",
@@ -7674,6 +7707,7 @@
                             "TRUSTEDTOKENS_API_KEY",
                             "A2AGENT_API_KEY",
                             "HUGGINGFACE_API_KEY",
+                            "SCALEWAY_API_KEY",
                             "GOOGLE_VERTEX_ACCESS_TOKEN"
                         ],
                         "id": "cloud",
@@ -9493,6 +9527,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "SCALEWAY_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
+            },
             "SIGNUP_PAUSED": {
                 "isMasked": false,
                 "isSet": false,
@@ -10673,6 +10713,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SCALEWAY_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "SIGNUP_PAUSED": {
                 "isMasked": false,
@@ -11872,6 +11918,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "SCALEWAY_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "SIGNUP_PAUSED": {
                 "isMasked": false,
@@ -13198,6 +13250,12 @@
                 "locked": false,
                 "value": "false"
             },
+            "SCALEWAY_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
+            },
             "SIGNUP_PAUSED": {
                 "isMasked": false,
                 "isSet": false,
@@ -14522,6 +14580,12 @@
                 "isSet": true,
                 "locked": true,
                 "value": "false"
+            },
+            "SCALEWAY_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "SIGNUP_PAUSED": {
                 "isMasked": false,

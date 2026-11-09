@@ -24,7 +24,7 @@ final class GoogleVideoGenerationTest extends TestCase
     {
         $video = $this->video($this->api([self::json(['name' => 'operations/op-1'])]));
 
-        $operation = $video->startVideoOperation('A lake at dawn', ['duration' => 5, 'resolution' => '4K', 'modelConfig' => ['allowed_resolutions' => ['1080p', '4K']]]);
+        $operation = $video->startVideoOperation('A lake at dawn', ['model' => 'veo-3.1-generate-preview', 'duration' => 5, 'resolution' => '4K', 'modelConfig' => ['allowed_resolutions' => ['1080p', '4K']]]);
 
         self::assertSame(['operationName' => 'operations/op-1', 'model' => 'veo-3.1-generate-preview', 'duration' => 4, 'resolution' => '4K'], $operation);
         self::assertSame(['durationSeconds' => 4, 'aspectRatio' => '16:9', 'resolution' => '4k'], $this->requests()[0]['body']['parameters']);
@@ -48,7 +48,7 @@ final class GoogleVideoGenerationTest extends TestCase
         $video = $this->video($this->api([self::json(['name' => 'operations/op-2']), self::json([])]));
 
         try {
-            $video->generateVideo('A lake', ['cancel_check' => static fn (): bool => true]);
+            $video->generateVideo('A lake', ['model' => 'veo-3.1-generate-preview', 'cancel_check' => static fn (): bool => true]);
             self::fail('A stopped render must end in a cancellation.');
         } catch (ProviderCancelledException) {
         }

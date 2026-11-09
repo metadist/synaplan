@@ -132,7 +132,7 @@ final class GoogleVideoGeneration
      */
     public function startVideoOperation(string $prompt, array $options = []): array
     {
-        $model = $options['model'] ?? 'veo-3.1-generate-preview';
+        $model = $options['model'] ?? 'gemini-omni-1.2-flash';
 
         $key = $this->api->requireKey();
 

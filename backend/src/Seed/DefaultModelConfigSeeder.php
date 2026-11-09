@@ -61,7 +61,7 @@ final readonly class DefaultModelConfigSeeder implements SeederInterface
         // seed(), after ModelSeeder has inserted Flare. A chosen model stays.
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2PIC',   'modelKey' => 'openai:gpt-image-2.5-flare:text2pic'],
         ['group' => 'DEFAULTMODEL', 'setting' => 'PIC2PIC',    'modelKey' => 'openai:gpt-image-2.5-flare:text2pic'],
-        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'modelKey' => 'google:veo-3.1-generate-preview:text2vid'],
+        ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2VID',   'modelKey' => 'google:gemini-omni-1.2-flash:text2vid'],
         // IMG2VID (animate an attached image). Defaults to Higgsfield DoP
         // Standard — an image-to-video model. Shares the text2vid BTAG (see
         // ModelCatalog::CAPABILITY_TAGS) but has its own default slot.

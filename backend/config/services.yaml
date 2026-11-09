@@ -509,6 +509,11 @@ services:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'
             $uploadDir: '%kernel.project_dir%/var/uploads'
 
+    App\AI\Provider\ScalewayProvider:
+        arguments:
+            $keyStore: '@App\AI\Credential\ProviderKeyStore'
+            $uploadDir: '%kernel.project_dir%/var/uploads'
+
     App\AI\Provider\XaiProvider:
         arguments:
             $keyStore: '@App\AI\Credential\ProviderKeyStore'

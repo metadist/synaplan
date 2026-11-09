@@ -81,7 +81,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             }
         }
         self::assertGreaterThan(30, $seen);
-        self::assertCount(22, $this->catalog->all(), 'twenty-one adapters and the key-only ElevenLabs row');
+        self::assertCount(23, $this->catalog->all(), 'twenty-two adapters and the key-only ElevenLabs row');
     }
 
     /** T1 — the store answers from the catalog */
@@ -93,7 +93,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             self::assertSame($descriptor->hasPlatformKey(), $store->supports($descriptor->name), $descriptor->name);
         }
         self::assertFalse($store->supports('not-a-provider'));
-        self::assertCount(15, $this->catalog->withKey());
+        self::assertCount(16, $this->catalog->withKey());
     }
 
     /** T2 — the key catalog is a projection of the key specs */
@@ -101,7 +101,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
     {
         $keyCatalog = new ProviderKeyCatalog($this->catalog);
         self::assertSame($keyCatalog->providerNames(), self::names($this->catalog->withKey()), 'Admin → AI keys order');
-        self::assertSame(['groq', 'openai', 'anthropic', 'google', 'mistral', 'trustedtokens', 'a2agent', 'huggingface', 'meta', 'cerebras', 'xai', 'perplexity', 'thehive', 'higgsfield', 'elevenlabs'], $keyCatalog->providerNames());
+        self::assertSame(['groq', 'openai', 'anthropic', 'google', 'mistral', 'trustedtokens', 'a2agent', 'huggingface', 'meta', 'cerebras', 'xai', 'perplexity', 'thehive', 'higgsfield', 'elevenlabs', 'scaleway'], $keyCatalog->providerNames());
 
         foreach ($this->catalog->withKey() as $descriptor) {
             $meta = $keyCatalog->get($descriptor->name);
@@ -188,7 +188,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             }
             ++$seen;
         }
-        self::assertSame(13, $seen, 'twelve keyed chat providers and Ollama declare defaults');
+        self::assertSame(14, $seen, 'thirteen keyed chat providers and Ollama declare defaults');
     }
 
     /** T6 — the preference order is the descriptor ranks */
@@ -206,7 +206,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
         $defaults = self::getContainer()->get(ProviderDefaultsService::class);
         \assert($defaults instanceof ProviderDefaultsService);
         self::assertSame(array_values($ranked), $defaults->preferenceOrder());
-        self::assertSame(['groq', 'openai', 'google', 'mistral', 'anthropic', 'trustedtokens', 'huggingface', 'xai', 'a2agent', 'meta', 'cerebras', 'ollama'], $defaults->preferenceOrder());
+        self::assertSame(['groq', 'openai', 'google', 'mistral', 'anthropic', 'trustedtokens', 'huggingface', 'xai', 'a2agent', 'meta', 'cerebras', 'ollama', 'scaleway'], $defaults->preferenceOrder());
         self::assertSame(range(1, \count($ranked)), array_keys($ranked), 'ranks are 1..n without gaps');
     }
 
@@ -234,6 +234,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             'mistral' => 'https://api.mistral.ai/v1/chat/completions',
             'openai' => 'https://api.openai.com/v1/chat/completions',
             'perplexity' => 'https://api.perplexity.ai/chat/completions',
+            'scaleway' => 'https://api.scaleway.ai/v1/chat/completions',
             'trustedtokens' => 'https://api.trustedtokens.eu/v1/chat/completions',
             'xai' => 'https://api.x.ai/v1/chat/completions',
         ], $fixed);
@@ -550,9 +551,9 @@ final class ProviderCatalogParityTest extends KernelTestCase
         foreach ($expected as $envVar => $placement) {
             self::assertSame($placement, $fields[$envVar] ?? null, $envVar);
         }
-        self::assertCount(15, $expected, 'fourteen key fields and one secret field are managed');
+        self::assertCount(16, $expected, 'fifteen key fields and one secret field are managed');
         self::assertSame(
-            ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'CEREBRAS_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN'],
+            ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GROQ_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'MISTRAL_API_KEY', 'XAI_API_KEY', 'META_API_KEY', 'CEREBRAS_API_KEY', 'TRUSTEDTOKENS_API_KEY', 'A2AGENT_API_KEY', 'HUGGINGFACE_API_KEY', 'SCALEWAY_API_KEY', 'GOOGLE_VERTEX_ACCESS_TOKEN'],
             array_keys($tab->sections()['cloud']->fields),
             'the shipped order of the cloud section',
         );
@@ -573,7 +574,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             );
         }
         self::assertSame(ProviderRegistry::CAPABILITIES, array_map(static fn (ProviderCapability $c): string => $c->value, ProviderCapability::cases()));
-        self::assertSame(['a2agent', 'anthropic', 'cerebras', 'google', 'groq', 'huggingface', 'meta', 'mistral', 'ollama', 'openaicompatible', 'openai', 'perplexity', 'test', 'triton', 'trustedtokens', 'xai'], $this->registry->getRegisteredProviderNames('chat'), 'the order the registry lists');
+        self::assertSame(['a2agent', 'anthropic', 'cerebras', 'google', 'groq', 'huggingface', 'meta', 'mistral', 'ollama', 'openaicompatible', 'openai', 'perplexity', 'scaleway', 'test', 'triton', 'trustedtokens', 'xai'], $this->registry->getRegisteredProviderNames('chat'), 'the order the registry lists');
 
         $services = file_get_contents(\dirname(__DIR__, 3).'/config/services.yaml');
         self::assertIsString($services);

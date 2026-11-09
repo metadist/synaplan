@@ -120,6 +120,12 @@ describe('Provider Flag Utility', () => {
     expect(getProviderFlag('cerebras')).toBe('circle-flags:us')
   })
 
+  it('should return the French flag for Scaleway', () => {
+    expect(getProviderFlag('Scaleway')).toBe('circle-flags:fr')
+    expect(getProviderFlag('scaleway')).toBe('circle-flags:fr')
+    expect(getProviderIcon('Scaleway')).toBe('simple-icons:scaleway')
+  })
+
   it('should return the Chinese flag for A2Agent', () => {
     expect(getProviderFlag('A2Agent')).toBe('circle-flags:cn')
     expect(getProviderFlag('a2agent')).toBe('circle-flags:cn')

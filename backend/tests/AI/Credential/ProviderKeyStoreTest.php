@@ -438,7 +438,7 @@ final class ProviderKeyStoreTest extends TestCase
     public function testCatalogCoversEverySupportedProvider(): void
     {
         $store = $this->makeStore();
-        self::assertCount(15, self::catalog()->providerNames());
+        self::assertCount(16, self::catalog()->providerNames());
         foreach (self::catalog()->providerNames() as $provider) {
             self::assertTrue($store->supports($provider), sprintf('ProviderKeyStore cannot store a key for catalog provider "%s"', $provider));
         }
