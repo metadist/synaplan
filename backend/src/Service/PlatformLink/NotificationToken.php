@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace App\Service\PlatformLink;
 
+use Firebase\JWT\BeforeValidException;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+
 /**
  * A notification to a cloud as a JSON Web Token (RFC 7519) in compact JWS
  * form, signed with EdDSA (Ed25519, RFC 8037). The key's id is the `kid` in
  * the header and in Synaplan's JWK Set at /.well-known/jwks.json, so a cloud
- * verifies it with any JOSE library or a few lines of libsodium.
+ * verifies it with any JOSE library. Signing and signature checks are
+ * firebase/php-jwt's; the time window below is the contract's.
  *
  * Header `typ` is `synaplan-notification+jwt` (explicit typing, RFC 8725
  * 3.11), so the token is never mistaken for another JWT. Claims: `iss`
@@ -38,11 +44,7 @@ final class NotificationToken
      */
     public static function encode(array $claims, string $secretKey, string $kid): string
     {
-        $header = self::b64(self::json(['alg' => 'EdDSA', 'typ' => self::TYPE, 'kid' => $kid]));
-        $payload = self::b64(self::json($claims));
-        $signature = sodium_crypto_sign_detached($header.'.'.$payload, self::keyBytes($secretKey));
-
-        return $header.'.'.$payload.'.'.self::b64($signature);
+        return JWT::encode($claims, base64_encode(self::keyBytes($secretKey)), 'EdDSA', $kid, ['typ' => self::TYPE]);
     }
 
     /**
@@ -93,48 +95,34 @@ final class NotificationToken
     }
 
     /**
+     * The claims of a token whose type and EdDSA signature verify with one of
+     * the keys. The time window is left to verdict(): it is the contract's
+     * (exp exclusive, iat up to a minute ahead), not the library's.
+     *
      * @param list<string> $publicKeys
      *
      * @return array<string, mixed>|null
      */
     public static function verifiedClaims(string $token, array $publicKeys): ?array
     {
-        $parts = explode('.', trim($token));
-        if (3 !== count($parts)) {
-            return null;
-        }
-        $header = json_decode(self::unb64($parts[0]) ?? '', true);
-        if (!is_array($header) || 'EdDSA' !== ($header['alg'] ?? null) || self::TYPE !== ($header['typ'] ?? null)) {
-            return null;
-        }
-        $signature = self::unb64($parts[2]);
-        if (null === $signature || SODIUM_CRYPTO_SIGN_BYTES !== strlen($signature)) {
-            return null;
-        }
         foreach ($publicKeys as $publicKey) {
-            $key = self::keyBytes($publicKey);
-            if (SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES === strlen($key)
-                && sodium_crypto_sign_verify_detached($signature, $parts[0].'.'.$parts[1], $key)) {
-                $claims = json_decode(self::unb64($parts[1]) ?? '', true);
-
-                return is_array($claims) ? $claims : null;
+            $headers = new \stdClass();
+            try {
+                $payload = JWT::decode(trim($token), new Key(base64_encode(self::keyBytes($publicKey)), 'EdDSA'), $headers);
+            } catch (ExpiredException|BeforeValidException $e) {
+                $payload = $e->getPayload();
+            } catch (\Throwable) {
+                continue;
             }
+            if (self::TYPE !== ($headers->typ ?? null)) {
+                return null;
+            }
+            $claims = json_decode((string) json_encode($payload), true);
+
+            return is_array($claims) ? $claims : null;
         }
 
         return null;
-    }
-
-    /**
-     * @param array<string, mixed> $value
-     */
-    private static function json(array $value): string
-    {
-        return json_encode($value, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR);
-    }
-
-    private static function b64(string $raw): string
-    {
-        return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
     }
 
     private static function unb64(string $encoded): ?string
