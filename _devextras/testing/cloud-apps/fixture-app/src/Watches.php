@@ -20,9 +20,9 @@ final class Watches
      *
      * @return array{status: int, body: array<mixed>}
      */
-    public function list(string $apiKey): array
+    public function list(string $accessToken): array
     {
-        return $this->synaplan->json('GET', '/api/v1/cloud/watches', null, ['X-Api-Key' => $apiKey]);
+        return $this->synaplan->json('GET', '/api/v1/cloud/watches', null, ['Authorization' => 'Bearer '.$accessToken]);
     }
 
     /**
@@ -30,7 +30,7 @@ final class Watches
      *
      * @return array{status: int, body: array<mixed>}
      */
-    public function upload(string $apiKey, int $watchId, array $fields, string $bytes, string $name): array
+    public function upload(string $accessToken, int $watchId, array $fields, string $bytes, string $name): array
     {
         return $this->synaplan->upload(
             '/api/v1/cloud/watches/'.$watchId.'/files',
@@ -38,7 +38,7 @@ final class Watches
             $bytes,
             $name,
             'application/octet-stream',
-            ['X-Api-Key' => $apiKey],
+            ['Authorization' => 'Bearer '.$accessToken],
         );
     }
 
@@ -47,13 +47,13 @@ final class Watches
      *
      * @return array{status: int, body: array<mixed>}
      */
-    public function reconcile(string $apiKey, int $watchId, array $items): array
+    public function reconcile(string $accessToken, int $watchId, array $items): array
     {
         return $this->synaplan->json(
             'POST',
             '/api/v1/cloud/watches/'.$watchId.'/reconcile',
             ['items' => $items],
-            ['X-Api-Key' => $apiKey],
+            ['Authorization' => 'Bearer '.$accessToken],
         );
     }
 }

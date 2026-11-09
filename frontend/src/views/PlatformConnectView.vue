@@ -51,19 +51,11 @@
             }}
           </p>
           <div
-            class="surface-chip rounded-xl p-3 text-center ring-1 ring-black/[0.03] dark:ring-white/[0.04]"
-            :class="signedInAs ? 'mb-3' : 'mb-6'"
+            class="surface-chip rounded-xl p-3 text-center ring-1 ring-black/[0.03] dark:ring-white/[0.04] mb-6"
           >
             <p class="txt-primary text-sm font-medium">{{ confirmUid }}</p>
             <p class="txt-secondary text-xs mt-1">{{ confirmHost }}</p>
           </div>
-          <p
-            v-if="signedInAs"
-            class="txt-secondary text-xs text-center mb-6"
-            data-testid="signed-in-as"
-          >
-            {{ signedInAs }}
-          </p>
 
           <button
             type="button"
@@ -155,7 +147,6 @@ import { cycleLocale } from '@/i18n'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
 import { authReady } from '@/stores/auth'
-import { isPlatformLinksEnabled } from '@/composables/usePlatformLinksFeature'
 import { platformLinksApi, type OutlookSignInPayload } from '@/services/api/platformLinksApi'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 import { resolvePlatformClient, type PlatformClientPolicy } from '@/platform-connect/clients'
@@ -168,9 +159,8 @@ import { resolvePlatformClient, type PlatformClientPolicy } from '@/platform-con
  * `outlook-builtin` allow-list in BPLATFORMINSTANCES. This page never decides
  * where the key travels and never posts it to an unknown window.
  *
- * Nextcloud / ownCloud / OpenCloud (`link-code`): the server issues a one-time
- * code and the browser follows the redirect it returns. The key is minted
- * server-to-server on exchange and never reaches this page.
+ * Clouds connect through Synaplan's OAuth2 server and its consent page
+ * (/connect/cloud); this page refuses them.
  */
 
 interface OfficeUi {
@@ -192,7 +182,6 @@ const viewState = ref<ViewState>('loading')
 const errorMessage = ref<string>('')
 /** Office.js dialog channel is available (`messageParent`); false when opened outside Outlook. */
 const officeChannelAvailable = ref(false)
-const publicHost = ref<string>('')
 const clientPolicy = ref<PlatformClientPolicy | null>(null)
 
 const currentLanguage = computed(() => locale.value)
@@ -203,26 +192,9 @@ const clientLabel = computed(() =>
   clientPolicy.value ? t(clientPolicy.value.labelKey) : t('platformConnect.clients.unknown')
 )
 
-const confirmHost = computed(() => {
-  if (clientPolicy.value?.delivery === 'link-code') {
-    return publicHost.value
-  }
-  return targetBaseUrl.value
-})
+const confirmHost = computed(() => targetBaseUrl.value)
 
-const confirmUid = computed(() => {
-  if (clientPolicy.value?.delivery === 'link-code') {
-    return ((route.query.external_id as string | undefined) ?? '').trim()
-  }
-  return userEmail.value
-})
-
-// Outlook's card already shows the Synaplan email as its uid.
-const signedInAs = computed(() =>
-  clientPolicy.value?.delivery === 'link-code' && userEmail.value
-    ? t('platformConnect.signedInAs', { email: userEmail.value })
-    : ''
-)
+const confirmUid = computed(() => userEmail.value)
 
 const targetBaseUrl = computed(() => {
   const fromQuery = route.query.baseUrl as string | undefined
@@ -340,40 +312,10 @@ async function handleOutlookConnect(): Promise<void> {
   viewState.value = 'success'
 }
 
-async function handleLinkCodeConnect(): Promise<void> {
-  const instanceId = ((route.query.instance_id as string | undefined) ?? '').trim()
-  const externalId = ((route.query.external_id as string | undefined) ?? '').trim()
-  const redirectUri = ((route.query.redirect_uri as string | undefined) ?? '').trim()
-  const state = stateNonce.value.trim()
-  if (!instanceId || !externalId || !redirectUri || !state) {
-    errorMessage.value = t('platformConnect.errorMissingState')
-    viewState.value = 'error'
-    return
-  }
-
-  const withMemories = route.query.with_memories === '1' || route.query.with_memories === 'true'
-  const response = await platformLinksApi.createLinkCode({
-    instanceId,
-    externalId,
-    redirectUri,
-    state,
-    withMemories,
-  })
-  if (!response.redirect) {
-    throw new Error(t('platformConnect.errorIssuanceFailed'))
-  }
-  viewState.value = 'success'
-  window.location.assign(response.redirect)
-}
-
 async function handleConnect(): Promise<void> {
   errorMessage.value = ''
   viewState.value = 'connecting'
   try {
-    if (clientPolicy.value?.delivery === 'link-code') {
-      await handleLinkCodeConnect()
-      return
-    }
     await handleOutlookConnect()
   } catch (err) {
     errorMessage.value = err instanceof Error ? err.message : String(err)
@@ -399,13 +341,8 @@ async function bootstrap(): Promise<void> {
   try {
     const policy = resolvePlatformClient(route.query.client)
     clientPolicy.value = policy
-    if (!policy) {
+    if (!policy || policy.delivery !== 'fragment-payload') {
       errorMessage.value = t('platformConnect.errorUnknownClient')
-      viewState.value = 'error'
-      return
-    }
-    if (policy.flagGated && !isPlatformLinksEnabled()) {
-      errorMessage.value = t('platformConnect.errorFlagOff')
       viewState.value = 'error'
       return
     }
@@ -422,19 +359,6 @@ async function bootstrap(): Promise<void> {
     if (!stateNonce.value) {
       errorMessage.value = t('platformConnect.errorMissingState')
       viewState.value = 'error'
-      return
-    }
-
-    if (policy.delivery === 'link-code') {
-      const instanceId = ((route.query.instance_id as string | undefined) ?? '').trim()
-      if (!instanceId) {
-        errorMessage.value = t('platformConnect.errorMissingState')
-        viewState.value = 'error'
-        return
-      }
-      const publicInfo = await platformLinksApi.getPublicInstance(instanceId)
-      publicHost.value = publicInfo.host
-      viewState.value = 'ready'
       return
     }
 

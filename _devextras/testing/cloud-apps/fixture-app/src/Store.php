@@ -258,19 +258,6 @@ final class Store
     }
 
     /**
-     * The key a linked person's work is done with, or '' when the person is
-     * not linked here.
-     *
-     * @param array<string, mixed> $state
-     */
-    public static function personKey(array $state, string $person): string
-    {
-        $link = is_array($state['links'] ?? null) ? ($state['links'][$person] ?? null) : null;
-
-        return is_array($link) && is_string($link['key'] ?? null) ? $link['key'] : '';
-    }
-
-    /**
      * A person's id as a folder name. Platform user ids are short and plain;
      * anything else is refused rather than escaped.
      */
@@ -314,7 +301,8 @@ final class Store
             'public_url' => self::env('SYNAPLAN_PUBLIC_URL', 'http://localhost:5173'),
             'fixture_url' => self::env('FIXTURE_PUBLIC_URL', 'http://localhost:8099'),
             'inbound_url' => self::env('FIXTURE_INBOUND_URL', 'http://cloud-fixture:8099/inbound'),
-            'instance' => ['id' => '', 'secret' => ''],
+            'instance' => ['id' => ''],
+            'oauth_key' => null,
             'notify_keys' => [],
             'issuer' => '',
             'switches' => array_fill_keys(self::SWITCHES, false),

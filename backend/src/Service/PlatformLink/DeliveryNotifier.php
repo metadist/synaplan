@@ -55,6 +55,7 @@ final readonly class DeliveryNotifier
             $identity->getInstanceId(),
             (string) $id,
             (int) ($identity->getRevokedAt() ?? 0),
+            $identity->getExternalId(),
         ));
     }
 }

@@ -3,7 +3,8 @@ export type PlatformClientId = 'outlook' | 'nextcloud' | 'owncloud' | 'opencloud
 export interface PlatformClientPolicy {
   id: PlatformClientId
   labelKey: string
-  delivery: 'fragment-payload' | 'link-code'
+  /** fragment-payload: Outlook's confirm card; oauth: a cloud's consent at /connect/cloud. */
+  delivery: 'fragment-payload' | 'oauth'
   flagGated: boolean
 }
 
@@ -17,19 +18,19 @@ export const PLATFORM_CLIENTS: Record<PlatformClientId, PlatformClientPolicy> = 
   nextcloud: {
     id: 'nextcloud',
     labelKey: 'platformConnect.clients.nextcloud',
-    delivery: 'link-code',
+    delivery: 'oauth',
     flagGated: true,
   },
   owncloud: {
     id: 'owncloud',
     labelKey: 'platformConnect.clients.owncloud',
-    delivery: 'link-code',
+    delivery: 'oauth',
     flagGated: true,
   },
   opencloud: {
     id: 'opencloud',
     labelKey: 'platformConnect.clients.opencloud',
-    delivery: 'link-code',
+    delivery: 'oauth',
     flagGated: true,
   },
 }

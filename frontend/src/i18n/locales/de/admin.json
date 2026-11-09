@@ -86,6 +86,7 @@
     "loading": "Sitzung wird geprüft…",
     "confirmPrompt": "{client} unter {host} als {uid} verbinden?",
     "connectButton": "{client} verbinden",
+    "denyButton": "Ablehnen",
     "scopesNote": "Gewährt Zugriff auf Chats, Dateien und Suche. Der Schlüssel bleibt auf der Plattform — du tippst ihn nicht ein.",
     "connecting": "Verbinden…",
     "successTitle": "Verbunden.",

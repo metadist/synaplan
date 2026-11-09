@@ -40,7 +40,7 @@ final class OidcBearerAuthenticatorTest extends TestCase
         $users = $this->createStub(OidcUserService::class);
         $users->method('findOrCreateFromClaims')->willReturn($user);
         $attribution = $this->createMock(PlatformBearerAttribution::class);
-        $attribution->expects($this->once())->method('attribute')->with($user, $claims, false)->willThrowException(new PlatformDisconnectedException());
+        $attribution->expects($this->once())->method('attribute')->with($user, $claims)->willThrowException(new PlatformDisconnectedException());
 
         $authenticator = new OidcBearerAuthenticator($tokens, $users, new NullLogger(), $attribution, $this->createStub(AccessTokenValidator::class));
         $request = $this->request('GET', '/v1/models', 'aaa.bbb.ccc');

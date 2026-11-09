@@ -473,10 +473,6 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows(['*'], $encoded, 'POST'));
         self::assertFalse(ApiKeyScope::allows(['cloud:watch'], $encoded, 'POST'));
         self::assertFalse(ApiKeyScope::allows([], '/api/v1/cloud/watches/%2566rom-message/12', 'POST'));
-
-        foreach (['chat', 'files', 'rag'] as $scope) {
-            self::assertTrue(ApiKeyScope::allows([$scope], '/api/v1/platform-links/identities/adopt', 'POST'));
-        }
     }
 
     public function testPlatformRoutesKeepTheGatewayScopes(): void

@@ -86,6 +86,7 @@
     "loading": "Oturumunuz kontrol ediliyor…",
     "confirmPrompt": "{host} üzerindeki {client} uygulamasını {uid} olarak bağla?",
     "connectButton": "{client} bağla",
+    "denyButton": "Reddet",
     "scopesNote": "Sohbetlere, dosyalara ve aramaya erişim verir. Anahtar platformda kalır — buraya yazmazsınız.",
     "connecting": "Bağlanıyor…",
     "successTitle": "Bağlandı.",
