@@ -49,6 +49,106 @@ final readonly class RuntimeProfile
     }
 
     /**
+     * A profile that was stored as JSON and has to be an object again.
+     * Runners read scopes and instructions from the instance.
+     *
+     * @param array<string, mixed> $data
+     */
+    public static function fromArray(array $data): self
+    {
+        $modelIds = [];
+        foreach (is_array($data['modelIds'] ?? null) ? $data['modelIds'] : [] as $capability => $modelId) {
+            if (is_string($capability)) {
+                $modelIds[$capability] = is_int($modelId) ? $modelId : null;
+            }
+        }
+
+        return new self(
+            promptId: self::intOrNull($data['promptId'] ?? null),
+            promptTopic: is_string($data['promptTopic'] ?? null) ? $data['promptTopic'] : '',
+            systemPrompt: is_string($data['systemPrompt'] ?? null) ? $data['systemPrompt'] : null,
+            modelIds: $modelIds,
+            ragScopes: self::ragScopes($data['ragScopes'] ?? null),
+            toolFlags: is_array($data['toolFlags'] ?? null) ? $data['toolFlags'] : [],
+            skillAllow: self::stringList($data['skillAllow'] ?? null),
+            skillDeny: self::stringList($data['skillDeny'] ?? null),
+            parameters: is_array($data['parameters'] ?? null) ? $data['parameters'] : [],
+            agentId: self::intOrNull($data['agentId'] ?? null),
+            agentVersionId: self::intOrNull($data['agentVersionId'] ?? null),
+            notes: self::stringList($data['notes'] ?? null) ?? [],
+            ragLimit: self::intOrNull($data['ragLimit'] ?? null),
+            ragMinScore: is_int($data['ragMinScore'] ?? null) || is_float($data['ragMinScore'] ?? null) ? (float) $data['ragMinScore'] : null,
+            viewerId: self::intOrNull($data['viewerId'] ?? null),
+            includeUserFiles: true === ($data['includeUserFiles'] ?? false),
+        );
+    }
+
+    /**
+     * @return list<array{ownerId: int, groupKey: string, fileIds?: list<int>}>
+     */
+    private static function ragScopes(mixed $scopes): array
+    {
+        if (!is_array($scopes)) {
+            return [];
+        }
+        $parsed = [];
+        foreach ($scopes as $scope) {
+            if (!is_array($scope) || !is_int($scope['ownerId'] ?? null) || !is_string($scope['groupKey'] ?? null)) {
+                continue;
+            }
+            $entry = ['ownerId' => $scope['ownerId'], 'groupKey' => $scope['groupKey']];
+            $fileIds = self::intList($scope['fileIds'] ?? null);
+            if (null !== $fileIds) {
+                $entry['fileIds'] = $fileIds;
+            }
+            $parsed[] = $entry;
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private static function stringList(mixed $values): ?array
+    {
+        if (!is_array($values)) {
+            return null;
+        }
+        $parsed = [];
+        foreach ($values as $value) {
+            if (is_string($value)) {
+                $parsed[] = $value;
+            }
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function intList(mixed $values): ?array
+    {
+        if (!is_array($values)) {
+            return null;
+        }
+        $parsed = [];
+        foreach ($values as $value) {
+            if (is_int($value)) {
+                $parsed[] = $value;
+            }
+        }
+
+        return $parsed;
+    }
+
+    private static function intOrNull(mixed $value): ?int
+    {
+        return is_int($value) ? $value : null;
+    }
+
+    /**
      * The first RAG scope as the group-key string the search path consumes.
      *
      * A scope owned by someone other than the viewer (a shared assistant's

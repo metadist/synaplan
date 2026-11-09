@@ -246,6 +246,7 @@
                         },
                         "model": "gpt-image-1",
                         "modelConfig": [],
+                        "planMessageId": 1001,
                         "provider": "openai",
                         "quality": "standard",
                         "size": "1024x1024",
@@ -1221,6 +1222,7 @@
                         },
                         "model": "gpt-image-1-edit",
                         "modelConfig": [],
+                        "planMessageId": 1001,
                         "provider": "openai",
                         "quality": "high",
                         "size": "1024x1024",
@@ -2786,7 +2788,8 @@
                         "lang": "en",
                         "media_usage": {
                             "characters": 14
-                        }
+                        },
+                        "planMessageId": 1001
                     },
                     "prompt": "Welcome aboard",
                     "provider": "openai",
@@ -3292,6 +3295,7 @@
                         "modelConfig": {
                             "default_duration": 8
                         },
+                        "planMessageId": 1001,
                         "progress_callback": "<callable>",
                         "provider": "google",
                         "resolution": null

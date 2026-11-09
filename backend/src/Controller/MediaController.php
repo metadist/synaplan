@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\Media\MediaGenerationServiceInterface;
+use App\Service\Media\WebMediaAnswer;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,6 +25,7 @@ final class MediaController extends AbstractController
 {
     public function __construct(
         private MediaGenerationServiceInterface $mediaService,
+        private WebMediaAnswer $webMedia,
         private LoggerInterface $logger,
     ) {
     }
@@ -136,7 +138,7 @@ final class MediaController extends AbstractController
     #[OA\Post(
         path: '/api/v1/media/generate',
         summary: 'Generate image or video from text prompt',
-        description: 'Synchronous media generation endpoint for external integrations (Nextcloud, API clients). Calls the configured AI provider and returns the generated file URL.',
+        description: 'Image generation returns the file. Video generation starts a background job and returns its id; poll GET /api/v1/media/video/jobs/{jobId}. The request does not wait for a render.',
         security: [['Bearer' => []]],
         tags: ['Media']
     )]
@@ -221,6 +223,21 @@ final class MediaController extends AbstractController
         )
     )]
     #[OA\Response(
+        response: 202,
+        description: 'Video generation started. Poll the job; this request does not wait for the file.',
+        content: new OA\JsonContent(
+            required: ['success', 'status', 'jobId', 'provider', 'model'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(property: 'status', type: 'string', example: 'processing'),
+                new OA\Property(property: 'jobId', type: 'string'),
+                new OA\Property(property: 'provider', type: 'string', example: 'google'),
+                new OA\Property(property: 'model', type: 'string', example: 'veo-3.1'),
+                new OA\Property(property: 'resolution', type: 'string', nullable: true, example: '1080p'),
+            ]
+        )
+    )]
+    #[OA\Response(
         response: 400,
         description: 'Invalid request (missing prompt or invalid type)',
         content: new OA\JsonContent(
@@ -266,9 +283,9 @@ final class MediaController extends AbstractController
             : null;
 
         try {
-            $result = $this->mediaService->generate($user, $prompt, $type, $modelId, $resolution);
+            $answer = $this->webMedia->answer($user, $prompt, $type, $modelId, $resolution);
 
-            return $this->json($result);
+            return $this->json($answer['body'], $answer['status']);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (RateLimitExceededException $e) {

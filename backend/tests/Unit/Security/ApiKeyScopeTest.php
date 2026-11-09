@@ -439,6 +439,8 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/summary/generate'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/media/generate-from-images', 'POST'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/api/v1/media/video/start', 'POST'));
+        self::assertTrue(ApiKeyScope::allows(['chat'], '/api/v1/media/video/jobs/'.str_repeat('ab', 16), 'GET'));
+        self::assertFalse(ApiKeyScope::allows(['chat'], '/api/v1/media/video/jobs/'.str_repeat('ab', 16), 'POST'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/v1/messages', 'POST'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/v1/models', 'GET'));
         self::assertFalse(ApiKeyScope::allows($scopes, '/v1/embeddings', 'POST'));

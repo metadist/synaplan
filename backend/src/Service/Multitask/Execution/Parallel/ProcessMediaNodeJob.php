@@ -81,6 +81,10 @@ final class ProcessMediaNodeJob implements MediaNodeJob
                 break;
             }
 
+            if (true === ($decoded['running'] ?? false)) {
+                return NodeResult::running(is_array($decoded['metadata'] ?? null) ? $decoded['metadata'] : []);
+            }
+
             if (true === ($decoded['ok'] ?? false)) {
                 /** @var list<array<string, mixed>> $files */
                 $files = is_array($decoded['files'] ?? null) ? $decoded['files'] : [];

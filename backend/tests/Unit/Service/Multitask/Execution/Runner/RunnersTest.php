@@ -911,6 +911,38 @@ final class RunnersTest extends TestCase
         self::assertTrue($capturedOptions['record_media_usage'] ?? false);
     }
 
+    public function testASavedTaskRenderStaysInlineAndKeepsTheTurn(): void
+    {
+        $handler = $this->createMock(MediaGenerationHandler::class);
+        $capturedOptions = null;
+        $handler->method('handle')->willReturnCallback(
+            function ($msg, $thread, $classification, $progress, $options) use (&$capturedOptions): array {
+                $capturedOptions = $options;
+
+                return [
+                    'content' => '__IMAGE_GENERATED__',
+                    'metadata' => [
+                        'file' => ['path' => '/api/v1/files/uploads/1/000/dog.png', 'type' => 'image'],
+                    ],
+                ];
+            }
+        );
+
+        $runner = new MediaGenerationRunner($handler, $this->createStub(LoggerInterface::class));
+        $node = new TaskNode('n1', Capability::ImageGeneration, [], ['prompt' => 'a cat']);
+        $context = new NodeContext($this->message('a cat'), [], 1, ['language' => 'en', 'model_id' => 41], [
+            'saved_task' => true,
+            'runtime_profile' => ['instructions' => 'be brief'],
+        ]);
+
+        $runner->run($node, $context);
+
+        self::assertIsArray($capturedOptions);
+        self::assertTrue($capturedOptions['force_inline_media'] ?? false);
+        self::assertSame(41, $capturedOptions['plan_resume']['classification']['model_id'] ?? null);
+        self::assertSame(['instructions' => 'be brief'], $capturedOptions['plan_resume']['runtime_profile'] ?? null);
+    }
+
     public function testMediaGenerationRunnerReturnsRunningWhenHandlerDetachedAsyncJob(): void
     {
         $handler = $this->createMock(MediaGenerationHandler::class);

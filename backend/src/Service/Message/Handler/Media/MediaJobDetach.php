@@ -32,9 +32,9 @@ final readonly class MediaJobDetach
     }
 
     /**
-     * The async backbone is the default, but `options['force_inline_media']`
-     * forces the blocking path: a multitask media node another node depends on
-     * must produce its file in the same turn (#1218).
+     * The async backbone is the default. `options['force_inline_media']` is only
+     * for a turn that must not queue (incognito). A multitask node another step
+     * needs still detaches; the plan continues when the job ends.
      */
     public function allowed(MediaTurnRequest $request): bool
     {
@@ -100,7 +100,9 @@ final readonly class MediaJobDetach
             'nodeId' => '' !== (string) $nodeId ? $nodeId : null,
             'trackId' => '' !== $trackId ? $trackId : null,
             'inputRef' => $inputRef,
-            'options' => $mediaOptions,
+            'options' => $mediaOptions
+                + ['planMessageId' => $message->getId()]
+                + (is_array($options['plan_resume'] ?? null) ? ['plan_resume' => $options['plan_resume']] : []),
         ]);
 
         if (!$this->mediaJobDispatcher->dispatch($job)) {

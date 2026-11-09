@@ -208,13 +208,11 @@ final class DagExecutorTest extends TestCase
     }
 
     /**
-     * Issue #1218: a media node another node depends on (here `file_analysis`
-     * reads `$n1.file`) must be flagged for synchronous in-turn generation, so
-     * the produced file is available to that dependent — an async detach could
-     * never deliver it. NodeContext::mustRunMediaInline() is how the runner
-     * learns this; assert the executor sets it and the compound chain completes.
+     * A media node another step needs does not keep the web request waiting.
+     * The first pass records the render as still running. After the worker
+     * supplies the file, the same plan finishes.
      */
-    public function testMediaNodeWithDependentRunsInlineAndCompletesCompoundChain(): void
+    public function testMediaNodeWithDependentReturnsBeforeTheRenderAndFinishesAfterIt(): void
     {
         $plan = TaskPlan::fromArray([
             'version' => 1, 'language' => 'en', 'reply_node' => 'n3',
@@ -228,25 +226,32 @@ final class DagExecutorTest extends TestCase
         $inlineSeen = [];
         $runner = $this->runner(function (TaskNode $node, NodeContext $ctx) use (&$inlineSeen): NodeResult {
             $inlineSeen[$node->id] = $ctx->mustRunMediaInline($node->id);
+            if (Capability::ImageGeneration === $node->capability && null === $ctx->getResult($node->id)) {
+                return NodeResult::running(['media_job' => ['job_id' => 'job-1', 'state' => 'running']]);
+            }
             $in = $ctx->resolveInputs($node);
 
             return match ($node->capability) {
-                Capability::ImageGeneration => NodeResult::ok(null, [['path' => '/api/v1/files/uploads/n1.png', 'type' => 'image']]),
                 Capability::FileAnalysis => NodeResult::ok('a cat on a windowsill'),
                 Capability::ComposeReply => NodeResult::ok(is_string($in['text']) ? $in['text'] : '', array_values(array_filter((array) ($in['attachments'] ?? []), 'is_array'))),
                 default => NodeResult::failed('unexpected'),
             };
         });
 
-        $result = $this->executor($runner)->execute($plan, $this->context());
+        $executor = $this->executor($runner);
+        $context = $this->context();
+        $paused = $executor->execute($plan, $context);
 
-        self::assertTrue($inlineSeen['n1'], 'image node with a dependent must run inline');
-        self::assertFalse($result['all_failed']);
-        self::assertFalse($result['partial_failure']);
-        self::assertSame('a cat on a windowsill', $result['content']);
-        self::assertCount(1, $result['files']);
-        self::assertSame('image', $result['files'][0]['type']);
-        self::assertSame(['n1' => 'done', 'n2' => 'done', 'n3' => 'done'], $result['node_statuses']);
+        self::assertFalse($inlineSeen['n1'] ?? true, 'a dependent render must not block the request');
+        self::assertSame('running', $paused['node_statuses']['n1']);
+        self::assertArrayNotHasKey('n2', array_filter($paused['node_statuses'], static fn (string $status): bool => 'done' === $status));
+        self::assertFalse($paused['all_failed']);
+
+        $context->setResult('n1', NodeResult::ok(null, [['path' => '/api/v1/files/uploads/n1.png', 'type' => 'image']]));
+        $finished = $executor->execute($plan, $context);
+
+        self::assertSame('a cat on a windowsill', $finished['content']);
+        self::assertSame(['n1' => 'done', 'n2' => 'done', 'n3' => 'done'], $finished['node_statuses']);
     }
 
     /**

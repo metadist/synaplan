@@ -88,13 +88,22 @@ final class RunMediaNodeCommand extends Command
         $message = $this->resolveMessage($messageId, $userId, $prompt, $language);
 
         $context = new NodeContext($message, $thread, $userId > 0 ? $userId : null, ['language' => $language], $options);
+        $nodeId = is_string($payload['node_id'] ?? null) ? trim($payload['node_id']) : '';
         // Provide the prompt under both keys so image (prompt) and tts (text) runners pick it up.
-        $node = new TaskNode('n1', $capability, [], ['prompt' => $prompt, 'text' => $prompt], $params);
+        $node = new TaskNode('' !== $nodeId ? $nodeId : 'n1', $capability, [], ['prompt' => $prompt, 'text' => $prompt], $params);
 
         try {
             $result = $runner->run($node, $context);
         } catch (\Throwable $e) {
             return $this->emit($output, ['ok' => false, 'error' => $e->getMessage()]);
+        }
+
+        if ($result->isRunning()) {
+            return $this->emit($output, [
+                'ok' => true,
+                'running' => true,
+                'metadata' => $result->metadata,
+            ]);
         }
 
         if (!$result->isSuccessful()) {

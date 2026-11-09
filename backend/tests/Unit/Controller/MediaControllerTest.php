@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\Media\MediaGenerationServiceInterface;
+use App\Service\Media\WebMediaAnswer;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -24,7 +25,7 @@ class MediaControllerTest extends TestCase
     protected function setUp(): void
     {
         $this->mediaService = $this->createMock(MediaGenerationServiceInterface::class);
-        $this->controller = new MediaController($this->mediaService, new NullLogger());
+        $this->controller = new MediaController($this->mediaService, new WebMediaAnswer($this->mediaService), new NullLogger());
 
         $container = new Container();
         $container->set('serializer', new class {
@@ -300,7 +301,7 @@ class MediaControllerTest extends TestCase
                 && 'STOP' === $context['finish_reason']
                 && '10' === $context['text_response']),
         );
-        $controller = new MediaController($this->mediaService, $logger);
+        $controller = new MediaController($this->mediaService, new WebMediaAnswer($this->mediaService), $logger);
         $controller->setContainer($this->containerWithSerializer());
 
         $response = $controller->generateFromImages($this->makePic2picRequest('Wie viele Fenster hat dieses Haus?'), $this->createUser());
