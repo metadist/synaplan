@@ -1548,7 +1548,8 @@ const handleSessionEvent = (event: WidgetEvent) => {
 
     nextTick(() => scrollToBottom())
   } else if (event.type === 'takeover') {
-    const takeoverText = (event.message as string) ?? 'You are now connected with a person from our team.'
+    const takeoverText =
+      (event.message as string) ?? 'You are now connected with a person from our team.'
     if (selectedSession.value) {
       const previousMode = selectedSession.value.mode
       selectedSession.value.mode = 'human'
