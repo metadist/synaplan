@@ -1011,6 +1011,7 @@ services:
     App\Service\OAuth\Server\OAuthServerFactory:
         arguments:
             $secret: '%env(APP_SECRET)%'
+            $issuer: '%env(APP_URL)%'
 
     App\Service\OAuth\Server\RegistrationPolicy:
         arguments:

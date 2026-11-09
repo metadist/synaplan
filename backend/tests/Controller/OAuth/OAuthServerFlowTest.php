@@ -129,6 +129,15 @@ final class OAuthServerFlowTest extends WebTestCase
         $this->tokenRequest($assertion, ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'a client assertion is good for one request');
 
+        $this->client->request('POST', '/oauth/token', ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token'], 'client_id' => $clientId]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'no assertion, no client');
+        self::assertSame('invalid_client', $this->json()['error']);
+        $this->client->request('POST', '/oauth/token', ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token'], 'client_id' => $clientId, 'client_secret' => 'guess']);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'a secret is no way in');
+        $other = (string) $this->register(self::IAT)['client_id'];
+        $this->tokenRequest($this->assertion($other, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
+        self::assertFalse($this->client->getResponse()->isSuccessful(), 'another client cannot redeem this grant');
+
         $rotated = $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
         self::assertResponseIsSuccessful();
         $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
