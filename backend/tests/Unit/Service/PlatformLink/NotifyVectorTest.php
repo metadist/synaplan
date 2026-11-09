@@ -38,6 +38,9 @@ final class NotifyVectorTest extends TestCase
 
         self::assertSame(NotificationToken::OK, NotificationToken::verdict($token, 'https://synaplan.example', 'oidc-cloud', [$public], 1_700_000_100));
         self::assertSame(NotificationToken::STALE, NotificationToken::verdict($token, 'https://synaplan.example', 'oidc-cloud', [$public], 1_700_000_400));
+        $exp = (int) (NotificationToken::verifiedClaims($token, [$public])['exp'] ?? 0);
+        self::assertSame(NotificationToken::OK, NotificationToken::verdict($token, 'https://synaplan.example', 'oidc-cloud', [$public], $exp - 1));
+        self::assertSame(NotificationToken::STALE, NotificationToken::verdict($token, 'https://synaplan.example', 'oidc-cloud', [$public], $exp), 'exp is exclusive (RFC 7519 4.1.4)');
         self::assertSame(NotificationToken::WRONG_ISSUER, NotificationToken::verdict($token, 'https://other.example', 'oidc-cloud', [$public], 1_700_000_100));
         $claims = NotificationToken::verifiedClaims($token, [$public]);
         self::assertSame(['oidc-cloud', 'ada', 'pickup', '15'], [$claims['aud'] ?? null, $claims['sub'] ?? null, $claims['type'] ?? null, $claims['id'] ?? null]);
