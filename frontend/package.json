@@ -105,6 +105,6 @@
     "vue-tsc": "3.3.14"
   },
   "overrides": {
-    "minimatch": "11.0.4"
+    "minimatch": "11.0.5"
   }
 }
