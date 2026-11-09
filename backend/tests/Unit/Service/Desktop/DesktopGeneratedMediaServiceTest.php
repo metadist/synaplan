@@ -91,6 +91,37 @@ final class DesktopGeneratedMediaServiceTest extends TestCase
         self::assertSame('/api/v1/files/uploads/01/000/x.png', $out['file']['url']);
     }
 
+    public function testVideoReturnsTheFinishedFile(): void
+    {
+        $user = $this->createMock(User::class);
+        $file = $this->createMock(File::class);
+        $file->method('getId')->willReturn(12);
+        $repo = $this->createMock(EntityRepository::class);
+        $repo->method('findOneBy')->willReturn($file);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturn($repo);
+
+        $media = $this->createMock(MediaGenerationServiceInterface::class);
+        $media->expects($this->once())
+            ->method('generate')
+            ->with($user, 'a cat running', 'video', 45)
+            ->willReturn([
+                'success' => true,
+                'file' => [
+                    'url' => '/api/v1/files/uploads/01/000/clip.mp4',
+                    'type' => 'video',
+                    'mimeType' => 'video/mp4',
+                ],
+                'provider' => 'google',
+                'model' => 'veo-3.1-generate-preview',
+            ]);
+
+        $out = $this->service($media, $em)->generate($user, 'a cat running', 'video', 'google:veo-3.1-generate-preview:text2vid');
+
+        self::assertSame(12, $out['file']['id']);
+        self::assertSame('/api/v1/files/uploads/01/000/clip.mp4', $out['file']['url']);
+    }
+
     public function testSpeakPassesExplicitLanguageToFacade(): void
     {
         $user = $this->createMock(User::class);

@@ -68,7 +68,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
     /**
      * Generate media (image or video) from a text prompt.
      *
-     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}|array{success: true, status: 'processing', jobId: string, provider: string, model: string, resolution: string|null}
+     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}
      *
      * @throws \InvalidArgumentException  on bad input
      * @throws RateLimitExceededException when user exceeds quota
@@ -88,9 +88,6 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $resolvedModelId = $resolved['modelId'];
 
         $resolution = 'video' === $type ? $this->normalizeResolution($resolution, $modelConfig) : null;
-        if ('video' === $type && $this->aiFacade->supportsAsyncVideo(is_string($provider) ? $provider : null)) {
-            return VideoGenerationStart::accepted($this->startVideoGeneration($user, $prompt, $modelId, $resolution));
-        }
 
         $this->logger->info('Media generation request', [
             'user_id' => $user->getId(),

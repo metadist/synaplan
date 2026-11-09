@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Service\Exception\NoModelAvailableException;
 use App\Service\Exception\RateLimitExceededException;
 use App\Service\Media\MediaGenerationServiceInterface;
+use App\Service\Media\WebMediaAnswer;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,6 +25,7 @@ final class MediaController extends AbstractController
 {
     public function __construct(
         private MediaGenerationServiceInterface $mediaService,
+        private WebMediaAnswer $webMedia,
         private LoggerInterface $logger,
     ) {
     }
@@ -281,12 +283,9 @@ final class MediaController extends AbstractController
             : null;
 
         try {
-            $result = $this->mediaService->generate($user, $prompt, $type, $modelId, $resolution);
-            if (array_key_exists('jobId', $result)) {
-                return $this->json($result, Response::HTTP_ACCEPTED);
-            }
+            $answer = $this->webMedia->answer($user, $prompt, $type, $modelId, $resolution);
 
-            return $this->json($result);
+            return $this->json($answer['body'], $answer['status']);
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
         } catch (RateLimitExceededException $e) {

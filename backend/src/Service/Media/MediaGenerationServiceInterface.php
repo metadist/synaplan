@@ -22,7 +22,7 @@ interface MediaGenerationServiceInterface
      * resolution actually used (after normalization and provider negotiation), which
      * may differ from the caller's input.
      *
-     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}|array{success: true, status: 'processing', jobId: string, provider: string, model: string, resolution: string|null}
+     * @return array{success: true, file: array{url: string, type: string, mimeType: string}, provider: string, model: string, resolution?: string}
      *
      * @throws \InvalidArgumentException  on bad input
      * @throws RateLimitExceededException when user exceeds quota
