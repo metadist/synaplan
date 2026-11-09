@@ -81,6 +81,8 @@ prompting flow.
 | [`20261102-governance-and-privacy/`](./20261102-governance-and-privacy/00_master_plan.md) | Personal-data masking before cloud models, local only per group, agent review before publish, conversation retention, governance overview (GV1–GV7) | not started (row 41) |
 | [`20261102-agent-template-gallery/`](./20261102-agent-template-gallery/00_master_plan.md) | Assistants → New opens a gallery of bundle-v1 templates with requirements, install checklist and CI acceptance runs (TG1–TG6) | not started (row 42) |
 | [`20261104-hosted-plugins/`](./20261104-hosted-plugins/00_master_plan.md) | First-party plugins in `plugins/`, CI, docs, and a way for an administrator to leave one out (HP0–HP10). Synamail profiles first | worked on (row 43) — HP4, 2026-11-05 |
+| [`20261106-assistant-onboarding-ux/`](./20261106-assistant-onboarding-ux/00_master_plan.md) | Set up a working assistant without guesswork: deterministic search for scheduled runs, no invented answers, search status surfaced, sticky truthful test panel, Activate for personal assistants | not started (row 44) — plan 2026-11-06, §0 unticked |
+| [`20261109-coding-backend/`](./20261109-coding-backend/00_master_plan.md) | One coding model per account, the context window on the Coding page and in the Claude Code, Pi, and OpenCode setup, statistics by model and editor (CB0–CB6) | not started (row 45) — plan 2026-11-09, §6 unticked |
 
 ## Archive
 
