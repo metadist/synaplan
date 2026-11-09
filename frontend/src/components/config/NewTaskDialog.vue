@@ -6,7 +6,7 @@
       @click.self="close"
     >
       <form
-        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto scroll-thin"
+        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto scroll-thin"
         role="dialog"
         aria-modal="true"
         aria-labelledby="new-task-title"

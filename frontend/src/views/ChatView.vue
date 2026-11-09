@@ -61,7 +61,7 @@
       <div
         v-else
         ref="chatContainer"
-        class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain chat-scroll-keyboard-pad"
+        class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-chat overscroll-contain"
         :class="{
           'flex flex-col items-center': isEmptyLanding,
           'max-md:hidden': liveStage,
@@ -1844,10 +1844,23 @@ const handleVisibilityChangeForToken = () => {
   }
 }
 
-const handleViewportResize = () => {
+// Keep the newest message right above the composer while the message area
+// changes height: a mobile browser shrinking the viewport for its keyboard, the
+// native shell taking the keyboard's overlap off the content column on every
+// frame (shrink model, style.css), a rotation. Observing the container itself
+// covers all of them with one signal, in the frame the height changed. While
+// streaming the pin behaviour stays intact instead of jumping to the bottom.
+//
+// The scroll events those pins produce arrive a frame late. By then the next
+// keyboard frame has shrunk the container again, so the event's scrollTop no
+// longer equals the value last set and handleScroll would read a user scroll
+// that "left the bottom" and drop auto-follow for good. Scroll events inside
+// this window after a resize pin are therefore taken as programmatic.
+const RESIZE_PIN_GRACE_MS = 200
+let lastResizePinAt = 0
+const handleMessageAreaResize = () => {
   if (!autoScroll.value || !chatContainer.value) return
-  // While streaming, keep the pin behaviour intact instead of jumping to the
-  // bottom (e.g. when the mobile keyboard resizes the visual viewport).
+  lastResizePinAt = Date.now()
   if (historyStore.messages.some((m) => m.isStreaming)) {
     followStreamingScroll()
     return
@@ -1856,29 +1869,17 @@ const handleViewportResize = () => {
   expectedScrollTop = chatContainer.value.scrollTop
 }
 
-if (window.visualViewport) {
-  window.visualViewport.addEventListener('resize', handleViewportResize)
-}
-
-// Native keyboard bridge (app/synaplan-native.js) fires this on show/hide with
-// Keyboard.resize:'none', where visualViewport never changes — so this is the
-// only signal that the keyboard opened. When the user is pinned to the bottom
-// we re-pin after the inset-driven padding is applied, keeping the latest
-// message right above the composer. rAF guarantees the new scrollHeight is
-// measured (the padding var was set synchronously just before this event).
-const handleKeyboardInsetChange = () => {
-  if (!autoScroll.value || !chatContainer.value) return
-  if (historyStore.messages.some((m) => m.isStreaming)) {
-    followStreamingScroll()
-    return
-  }
-  requestAnimationFrame(() => {
-    if (!chatContainer.value) return
-    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    expectedScrollTop = chatContainer.value.scrollTop
-  })
-}
-window.addEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
+const messageAreaObserver =
+  typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(handleMessageAreaResize)
+// The container is conditional (provider setup replaces it), so follow the ref.
+watch(
+  chatContainer,
+  (container, previous) => {
+    if (previous) messageAreaObserver?.unobserve(previous)
+    if (container) messageAreaObserver?.observe(container)
+  },
+  { immediate: true }
+)
 
 // Window event handler for memory badges (used by MessageText.vue)
 const handleOpenMemoryDialogEvent = (event: Event) => {
@@ -2173,10 +2174,7 @@ onBeforeUnmount(() => {
     currentAudioStreamer = null
   }
   isAudioStreaming.value = false
-  if (window.visualViewport) {
-    window.visualViewport.removeEventListener('resize', handleViewportResize)
-  }
-  window.removeEventListener('synaplan:keyboardinset', handleKeyboardInsetChange)
+  messageAreaObserver?.disconnect()
   window.removeEventListener('open-memory-dialog', handleOpenMemoryDialogEvent)
   window.removeEventListener('open-feedback-dialog', handleOpenFeedbackDialogEvent)
   window.removeEventListener('open-first-run-setup', handleOpenFirstRunSetupEvent)
@@ -2426,7 +2424,9 @@ const handleScroll = async () => {
   // Distinguish our own programmatic scrolls (including the pinned position
   // that is NOT at the bottom) from real user scrolling. Only the latter may
   // toggle auto-follow off/on.
-  const isProgrammatic = Math.abs(scrollTop - expectedScrollTop) <= 1
+  const isProgrammatic =
+    Math.abs(scrollTop - expectedScrollTop) <= 1 ||
+    Date.now() - lastResizePinAt < RESIZE_PIN_GRACE_MS
   if (!isProgrammatic) {
     const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
     autoScroll.value = isAtBottom

@@ -3,12 +3,12 @@
     <Transition name="modal">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+        class="modal-overlay fixed inset-0 z-[110] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
         data-testid="modal-iam-share"
         @click.self="close"
       >
         <div
-          class="surface-elevated w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto scroll-thin"
+          class="modal-panel surface-elevated w-full max-w-lg p-6 overflow-y-auto scroll-thin"
           role="dialog"
           aria-modal="true"
         >

@@ -1,22 +1,24 @@
 <template>
-  <article class="max-w-2xl mx-auto px-4 py-8 space-y-8" data-testid="page-using-ai-well">
-    <header class="space-y-2">
-      <h1 class="text-2xl font-semibold txt-primary">{{ t('pageTitles.usingAiWell') }}</h1>
-      <p class="text-sm txt-secondary">{{ t('people.literacy.ask') }}</p>
-    </header>
-    <section v-for="(section, index) in page" :key="section.title" class="space-y-2">
-      <h2 class="text-lg font-medium txt-primary">{{ index + 1 }}. {{ section.title }}</h2>
-      <p class="text-sm txt-primary leading-6">{{ section.body }}</p>
-    </section>
-    <button
-      type="button"
-      class="btn-primary px-4 py-2.5 text-sm font-medium"
-      data-testid="btn-literacy-done"
-      @click="done"
-    >
-      {{ t('people.literacy.done') }}
-    </button>
-  </article>
+  <div class="app-screen bg-app" data-testid="page-using-ai-well-root">
+    <article class="max-w-2xl mx-auto px-4 py-8 space-y-8" data-testid="page-using-ai-well">
+      <header class="space-y-2">
+        <h1 class="text-2xl font-semibold txt-primary">{{ t('pageTitles.usingAiWell') }}</h1>
+        <p class="text-sm txt-secondary">{{ t('people.literacy.ask') }}</p>
+      </header>
+      <section v-for="(section, index) in page" :key="section.title" class="space-y-2">
+        <h2 class="text-lg font-medium txt-primary">{{ index + 1 }}. {{ section.title }}</h2>
+        <p class="text-sm txt-primary leading-6">{{ section.body }}</p>
+      </section>
+      <button
+        type="button"
+        class="btn-primary px-4 py-2.5 text-sm font-medium"
+        data-testid="btn-literacy-done"
+        @click="done"
+      >
+        {{ t('people.literacy.done') }}
+      </button>
+    </article>
+  </div>
 </template>
 
 <script setup lang="ts">

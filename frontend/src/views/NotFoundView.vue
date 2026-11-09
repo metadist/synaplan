@@ -1,9 +1,9 @@
 <template>
   <div
-    class="min-h-screen flex items-center justify-center bg-app px-6"
+    class="app-screen flex items-start justify-center bg-app px-6 py-12"
     data-testid="page-not-found"
   >
-    <div class="max-w-2xl w-full text-center" data-testid="section-card">
+    <div class="max-w-2xl w-full my-auto text-center" data-testid="section-card">
       <!-- Animated 404 -->
       <div class="relative mb-8" data-testid="section-illustration">
         <h1

@@ -1,6 +1,9 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-chat px-4 py-10">
-    <div class="w-full max-w-md surface-card rounded-2xl p-6 sm:p-8" data-testid="page-login-link">
+  <div class="app-screen flex items-start justify-center bg-chat px-4 py-10">
+    <div
+      class="w-full max-w-md my-auto surface-card rounded-2xl p-6 sm:p-8"
+      data-testid="page-login-link"
+    >
       <p
         v-if="phase === 'opening'"
         class="text-sm txt-primary"

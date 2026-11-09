@@ -346,7 +346,7 @@
             <div
               v-if="showKeyModal"
               ref="keyModalPanel"
-              class="surface-elevated max-w-2xl w-full p-6 md:p-8"
+              class="modal-panel surface-elevated max-w-2xl w-full p-6 md:p-8 overflow-y-auto scroll-thin"
               role="dialog"
               aria-modal="true"
               aria-labelledby="api-key-created-title"

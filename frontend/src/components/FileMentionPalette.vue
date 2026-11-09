@@ -27,7 +27,7 @@
   >
     <div
       v-if="visible"
-      class="fixed bottom-0 left-0 right-0 md:absolute md:bottom-full md:left-0 md:right-0 md:mb-2 bg-white dark:bg-gray-900 border-t md:border border-gray-200 dark:border-gray-700 md:rounded-xl md:shadow-xl z-[60] max-h-[50vh] md:max-h-[300px] flex flex-col"
+      class="file-mention-palette fixed bottom-0 left-0 right-0 md:absolute md:bottom-full md:left-0 md:right-0 md:mb-2 bg-white dark:bg-gray-900 border-t md:border border-gray-200 dark:border-gray-700 md:rounded-xl md:shadow-xl z-[60] max-h-[50vh] md:max-h-[300px] flex flex-col"
       role="listbox"
       data-testid="comp-file-mention-palette"
       @click.stop
@@ -248,3 +248,15 @@ const getFileIcon = (fileType: string): string => {
 
 defineExpose({ handleKeyDown })
 </script>
+
+<style scoped>
+@media (max-width: 767px) {
+  .file-mention-palette {
+    bottom: var(--keyboard-inset-height, 0px);
+    max-height: min(
+      50dvh,
+      calc(100dvh - var(--keyboard-inset-height, 0px) - env(safe-area-inset-top, 0px) - 3.5rem)
+    );
+  }
+}
+</style>

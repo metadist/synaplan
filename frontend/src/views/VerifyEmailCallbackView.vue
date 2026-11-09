@@ -1,9 +1,9 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12"
     data-testid="page-verify-email-callback"
   >
-    <div class="w-full max-w-md">
+    <div class="w-full max-w-md my-auto">
       <div class="text-center mb-8">
         <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
       </div>

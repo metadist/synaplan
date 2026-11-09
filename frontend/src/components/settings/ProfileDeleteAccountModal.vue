@@ -2,11 +2,13 @@
   <Teleport to="#app">
     <div
       v-if="showDeleteModal"
-      class="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 px-4"
+      class="modal-overlay fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 p-4"
       data-testid="modal-delete-account"
       @click.self="showDeleteModal = false"
     >
-      <div class="surface-card max-w-lg w-full p-6 space-y-6 animate-scale-in">
+      <div
+        class="modal-panel surface-card max-w-lg w-full p-6 space-y-6 overflow-y-auto scroll-thin animate-scale-in"
+      >
         <div class="text-center">
           <div
             class="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center"

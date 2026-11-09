@@ -264,7 +264,10 @@
             enter-from-class="opacity-0 scale-95 translate-y-4"
             leave-to-class="opacity-0 scale-95 translate-y-4"
           >
-            <div v-if="showPairing" class="surface-elevated max-w-lg w-full p-6 md:p-8">
+            <div
+              v-if="showPairing"
+              class="modal-panel surface-elevated max-w-lg w-full p-6 md:p-8 overflow-y-auto scroll-thin"
+            >
               <div class="flex items-start gap-4 mb-6">
                 <div
                   class="flex-shrink-0 w-12 h-12 rounded-full bg-[var(--brand-alpha-light)] flex items-center justify-center"

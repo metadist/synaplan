@@ -1,10 +1,9 @@
 <template>
   <div
-    class="min-h-dvh bg-light-bg dark:bg-dark-bg flex flex-col relative overflow-y-auto overflow-x-hidden px-4 py-6"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex flex-col relative px-4 py-6"
     :style="{
       paddingTop: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)',
-      paddingBottom:
-        'calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-inset-height, 0px) + 1.5rem)',
+      paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
     }"
     data-testid="page-setup"
   >

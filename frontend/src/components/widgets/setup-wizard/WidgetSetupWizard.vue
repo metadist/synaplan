@@ -6,7 +6,7 @@
       @click.self="handleClose"
     >
       <div
-        class="modal-panel surface-card rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+        class="modal-panel surface-card rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col"
       >
         <!-- Header -->
         <div

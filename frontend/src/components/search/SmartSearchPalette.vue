@@ -3,7 +3,7 @@
     <Transition name="smart-search-fade">
       <div
         v-if="store.isOpen"
-        class="fixed inset-0 z-[9000] flex items-start justify-center sm:pt-[10vh] sm:px-4"
+        class="modal-overlay fixed inset-0 z-[9000] flex items-start justify-center sm:pt-[10vh] sm:px-4"
         data-testid="modal-smart-search"
       >
         <div
@@ -15,7 +15,7 @@
           role="dialog"
           aria-modal="true"
           :aria-label="$t('search.palette.label')"
-          class="relative surface-card w-full h-full sm:h-auto sm:max-h-[72vh] sm:max-w-2xl lg:max-w-4xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden"
+          class="smart-search-panel relative surface-card w-full h-full sm:h-auto sm:max-w-2xl lg:max-w-4xl sm:rounded-xl shadow-2xl flex flex-col overflow-hidden"
           data-testid="panel-smart-search"
         >
           <div
@@ -288,6 +288,27 @@ const { onKeydown } = usePaletteKeys({
 </script>
 
 <style scoped>
+/* Full height on phones (minus the native keyboard via modal-overlay); on
+   sm+ the dialog starts 10vh down and stays above the keyboard too. */
+@media (max-width: 639px) {
+  .modal-overlay {
+    padding-top: 0;
+    padding-bottom: var(--keyboard-inset-height, 0px);
+  }
+}
+
+@media (min-width: 640px) {
+  .smart-search-panel {
+    max-height: min(
+      72vh,
+      calc(
+        100dvh - 10vh - max(env(safe-area-inset-bottom, 0px), 1rem) -
+          var(--keyboard-inset-height, 0px)
+      )
+    );
+  }
+}
+
 .smart-search-fade-enter-active,
 .smart-search-fade-leave-active {
   transition: opacity 0.15s ease;

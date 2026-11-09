@@ -34,7 +34,10 @@ watch(activeCount, (count) => {
     <button
       v-if="visible"
       type="button"
-      class="surface-card fixed bottom-4 left-4 z-[999] inline-flex items-center gap-2 rounded-full border border-brand px-3 py-2 text-sm font-medium text-brand shadow-md hover:bg-black/5 dark:hover:bg-white/5"
+      class="surface-card fixed left-4 z-[999] inline-flex items-center gap-2 rounded-full border border-brand px-3 py-2 text-sm font-medium text-brand shadow-md hover:bg-black/5 dark:hover:bg-white/5"
+      style="
+        bottom: calc(1rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-inset-height, 0px));
+      "
       :aria-label="$t('jobs.tray.openLabel', { count: activeCount })"
       data-testid="jobs-tray-launcher"
       @click="toggle"

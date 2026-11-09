@@ -1,7 +1,10 @@
 <template>
   <div
     v-if="due"
-    class="fixed bottom-4 left-4 right-4 z-40 mx-auto max-w-lg surface-card border border-light-border/30 dark:border-dark-border/20 rounded-xl p-4 shadow-lg space-y-3"
+    class="fixed left-4 right-4 z-40 mx-auto max-w-lg surface-card border border-light-border/30 dark:border-dark-border/20 rounded-xl p-4 shadow-lg space-y-3"
+    style="
+      bottom: calc(1rem + env(safe-area-inset-bottom, 0px) + var(--keyboard-inset-height, 0px));
+    "
     data-testid="card-ai-literacy"
     role="dialog"
     aria-labelledby="ai-literacy-ask"

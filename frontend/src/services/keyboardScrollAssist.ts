@@ -1,23 +1,18 @@
 /**
  * Keyboard scroll-assist for the native shell (Capacitor `Keyboard.resize: 'none'`).
  *
- * With `resize: 'none'` the WebView never shrinks, so an opening soft keyboard
- * simply OVERLAYS the bottom of the page. The chat composer copes on its own by
- * floating up via the `--keyboard-inset-height` CSS var (see
- * `synaplan-apps/app/synaplan-native.js` + `.chat-composer-sticky` in style.css).
- * But an ordinary input in a form, dialog or settings page has no such handling:
- * it stays hidden behind the keyboard, and on a short (non-scrollable) page the
- * user cannot even scroll to reach it.
- *
- * This module keeps EVERY focused editable where the user tapped it:
+ * With `resize: 'none'` the WebView never shrinks. The shell reports the
+ * keyboard's overlap as `--keyboard-inset-height` and the content column takes
+ * it off its height (shrink model, style.css), so the scroll areas inside
+ * shrink and a field at the bottom of a form can always be scrolled clear of
+ * the keyboard. What the layout cannot do is choose the scroll position. This
+ * module keeps EVERY focused editable where the user tapped it:
  *   1. Remember the position on pointerdown, before the keyboard pans.
- *   2. Reserve room — temporary bottom padding on the nearest scrollable
- *      ancestor, so a short page can still clear the keyboard.
- *   3. If Samsung pins the field to the top edge, restore that scroll, then
- *      move it only as far as the keyboard actually covers.
+ *   2. If Samsung pins the field to the top edge, restore that scroll.
+ *   3. Move the field only as far as the keyboard actually covers it.
  *
  * The native shell publishes `synaplan:keyboardinset`. `detail.height` is the
- * CSS lift (0 when the WebView already shrank). `detail.keyboardHeight` is the
+ * CSS inset (0 when the WebView already shrank). `detail.keyboardHeight` is the
  * IME, so a shrunk layout still reveals the field. `focusin` covers a jump to
  * another field while the keyboard stays open.
  *
@@ -37,12 +32,8 @@ import {
 let initialized = false
 /** Current soft-keyboard height in px (0 when hidden). */
 let keyboardHeight = 0
-/** CSS lift published by the shell. 0 when the WebView itself already shrank. */
+/** CSS inset published by the shell. 0 when the WebView itself already shrank. */
 let cssInset = 0
-/** The scroll container we padded, so we can restore it on hide/refocus. */
-let paddedScroller: HTMLElement | null = null
-/** The scroller's inline `padding-bottom` before we touched it (for restore). */
-let paddedScrollerOriginalPadding = ''
 
 /** Gap kept between the field and the keyboard, and below the top edge. */
 const REVEAL_MARGIN_PX = 16
@@ -61,35 +52,6 @@ let revealTimers: ReturnType<typeof setTimeout>[] = []
 const REVEAL_DELAYS_MS = [50, 150, 320]
 const MAX_VIEWPORT_CORRECTIONS = 8
 
-/** The chat composer manages its own keyboard float — never fight it. */
-function isChatComposerField(el: Element): boolean {
-  return el.closest('.chat-composer-sticky') !== null
-}
-
-/**
- * Nearest ancestor that scrolls vertically. Falls back to the app's primary
- * content area, then the document scroller, so a field is always liftable.
- */
-function findScrollableAncestor(el: Element): HTMLElement {
-  let node: HTMLElement | null = el.parentElement
-  while (node && node !== document.body) {
-    const overflowY = window.getComputedStyle(node).overflowY
-    if (overflowY === 'auto' || overflowY === 'scroll') return node
-    node = node.parentElement
-  }
-  const primary = document.querySelector<HTMLElement>('main[data-testid="section-primary-content"]')
-  if (primary && primary.contains(el)) return primary
-  return (document.scrollingElement as HTMLElement | null) ?? document.documentElement
-}
-
-function restoreScrollerPadding(): void {
-  if (paddedScroller) {
-    paddedScroller.style.paddingBottom = paddedScrollerOriginalPadding
-    paddedScroller = null
-    paddedScrollerOriginalPadding = ''
-  }
-}
-
 /** Every scrollable ancestor, plus the document. Samsung may pan any of them. */
 function scrollableAncestors(el: Element): HTMLElement[] {
   const found: HTMLElement[] = []
@@ -101,7 +63,6 @@ function scrollableAncestors(el: Element): HTMLElement[] {
   }
   const doc = document.scrollingElement
   if (doc instanceof HTMLElement && !found.includes(doc)) found.push(doc)
-  if (found.length === 0) found.push(findScrollableAncestor(el))
   return found
 }
 
@@ -149,22 +110,6 @@ function visibleBand(): { top: number; bottom: number } {
   }
 }
 
-function reservePadding(el: HTMLElement): void {
-  // The shell publishes a 0 CSS lift once the WebView itself shrank. Extra
-  // padding there is the gap above the keyboard.
-  if (cssInset <= 0) return
-  const scroller = findScrollableAncestor(el)
-  if (scroller !== paddedScroller) {
-    restoreScrollerPadding()
-    paddedScroller = scroller
-    paddedScrollerOriginalPadding = scroller.style.paddingBottom
-    const basePadding = parseFloat(window.getComputedStyle(scroller).paddingBottom) || 0
-    scroller.style.paddingBottom = `${basePadding + keyboardHeight + REVEAL_MARGIN_PX}px`
-  }
-  // Commit the padding before measuring, so a short page can scroll.
-  void scroller.scrollHeight
-}
-
 function scrollByDelta(el: HTMLElement, delta: number): void {
   let remaining = delta
   for (const scroller of scrollableAncestors(el)) {
@@ -183,8 +128,7 @@ function clearRevealTimers(): void {
 
 /**
  * Put the focused field back where the user tapped it, then lift it only as
- * far as the keyboard requires. The chat composer floats on its own; here we
- * only undo the pan that shoved it to the top.
+ * far as the keyboard requires.
  */
 function revealActiveField(fromViewport = false): void {
   if (revealing || keyboardHeight <= 0) return
@@ -204,8 +148,6 @@ function revealActiveField(fromViewport = false): void {
       restoreLocks()
       changed = true
     }
-    if (isChatComposerField(field)) return
-    reservePadding(field)
     const rect = field.getBoundingClientRect()
     const band = visibleBand()
     const delta = keyboardRevealDelta({
@@ -249,7 +191,6 @@ function onKeyboardInset(event: Event): void {
     scheduleReveal()
   } else {
     clearRevealTimers()
-    restoreScrollerPadding()
     anchorEl = null
     anchorTop = 0
     locks = []
@@ -282,14 +223,30 @@ function onViewport(): void {
 
 /**
  * Wire the global keyboard scroll-assist. Idempotent; native shell only.
- * Called once from App.vue, alongside the other native bootstraps.
+ * Called once from App.vue, alongside the other native bootstraps. Returns
+ * the teardown (tests); the app keeps it for its lifetime.
  */
-export function initKeyboardScrollAssist(): void {
-  if (initialized || !isNativeApp()) return
+export function initKeyboardScrollAssist(): () => void {
+  if (initialized || !isNativeApp()) return () => {}
   initialized = true
   window.addEventListener('synaplan:keyboardinset', onKeyboardInset)
   document.addEventListener('pointerdown', onPointerDown, true)
   document.addEventListener('focusin', onFocusIn)
   window.visualViewport?.addEventListener('resize', onViewport)
   window.visualViewport?.addEventListener('scroll', onViewport)
+  return () => {
+    clearRevealTimers()
+    window.removeEventListener('synaplan:keyboardinset', onKeyboardInset)
+    document.removeEventListener('pointerdown', onPointerDown, true)
+    document.removeEventListener('focusin', onFocusIn)
+    window.visualViewport?.removeEventListener('resize', onViewport)
+    window.visualViewport?.removeEventListener('scroll', onViewport)
+    keyboardHeight = 0
+    cssInset = 0
+    anchorEl = null
+    anchorTop = 0
+    locks = []
+    corrections = 0
+    initialized = false
+  }
 }

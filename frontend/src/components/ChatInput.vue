@@ -1,16 +1,16 @@
 <template>
   <!--
     Sticky chat input bar — `position: sticky; bottom: 0` keeps it pinned to
-    the bottom of the scroll area and, on iOS, follows the soft keyboard via
-    the visual viewport.
+    the bottom of the chat column. In the native shell that column shrinks by
+    the keyboard's overlap on every frame (shrink model, style.css), so the
+    composer rides up with the keyboard; mobile browsers shrink the viewport
+    themselves.
 
     The composer is the bottom-most element on every breakpoint (the mobile
     push-drawer is an overlay, not a bottom bar), so it owns the iOS home-
     indicator inset. That inset lives in `.chat-composer-sticky` (style.css) and
     collapses to 0 while the keyboard is up so the input sits right above it —
-    driven by `--keyboard-inset-height` (native) with `--kb-open` as the web
-    fallback, because Keyboard.resize:'none' means visualViewport never shrinks
-    in the native app.
+    `html.synaplan-keyboard-open` from the shell, `--kb-open` as the web fallback.
   -->
   <div
     :class="[
