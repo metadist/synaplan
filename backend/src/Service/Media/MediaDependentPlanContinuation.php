@@ -33,30 +33,38 @@ final readonly class MediaDependentPlanContinuation
         private GeneratedFileRegistrar $files,
         private EntityManagerInterface $em,
         private LockFactory $locks,
+        private MediaJobRebinder $rebinder,
         private LoggerInterface $logger,
     ) {
     }
 
-    public function continue(int $messageId, string $nodeId, string $jobKey): void
+    /**
+     * False only when another worker holds this plan's lock. The caller
+     * retries; dropping the command would leave a finished render's
+     * dependents pending.
+     */
+    public function continue(int $messageId, string $nodeId, string $jobKey): bool
     {
         $job = $this->jobs->findByKey($jobKey);
         if (null === $job || !$job->isTerminal()) {
-            return;
+            return true;
         }
         $visible = $this->messages->find($messageId);
         if (!$visible instanceof Message) {
-            return;
+            return true;
         }
         $planMessageId = $this->planMessageId($job, $visible);
         $lock = $this->locks->createLock('media-plan:'.$planMessageId, 120);
         if (!$lock->acquire()) {
-            return;
+            return false;
         }
         try {
             $this->continueLocked($visible, $planMessageId, $nodeId, $job);
         } finally {
             $lock->release();
         }
+
+        return true;
     }
 
     private function continueLocked(Message $visible, int $planMessageId, string $nodeId, MediaJob $job): void
@@ -72,9 +80,9 @@ final readonly class MediaDependentPlanContinuation
         }
 
         $options = [];
-        $trackId = $job->getOptions()['track_id'] ?? null;
-        if (is_scalar($trackId) && '' !== (string) $trackId) {
-            $options['track_id'] = (string) $trackId;
+        $trackId = $job->getTrackId();
+        if (null !== $trackId && '' !== $trackId) {
+            $options['track_id'] = $trackId;
         }
         $context = $this->rehydrator->fromMessage($planMessage, $options);
         $context->setResult($nodeId, $this->settled($job));
@@ -94,12 +102,34 @@ final readonly class MediaDependentPlanContinuation
         }
         $this->attachFiles($visible, $assembled['files']);
         $this->em->flush();
+        $this->rebindNewJobs($visible, $assembled['node_job_keys']);
         $this->logger->info('Media plan continued after the render finished', [
             'message_id' => $visible->getId(),
             'plan_message_id' => $planMessageId,
             'node_id' => $nodeId,
             'job_key' => $job->getJobKey(),
         ]);
+    }
+
+    /**
+     * Jobs the resumed plan just started are bound to the plan message.
+     * Point them at the reply the person sees, and keep planMessageId so
+     * the next finished render can find the same rows. A render that
+     * already finished while bound to the prompt is synced here.
+     *
+     * @param array<string, string> $jobKeys
+     */
+    private function rebindNewJobs(Message $visible, array $jobKeys): void
+    {
+        $visibleId = $visible->getId();
+        if (null === $visibleId || 'OUT' !== $visible->getDirection()) {
+            return;
+        }
+        foreach ($jobKeys as $jobKey) {
+            if ('' !== $jobKey) {
+                $this->rebinder->rebind($jobKey, $visibleId);
+            }
+        }
     }
 
     /**

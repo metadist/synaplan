@@ -149,6 +149,26 @@ final class RunMediaNodeCommandTest extends TestCase
         self::assertSame(3, $seenContext->message->getUserId());
     }
 
+    public function testTheSubprocessUsesTheSuppliedNodeId(): void
+    {
+        $seen = null;
+        $runner = $this->runner(function (TaskNode $node) use (&$seen): NodeResult {
+            $seen = $node->id;
+
+            return NodeResult::running(['media_job' => ['job_id' => 'job-2']]);
+        });
+
+        $tester = $this->tester($runner);
+        $tester->execute(['--payload' => json_encode([
+            'node_id' => 'n2',
+            'capability' => 'image_generation',
+            'prompt' => 'a second picture',
+        ])]);
+
+        self::assertSame('n2', $seen);
+        self::assertTrue($this->parseResult($tester)['running']);
+    }
+
     public function testRejectsUnknownCapability(): void
     {
         $tester = $this->tester($this->runner(static fn (): NodeResult => NodeResult::ok('x')));
