@@ -154,7 +154,11 @@ final readonly class AgentTriggerMaterializer
                     'tz' => (string) ($schedule['tz'] ?? 'UTC'),
                     'agentId' => $agentId,
                 ],
-                'graph' => $this->chatGraph(SavedTask::TRIGGER_SCHEDULE, (string) ($schedule['instruction'] ?? '')),
+                'graph' => $this->chatGraph(
+                    SavedTask::TRIGGER_SCHEDULE,
+                    (string) ($schedule['instruction'] ?? ''),
+                    $this->scheduleReadsMailbox($agent, $schedule),
+                ),
             ],
         );
     }
@@ -370,10 +374,33 @@ final readonly class AgentTriggerMaterializer
     }
 
     /**
+     * @param array<string, mixed> $schedule
+     */
+    private function scheduleReadsMailbox(Agent $agent, array $schedule): bool
+    {
+        $text = strtolower((string) ($schedule['instruction'] ?? '')).' '.strtolower($agent->getSlug());
+
+        return str_contains($text, 'mailbox') || str_contains($text, 'daily-briefing');
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function chatGraph(string $triggerType, string $instruction): array
+    private function chatGraph(string $triggerType, string $instruction, bool $searchMailbox = false): array
     {
+        if ($searchMailbox) {
+            return [
+                'version' => 1,
+                'trigger' => ['type' => $triggerType],
+                'instruction' => $instruction,
+                'reply_node' => 'n2',
+                'nodes' => [
+                    ['id' => 'n1', 'capability' => 'email_search', 'depends_on' => [], 'params' => ['query' => 'ALL']],
+                    ['id' => 'n2', 'capability' => 'chat', 'depends_on' => ['n1'], 'inputs' => ['text' => $instruction]],
+                ],
+            ];
+        }
+
         return [
             'version' => 1,
             'trigger' => ['type' => $triggerType],

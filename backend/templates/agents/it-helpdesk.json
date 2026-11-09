@@ -1,0 +1,88 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "it-helpdesk",
+    "version": "2026.11.1",
+    "titleKey": "templates.itHelpdesk.title",
+    "summaryKey": "templates.itHelpdesk.summary",
+    "category": "support",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "knowledgeFolder",
+        "hintKey": "templates.itHelpdesk.needsArticles"
+      }
+    ],
+    "tryIt": [
+      "templates.itHelpdesk.try1",
+      "templates.itHelpdesk.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "it-helpdesk",
+          "name": "IT helpdesk",
+          "description": "Writes a first answer from your help articles and cites the article.",
+          "icon": "mdi:headset",
+          "instruction": "You write a first answer to an IT question using the help articles in your knowledge. Cite the article. If the articles do not cover it, say so and suggest what the person can check next. You do not claim a ticket was opened. If no articles are attached, say that the person still needs to choose the folder with the help articles. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.3,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "A colleague cannot connect to the VPN. What should they try first?",
+                "How do we reset a forgotten password?"
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

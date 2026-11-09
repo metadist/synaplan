@@ -7,6 +7,8 @@ namespace App\Controller;
 use App\DTO\Tool\ApprovalResponse;
 use App\Entity\User;
 use App\Message\ResumeApprovalCommand;
+use App\Service\AgentTemplate\AgentPublishReview;
+use App\Service\AgentTemplate\Exception\AgentPublishReviewException;
 use App\Service\Email\MailerConfig;
 use App\Service\Tool\ApprovalNotFoundException;
 use App\Service\Tool\ApprovalService;
@@ -30,6 +32,7 @@ final class ApprovalController extends AbstractController
         private ToolsConfig $toolsConfig,
         private MessageBusInterface $bus,
         private MailerConfig $mailerConfig,
+        private AgentPublishReview $reviews,
     ) {
     }
 
@@ -66,11 +69,17 @@ final class ApprovalController extends AbstractController
         }
         \assert($user instanceof User);
         $status = (string) $request->query->get('status', 'pending');
+        $approvals = $this->approvals->listFor($user, $status);
+        foreach ($this->reviews->forReviewer($user, $status) as $approval) {
+            $row = $this->approvals->toArray($approval);
+            $row['canDecide'] = true;
+            $approvals[] = $row;
+        }
 
         return $this->json([
             'success' => true,
-            'pendingCount' => $this->approvals->pendingCount($user),
-            'approvals' => $this->approvals->listFor($user, $status),
+            'pendingCount' => $this->approvals->pendingCount($user) + $this->reviews->countForReviewer($user),
+            'approvals' => $approvals,
         ]);
     }
 
@@ -106,6 +115,9 @@ final class ApprovalController extends AbstractController
             return $denied;
         }
         \assert($user instanceof User);
+        if ($this->reviews->isPublishReview($id)) {
+            return $this->decidePublishReview($id, $user, true, null);
+        }
         $payload = json_decode($request->getContent() ?: '{}', true);
         $payload = is_array($payload) ? $payload : [];
         try {
@@ -157,6 +169,9 @@ final class ApprovalController extends AbstractController
         $payload = json_decode($request->getContent() ?: '{}', true);
         $payload = is_array($payload) ? $payload : [];
         $reason = is_string($payload['reason'] ?? null) ? $payload['reason'] : null;
+        if ($this->reviews->isPublishReview($id)) {
+            return $this->decidePublishReview($id, $user, false, $reason);
+        }
         try {
             $approval = $this->approvals->reject($id, $user, $reason);
         } catch (ApprovalNotFoundException) {
@@ -238,6 +253,27 @@ final class ApprovalController extends AbstractController
             'success' => true,
             'mode' => $this->toolsConfig->notifyMode((int) $user->getId()),
         ]);
+    }
+
+    private function decidePublishReview(int $id, User $user, bool $approve, ?string $note): JsonResponse
+    {
+        try {
+            $approval = $approve
+                ? $this->reviews->approve($id, $user)
+                : $this->reviews->sendBack($id, $user, $note);
+        } catch (AgentPublishReviewException $e) {
+            $status = match ($e->reason) {
+                AgentPublishReviewException::FORBIDDEN => Response::HTTP_FORBIDDEN,
+                AgentPublishReviewException::SHARING_OFF => Response::HTTP_CONFLICT,
+                default => Response::HTTP_NOT_FOUND,
+            };
+
+            return $this->json(['success' => false, 'error' => $e->getMessage(), 'code' => $e->reason], $status);
+        }
+        $row = $this->approvals->toArray($approval);
+        $row['canDecide'] = false;
+
+        return $this->json(['success' => true, 'approval' => $row]);
     }
 
     private function guard(?User $user): ?JsonResponse

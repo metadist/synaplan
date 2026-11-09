@@ -63,6 +63,18 @@ class WidgetRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    public function countForOwnerAndAgent(int $ownerId, int $agentId): int
+    {
+        return (int) $this->createQueryBuilder('w')
+            ->select('COUNT(w.id)')
+            ->where('w.ownerId = :ownerId')
+            ->andWhere('w.agentId = :agentId')
+            ->setParameter('ownerId', $ownerId)
+            ->setParameter('agentId', $agentId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     /**
      * Alias for findByOwner.
      */

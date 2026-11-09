@@ -1,0 +1,88 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "offer-writer",
+    "version": "2026.11.1",
+    "titleKey": "templates.offerWriter.title",
+    "summaryKey": "templates.offerWriter.summary",
+    "category": "sales",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "knowledgeFolder",
+        "hintKey": "templates.offerWriter.needsPriceList"
+      }
+    ],
+    "tryIt": [
+      "templates.offerWriter.try1",
+      "templates.offerWriter.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "offer-writer",
+          "name": "Offer writer",
+          "description": "Writes an offer from your price list and cites every price.",
+          "icon": "mdi:file-document-edit-outline",
+          "instruction": "You write customer offers from the price list in your knowledge. Use only prices and terms that appear in those files, and cite the file for each price. If a price is not in the files, say you do not have it and do not invent one. If the price list is missing, say that the person still needs to choose the folder with the price list, and do not invent prices. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.3,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "Write an offer for Müller GmbH for 10 licenses.",
+                "Which prices in the list apply to a one-year support contract?"
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

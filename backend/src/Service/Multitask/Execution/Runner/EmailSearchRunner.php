@@ -42,6 +42,15 @@ final readonly class EmailSearchRunner implements TaskRunner
     /** Max merged hits across all sources (token control). */
     private const MAX_RESULTS = 10;
 
+    /** Shown when the run has nothing to read. The chat step must not invent mail. */
+    private const NO_MAILBOX = [
+        'en' => 'No mailbox is connected, so no mail was read.',
+        'de' => 'Es ist kein Postfach verbunden, deshalb wurde keine Mail gelesen.',
+        'es' => 'No hay ningún buzón conectado, así que no se leyó ningún correo.',
+        'fr' => 'Aucune boîte mail n’est connectée, donc aucun message n’a été lu.',
+        'tr' => 'Bağlı bir posta kutusu yok, bu yüzden hiçbir e-posta okunmadı.',
+    ];
+
     /** Per-source hard time budget: a dead mail server degrades one node, not the turn. */
     private const PER_MAILBOX_TIMEOUT_SECONDS = 15;
 
@@ -89,7 +98,11 @@ final readonly class EmailSearchRunner implements TaskRunner
         $m365Connections = $this->searchableM365Connections((int) $userId);
         $sourceCount = count($accounts) + count($m365Connections);
         if (0 === $sourceCount) {
-            return NodeResult::failed('no email account is connected — connect a mailbox under Channels → Email Automation or a Microsoft 365 account under Connections');
+            return NodeResult::ok($this->noMailboxSentence($context), [], [
+                'email_search' => true,
+                'results_count' => 0,
+                'no_mailbox' => true,
+            ]);
         }
 
         $inputs = $context->resolveInputs($node);
@@ -163,6 +176,13 @@ final readonly class EmailSearchRunner implements TaskRunner
             'query' => $query,
             'results_count' => count($hits),
         ]);
+    }
+
+    private function noMailboxSentence(NodeContext $context): string
+    {
+        $language = strtolower(substr($context->message->getLanguage(), 0, 2));
+
+        return self::NO_MAILBOX[$language] ?? self::NO_MAILBOX['en'];
     }
 
     /**

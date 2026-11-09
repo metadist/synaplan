@@ -1509,10 +1509,9 @@ PROMPT;
         // So `deleteByFile` is correct.
 
         $chunksDeleted = $this->vectorStorageFacade->deleteByFile($user->getId(), $messageId);
-
-        if (0 === $chunksDeleted) {
-            // Maybe check if file exists first to return 404?
-            // But for now, idempotent success is fine.
+        $file = $this->fileRepository->find($messageId);
+        if ($file && $file->getUserId() === $user->getId() && $file->getGroupKey() === "TASKPROMPT:{$topic}") {
+            $this->fileRepository->updateGroupKey($file, 'DEFAULT');
         }
 
         $this->logger->info('Deleted file from task prompt', [

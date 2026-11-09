@@ -38,6 +38,7 @@ const row = {
   requestedBy: { kind: 'chat' as const },
   sideEffect: 'write' as const,
   canAlwaysAllow: true,
+  canDecide: true,
 }
 
 describe('approvals store', () => {

@@ -33,6 +33,7 @@ use OpenApi\Attributes as OA;
             ]
         ),
         new OA\Property(property: 'canAlwaysAllow', type: 'boolean'),
+        new OA\Property(property: 'canDecide', type: 'boolean'),
         new OA\Property(property: 'requestedBy', ref: new Model(type: ApprovalRequestedBy::class)),
     ]
 )]

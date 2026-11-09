@@ -1293,7 +1293,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Outils HTTP personnalisés",
         "WORKFLOWS_BUILDER_ENABLED": "Éditeur d’étapes",
         "CHAT_EXPORT_ENABLED": "Exporter les chats",
-        "CHAT_SHARE_ENABLED": "Partager les chats"
+        "CHAT_SHARE_ENABLED": "Partager les chats",
+        "AGENTS_PUBLISH_REVIEW": "Vérification avant de partager un assistant avec tout le monde"
       }
     },
     "intro": {

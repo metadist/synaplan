@@ -1289,7 +1289,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Herramientas HTTP propias",
         "WORKFLOWS_BUILDER_ENABLED": "Editor de pasos",
         "CHAT_EXPORT_ENABLED": "Exportar chats",
-        "CHAT_SHARE_ENABLED": "Compartir chats"
+        "CHAT_SHARE_ENABLED": "Compartir chats",
+        "AGENTS_PUBLISH_REVIEW": "Revisión antes de compartir un asistente con todos"
       }
     },
     "intro": {

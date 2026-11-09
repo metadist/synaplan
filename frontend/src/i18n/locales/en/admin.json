@@ -1293,7 +1293,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Custom HTTP tools",
         "WORKFLOWS_BUILDER_ENABLED": "Task steps editor",
         "CHAT_EXPORT_ENABLED": "Export chats",
-        "CHAT_SHARE_ENABLED": "Share chats"
+        "CHAT_SHARE_ENABLED": "Share chats",
+        "AGENTS_PUBLISH_REVIEW": "Review before an assistant is shared with everyone"
       }
     },
     "intro": {

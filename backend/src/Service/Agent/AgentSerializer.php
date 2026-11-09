@@ -9,6 +9,7 @@ use App\Entity\AgentVersion;
 use App\Entity\User;
 use App\Service\Agent\Definition\AgentDefinitionValidator;
 use App\Service\Agent\Exception\AgentDefinitionException;
+use App\Service\AgentTemplate\AgentTemplateRef;
 
 final class AgentSerializer
 {
@@ -76,6 +77,7 @@ final class AgentSerializer
             'canEdit' => $canEdit,
             'canStartChat' => $canStartChat,
             'canClone' => true,
+            'templateId' => AgentTemplateRef::idFromSource($agent->getSource()),
         ];
     }
 

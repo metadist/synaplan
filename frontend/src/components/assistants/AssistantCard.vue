@@ -23,6 +23,9 @@
           <span v-else-if="card.status === 'draft'" data-testid="badge-card-draft">
             · {{ $t('assistants.statusDraft') }}</span
           >
+          <span v-if="card.templateId" data-testid="badge-card-template">
+            · {{ $t('templates.fromTemplate') }}</span
+          >
         </p>
       </div>
     </div>

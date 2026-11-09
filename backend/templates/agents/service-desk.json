@@ -1,0 +1,93 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "service-desk",
+    "version": "2026.11.1",
+    "titleKey": "templates.serviceDesk.title",
+    "summaryKey": "templates.serviceDesk.summary",
+    "category": "support",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "knowledgeFolder",
+        "hintKey": "templates.serviceDesk.needsFolder"
+      },
+      {
+        "kind": "feature",
+        "value": "widget",
+        "hintKey": "templates.serviceDesk.needsWidget"
+      }
+    ],
+    "tryIt": [
+      "templates.serviceDesk.try1",
+      "templates.serviceDesk.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "service-desk",
+          "name": "Citizens' service desk",
+          "description": "Answers website visitors from approved documents and cites the passage.",
+          "icon": "mdi:account-voice",
+          "instruction": "You answer a visitor from the approved documents, in the language they wrote in. Cite the passage. If the document does not answer, say what is missing and do not invent a rule. If no document is attached, say that the office still needs to choose the folder. Do not collect personal data and do not send a request. This is not a decision of the office. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": true,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.2,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "Which documents do I need to register a move?",
+                "What are the opening hours of the citizens' office?"
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

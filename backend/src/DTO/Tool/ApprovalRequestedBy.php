@@ -16,6 +16,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'taskId', type: 'integer', nullable: true),
         new OA\Property(property: 'runId', type: 'integer', nullable: true),
         new OA\Property(property: 'nodeId', type: 'string', nullable: true),
+        new OA\Property(property: 'agentId', type: 'integer', nullable: true),
     ]
 )]
 final class ApprovalRequestedBy

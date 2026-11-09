@@ -263,6 +263,7 @@ const featureKeys = [
   'WORKFLOWS.BUILDER_ENABLED',
   'CHAT.EXPORT_ENABLED',
   'CHAT.SHARE_ENABLED',
+  'AGENTS.PUBLISH_REVIEW',
 ] as const
 /** Code defaults used when no instance row exists. Matches the PHP resolvers. */
 const featureBuiltinOn = new Set<string>([

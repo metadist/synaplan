@@ -1067,6 +1067,7 @@ function ingestApprovalRequired(data: StreamUpdatePayload): void {
     },
     sideEffect,
     canAlwaysAllow: sideEffect === 'write',
+    canDecide: true,
   })
   void approvalsStore.load('pending')
 }

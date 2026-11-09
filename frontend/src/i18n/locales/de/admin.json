@@ -1293,7 +1293,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Eigene HTTP-Werkzeuge",
         "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor",
         "CHAT_EXPORT_ENABLED": "Chats exportieren",
-        "CHAT_SHARE_ENABLED": "Chats teilen"
+        "CHAT_SHARE_ENABLED": "Chats teilen",
+        "AGENTS_PUBLISH_REVIEW": "Prüfung, bevor ein Assistent mit allen geteilt wird"
       }
     },
     "intro": {
