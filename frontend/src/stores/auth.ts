@@ -150,10 +150,17 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.isAdmin === true || user.value?.level === 'ADMIN')
   /**
    * True whenever an admin is operating as another user. Drives the
-   * impersonation banner and unlocks admin-level error diagnostics in
-   * ErrorView so the real admin always sees the full failure context.
+   * impersonation banner. It does not make the impersonated account an
+   * admin: route guards keep using `isAdmin`.
    */
   const isImpersonating = computed(() => impersonator.value !== null)
+  /**
+   * Provider dumps in the chat error notice and the full-screen error view.
+   * True for an admin on their own session, and for an admin who is
+   * impersonating. False for the account being viewed: that person cannot
+   * turn this on, and the server does not send the dump to them.
+   */
+  const canSeeAdminDiagnostics = computed(() => isAdmin.value || isImpersonating.value)
   const isPro = computed(() => {
     const config = useConfigStore()
     return (
@@ -681,6 +688,7 @@ export const useAuthStore = defineStore('auth', () => {
     isTeam,
     isAdmin,
     isImpersonating,
+    canSeeAdminDiagnostics,
     // Actions
     login,
     register,

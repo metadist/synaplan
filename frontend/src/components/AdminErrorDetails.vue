@@ -5,8 +5,10 @@ import { Icon } from '@iconify/vue'
 import { useAuthStore } from '@/stores/auth'
 
 /**
- * Expandable provider dump. The server only sends `debug` to an admin;
- * the role check here is a second gate so a leaked field still stays shut.
+ * Expandable provider dump. The server sends `debug` only to an administrator,
+ * including one who is impersonating this account. This check is the second
+ * gate: a field that leaked to the account itself stays shut, because
+ * `canSeeAdminDiagnostics` is false for that person.
  */
 const props = defineProps<{
   debug?: string | null
@@ -17,7 +19,7 @@ const props = defineProps<{
 const { t } = useI18n()
 const authStore = useAuthStore()
 const open = ref(false)
-const visible = computed(() => authStore.isAdmin && !!props.debug?.trim())
+const visible = computed(() => authStore.canSeeAdminDiagnostics && !!props.debug?.trim())
 </script>
 
 <template>

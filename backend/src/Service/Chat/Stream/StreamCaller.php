@@ -31,6 +31,7 @@ final readonly class StreamCaller
         public ?WidgetSession $widgetSession = null,
         public ?GuestSession $guestSession = null,
         public ?string $widgetTaskPrompt = null,
+        public bool $providerDiagnostics = false,
     ) {
     }
 
@@ -45,12 +46,18 @@ final readonly class StreamCaller
     }
 
     /**
-     * Provider dumps belong to the signed-in admin on their own turn.
-     * A widget visitor and a guest stream as someone else.
+     * Provider dumps belong to an administrator: on their own turn, or while
+     * they are impersonating this account. A widget visitor and a guest
+     * stream as someone else, so the flag is ignored for them even when the
+     * shared user is an admin.
      */
     public function seesProviderDiagnostics(): bool
     {
-        return !$this->isWidget() && !$this->isGuest() && $this->user->isAdmin();
+        if ($this->isWidget() || $this->isGuest()) {
+            return false;
+        }
+
+        return $this->providerDiagnostics || $this->user->isAdmin();
     }
 
     /**

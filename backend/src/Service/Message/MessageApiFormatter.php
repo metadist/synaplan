@@ -8,9 +8,9 @@ use App\AI\Exception\ChatFailureReason;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Auth\ProviderDiagnosticsAccess;
 use App\Service\Chat\Stream\StreamMessageMeta;
 use App\Service\File\DataUrlFixer;
-use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Serializes a persisted Message entity into the canonical API row shape.
@@ -28,7 +28,7 @@ final readonly class MessageApiFormatter
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
         private DataUrlFixer $dataUrlFixer,
-        private Security $security,
+        private ProviderDiagnosticsAccess $diagnostics,
     ) {
     }
 
@@ -437,8 +437,8 @@ final readonly class MessageApiFormatter
             return null;
         }
 
-        $isAdmin = $this->security->isGranted('ROLE_ADMIN');
-        $nodeDebug = $isAdmin ? $this->nodeErrorDebug($m) : [];
+        $maySeeDiagnostics = $this->diagnostics->viewerMaySee();
+        $nodeDebug = $maySeeDiagnostics ? $this->nodeErrorDebug($m) : [];
         foreach ($decoded['cards'] as &$card) {
             if (!is_array($card)) {
                 continue;
@@ -447,12 +447,12 @@ final readonly class MessageApiFormatter
             if (isset($card['error']) && is_string($card['error'])) {
                 $split = StoredAdminDiagnostics::split($card['error']);
                 $card['error'] = $split['text'];
-                if ($isAdmin && null !== $split['debug']) {
+                if ($maySeeDiagnostics && null !== $split['debug']) {
                     $card['errorDebug'] = $split['debug'];
                 }
             }
             $nodeId = $card['nodeId'] ?? null;
-            if ($isAdmin && is_string($nodeId) && isset($nodeDebug[$nodeId]) && '' !== $nodeDebug[$nodeId]) {
+            if ($maySeeDiagnostics && is_string($nodeId) && isset($nodeDebug[$nodeId]) && '' !== $nodeDebug[$nodeId]) {
                 $card['errorDebug'] = $nodeDebug[$nodeId];
             }
         }
@@ -541,7 +541,10 @@ final readonly class MessageApiFormatter
 
         $resolved = $reason ?? ChatFailureReason::Unknown;
         $debug = null;
-        if ($this->security->isGranted('ROLE_ADMIN')) {
+        // The account that hit the error is not an admin. An impersonating
+        // administrator still receives the dump; the account's own session
+        // does not, because the gate checks the signed token and the stash.
+        if ($this->diagnostics->viewerMaySee()) {
             $stored = $m->getMeta('error_debug');
             $debug = is_string($stored) && '' !== $stored ? $stored : $embeddedDebug;
         }

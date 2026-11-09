@@ -247,9 +247,10 @@ final readonly class StreamMessageMeta
     }
 
     /**
-     * Fields for the `complete` event. `$includeDebug` is true only for the
-     * signed-in admin who is looking at their own turn — never a widget
-     * visitor or a guest, even when the shared processing user is an admin.
+     * Fields for the `complete` event. `$includeDebug` is true only for an
+     * administrator on their own turn, or an administrator impersonating
+     * this account — never a widget visitor or a guest, and never the
+     * impersonated person on their own session.
      *
      * @return array<string, mixed>
      */
