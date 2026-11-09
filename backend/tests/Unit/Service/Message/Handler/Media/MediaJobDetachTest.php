@@ -48,7 +48,7 @@ final class MediaJobDetachTest extends TestCase
             'nodeId' => 'n2',
             'trackId' => 'track-1',
             'inputRef' => '/uploads/photo.png',
-            'options' => ['quality' => 'high', 'size' => '1536x1024', 'lang' => 'de', 'media_usage' => ['images' => 1, 'quality' => 'high', 'size' => '1536x1024']],
+            'options' => ['quality' => 'high', 'size' => '1536x1024', 'lang' => 'de', 'media_usage' => ['images' => 1, 'quality' => 'high', 'size' => '1536x1024'], 'planMessageId' => 1001],
         ], $this->log[0][1]);
         self::assertSame(['job_id' => 'job-1', 'type' => 'image', 'state' => 'running'], $answer['metadata']['media_job']);
     }
