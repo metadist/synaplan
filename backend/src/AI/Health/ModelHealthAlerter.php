@@ -67,6 +67,9 @@ final readonly class ModelHealthAlerter
         foreach ($modelIds as $id) {
             $last = isset($rows[$id]) ? $rows[$id]->getLastAlerted() : 0;
             $lastKind = isset($rows[$id]) ? $rows[$id]->getLastAlertedKind() : null;
+            // Inside the window the recorded kind only moves up. A milder
+            // kind must not become the record, or the next worse incident
+            // looks new and pages again the same day.
             if ($last <= 0
                 || ($now - $last) >= $quietFor
                 || $severity > ModelHealthAlert::severity($lastKind)) {
@@ -101,7 +104,12 @@ final readonly class ModelHealthAlerter
 
         $this->email->sendModelHealthAlert($deliver);
         $this->discord->notifyModelHealth($deliver);
-        $this->health->stampAlerted($deliver->modelIds, $deliver->kind, $now);
+        $this->health->stampAlerted(
+            $deliver->modelIds,
+            $deliver->kind,
+            $now,
+            $this->config->alertThrottleSeconds(),
+        );
         $this->rememberOpen($this->key($alert), $deliver);
 
         $this->logger->warning('Model health alert raised', [

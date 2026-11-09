@@ -90,17 +90,62 @@ class ModelHealthRepository extends ServiceEntityRepository
      * lose the stamp when a later provider aborts the run or the scheduler's
      * timeout kills it, and the next run would send the same message again.
      *
+     * A milder kind does not replace a stronger one while that quiet window is
+     * still open. Overwriting the kind is what let the next credential look
+     * like a new, worse incident and page again inside the same day. Once the
+     * window has elapsed, the kind on this run — milder or not — is the record.
+     *
      * @param list<int> $modelIds
      */
-    public function stampAlerted(array $modelIds, string $kind, int $at): void
+    public function stampAlerted(array $modelIds, string $kind, int $at, int $quietForSeconds = 0): void
     {
         foreach ($modelIds as $modelId) {
-            $this->findOrCreate($modelId)
-                ->setLastAlerted($at)
-                ->setLastAlertedKind($kind);
+            $row = $this->findOrCreate($modelId);
+            if ($this->keepsStrongerIncident($row, $kind, $at, $quietForSeconds)) {
+                continue;
+            }
+
+            $row->setLastAlerted($at)->setLastAlertedKind($kind);
         }
 
         $this->getEntityManager()->flush();
+    }
+
+    /**
+     * True when this row already records a stronger incident and its quiet
+     * window has not elapsed. Rank is credential, then offline, then degraded.
+     */
+    private function keepsStrongerIncident(ModelHealth $row, string $kind, int $at, int $quietForSeconds): bool
+    {
+        if ($quietForSeconds <= 0) {
+            return false;
+        }
+
+        $last = $row->getLastAlerted();
+        $lastKind = $row->getLastAlertedKind();
+        if ($last <= 0 || null === $lastKind || '' === $lastKind) {
+            return false;
+        }
+
+        if (($at - $last) >= $quietForSeconds) {
+            return false;
+        }
+
+        return self::alertRank($kind) < self::alertRank($lastKind);
+    }
+
+    /**
+     * credential outranks offline, which outranks degraded. Anything else
+     * ranks below those three and may always be replaced.
+     */
+    private static function alertRank(string $kind): int
+    {
+        return match ($kind) {
+            'credential' => 3,
+            'offline' => 2,
+            'degraded' => 1,
+            default => 0,
+        };
     }
 
     /**

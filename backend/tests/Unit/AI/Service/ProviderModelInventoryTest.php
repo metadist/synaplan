@@ -168,6 +168,56 @@ final class ProviderModelInventoryTest extends TestCase
         $this->assertSame(['https://api.x.ai/v1/models/grok-4.5'], $requested);
     }
 
+    /**
+     * xAI accepts grok-imagine-image-quality on image generation but omits
+     * that alias from GET /v1/models and answers 404 for the id. The image
+     * roster listing the base model is what keeps the alias alive.
+     */
+    public function testXaiImageQualityAliasIsConfirmedThroughTheImageRoster(): void
+    {
+        $requested = [];
+        $client = new MockHttpClient(static function (string $method, string $url) use (&$requested): MockResponse {
+            $requested[] = $url;
+
+            return new MockResponse(json_encode([
+                'models' => [
+                    ['id' => 'grok-imagine-image'],
+                    ['id' => 'grok-imagine-image-2.0'],
+                ],
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $result = $this->inventoryWithClient($client, 'xai')->probe('xai', 'grok-imagine-image-quality');
+
+        $this->assertSame(ModelProbeResult::Alive, $result);
+        $this->assertSame(['https://api.x.ai/v1/image-generation-models'], $requested);
+    }
+
+    public function testXaiImageQualityAliasIsAliveWhenTheRosterListsTheAliasItself(): void
+    {
+        $result = $this->inventory(new MockResponse(json_encode([
+            'models' => [['id' => 'grok-imagine-image-quality']],
+        ], \JSON_THROW_ON_ERROR)), 'xai')->probe('xai', 'grok-imagine-image-quality');
+
+        $this->assertSame(ModelProbeResult::Alive, $result);
+    }
+
+    public function testXaiImageProbeWithAnUnrelatedRosterStaysInconclusive(): void
+    {
+        $result = $this->inventory(new MockResponse('{"models":[{"id":"something-else"}]}'), 'xai')
+            ->probe('xai', 'grok-imagine-image-quality');
+
+        $this->assertSame(ModelProbeResult::Inconclusive, $result);
+    }
+
+    public function testXaiImageProbeTreatsAMissingRosterAsGone(): void
+    {
+        $result = $this->inventory(new MockResponse('{"code":"not-found"}', ['http_code' => 404]), 'xai')
+            ->probe('xai', 'grok-imagine-image-quality');
+
+        $this->assertSame(ModelProbeResult::Gone, $result);
+    }
+
     public function testProbeAddressesTheModelUnderTheListingUrl(): void
     {
         $requested = [];

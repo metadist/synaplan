@@ -7,7 +7,9 @@ namespace App\Tests\Unit\AI\Health\Probe;
 use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
+use App\AI\Health\FailureKind;
 use App\AI\Health\Probe\PlatformKeyModelListProbe;
+use App\AI\Health\Probe\ProbeResult;
 use App\AI\Service\ProviderModelInventoryInterface;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
@@ -81,5 +83,101 @@ final class PlatformKeyModelListProbeTest extends TestCase
         self::assertContains('claude-b', $result->modelIds);
         self::assertCount(2, $requested);
         self::assertStringContainsString('after_id=claude-a', $requested[1]);
+    }
+
+    public function testATransientTransportFailureIsRetriedOnceAndThenSucceeds(): void
+    {
+        $attempts = 0;
+        $client = new MockHttpClient(function () use (&$attempts): MockResponse {
+            ++$attempts;
+            if (1 === $attempts) {
+                throw new \RuntimeException('Failed to connect to api.anthropic.com port 443 after 4001 ms');
+            }
+
+            return new MockResponse(json_encode([
+                'data' => [['id' => 'claude-a']],
+                'has_more' => false,
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $result = $this->probe($client);
+
+        self::assertTrue($result->isOk());
+        self::assertContains('claude-a', $result->modelIds);
+        self::assertSame(2, $attempts);
+    }
+
+    public function testAPersistentTransportFailureStaysTransientAfterOneRetry(): void
+    {
+        $attempts = 0;
+        $client = new MockHttpClient(function () use (&$attempts): MockResponse {
+            ++$attempts;
+
+            throw new \RuntimeException('Failed to connect to api.anthropic.com port 443 after 4001 ms');
+        });
+
+        $result = $this->probe($client);
+
+        self::assertTrue($result->isFailed());
+        self::assertSame(FailureKind::Transient, $result->kind);
+        self::assertStringContainsString('Could not reach the provider API', $result->message);
+        self::assertSame(2, $attempts);
+    }
+
+    public function testAnUpstreamServerErrorIsRetriedOnce(): void
+    {
+        $attempts = 0;
+        $client = new MockHttpClient(function () use (&$attempts): MockResponse {
+            ++$attempts;
+            if (1 === $attempts) {
+                return new MockResponse('{}', ['http_code' => 503]);
+            }
+
+            return new MockResponse(json_encode([
+                'data' => [['id' => 'claude-a']],
+                'has_more' => false,
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $result = $this->probe($client);
+
+        self::assertTrue($result->isOk());
+        self::assertContains('claude-a', $result->modelIds);
+        self::assertSame(2, $attempts);
+    }
+
+    public function testARejectedKeyIsNotRetried(): void
+    {
+        $attempts = 0;
+        $client = new MockHttpClient(function () use (&$attempts): MockResponse {
+            ++$attempts;
+
+            return new MockResponse('{}', ['http_code' => 401]);
+        });
+
+        $result = $this->probe($client);
+
+        self::assertTrue($result->isFailed());
+        self::assertSame(FailureKind::Credential, $result->kind);
+        self::assertSame(1, $attempts);
+    }
+
+    private function probe(HttpClientInterface $client): ProbeResult
+    {
+        $keyStore = new ProviderKeyStore(
+            $this->createStub(ConfigRepository::class),
+            new EncryptionService('unit-test-secret', new NullLogger()),
+            new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
+            ['anthropic' => 'unit-test-provider-key-0123456789'],
+        );
+
+        return (new PlatformKeyModelListProbe(
+            $client,
+            $keyStore,
+            $this->createStub(ProviderModelInventoryInterface::class),
+            new NullLogger(),
+            new ProviderKeyCatalog(ProviderCatalog::builtIn()),
+        ))->probe('anthropic');
     }
 }
