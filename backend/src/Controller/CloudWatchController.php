@@ -219,9 +219,8 @@ final class CloudWatchController extends AbstractController
         operationId: 'cloudWatchIndex',
         summary: 'Watches on this cloud, one page at a time',
         tags: ['Cloud watches'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', maximum: 500)),
             new OA\Parameter(name: 'cursor', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'since', in: 'query', schema: new OA\Schema(type: 'string')),
@@ -229,7 +228,11 @@ final class CloudWatchController extends AbstractController
         responses: [
             new OA\Response(response: 200, description: 'A page, or the changes since a cursor'),
             new OA\Response(response: 304, description: 'Nothing changed'),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
             new OA\Response(response: 410, description: 'The cursor is older than 7 days'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ],
     )]
     public function index(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse|Response

@@ -35,18 +35,18 @@ final class CloudDeliveryController extends AbstractController
         operationId: 'claimCloudDelivery',
         summary: 'Claim a queued copy and receive a one-time download path',
         tags: ['Platform Links'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Claimed'),
-            new OA\Response(response: 403, description: 'Wrong instance'),
-            new OA\Response(response: 404, description: 'Unknown delivery'),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Wrong instance, or instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown delivery, or unknown instance (unknown_instance)'),
             new OA\Response(response: 409, description: 'Already claimed'),
             new OA\Response(response: 410, description: 'Expired'),
-            new OA\Response(response: 429, description: 'Too many failed claims'),
+            new OA\Response(response: 429, description: 'Too many failed claims, or too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
     public function claim(int $id, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
@@ -65,16 +65,19 @@ final class CloudDeliveryController extends AbstractController
         operationId: 'downloadCloudDelivery',
         summary: 'Download a claimed copy once',
         tags: ['Platform Links'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
             new OA\Parameter(name: 'ticket', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'File bytes'),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
             new OA\Response(response: 405, description: 'A header-only request cannot take the file'),
             new OA\Response(response: 410, description: 'Ticket already used or unknown'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
     public function download(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): Response
@@ -103,15 +106,16 @@ final class CloudDeliveryController extends AbstractController
         operationId: 'recordCloudDeliveryResult',
         summary: 'Record that a copy was written or failed',
         tags: ['Platform Links'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Current state'),
-            new OA\Response(response: 403, description: 'Wrong instance'),
-            new OA\Response(response: 404, description: 'Unknown delivery'),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Wrong instance, or instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown delivery, or unknown instance (unknown_instance)'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
     public function result(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse

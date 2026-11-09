@@ -392,10 +392,7 @@ final class PlatformLinkController extends AbstractController
         summary: 'A person was deleted, disabled or enabled in the cloud',
         description: 'Instance credential. deleted revokes that identity and its key. The Synaplan account is removed only while this cloud alone manages it; otherwise it stays and the answer says why. A repeated event answers 200.',
         tags: ['Platform Links'],
-        parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -421,9 +418,11 @@ final class PlatformLinkController extends AbstractController
                 )
             ),
             new OA\Response(response: 400, description: 'Missing user id or unknown event'),
-            new OA\Response(response: 401, description: 'Instance credential missing'),
+            new OA\Response(response: 401, description: 'Instance credential missing, or missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
             new OA\Response(response: 409, description: 'A removed person cannot be enabled'),
-            new OA\Response(response: 404, description: 'Feature disabled'),
+            new OA\Response(response: 404, description: 'Feature disabled, or unknown instance (unknown_instance)'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
     public function lifecycle(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse

@@ -101,10 +101,7 @@ final class PlatformInstanceController extends AbstractController
         operationId: 'getPlatformInstanceSelf',
         summary: 'Describe this instance using its credentials',
         tags: ['Platform Links'],
-        parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         responses: [
             new OA\Response(
                 response: 200,
@@ -136,8 +133,9 @@ final class PlatformInstanceController extends AbstractController
                     ]
                 )
             ),
-            new OA\Response(response: 401, description: 'Invalid instance credentials'),
-            new OA\Response(response: 404, description: 'Feature disabled or unknown instance'),
+            new OA\Response(response: 401, description: 'Invalid instance credentials, or missing or wrong instance credential'),
+            new OA\Response(response: 404, description: 'Feature disabled or unknown instance, or unknown instance (unknown_instance)'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
     public function self(#[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
@@ -157,10 +155,7 @@ final class PlatformInstanceController extends AbstractController
         operationId: 'setPlatformInstanceDeliveryUrl',
         summary: 'Set the address Synaplan calls for this cloud',
         tags: ['Platform Links'],
-        parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         requestBody: new OA\RequestBody(
             required: true,
             content: new OA\JsonContent(
@@ -181,9 +176,10 @@ final class PlatformInstanceController extends AbstractController
         ),
         responses: [
             new OA\Response(response: 200, description: 'Address saved'),
-            new OA\Response(response: 401, description: 'Invalid instance credentials'),
-            new OA\Response(response: 404, description: 'Feature disabled or unknown instance'),
+            new OA\Response(response: 401, description: 'Invalid instance credentials, or missing or wrong instance credential'),
+            new OA\Response(response: 404, description: 'Feature disabled or unknown instance, or unknown instance (unknown_instance)'),
             new OA\Response(response: 422, description: 'Address is not on this cloud'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
     public function deliveryUrl(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse

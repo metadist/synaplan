@@ -110,15 +110,14 @@ final class CloudFileController extends AbstractController
         operationId: 'cloudSourceEvents',
         summary: 'A cloud reports that files changed, moved, were deleted or came back',
         tags: ['Cloud files'],
-        parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         responses: [
             new OA\Response(response: 200, description: 'How many events applied, and which copies should be uploaded again'),
             new OA\Response(response: 400, description: 'The event list is empty, too long, or malformed'),
-            new OA\Response(response: 401, description: 'Invalid instance credentials'),
-            new OA\Response(response: 404, description: 'Cloud file state is turned off'),
+            new OA\Response(response: 401, description: 'Invalid instance credentials, or missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Cloud file state is turned off, or unknown instance (unknown_instance)'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ],
     )]
     public function events(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
