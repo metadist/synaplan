@@ -13,7 +13,7 @@
         ></div>
 
         <div
-          class="relative surface-elevated max-w-md w-full p-6 rounded-2xl"
+          class="modal-panel relative surface-elevated max-w-md w-full p-6 rounded-2xl overflow-y-auto scroll-thin"
           role="dialog"
           aria-modal="true"
           :aria-label="title"

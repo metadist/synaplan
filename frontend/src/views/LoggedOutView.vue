@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative"
     data-testid="page-logged-out"
   >
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
@@ -25,7 +25,7 @@
       </button>
     </div>
 
-    <div class="w-full max-w-md" data-testid="section-card">
+    <div class="w-full max-w-md my-auto" data-testid="section-card">
       <div class="text-center mb-8" data-testid="section-header">
         <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
       </div>

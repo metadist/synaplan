@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative"
     data-testid="page-platform-connect"
   >
     <div class="absolute inset-0 overflow-hidden pointer-events-none">
@@ -18,7 +18,7 @@
       </button>
     </div>
 
-    <div class="w-full max-w-sm relative z-10" data-testid="section-card">
+    <div class="w-full max-w-sm my-auto relative z-10" data-testid="section-card">
       <div
         class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-8 bg-[var(--bg-card)] ring-1 ring-black/[0.05] shadow-black/[0.04] dark:ring-white/[0.04] dark:shadow-black/30"
       >

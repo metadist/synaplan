@@ -1,7 +1,6 @@
 <template>
   <div
-    class="app-screen bg-light-bg dark:bg-dark-bg flex justify-center px-4 py-6 sm:py-12 relative"
-    :class="isNativeApp() ? 'items-start' : 'items-start sm:items-center'"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative"
     :style="
       isNativeApp() ? { paddingTop: 'calc(env(safe-area-inset-top, 0px) + 4.5rem)' } : undefined
     "
@@ -56,7 +55,16 @@
       </button>
     </div>
 
-    <div class="w-full max-w-sm auth-card-enter relative z-10" data-testid="section-card">
+    <!--
+      my-auto centers the card while it fits (desktop / tall screens) and falls
+      back to the top edge once the form is taller than the available viewport
+      (e.g. with the soft keyboard open), so the page scrolls instead of clipping.
+    -->
+    <div
+      class="w-full max-w-sm auth-card-enter relative z-10"
+      :class="{ 'my-auto': !isNativeApp() }"
+      data-testid="section-card"
+    >
       <div
         class="backdrop-blur-xl rounded-[1.25rem] shadow-xl p-6 sm:p-8"
         :class="

@@ -102,7 +102,7 @@ defineExpose({ shouldShowWarning })
 
         <!-- Dialog -->
         <div
-          class="relative surface-card rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 animate-scale-in"
+          class="modal-panel relative surface-card rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4 overflow-y-auto scroll-thin animate-scale-in"
           role="dialog"
           aria-modal="true"
           @click.stop

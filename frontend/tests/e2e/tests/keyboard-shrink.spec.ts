@@ -103,6 +103,14 @@ test.describe('Native keyboard shrink — chat', () => {
     const drawer = await page.locator(selectors.nav.mobileDrawer).boundingBox()
     expect(drawer && Math.round(drawer.height)).toBe(FULL_HEIGHT)
 
+    // Tapping the mobile drawer toggle while the composer is focused blurs the
+    // input (dismisses the keyboard) and opens the drawer.
+    await page.locator(selectors.chat.textInput).focus()
+    await expect(page.locator(selectors.chat.textInput)).toBeFocused()
+    await page.locator(selectors.nav.mobileDrawerToggle).click()
+    await expect(page.locator(selectors.chat.textInput)).not.toBeFocused()
+    await page.locator(selectors.nav.mobileDrawerToggle).click()
+
     // Keyboard gone: the composer owns the bottom edge again.
     await shellReportsKeyboard(page, 0)
     await expect.poll(() => bottomOf(page, selectors.chat.composer)).toBe(FULL_HEIGHT)

@@ -15,7 +15,7 @@
 
         <!-- Modal Content -->
         <div
-          class="relative surface-elevated max-w-md w-full p-6 animate-in"
+          class="modal-panel relative surface-elevated max-w-md w-full p-6 overflow-y-auto scroll-thin animate-in"
           data-testid="modal-body"
         >
           <!-- Icon -->

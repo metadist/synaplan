@@ -27,7 +27,7 @@
   >
     <div
       v-if="visible"
-      class="fixed bottom-0 left-0 right-0 md:bottom-32 md:left-1/2 md:-translate-x-1/2 md:w-[720px] md:max-w-[92vw] surface-card border-t md:border border-light-border/30 dark:border-dark-border/30 md:!rounded-xl z-[60] h-[85vh] md:h-auto md:max-h-[70vh] flex flex-col"
+      class="command-palette fixed bottom-0 left-0 right-0 md:bottom-32 md:left-1/2 md:-translate-x-1/2 md:w-[720px] md:max-w-[92vw] surface-card border-t md:border border-light-border/30 dark:border-dark-border/30 md:!rounded-xl z-[60] h-[85vh] md:h-auto md:max-h-[70vh] flex flex-col"
       role="menu"
       data-testid="comp-command-palette"
       @click.stop
@@ -201,3 +201,18 @@ const scrollToSelected = () => {
 
 defineExpose({ handleKeyDown })
 </script>
+
+<style scoped>
+/* Native soft keyboard (shrink model): the WebView stays at full height, so a
+   fixed bottom sheet must sit above --keyboard-inset-height and shrink its
+   available height accordingly. */
+@media (max-width: 767px) {
+  .command-palette {
+    bottom: var(--keyboard-inset-height, 0px);
+    height: min(
+      85dvh,
+      calc(100dvh - var(--keyboard-inset-height, 0px) - env(safe-area-inset-top, 0px) - 3.5rem)
+    );
+  }
+}
+</style>

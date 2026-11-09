@@ -1,6 +1,6 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-chat px-4 py-10">
-    <div class="w-full max-w-md surface-card rounded-2xl p-6 sm:p-8">
+  <div class="app-screen flex items-start justify-center bg-chat px-4 py-10">
+    <div class="w-full max-w-md my-auto surface-card rounded-2xl p-6 sm:p-8">
       <h1 class="text-xl font-semibold txt-primary mb-1">
         {{ knownPlan ? $t('auth.start.title', { plan: planName }) : $t('auth.start.planInvalid') }}
       </h1>

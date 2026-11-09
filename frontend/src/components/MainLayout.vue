@@ -239,8 +239,12 @@ const closeDrawer = () => sidebarStore.closeMobileDrawer()
 
 const handleToggle = () => {
   // The button tap itself always confirms with a single haptic pulse.
-  fireHaptic()
-  sidebarStore.toggleMobileDrawer()
+  if (sidebarStore.mobileDrawerOpen) {
+    fireHaptic()
+    closeDrawer()
+    return
+  }
+  openDrawer()
 }
 
 const onTouchStart = (event: TouchEvent) => {

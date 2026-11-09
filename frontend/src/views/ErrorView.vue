@@ -1,6 +1,9 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-app px-6" data-testid="page-error">
-    <div class="max-w-2xl w-full text-center" data-testid="section-card">
+  <div
+    class="app-screen flex items-start justify-center bg-app px-6 py-12"
+    data-testid="page-error"
+  >
+    <div class="max-w-2xl w-full my-auto text-center" data-testid="section-card">
       <div class="mb-8 relative" data-testid="section-icon">
         <div
           class="inline-flex items-center justify-center w-32 h-32 rounded-full bg-gradient-to-br from-red-500/10 to-orange-500/10 relative"

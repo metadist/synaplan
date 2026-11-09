@@ -7,7 +7,7 @@
     >
       <div
         ref="panel"
-        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto scroll-thin p-4 sm:p-6 space-y-4"
+        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto scroll-thin p-4 sm:p-6 space-y-4"
         role="dialog"
         aria-modal="true"
         :aria-label="title"
