@@ -184,7 +184,7 @@ final readonly class ResumeApprovalCommandHandler
             new ToolInvocation(
                 $approval->getTool(),
                 ApprovalService::executionArgs($approval),
-                new ToolCaller($approval->getOwnerId(), ToolChannel::RESUME),
+                new ToolCaller($approval->getOwnerId(), ToolChannel::RESUME, approvalId: (int) $approval->getId()),
                 decision: new GateRequest(null, PolicyContext::Interactive, $approval->getRequestedBy(), alreadyApproved: true),
             ),
         );

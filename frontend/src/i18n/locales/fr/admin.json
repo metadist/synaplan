@@ -1159,12 +1159,37 @@
         "admin_user_level_change": "Niveau utilisateur modifié",
         "messages_gateway_flags": "Réglages de la passerelle modifiés",
         "messages_gateway_upstream": "Adresse de la passerelle modifiée",
-        "messages_gateway_aliases": "Alias de modèles modifiés"
+        "messages_gateway_aliases": "Alias de modèles modifiés",
+        "tool_executed": "Appels d'outils"
       },
       "what": "Ce qui s’est passé",
       "emptyNote": "Ce journal indique qui a fait quoi. Il n’ouvre pas le contenu des chats ni des fichiers.",
       "someone": "Quelqu’un",
       "anItem": "un élément",
+      "tool": {
+        "empty": "Aucun appel d'outil n'est encore enregistré.",
+        "emptyAction": "Ouvrir les approbations",
+        "approvalLink": "Approbation #{id}",
+        "unnamed": "un outil",
+        "outcome": {
+          "done": "Terminé",
+          "failed": "Cela a échoué",
+          "refused": "Cela a été refusé",
+          "needs_approval": "Cela attend une approbation",
+          "timed_out": "Le délai est dépassé",
+          "other": "Achevé"
+        },
+        "source": {
+          "document": "{who} a modifié un document avec {tool}. {outcome}.",
+          "mcp": "{who} a exécuté {tool} sur un serveur connecté. {outcome}.",
+          "custom": "{who} a appelé {tool}. {outcome}.",
+          "compute": "{who} a exécuté du code avec {tool}. {outcome}.",
+          "skill": "{who} a utilisé la compétence {tool}. {outcome}.",
+          "plugin": "{who} a utilisé un outil d'application, {tool}. {outcome}.",
+          "builtin": "{who} a utilisé un outil intégré, {tool}. {outcome}.",
+          "unknown": "{who} a exécuté {tool}. {outcome}."
+        }
+      },
       "sentence": {
         "shareGrant": "{who} a partagé « {resource} » avec {subject}.",
         "shareRevoke": "{who} a cessé de partager « {resource} » avec {subject}.",

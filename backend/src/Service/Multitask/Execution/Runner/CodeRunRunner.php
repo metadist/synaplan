@@ -208,7 +208,7 @@ final readonly class CodeRunRunner implements TaskRunner
         $requestedBy = null !== $savedTaskRunId
             ? sprintf('task_run:%d:%s', $savedTaskRunId, $node->id)
             : 'chat:'.(int) $context->message->getId();
-        $this->noteFinished($user, $result, $requestedBy);
+        $this->noteFinished($user, $result, $requestedBy, $context->grantedApprovalId($node->id));
 
         return $this->toNodeResult($result);
     }
@@ -219,7 +219,7 @@ final readonly class CodeRunRunner implements TaskRunner
      *
      * @param array<string, mixed> $result
      */
-    public function noteFinished(User $user, array $result, string $requestedBy): void
+    public function noteFinished(User $user, array $result, string $requestedBy, ?int $approvalId = null): void
     {
         $runId = $result['compute_run_id'] ?? null;
         $outcome = is_string($result['outcome'] ?? null) ? $result['outcome'] : '';
@@ -241,6 +241,7 @@ final readonly class CodeRunRunner implements TaskRunner
             $requestedBy,
             'ok' === $outcome ? ToolOutcomeKind::Done : ToolOutcomeKind::Failed,
             $stored?->getDurationMs() ?? 0,
+            $approvalId,
         );
     }
 

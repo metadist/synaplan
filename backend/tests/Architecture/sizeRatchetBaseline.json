@@ -221,7 +221,6 @@
         "src/Service/Research/UrlContentService.php::UrlContentService::fetchForCrawling": 153,
         "src/Service/Research/UrlContentService.php::UrlContentService::fetchForReading": 122,
         "src/Service/Research/WebResearchService.php::WebResearchService::deepen": 122,
-        "src/Service/SavedTask/SavedTaskResumeService.php::SavedTaskResumeService::resume": 112,
         "src/Service/SavedTask/SavedTaskRunner.php::SavedTaskRunner::run": 136,
         "src/Service/Search/BraveSearchService.php::BraveSearchService::search": 105,
         "src/Service/SelfAware/Docs/PlatformDocsSyncService.php::PlatformDocsSyncService::sync": 117,

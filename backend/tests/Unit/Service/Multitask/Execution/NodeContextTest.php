@@ -33,6 +33,19 @@ final class NodeContextTest extends TestCase
         return $m;
     }
 
+    public function testAGrantedApprovalStaysOnThatNode(): void
+    {
+        $ctx = $this->context($this->message());
+        $ctx->grantApproval('n1', 812);
+        $ctx->markApproved('n2');
+
+        self::assertTrue($ctx->isApproved('n1'));
+        self::assertSame(812, $ctx->grantedApprovalId('n1'));
+        self::assertTrue($ctx->isApproved('n2'));
+        self::assertNull($ctx->grantedApprovalId('n2'));
+        self::assertNull($ctx->grantedApprovalId('n3'));
+    }
+
     public function testResolvesMessageText(): void
     {
         $ctx = $this->context($this->message('what is in this?'));

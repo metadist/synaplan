@@ -1,5 +1,10 @@
 # Architecture update — status
 
+> **2026-11-08 — AU25b.** People → Audit has a Tool calls chip. A row is
+> one sentence from the tool, the source and the outcome. An approval id
+> on the row opens Approvals. Arguments and results stay off the row.
+> `EGRESS.MODE` stays `off`.
+
 > **2026-11-04 — AU25.** The gate runs on every tool call. A write that
 > runs leaves `tool.executed` (no arguments, no result). The OpenAI loop
 > and custom HTTP gain a `TOOLS` row. A document edit of the person's own
@@ -97,7 +102,29 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-10-31 | AU22 | [#2918](https://github.com/metadist/synaplan/pull/2918), stacked on #2914 | merged (`acecdf763`) | `app:provider:scaffold`, `AddProviderJourneyTest`, `EgressPolicy` reads the catalog (T23). `EGRESS.MODE` stays `off` |
 | 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | merged (`39a07233d`) | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
 | 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936) | merged (`926d7e4e3`) | Every loop and runner calls `ToolInvoker`. `tool_loops.json` matches the merged AU23 snapshot. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
-| 2026-11-04 | AU25 | [#2980](https://github.com/metadist/synaplan/pull/2980) | open | The gate runs on every call. Writes are audited. The OpenAI loop and custom HTTP gain `TOOLS`. Own-file edits stay allowed |
+| 2026-11-04 | AU25 | [#2980](https://github.com/metadist/synaplan/pull/2980) | merged (`2026-11-04`) | The gate runs on every call. Writes are audited. The OpenAI loop and custom HTTP gain `TOOLS`. Own-file edits stay allowed |
+| 2026-11-08 | AU25b | [#3035](https://github.com/metadist/synaplan/pull/3035) | open | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
+
+## 2026-11-08 — AU25b: tool calls in the audit log
+
+Started from `main` at `5234ae414`.
+
+People → Audit shows Tool calls immediately after All. The sentence is the
+tool's display name (a connected-server name drops the `mcp__<id>__`
+prefix), the source and the outcome. A resumed approval stores its id on
+the row; the sentence links to Approvals on that entry. The empty chip says
+nothing is recorded yet and opens Approvals. The row still has no arguments
+and no result.
+
+The live walk (2026-11-08, admin, German UI, light and dark, 320 px):
+People → Audit → Werkzeugaufrufe. The chip is the second one. Two rows
+read “Audit Ada … hat ein App-Werkzeug verwendet, memory_add. Erledigt.”
+The fact that was stored is not on the page. Dark text is white on the
+dark card. At 320 px the sentence wraps inside the card. The row came from
+`memory_add` on Synaplan's own tool server. Editing an uploaded office
+file is off, and this stack has no external tool server, so a document
+edit and a connected-server write are the unit test, fed the subjects
+from `tool_loops.json`.
 
 ## 2026-11-04 — AU25: every tool call passes the approval gate and is audited
 

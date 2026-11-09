@@ -487,10 +487,13 @@ characters.
 
 A write or a destructive call that runs leaves one `tool.executed` row in
 the audit log. The row names the tool, the source, the kind, the outcome
-and how long it took. It does not contain the arguments or the result. A
-read is counted and is not an audit row. A document edit on the person's
-own file is a write with policy auto, so the gate runs and nobody is asked.
-An approval that was already given is not asked again.
+and how long it took. When the run was already approved, it also names that
+approval. It does not contain the arguments or the result. People → Audit
+has a Tool calls filter. Each row is one sentence from those fields, and
+the approval id opens that entry in Approvals. A read is counted and is not
+an audit row. A document edit on the person's own file is a write with
+policy auto, so the gate runs and nobody is asked. An approval that was
+already given is not asked again.
 
 The OpenAI-compatible loop and a custom HTTP tool write a `TOOLS` usage
 row. The Messages loop already wrote that row and still does, so a call is

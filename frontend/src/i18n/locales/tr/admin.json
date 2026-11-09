@@ -1155,12 +1155,37 @@
         "admin_user_level_change": "Kullanıcı seviyesi değiştirildi",
         "messages_gateway_flags": "Ağ geçidi ayarları değiştirildi",
         "messages_gateway_upstream": "Ağ geçidi adresi değiştirildi",
-        "messages_gateway_aliases": "Model takma adları değiştirildi"
+        "messages_gateway_aliases": "Model takma adları değiştirildi",
+        "tool_executed": "Araç çağrıları"
       },
       "what": "Ne oldu",
       "emptyNote": "Bu kayıt kimin ne yaptığını tutar. Sohbet veya dosya içeriğini açmaz.",
       "someone": "Birisi",
       "anItem": "bir öğe",
+      "tool": {
+        "empty": "Henüz kayıtlı bir araç çağrısı yok.",
+        "emptyAction": "Onayları aç",
+        "approvalLink": "Onay #{id}",
+        "unnamed": "bir araç",
+        "outcome": {
+          "done": "Tamamlandı",
+          "failed": "Başarısız oldu",
+          "refused": "Reddedildi",
+          "needs_approval": "Onay bekliyor",
+          "timed_out": "Süre doldu",
+          "other": "Bitti"
+        },
+        "source": {
+          "document": "{who}, {tool} ile bir belgeyi düzenledi. {outcome}.",
+          "mcp": "{who}, bağlı bir sunucuda {tool} çalıştırdı. {outcome}.",
+          "custom": "{who}, {tool} aracını çağırdı. {outcome}.",
+          "compute": "{who}, {tool} ile kod çalıştırdı. {outcome}.",
+          "skill": "{who}, {tool} becerisini kullandı. {outcome}.",
+          "plugin": "{who} bir uygulama aracı kullandı, {tool}. {outcome}.",
+          "builtin": "{who} yerleşik bir araç kullandı, {tool}. {outcome}.",
+          "unknown": "{who}, {tool} çalıştırdı. {outcome}."
+        }
+      },
       "sentence": {
         "shareGrant": "{who}, “{resource}” öğesini {subject} ile paylaştı.",
         "shareRevoke": "{who}, “{resource}” paylaşımını {subject} ile durdurdu.",

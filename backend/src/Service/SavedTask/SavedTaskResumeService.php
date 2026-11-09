@@ -17,6 +17,7 @@ use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeContextRehydrator;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
+use App\Service\Multitask\Plan\TaskPlan;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
 use App\Service\SavedTask\Graph\SavedTaskPlanFactory;
@@ -119,7 +120,24 @@ final readonly class SavedTaskResumeService
             }
         }
 
+        $context->grantApproval($nodeId, $approvalId);
         $assembled = $this->dagExecutor->resume($plan, $context, $nodeId, $approval->getArgs() ?? []);
+
+        return $this->settle($run, $task, $approval, $plan, $assembled, $runId, $nodeId);
+    }
+
+    /**
+     * @param array{node_statuses: array<string, string>, all_failed: bool} $assembled
+     */
+    private function settle(
+        SavedTaskRun $run,
+        SavedTask $task,
+        Approval $approval,
+        TaskPlan $plan,
+        array $assembled,
+        int $runId,
+        string $nodeId,
+    ): SavedTaskRun {
         $messageId = $run->getMessageId();
         $statuses = $assembled['node_statuses'];
         if (null !== $messageId) {
@@ -158,7 +176,7 @@ final readonly class SavedTaskResumeService
         $this->logger->info('Saved task resumed after approval', [
             'run_id' => $runId,
             'node_id' => $nodeId,
-            'approval_id' => $approvalId,
+            'approval_id' => $approval->getId(),
         ]);
 
         return $run;

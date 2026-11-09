@@ -1155,12 +1155,37 @@
         "admin_user_level_change": "Nivel de usuario cambiado",
         "messages_gateway_flags": "Ajustes de la puerta de enlace cambiados",
         "messages_gateway_upstream": "Dirección de la puerta de enlace cambiada",
-        "messages_gateway_aliases": "Alias de modelos cambiados"
+        "messages_gateway_aliases": "Alias de modelos cambiados",
+        "tool_executed": "Llamadas a herramientas"
       },
       "what": "Qué ocurrió",
       "emptyNote": "Este registro indica quién hizo qué. No abre el contenido de chats ni de archivos.",
       "someone": "Alguien",
       "anItem": "un elemento",
+      "tool": {
+        "empty": "Todavía no hay llamadas a herramientas.",
+        "emptyAction": "Abrir aprobaciones",
+        "approvalLink": "Aprobación #{id}",
+        "unnamed": "una herramienta",
+        "outcome": {
+          "done": "Hecho",
+          "failed": "Ha fallado",
+          "refused": "Se ha rechazado",
+          "needs_approval": "Está esperando una aprobación",
+          "timed_out": "Se ha agotado el tiempo",
+          "other": "Terminado"
+        },
+        "source": {
+          "document": "{who} editó un documento con {tool}. {outcome}.",
+          "mcp": "{who} ejecutó {tool} en un servidor conectado. {outcome}.",
+          "custom": "{who} llamó a {tool}. {outcome}.",
+          "compute": "{who} ejecutó código con {tool}. {outcome}.",
+          "skill": "{who} usó la habilidad {tool}. {outcome}.",
+          "plugin": "{who} usó una herramienta de una app, {tool}. {outcome}.",
+          "builtin": "{who} usó una herramienta integrada, {tool}. {outcome}.",
+          "unknown": "{who} ejecutó {tool}. {outcome}."
+        }
+      },
       "sentence": {
         "shareGrant": "{who} compartió «{resource}» con {subject}.",
         "shareRevoke": "{who} dejó de compartir «{resource}» con {subject}.",

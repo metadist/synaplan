@@ -168,6 +168,36 @@ final readonly class ApprovalService
     }
 
     /**
+     * One approval the viewer may open from the audit log.
+     *
+     * The owner sees the same card as the inbox. An administrator who is not
+     * the owner sees the tool and its outcome, without the preview or the
+     * request body, so another person's arguments stay out of the audit link.
+     *
+     * @return array<string, mixed>
+     */
+    public function findForViewer(User $viewer, int $id): array
+    {
+        $approval = $this->approvals->find($id);
+        if (!$approval instanceof Approval) {
+            throw new ApprovalNotFoundException($id);
+        }
+        $owner = $approval->getOwnerId() === (int) $viewer->getId();
+        if (!$owner && !$viewer->isAdmin()) {
+            throw new ApprovalNotFoundException($id);
+        }
+        $row = $this->toArray($approval);
+        if (!$owner) {
+            $row['resolvedRequest'] = null;
+            $row['preview'] = null;
+            $row['canAlwaysAllow'] = false;
+            $row['canDecide'] = false;
+        }
+
+        return $row;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toArray(Approval $approval): array
