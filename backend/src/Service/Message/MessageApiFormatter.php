@@ -443,13 +443,19 @@ final readonly class MessageApiFormatter
             if (!is_array($card)) {
                 continue;
             }
+            $storedCardDebug = isset($card['errorDebug']) && is_string($card['errorDebug']) && '' !== $card['errorDebug']
+                ? $card['errorDebug']
+                : null;
             unset($card['errorDebug']);
             if (isset($card['error']) && is_string($card['error'])) {
                 $split = StoredAdminDiagnostics::split($card['error']);
                 $card['error'] = $split['text'];
-                if ($maySeeDiagnostics && null !== $split['debug']) {
-                    $card['errorDebug'] = $split['debug'];
+                if (null !== $split['debug']) {
+                    $storedCardDebug = $split['debug'];
                 }
+            }
+            if ($maySeeDiagnostics && null !== $storedCardDebug) {
+                $card['errorDebug'] = $storedCardDebug;
             }
             $nodeId = $card['nodeId'] ?? null;
             if ($maySeeDiagnostics && is_string($nodeId) && isset($nodeDebug[$nodeId]) && '' !== $nodeDebug[$nodeId]) {

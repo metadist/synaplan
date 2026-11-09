@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import {
+  applyMediaJobUpdateToMessage,
   IN_PROGRESS_TURN_ID,
   mapApiMessageRow,
   mapInProgressTurn,
@@ -125,6 +126,48 @@ describe('messageMapper (issue #1070)', () => {
       expect(message.errorDebug).toBe('Provider: google')
       expect(message.mediaJob?.error).toBe('Das Video konnte leider nicht erstellt werden.')
       expect(message.mediaJob?.errorReason).toBe('model_unavailable')
+    })
+
+    it('promotes a failed background media job onto message error fields and adopts errorDebug on reconcile', () => {
+      const message = mapApiMessageRow(
+        baseRow({
+          text: '__VIDEO_GENERATING__',
+          mediaJob: {
+            job_id: 'job-abc',
+            type: 'video',
+            state: 'running',
+          },
+        })
+      )
+
+      applyMediaJobUpdateToMessage(message, {
+        job_id: 'job-abc',
+        type: 'video',
+        state: 'failed',
+        error: 'The video could not be created.',
+        error_reason: 'timeout',
+      })
+
+      expect(message.errorReason).toBe('timeout')
+      expect(message.errorMessage).toBe('The video could not be created.')
+
+      const persisted = mapApiMessageRow(
+        baseRow({
+          text: 'The video could not be created.',
+          errorReason: 'timeout',
+          errorDebug: 'Provider: google\nError: deadline exceeded',
+          mediaJob: {
+            job_id: 'job-abc',
+            type: 'video',
+            state: 'failed',
+            error: 'The video could not be created.',
+            error_reason: 'timeout',
+          },
+        })
+      )
+
+      reconcileLocalMessage(message, persisted)
+      expect(message.errorDebug).toBe('Provider: google\nError: deadline exceeded')
     })
 
     it('rebuilds taskPlan cards from persisted render state (DAG reload #1070)', () => {

@@ -127,6 +127,14 @@ final readonly class WidgetAnswerStore
         if (is_string($encodedSources)) {
             $outgoing->setMeta('rag_sources', $encodedSources);
         }
+        $errorReason = $metadata['chat_error_reason'] ?? null;
+        if (is_string($errorReason) && '' !== $errorReason) {
+            $outgoing->setMeta('error_reason', $errorReason);
+        }
+        $errorDebug = $metadata['chat_error_debug'] ?? null;
+        if (is_string($errorDebug) && '' !== trim($errorDebug)) {
+            $outgoing->setMeta('error_debug', mb_substr(trim($errorDebug), 0, 4000));
+        }
 
         $this->em->persist($outgoing);
         $this->em->flush();

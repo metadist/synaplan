@@ -64,6 +64,30 @@ final class MessageApiFormatterDiagnosticsTest extends TestCase
         self::assertSame('job 91 failed', $shown['cards'][0]['errorDebug']);
     }
 
+    public function testInlineTaskCardErrorDebugIsKeptForAdminsAndStrippedForUsers(): void
+    {
+        $message = $this->failedMessage();
+        $message->setMeta('task_plan', (string) json_encode([
+            'reply_node' => 'image',
+            'cards' => [[
+                'nodeId' => 'image',
+                'capability' => 'image_generation',
+                'kind' => 'image',
+                'state' => 'failed',
+                'error' => 'The image could not be created.',
+                'errorDebug' => 'Provider: openai\nError: invalid_image_url',
+            ]],
+        ], \JSON_THROW_ON_ERROR));
+
+        $hidden = $this->formatter(maySee: false)->format($message)['taskPlan'];
+        self::assertIsArray($hidden);
+        self::assertArrayNotHasKey('errorDebug', $hidden['cards'][0]);
+
+        $shown = $this->formatter(maySee: true)->format($message)['taskPlan'];
+        self::assertIsArray($shown);
+        self::assertSame('Provider: openai\nError: invalid_image_url', $shown['cards'][0]['errorDebug']);
+    }
+
     private function formatter(bool $maySee): MessageApiFormatter
     {
         $gate = $this->createStub(ProviderDiagnosticsAccess::class);

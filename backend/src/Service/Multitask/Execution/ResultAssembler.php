@@ -273,7 +273,7 @@ final class ResultAssembler
                 if (true === ($nodeResult->metadata['used_workspace'] ?? false)) {
                     $card['used_workspace'] = true;
                 }
-                $card = array_merge($card, CardTrace::fromResult($nodeResult));
+                $card = $this->withNodeDiagnostics(array_merge($card, CardTrace::fromResult($nodeResult)), $nodeResult->metadata);
                 $query = $nodeResult->metadata['query'] ?? null;
                 if (is_string($query) && '' !== $query && !isset($card['query'])) {
                     $card['query'] = $query;
@@ -536,5 +536,21 @@ final class ResultAssembler
         }
 
         return $notes;
+    }
+
+    /**
+     * @param array<string, mixed> $card
+     * @param array<string, mixed> $metadata
+     *
+     * @return array<string, mixed>
+     */
+    private function withNodeDiagnostics(array $card, array $metadata): array
+    {
+        $debug = $metadata['chat_error_debug'] ?? null;
+        if (is_string($debug) && '' !== trim($debug)) {
+            $card['errorDebug'] = mb_substr(trim($debug), 0, 4000);
+        }
+
+        return $card;
     }
 }

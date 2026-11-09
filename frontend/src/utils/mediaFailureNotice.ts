@@ -70,6 +70,7 @@ export function mediaJobFailure(row: {
 /** Copy the notice fields a reload knows and the live bubble does not. */
 export function adoptPersistedFailure(local: Message, persisted: Message): void {
   if (persisted.errorMessage) local.errorMessage = persisted.errorMessage
+  if (persisted.errorDebug) local.errorDebug = persisted.errorDebug
   if (!persisted.taskPlan || !local.taskPlan) return
   for (const card of local.taskPlan.cards) {
     const match = persisted.taskPlan.cards.find((candidate) => candidate.nodeId === card.nodeId)

@@ -792,6 +792,7 @@ import {
   parseContentWithThinking,
   IN_PROGRESS_TURN_ID,
 } from '@/utils/messageMapper'
+import { chatErrorSuggestsOtherModel } from '@/utils/chatErrorDisplay'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -2499,8 +2500,17 @@ let isViewUnmounted = false
 function onMediaJobUpdate(message: Message, job: MediaJobInfo): void {
   const becameFailed = job.state === 'failed' && message.mediaJob?.state !== 'failed'
   message.mediaJob = job
-  if (becameFailed && message.backendMessageId) {
-    void historyStore.reconcileMessage(message.id, message.backendMessageId)
+  if (becameFailed) {
+    if (job.errorReason && !message.errorReason) {
+      message.errorReason = job.errorReason
+      message.canRetryModel = chatErrorSuggestsOtherModel(job.errorReason)
+    }
+    if (job.error && !message.errorMessage) {
+      message.errorMessage = job.error
+    }
+    if (message.backendMessageId) {
+      void historyStore.reconcileMessage(message.id, message.backendMessageId)
+    }
   }
 }
 

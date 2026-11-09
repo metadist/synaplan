@@ -98,13 +98,23 @@ export function applyMediaJobUpdateToMessage(message: Message, update: MediaJobU
     }
   }
 
+  const failure = mediaJobFailure(update)
   message.mediaJob = {
     ...(message.mediaJob ?? {}),
     jobId: update.job_id,
     type: update.type,
     state: update.state,
-    ...mediaJobFailure(update),
+    ...failure,
     ...(update.percent != null ? { percent: update.percent } : {}),
+  }
+
+  if ('failed' === update.state) {
+    if (failure.errorReason && !message.errorReason) {
+      message.errorReason = failure.errorReason
+    }
+    if (failure.error && !message.errorMessage) {
+      message.errorMessage = failure.error
+    }
   }
 
   if ('done' === update.state && update.file?.url) {
