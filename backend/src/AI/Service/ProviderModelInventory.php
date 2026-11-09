@@ -132,10 +132,13 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
      * discontinued, and hides the opposite case just as easily.
      *
      * Every supported provider addresses a single model as `{listUrl}/{id}`,
-     * except xAI speech-to-speech. Those ids are absent from `/v1/models`
-     * and `GET /v1/models/grok-voice-3.0` answers 404 while
-     * `wss://api.x.ai/v1/realtime` still serves the model. The free voice
-     * roster is the check that does not retire a working voice model.
+     * except two xAI aliases. Speech-to-speech ids are absent from
+     * `/v1/models` and `GET /v1/models/grok-voice-3.0` answers 404 while
+     * `wss://api.x.ai/v1/realtime` still serves the model. The quality image
+     * alias `grok-imagine-image-quality` is the same shape: omitted from
+     * `/v1/models`, 404 on `GET /v1/models/{id}`, and still accepted by
+     * image generation. The free voice roster and the image-generation
+     * roster are the checks that do not retire a working alias.
      */
     public function probe(string $provider, string $providerModelId): ModelProbeResult
     {
@@ -161,6 +164,10 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
 
         if ('xai' === $provider && str_starts_with(mb_strtolower($providerModelId), 'grok-voice-')) {
             return $this->probeXaiVoice($provider, $providerModelId, $listing['url'], $headers);
+        }
+
+        if ('xai' === $provider && 'grok-imagine-image-quality' === mb_strtolower($providerModelId)) {
+            return $this->probeXaiImage($provider, $providerModelId, $listing['url'], $headers);
         }
 
         $call = new AiCall(
@@ -212,9 +219,68 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
      */
     private function probeXaiVoice(string $provider, string $providerModelId, string $listingUrl, array $headers): ModelProbeResult
     {
-        $rosterUrl = preg_replace('#/models$#', '/tts/voices', rtrim($listingUrl, '/'));
-        if (!is_string($rosterUrl) || $rosterUrl === rtrim($listingUrl, '/')) {
+        $roster = $this->fetchXaiRoster($provider, $providerModelId, $listingUrl, '/tts/voices', $headers);
+        if (null === $roster) {
             return ModelProbeResult::Inconclusive;
+        }
+
+        $status = $roster['status'];
+        if ($status >= 200 && $status < 300) {
+            $voices = $roster['body']['voices'] ?? null;
+
+            return is_array($voices) && [] !== $voices
+                ? ModelProbeResult::Alive
+                : ModelProbeResult::Inconclusive;
+        }
+
+        // A missing roster means the voice product itself is gone. Auth and
+        // rate-limit answers still say nothing about the model.
+        return 404 === $status ? ModelProbeResult::Gone : ModelProbeResult::Inconclusive;
+    }
+
+    /**
+     * Confirm xAI's quality image alias through the image-generation roster.
+     *
+     * `grok-imagine-image-quality` is accepted by image generation and is not
+     * a row of `GET /v1/models`. A 404 there used to mark the alias offline
+     * and route traffic away from a model that still draws. The roster is
+     * the free read: alive when it offers the base image model or this id,
+     * gone only when the roster itself is missing.
+     *
+     * @param array<string, string> $headers
+     */
+    private function probeXaiImage(string $provider, string $providerModelId, string $listingUrl, array $headers): ModelProbeResult
+    {
+        $roster = $this->fetchXaiRoster($provider, $providerModelId, $listingUrl, '/image-generation-models', $headers);
+        if (null === $roster) {
+            return ModelProbeResult::Inconclusive;
+        }
+
+        $status = $roster['status'];
+        if ($status >= 200 && $status < 300) {
+            return $this->xaiImageRosterConfirms($roster['body'], $providerModelId)
+                ? ModelProbeResult::Alive
+                : ModelProbeResult::Inconclusive;
+        }
+
+        // A missing roster means the image product itself is gone. Auth and
+        // rate-limit answers still say nothing about the alias.
+        return 404 === $status ? ModelProbeResult::Gone : ModelProbeResult::Inconclusive;
+    }
+
+    /**
+     * Fetch a sibling xAI roster endpoint (`/tts/voices`, `/image-generation-models`)
+     * derived from the `/models` listing URL through the probe pipeline.
+     *
+     * @param array<string, string> $headers
+     *
+     * @return array{status: int, body: array<mixed>}|null
+     */
+    private function fetchXaiRoster(string $provider, string $providerModelId, string $listingUrl, string $rosterPath, array $headers): ?array
+    {
+        $rosterUrl = preg_replace('#/models$#', $rosterPath, rtrim($listingUrl, '/'));
+        if (!is_string($rosterUrl) || $rosterUrl === rtrim($listingUrl, '/')) {
+            return null;
         }
 
         $call = new AiCall(
@@ -243,8 +309,8 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
                     ];
                 },
             )->value;
-            $status = $result['status'];
-            $body = $result['body'];
+
+            return $result;
         } catch (\Throwable $e) {
             $this->logger->warning('Model availability probe failed', [
                 'provider' => $provider,
@@ -252,20 +318,35 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
                 'error' => $e->getMessage(),
             ]);
 
-            return ModelProbeResult::Inconclusive;
+            return null;
+        }
+    }
+
+    /**
+     * The quality alias has no row of its own. The base image model, or the
+     * alias id if xAI starts listing it, is enough to keep it.
+     *
+     * @param array<mixed> $body
+     */
+    private function xaiImageRosterConfirms(array $body, string $providerModelId): bool
+    {
+        $models = $body['models'] ?? null;
+        if (!is_array($models)) {
+            return false;
         }
 
-        if ($status >= 200 && $status < 300) {
-            $voices = $body['voices'] ?? null;
-
-            return is_array($voices) && [] !== $voices
-                ? ModelProbeResult::Alive
-                : ModelProbeResult::Inconclusive;
+        $wanted = [
+            'grok-imagine-image' => true,
+            mb_strtolower($providerModelId) => true,
+        ];
+        foreach ($models as $entry) {
+            $id = is_string($entry) ? $entry : (is_array($entry) ? ($entry['id'] ?? null) : null);
+            if (is_string($id) && isset($wanted[mb_strtolower($id)])) {
+                return true;
+            }
         }
 
-        // A missing roster means the voice product itself is gone. Auth and
-        // rate-limit answers still say nothing about the model.
-        return 404 === $status ? ModelProbeResult::Gone : ModelProbeResult::Inconclusive;
+        return false;
     }
 
     /**

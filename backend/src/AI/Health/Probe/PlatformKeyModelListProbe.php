@@ -93,22 +93,13 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
         // Google and Anthropic paginate; a single request silently omits models
         // that then look exactly like retirements.
         do {
-            try {
-                $response = $this->httpClient->request($check['method'], $url, [
-                    'headers' => $headers,
-                    'timeout' => self::TIMEOUT_SECONDS,
-                ]);
-                $status = $response->getStatusCode();
-                $body = $status >= 200 && $status < 300 ? $response->toArray(false) : [];
-            } catch (\Throwable $e) {
-                $this->logger->info('Model catalog probe could not reach provider', [
-                    'provider' => $provider,
-                    'error' => $e->getMessage(),
-                ]);
-
-                return ProbeResult::failed(FailureKind::Transient, 'Could not reach the provider API: '.$e->getMessage());
+            $page = $this->requestPage($check['method'], $url, $headers, $provider);
+            if ($page instanceof ProbeResult) {
+                return $page;
             }
 
+            $status = $page['status'];
+            $body = $page['body'];
             if ($status < 200 || $status >= 300) {
                 return ProbeResult::failed(self::kindForStatus($status), sprintf('Provider catalog returned HTTP %d.', $status));
             }
@@ -156,6 +147,60 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
         }
 
         return $this->inventory->probe($provider, $providerModelId);
+    }
+
+    /**
+     * One catalog page. A dropped connection, a 429, or a 5xx is retried once
+     * immediately: one blip used to mark every model of the provider degraded
+     * and page the operator. A rejected key (401, 403, 402) is not retried —
+     * the key in hand is the one the store just returned, and repeating it
+     * cannot change the answer.
+     *
+     * @param array<string, string> $headers
+     *
+     * @return array{status: int, body: array<mixed>}|ProbeResult
+     */
+    private function requestPage(string $method, string $url, array $headers, string $provider): array|ProbeResult
+    {
+        $lastError = 'the provider did not answer';
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            try {
+                $response = $this->httpClient->request($method, $url, [
+                    'headers' => $headers,
+                    'timeout' => self::TIMEOUT_SECONDS,
+                ]);
+                $status = $response->getStatusCode();
+                if ((429 === $status || $status >= 500) && 0 === $attempt) {
+                    $lastError = sprintf('HTTP %d', $status);
+                    $this->logger->info('Model catalog probe retrying after an upstream error', [
+                        'provider' => $provider,
+                        'status' => $status,
+                    ]);
+                    continue;
+                }
+
+                return [
+                    'status' => $status,
+                    'body' => $status >= 200 && $status < 300 ? $response->toArray(false) : [],
+                ];
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+                if (0 === $attempt) {
+                    $this->logger->info('Model catalog probe retrying after a transport error', [
+                        'provider' => $provider,
+                        'error' => $lastError,
+                    ]);
+                    continue;
+                }
+            }
+        }
+
+        $this->logger->info('Model catalog probe could not reach provider', [
+            'provider' => $provider,
+            'error' => $lastError,
+        ]);
+
+        return ProbeResult::failed(FailureKind::Transient, 'Could not reach the provider API: '.$lastError);
     }
 
     /**

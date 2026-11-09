@@ -67,6 +67,9 @@ final readonly class ModelHealthAlerter
         foreach ($modelIds as $id) {
             $last = isset($rows[$id]) ? $rows[$id]->getLastAlerted() : 0;
             $lastKind = isset($rows[$id]) ? $rows[$id]->getLastAlertedKind() : null;
+            // Inside the window the recorded kind only moves up. A milder
+            // kind must not become the record, or the next worse incident
+            // looks new and pages again the same day.
             if ($last <= 0
                 || ($now - $last) >= $quietFor
                 || $severity > ModelHealthAlert::severity($lastKind)) {
@@ -101,8 +104,17 @@ final readonly class ModelHealthAlerter
 
         $this->email->sendModelHealthAlert($deliver);
         $this->discord->notifyModelHealth($deliver);
-        $this->health->stampAlerted($deliver->modelIds, $deliver->kind, $now);
+        $this->health->stampAlerted(
+            $deliver->modelIds,
+            $deliver->kind,
+            $now,
+            $this->config->alertThrottleSeconds(),
+        );
         $this->rememberOpen($this->key($alert), $deliver);
+        // Escalating a degraded or offline model to a worse incident replaces
+        // the milder one, so a later recovery does not send a duplicate
+        // all-clear for the old bucket alongside the new one.
+        $this->pruneSupersededOpen($alert->provider, $deliver->kind, $deliver->modelIds);
 
         $this->logger->warning('Model health alert raised', [
             'provider' => $deliver->provider,
@@ -253,6 +265,48 @@ final readonly class ModelHealthAlerter
             $this->cache->save($item);
         } catch (\Throwable $e) {
             $this->logger->debug('Model health alert state write failed', ['error' => $e->getMessage()]);
+        }
+    }
+
+    /**
+     * Drop escalated models from milder open incidents of the same provider so
+     * recovery sends one all-clear for the escalated incident, not two.
+     *
+     * @param list<int> $modelIds
+     */
+    private function pruneSupersededOpen(string $provider, string $raisedKind, array $modelIds): void
+    {
+        $raisedSeverity = ModelHealthAlert::severity($raisedKind);
+        $providerKey = self::normalize($provider);
+
+        foreach ([ModelHealthAlert::KIND_DEGRADED, ModelHealthAlert::KIND_OFFLINE] as $milderKind) {
+            if (ModelHealthAlert::severity($milderKind) >= $raisedSeverity) {
+                continue;
+            }
+
+            $key = $providerKey.'.'.$milderKind;
+            $open = $this->openModels($key);
+            if (null === $open) {
+                continue;
+            }
+
+            foreach ($modelIds as $id) {
+                unset($open[$id]);
+            }
+
+            if ([] === $open) {
+                $this->forget(self::OPEN_PREFIX.$key);
+                continue;
+            }
+
+            try {
+                $item = $this->cache->getItem(self::OPEN_PREFIX.$key);
+                $item->set($open);
+                $item->expiresAfter(self::OPEN_TTL_SECONDS);
+                $this->cache->save($item);
+            } catch (\Throwable $e) {
+                $this->logger->debug('Model health alert state write failed', ['error' => $e->getMessage()]);
+            }
         }
     }
 

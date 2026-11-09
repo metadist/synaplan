@@ -58,10 +58,20 @@ final class ModelHealthAlerterTest extends TestCase
 
             return $found;
         });
-        $health->method('stampAlerted')->willReturnCallback(function (array $ids, string $kind, int $at): void {
+        $health->method('stampAlerted')->willReturnCallback(function (array $ids, string $kind, int $at, int $quietForSeconds = 0): void {
             foreach ($ids as $id) {
                 $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
-                $this->healthRows[$id]->setLastAlerted($at)->setLastAlertedKind($kind);
+                $row = $this->healthRows[$id];
+                $last = $row->getLastAlerted();
+                $lastKind = $row->getLastAlertedKind();
+                if ($quietForSeconds > 0
+                    && $last > 0
+                    && null !== $lastKind
+                    && ($at - $last) < $quietForSeconds
+                    && ModelHealthAlert::severity($kind) < ModelHealthAlert::severity($lastKind)) {
+                    continue;
+                }
+                $row->setLastAlerted($at)->setLastAlertedKind($kind);
             }
         });
 
@@ -224,6 +234,51 @@ final class ModelHealthAlerterTest extends TestCase
         self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_OFFLINE, [1], ['Grok Voice 3'])));
         self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Grok Voice 3'])));
         self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $this->healthRows[1]->getLastAlertedKind());
+        self::assertNull($this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_DEGRADED));
+        self::assertNull($this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_OFFLINE));
+        self::assertSame([1 => 'Grok Voice 3'], $this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_CREDENTIAL));
+    }
+
+    /**
+     * A credential incident, then a transient degraded minute, then the same
+     * rejected key again — all inside one quiet period — is one page. The
+     * milder minute must not replace the recorded kind, or the key would
+     * look like a new and worse incident and ping everyone a second time.
+     */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAMilderProblemDoesNotResetTheKindOrPageAgain(): void
+    {
+        $sent = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert) use (&$sent): void {
+                $sent[] = $alert->kind;
+            }
+        );
+
+        $credential = self::alert(ModelHealthAlert::KIND_CREDENTIAL, [1], ['Claude Opus']);
+        self::assertTrue($this->alerter->raise($credential));
+        self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Claude Opus'])));
+        self::assertFalse($this->alerter->raise($credential));
+
+        self::assertSame([ModelHealthAlert::KIND_CREDENTIAL], $sent);
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $this->healthRows[1]->getLastAlertedKind());
+    }
+
+    /** Once the window has elapsed, a milder incident becomes the new record. */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAMilderProblemAfterTheQuietPeriodUpdatesTheRecordedKind(): void
+    {
+        $this->healthRows[1] = (new ModelHealth())
+            ->setModelId(1)
+            ->setLastAlerted(time() - (1440 * 60) - 5)
+            ->setLastAlertedKind(ModelHealthAlert::KIND_CREDENTIAL);
+
+        $this->email->expects(self::once())->method('sendModelHealthAlert');
+        $this->discord->expects(self::once())->method('notifyModelHealth');
+
+        self::assertTrue($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Claude Opus'])));
+        self::assertSame(ModelHealthAlert::KIND_DEGRADED, $this->healthRows[1]->getLastAlertedKind());
+        self::assertGreaterThan(time() - 30, $this->healthRows[1]->getLastAlerted());
     }
 
     /** The message must promise the quiet period the install actually uses. */

@@ -46,6 +46,7 @@ final class ModelHealthCheckCommand extends Command
         $this
             ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Probe and report without writing state, disabling models or sending alerts')
             ->addOption('provider', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Only check this provider (repeatable)')
+            ->addOption('fresh', null, InputOption::VALUE_NONE, 'Ignore remembered per-model confirmation verdicts and ask the provider again')
             ->addOption('jitter', null, InputOption::VALUE_REQUIRED, 'Wait a random 0..N seconds before starting, so scheduled runs do not all hit the providers at once')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Run even when MODELHEALTH.ENABLED is off');
     }
@@ -71,7 +72,7 @@ final class ModelHealthCheckCommand extends Command
 
         $io->title($dryRun ? 'Model health check (dry run)' : 'Model health check');
 
-        $run = $this->evaluator->run($dryRun, $providers);
+        $run = $this->evaluator->run($dryRun, $providers, (bool) $input->getOption('fresh'));
 
         if ([] === $run->verdicts) {
             $io->warning('No models found to check.');

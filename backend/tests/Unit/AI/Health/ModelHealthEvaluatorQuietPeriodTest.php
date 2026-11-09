@@ -214,6 +214,72 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
             [ModelHealthAlert::KIND_DEGRADED, false],
             [ModelHealthAlert::KIND_CREDENTIAL, false],
         ], $sent);
+
+        $probe->next = ProbeResult::ok(['grok-voice-3.0']);
+        $recovered = $evaluator->run();
+        self::assertCount(1, $recovered->alertsResolved, 'Recovery after escalation sends one all-clear for the credential incident, not a duplicate for the superseded degraded one');
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $recovered->alertsResolved[0]->kind);
+        self::assertSame([
+            [ModelHealthAlert::KIND_DEGRADED, false],
+            [ModelHealthAlert::KIND_CREDENTIAL, false],
+            [ModelHealthAlert::KIND_CREDENTIAL, true],
+        ], $sent);
+    }
+
+    /**
+     * The reverse of a flaky hour that turns into a rejected key. A rejected
+     * key, then one transient catalog miss, then the same rejected key again
+     * is a single credential page. The transient minute must not clear the
+     * recorded kind, and it must not be announced as a recovery.
+     */
+    public function testATransientMinuteDoesNotRePageARejectedKey(): void
+    {
+        $sent = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert, bool $resolved = false) use (&$sent): void {
+                $sent[] = [$alert->kind, $resolved];
+            }
+        );
+
+        $voice = self::model(1, 'xAI', 'grok-voice-3.0', 'Grok Voice 3');
+        $probe = new class implements ModelListProbeInterface {
+            public ProbeResult $next;
+
+            public function supports(string $service): bool
+            {
+                return true;
+            }
+
+            public function probe(string $service): ProbeResult
+            {
+                return $this->next;
+            }
+
+            public function confirm(string $service, string $providerModelId): ModelProbeResult
+            {
+                return ModelProbeResult::Inconclusive;
+            }
+        };
+        $evaluator = $this->evaluatorFor(['xAI' => ['grok-voice-3.0' => [$voice]]], [], $probe);
+
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'xAI rejected the API key.');
+        $rejected = $evaluator->run();
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $rejected->alertsRaised[0]->kind);
+
+        $probe->next = ProbeResult::failed(FailureKind::Transient, 'Could not reach the provider API.');
+        $blip = $evaluator->run();
+        self::assertSame([], $blip->alertsRaised, 'A milder transient miss stays inside the quiet period');
+        self::assertSame([], $blip->alertsResolved, 'The models are still failing, so the credential incident stays open');
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $this->healthRows[1]->getLastAlertedKind());
+
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'xAI rejected the API key.');
+        $again = $evaluator->run();
+        self::assertSame([], $again->alertsRaised, 'The same rejected key must not page again inside the quiet period');
+        self::assertSame([], $again->alertsResolved);
+
+        self::assertSame([
+            [ModelHealthAlert::KIND_CREDENTIAL, false],
+        ], $sent);
     }
 
     /**
@@ -273,10 +339,20 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
         $health->method('findOrCreate')->willReturnCallback(function (int $id): ModelHealth {
             return $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
         });
-        $health->method('stampAlerted')->willReturnCallback(function (array $ids, string $kind, int $at): void {
+        $health->method('stampAlerted')->willReturnCallback(function (array $ids, string $kind, int $at, int $quietForSeconds = 0): void {
             foreach ($ids as $id) {
                 $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
-                $this->healthRows[$id]->setLastAlerted($at)->setLastAlertedKind($kind);
+                $row = $this->healthRows[$id];
+                $last = $row->getLastAlerted();
+                $lastKind = $row->getLastAlertedKind();
+                if ($quietForSeconds > 0
+                    && $last > 0
+                    && null !== $lastKind
+                    && ($at - $last) < $quietForSeconds
+                    && ModelHealthAlert::severity($kind) < ModelHealthAlert::severity($lastKind)) {
+                    continue;
+                }
+                $row->setLastAlerted($at)->setLastAlertedKind($kind);
             }
         });
 
