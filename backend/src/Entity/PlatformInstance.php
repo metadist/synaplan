@@ -63,14 +63,11 @@ class PlatformInstance
     #[ORM\Column(name: 'BHOST', length: 255)]
     private string $host;
 
-    #[ORM\Column(name: 'BSECRETHASH', length: 255, options: ['default' => ''])]
-    private string $secretHash = '';
-
-    /** @var list<string>|null */
     /** The cloud's public keys (a JWK Set as JSON): it authenticates by private_key_jwt. */
     #[ORM\Column(name: 'BJWKS', type: 'text', nullable: true)]
     private ?string $jwks = null;
 
+    /** @var list<string>|null */
     #[ORM\Column(name: 'BREDIRECTURIS', type: 'json', nullable: true)]
     private ?array $redirectUris = null;
 
@@ -184,16 +181,6 @@ class PlatformInstance
     public function getHost(): string
     {
         return $this->host;
-    }
-
-    public function getSecretHash(): string
-    {
-        return $this->secretHash;
-    }
-
-    public function setSecretHash(string $secretHash): void
-    {
-        $this->secretHash = $secretHash;
     }
 
     /**

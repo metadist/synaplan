@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Service\File\CloudFilesConfig;
 use App\Service\OAuth\Server\AccessTokenKeyStore;
 use App\Service\PlatformLink\NotifyKeyStore;
 use App\Service\PlatformLink\PlatformLinksConfig;
@@ -31,6 +32,7 @@ final class CloudWellKnownController extends AbstractController
         private readonly NotifyKeyStore $notifyKeys,
         private readonly AccessTokenKeyStore $accessTokenKeys,
         private readonly PlatformLinksConfig $platformLinks,
+        private readonly CloudFilesConfig $cloudFiles,
         #[Autowire('%env(APP_URL)%')]
         private readonly string $appUrl,
     ) {
@@ -47,10 +49,11 @@ final class CloudWellKnownController extends AbstractController
                 response: 200,
                 description: 'Configuration',
                 content: new OA\JsonContent(
-                    required: ['issuer', 'jwks_uri'],
+                    required: ['issuer', 'jwks_uri', 'capabilities'],
                     properties: [
                         new OA\Property(property: 'issuer', type: 'string', example: 'https://synaplan.example'),
                         new OA\Property(property: 'jwks_uri', type: 'string', example: 'https://synaplan.example/.well-known/jwks.json'),
+                        new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string'), description: 'What this Synaplan offers clouds: deliveries, pickups, read_scope, and with cloud files on cloud_status, source_events, watches.'),
                     ]
                 )
             ),
@@ -63,7 +66,15 @@ final class CloudWellKnownController extends AbstractController
             return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
         }
         $issuer = rtrim($this->appUrl, '/');
-        $response = $this->json(['issuer' => $issuer, 'jwks_uri' => $issuer.'/.well-known/jwks.json']);
+        $capabilities = ['deliveries', 'pickups', 'read_scope'];
+        if ($this->cloudFiles->isEnabled()) {
+            $capabilities = [...$capabilities, 'cloud_status', 'source_events', 'watches'];
+        }
+        $response = $this->json([
+            'issuer' => $issuer,
+            'jwks_uri' => $issuer.'/.well-known/jwks.json',
+            'capabilities' => $capabilities,
+        ]);
         $response->setPublic();
         $response->setMaxAge(300);
 

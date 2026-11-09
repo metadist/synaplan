@@ -181,19 +181,12 @@ final class CloudFileStatusTest extends WebTestCase
         static::getContainer()->get(ConfigRepository::class)
             ->setValue(0, PlatformLinksConfig::CONFIG_GROUP, PlatformLinksConfig::KEY_ENABLED, '1');
         $this->em->flush();
-        $cloud = $this->cloud('caps');
-        $this->client->request('GET', '/api/v1/platform-links/instances/self', server: [
-            'HTTP_X_INSTANCE_ID' => $cloud['instance_id'],
-            'HTTP_X_INSTANCE_SECRET' => $cloud['secret'],
-        ]);
+        $this->client->request('GET', '/.well-known/synaplan-configuration');
         self::assertResponseStatusCodeSame(Response::HTTP_OK);
         self::assertNotContains('cloud_status', $this->json()['capabilities']);
 
         $this->enable();
-        $this->client->request('GET', '/api/v1/platform-links/instances/self', server: [
-            'HTTP_X_INSTANCE_ID' => $cloud['instance_id'],
-            'HTTP_X_INSTANCE_SECRET' => $cloud['secret'],
-        ]);
+        $this->client->request('GET', '/.well-known/synaplan-configuration');
         self::assertContains('cloud_status', $this->json()['capabilities']);
         self::assertContains('source_events', $this->json()['capabilities']);
     }
@@ -205,7 +198,7 @@ final class CloudFileStatusTest extends WebTestCase
     }
 
     /**
-     * @return array{user: User, instance_id: string, secret: string, server: array<string, string>}
+     * @return array{user: User, instance_id: string, server: array<string, string>}
      */
     private function cloud(string $prefix): array
     {
@@ -220,9 +213,7 @@ final class CloudFileStatusTest extends WebTestCase
         $this->em->flush();
 
         $instanceId = 'pi_'.$prefix.bin2hex(random_bytes(3));
-        $secret = 'sec-'.$prefix;
         $instance = new PlatformInstance('nextcloud', $instanceId, $prefix.'.example', ['https://'.$prefix.'.example/callback'], PlatformInstance::STATUS_ACTIVE);
-        $instance->setSecretHash(password_hash($secret, \PASSWORD_DEFAULT));
         $this->em->persist($instance);
 
         $plain = 'sk_'.bin2hex(random_bytes(29));
@@ -248,7 +239,6 @@ final class CloudFileStatusTest extends WebTestCase
         return [
             'user' => $user,
             'instance_id' => $instanceId,
-            'secret' => $secret,
             'server' => ['HTTP_X_API_KEY' => $plain],
         ];
     }

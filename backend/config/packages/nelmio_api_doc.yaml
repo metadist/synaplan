@@ -28,16 +28,6 @@ nelmio_api_doc:
                     in: header
                     name: X-API-Key
                     description: 'Synaplan API key (sk_...), sent in the X-API-Key header.'
-                PlatformInstanceId:
-                    type: apiKey
-                    in: header
-                    name: X-Instance-Id
-                    description: 'A connected cloud''s instance id. Sent together with PlatformInstanceSecret on the calls the cloud makes as itself.'
-                PlatformInstanceSecret:
-                    type: apiKey
-                    in: header
-                    name: X-Instance-Secret
-                    description: 'The secret Synaplan issued when the cloud registered. Sent together with PlatformInstanceId.'
     areas:
         path_patterns:
             - ^/api(?!/doc$) # Accepts all routes except /api/doc

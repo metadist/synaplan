@@ -50,7 +50,6 @@ final readonly class OidcCloudSeeder implements SeederInterface
         $created = !$instance instanceof PlatformInstance;
         if (!$instance instanceof PlatformInstance) {
             $instance = new PlatformInstance($this->cloud->client, PlatformInstance::OIDC_CLOUD_ID, $host, [], PlatformInstance::STATUS_ACTIVE);
-            $instance->setSecretHash(password_hash(bin2hex(random_bytes(32)), \PASSWORD_DEFAULT));
         }
         $instance->setClient($this->cloud->client);
         $instance->setHost($host);

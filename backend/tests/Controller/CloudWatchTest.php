@@ -330,15 +330,13 @@ final class CloudWatchTest extends WebTestCase
     /**
      * @param list<string> $scopes
      *
-     * @return array{user: User, identity: ExternalIdentity, instance_id: string, secret: string, server: array<string, string>}
+     * @return array{user: User, identity: ExternalIdentity, instance_id: string, server: array<string, string>}
      */
     private function cloud(string $prefix, array $scopes = ['cloud:watch', 'files']): array
     {
         $user = $this->person($prefix);
         $instanceId = 'pi_'.$prefix.bin2hex(random_bytes(3));
-        $secret = 'sec-'.$prefix;
         $instance = new PlatformInstance('nextcloud', $instanceId, $prefix.'.example', ['https://'.$prefix.'.example/callback'], PlatformInstance::STATUS_ACTIVE);
-        $instance->setSecretHash(password_hash($secret, \PASSWORD_DEFAULT));
         $this->em->persist($instance);
         $plain = 'sk_'.bin2hex(random_bytes(29));
         $key = new ApiKey();
@@ -363,7 +361,6 @@ final class CloudWatchTest extends WebTestCase
             'user' => $user,
             'identity' => $identity,
             'instance_id' => $instanceId,
-            'secret' => $secret,
             'server' => ['HTTP_X_API_KEY' => $plain],
         ];
     }

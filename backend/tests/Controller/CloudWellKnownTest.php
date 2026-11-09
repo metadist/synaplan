@@ -46,7 +46,9 @@ final class CloudWellKnownTest extends WebTestCase
         $this->client->request('GET', '/.well-known/synaplan-configuration');
         self::assertResponseIsSuccessful();
         $issuer = rtrim((string) $_SERVER['APP_URL'], '/');
-        self::assertSame(['issuer' => $issuer, 'jwks_uri' => $issuer.'/.well-known/jwks.json'], $this->json());
+        $body = $this->json();
+        self::assertSame([$issuer, $issuer.'/.well-known/jwks.json'], [$body['issuer'], $body['jwks_uri']]);
+        self::assertContains('deliveries', $body['capabilities']);
     }
 
     public function testNothingIsPublishedWhilePlatformLinksAreOff(): void
