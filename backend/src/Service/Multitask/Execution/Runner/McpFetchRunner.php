@@ -198,7 +198,13 @@ final readonly class McpFetchRunner implements TaskRunner
             new ToolInvocation(
                 $gateName,
                 $arguments,
-                new ToolCaller($userId, ToolChannel::MCP_FETCH, unattended: $unattended, requestId: $requestedBy),
+                new ToolCaller(
+                    $userId,
+                    ToolChannel::MCP_FETCH,
+                    unattended: $unattended,
+                    requestId: $requestedBy,
+                    approvalId: $context->grantedApprovalId($node->id),
+                ),
                 decision: new GateRequest(
                     null,
                     $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,

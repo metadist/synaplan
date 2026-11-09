@@ -6,7 +6,7 @@ import { getApiUrl, TIMEOUTS } from '../config/config'
 
 const SEL = selectors.assistants
 
-test.describe('@ci Assistants builder name autosave', () => {
+test.describe('@ci Agents builder name autosave', () => {
   test('an empty name does not discard a greeting typed in the same save', async ({
     page,
     request,
@@ -25,7 +25,7 @@ test.describe('@ci Assistants builder name autosave', () => {
     const greeting = 'hello from probe'
 
     try {
-      await page.goto(`/ai/assistants/${agentId}`)
+      await page.goto(`/ai/agents/${agentId}`)
       await expect(page.locator(SEL.builder)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       const name = page.locator(SEL.name)
       const greetingField = page.locator(SEL.greeting)

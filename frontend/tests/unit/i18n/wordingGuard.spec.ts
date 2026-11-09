@@ -17,6 +17,9 @@ const BANNED = [
   /\bplatform instances?\b/i,
   /\bchunks?\b/i,
   /\boperate\b/i,
+  // The built object is an agent since 2026-11 (UP7); "assistant" stays
+  // only as a search synonym and in the name AI Setup Assistant.
+  /\bassistants?\b/i,
 ]
 
 const GUARDED_PREFIXES = ['nav.', 'pageTitles.', 'apps.', 'tours.']
@@ -50,5 +53,18 @@ describe('wording guard', () => {
   it('detects a banned word (guard contract)', () => {
     expect(BANNED.some((pattern) => pattern.test('Inbound'))).toBe(true)
     expect(BANNED.some((pattern) => pattern.test('Apps'))).toBe(false)
+  })
+
+  it('keeps "assistant" out of the agents namespace copy', () => {
+    const hits: string[] = []
+    for (const [key, value] of Object.entries(en)) {
+      if (!/^(assistants|templates|bundle)\./.test(key)) continue
+      // The external model name is a frozen contract, not product copy.
+      if (value.includes('assistant:{slug}')) continue
+      // Interpolation placeholder names are code, not product copy.
+      const copy = value.replace(/\{[^}]+\}/g, '')
+      if (/\bassistants?\b/i.test(copy)) hits.push(`${key} = "${value}"`)
+    }
+    expect(hits).toEqual([])
   })
 })

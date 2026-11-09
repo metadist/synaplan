@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\MessageHandler;
 
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Exception\ProviderException;
 use App\AI\Service\AiFacade;
 use App\Message\AdvanceMediaJobCommand;
-use App\Repository\UserRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\MediaJob;
@@ -89,7 +89,6 @@ final readonly class AdvanceMediaJobCommandHandler
         private SyncMediaJobGenerator $syncGenerator,
         private LockFactory $lockFactory,
         private LoggerInterface $logger,
-        private UserRepository $userRepository,
         private string $uploadDir = '/var/www/backend/var/uploads',
     ) {
     }
@@ -375,6 +374,11 @@ final readonly class AdvanceMediaJobCommandHandler
     private function timeOut(MediaJob $job): void
     {
         $this->cancelProvider($job);
+        $budget = new \RuntimeException('Media job exceeded the platform wait budget');
+        $job->rememberFailure(
+            ChatFailureReason::Timeout->value,
+            $this->errorBuilder->diagnostics($budget),
+        );
         $this->jobService->markTimedOut(
             $job,
             $this->errorBuilder->buildTimeoutMessage(
@@ -482,42 +486,17 @@ final readonly class AdvanceMediaJobCommandHandler
         return $e instanceof \Exception ? $e : new \RuntimeException($e->getMessage(), 0, $e);
     }
 
-    /**
-     * Resolve whether the job's owner is an admin. Best-effort: a lookup failure
-     * (user gone, DB blip) must never block a job from reaching its terminal
-     * state, so it simply degrades to "not admin" (the safe, non-leaky default).
-     */
-    private function isAdminUser(int $userId): bool
-    {
-        if ($userId <= 0) {
-            return false;
-        }
-
-        try {
-            return $this->userRepository->find($userId)?->isAdmin() ?? false;
-        } catch (\Throwable $e) {
-            $this->logger->warning('MediaJob: failed to resolve admin status for diagnostics', [
-                'user_id' => $userId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
-    }
-
     private function fail(MediaJob $job, \Throwable $e): void
     {
         $exception = $e instanceof \Exception ? $e : new \RuntimeException($e->getMessage(), 0, $e);
         $lang = is_string($job->getOptions()['lang'] ?? null) ? (string) $job->getOptions()['lang'] : 'en';
 
-        // Admins get the raw provider error/cause appended (so failures are
-        // diagnosable straight from the chat); regular users only ever see the
-        // clean, non-leaky message.
-        $message = $this->errorBuilder->buildErrorMessage(
-            $exception,
-            $job->getType(),
-            $lang,
-            $this->isAdminUser($job->getUserId()),
+        // The sentence is for everyone. The raw provider dump is stored beside
+        // it and only an admin viewer can open it in the error notice.
+        $message = $this->errorBuilder->buildErrorMessage($exception, $job->getType(), $lang);
+        $job->rememberFailure(
+            $this->errorBuilder->failureReason($exception)->value,
+            $this->errorBuilder->diagnostics($exception),
         );
 
         // Persist the raw cause as dev/admin meta (NOT exposed by toStatusArray,

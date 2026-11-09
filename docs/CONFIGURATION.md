@@ -259,7 +259,7 @@ Every install seeds the full model catalog. Which rows a person can pick is deci
 | Who | What they see |
 | --- | --- |
 | Regular users | Only models of available providers, from `GET /api/v1/config/models`. Everything else is hidden, including Ollama rows that are not pulled yet. |
-| Administrators | The same picker, unless `includeUnavailable=1` is passed on that config endpoint (admins only). The catalog under **Manage → Assistants → Models** is `GET /api/v1/admin/models`, which already returns every row and does not take that parameter. Unavailable rows stay in that list, greyed, with a badge: **Provider not configured** or **Not pulled**. |
+| Administrators | The same picker, unless `includeUnavailable=1` is passed on that config endpoint (admins only). The catalog under **Manage → Agents → Models** is `GET /api/v1/admin/models`, which already returns every row and does not take that parameter. Unavailable rows stay in that list, greyed, with a badge: **Provider not configured** or **Not pulled**. |
 
 **Select suggested models** recommends only within the providers this installation can reach. A new account does not get frozen per-user default rows; the install-wide defaults apply until that person chooses a model.
 

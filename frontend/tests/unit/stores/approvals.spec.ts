@@ -70,6 +70,42 @@ describe('approvals store', () => {
     expect(store.pendingCount).toBe(0)
   })
 
+  it('ignores an older decided list that arrives after a newer one', async () => {
+    const approved = { ...row, status: 'approved', preview: 'Approved and waiting' }
+    const executed = { ...row, status: 'executed', preview: 'Now executed' }
+    let releaseOlder: (value: { pendingCount: number; approvals: (typeof row)[] }) => void = () =>
+      undefined
+    let calls = 0
+    mockList.mockImplementation(() => {
+      calls += 1
+      if (calls === 1) {
+        return new Promise((resolve) => {
+          releaseOlder = resolve
+        })
+      }
+      return Promise.resolve({ pendingCount: 0, approvals: [executed] })
+    })
+    const store = useApprovalsStore()
+    const older = store.load('decided')
+    const newer = store.load('decided')
+    await newer
+    expect(store.decided[0]?.status).toBe('executed')
+    releaseOlder({ pendingCount: 0, approvals: [approved] })
+    await older
+    expect(store.decided[0]?.status).toBe('executed')
+    expect(store.decided[0]?.preview).toBe('Now executed')
+  })
+
+  it('clears decided rows when the reload fails', async () => {
+    mockList.mockResolvedValueOnce({ pendingCount: 0, approvals: [row] })
+    const store = useApprovalsStore()
+    await store.load('decided')
+    expect(store.decided).toHaveLength(1)
+    mockList.mockRejectedValueOnce(new Error('down'))
+    await store.load('decided')
+    expect(store.decided).toEqual([])
+  })
+
   it('ignores a duplicate stream card', () => {
     const store = useApprovalsStore()
     store.addFromStream(row)

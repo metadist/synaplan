@@ -41,7 +41,7 @@
     "examplePrompt": "Explícame a grandes rasgos las funciones",
     "helpCommand": {
       "label": "Ayuda",
-      "description": "Preguntar qué puede hacer este asistente de IA aquí"
+      "description": "Preguntar qué puede hacer este IA aquí"
     },
     "docPill": {
       "tooltip": "Abrir en la documentación",
@@ -423,7 +423,7 @@
       "filterPlaceholder": "Filtrar modelos…",
       "clearFilter": "Borrar filtro",
       "noMatch": "Ningún modelo coincide con «{query}».",
-      "assistants": "Asistentes"
+      "assistants": "Agentes"
     },
     "defaultModelOffer": {
       "body": "{name} no ha estado disponible {count} veces en la última hora.",
@@ -462,10 +462,10 @@
     "copy": "Copiar mensaje",
     "whatWasSent": "Qué se envió",
     "whatWasSentTitle": "Qué se envió",
-    "whatWasSentBody": "Su pregunta, los mensajes anteriores y las instrucciones que recibió su asistente.",
+    "whatWasSentBody": "Su pregunta, los mensajes anteriores y las instrucciones que recibió su agente.",
     "whatWasSentInstructions": "Instrucciones",
     "whatWasSentYou": "Usted",
-    "whatWasSentAssistant": "Asistente",
+    "whatWasSentAssistant": "Agente",
     "whatWasSentQuestion": "Su pregunta",
     "whatWasSentHistory": "Mensajes anteriores",
     "whatWasSentAfter": "Enviado después de su pregunta",
@@ -1012,22 +1012,22 @@
   },
   "approvals": {
     "title": "Aprobaciones",
-    "subtitle": "Antes de que un asistente o una tarea envíe un correo, escriba en un calendario, guarde un archivo o use una herramienta externa, puede esperar aquí tu aprobación. Una solicitud para compartir un asistente con todos también espera aquí.",
+    "subtitle": "Antes de que un agente o una tarea envíe un correo, escriba en un calendario, guarde un archivo o use una herramienta externa, puede esperar aquí tu aprobación. Una solicitud para compartir un agente con todos también espera aquí.",
     "pending": "En espera",
     "decided": "Decididas",
-    "emptyPending": "Nada necesita tu aprobación. Aquí aparecen tarjetas cuando una tarea guardada o un chat quiere cambiar algo, o cuando un asistente espera a ser compartido con todos.",
+    "emptyPending": "Nada necesita tu aprobación. Aquí aparecen tarjetas cuando una tarea guardada o un chat quiere cambiar algo, o cuando un agente espera a ser compartido con todos.",
     "emptyDecided": "Aún no hay decisiones anteriores.",
     "approve": "Aprobar",
     "reject": "Rechazar",
     "sendBack": "Devolver",
-    "sendBackReason": "¿Qué deberían cambiar? El asistente se queda con esa persona hasta que lo apruebes.",
+    "sendBackReason": "¿Qué deberían cambiar? El agente se queda con esa persona hasta que lo apruebes.",
     "shareAssistant": "Compartir {name} con todos. Pueden usarlo, pero no cambiarlo. No se comparte nada hasta que lo apruebes.",
     "shareAssistantWaiting": "{name} aún no está compartido. Las demás personas podrán usarlo, pero no cambiarlo, cuando otra persona con acceso de administración lo apruebe.",
     "sharedWithEveryone": "Compartido con todos. Pueden usarlo, pero no cambiarlo.",
-    "sentBackToast": "Devuelta. El asistente se queda con quien lo creó. No se compartió nada.",
-    "waitingForAnotherAdmin": "Otra persona con acceso de administración tiene que aprobarlo. No puedes aprobar tu propio asistente.",
+    "sentBackToast": "Devuelta. El agente se queda con quien lo creó. No se compartió nada.",
+    "waitingForAnotherAdmin": "Otra persona con acceso de administración tiene que aprobarlo. No puedes aprobar tu propio agente.",
     "sharingOff": "Compartir con todos está desactivado, así que no se compartió nada.",
-    "alwaysAllow": "Permitir siempre para este asistente",
+    "alwaysAllow": "Permitir siempre para este agente",
     "rejectReason": "¿Por qué lo rechazas?",
     "rejectReasonPlaceholder": "Nota opcional",
     "expired": "Esta solicitud caducó",

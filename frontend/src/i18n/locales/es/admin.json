@@ -526,11 +526,11 @@
         "BRAVE_SEARCH_ENABLED": "Activar búsqueda web",
         "BRAVE_SEARCH_API_KEY": "Clave API de Brave Search",
         "BRAVE_SEARCH_COUNT": "Resultados por búsqueda",
-        "MEDIA_ASYNC_JOBS_ENABLED": "Genera imágenes, vídeo y audio en segundo plano para que el chat no se bloquee. El asistente muestra el estado en directo y un aviso cuando termina. Si está desactivado, el turno espera a que el archivo esté listo. Necesita el contenedor worker.",
-        "COMPUTE_ENABLED": "El asistente puede hacer trabajo corto con archivos (Python o Node) sobre copias de los archivos que elijas. Necesita el sidecar de cómputo (COMPUTE_URL + COMPUTE_TOKEN). Un docker compose up local arranca ese sidecar y activa esto.",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Genera imágenes, vídeo y audio en segundo plano para que el chat no se bloquee. La IA muestra el estado en directo y un aviso cuando termina. Si está desactivado, el turno espera a que el archivo esté listo. Necesita el contenedor worker.",
+        "COMPUTE_ENABLED": "La IA puede hacer trabajo corto con archivos (Python o Node) sobre copias de los archivos que elijas. Necesita el sidecar de cómputo (COMPUTE_URL + COMPUTE_TOKEN). Un docker compose up local arranca ese sidecar y activa esto.",
         "COMPUTE_REQUIRE_TIER": "Aislamiento mínimo que el sidecar debe informar antes de activar el trabajo con archivos: Estándar (Docker normal), Aislamiento fuerte (gVisor) o Máquina virtual (microVM). Synaplan Cloud exige aislamiento fuerte.",
-        "COMPUTE_WORKSPACES_ENABLED": "Conserva una carpeta entre ejecuciones para que el asistente pueda continuar un trabajo anterior. Archivos → Espacio de trabajo muestra el contenido. El trabajo con archivos también debe estar activado.",
-        "COMPUTE_EGRESS_ENABLED": "Una ejecución puede descargar de una lista corta de sitios web públicos que el asistente haya nombrado. Desactivado por defecto: las ejecuciones permanecen sin red. Las direcciones privadas o locales se rechazan siempre. Solo se puede activar si el sidecar ofrece acceso a sitios web.",
+        "COMPUTE_WORKSPACES_ENABLED": "Conserva una carpeta entre ejecuciones para que la IA pueda continuar un trabajo anterior. Archivos → Espacio de trabajo muestra el contenido. El trabajo con archivos también debe estar activado.",
+        "COMPUTE_EGRESS_ENABLED": "Una ejecución puede descargar de una lista corta de sitios web públicos que la IA haya nombrado. Desactivado por defecto: las ejecuciones permanecen sin red. Las direcciones privadas o locales se rechazan siempre. Solo se puede activar si el sidecar ofrece acceso a sitios web.",
         "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Cuando una ejecución vaya a descargar de la web, pregunta primero a la persona propietaria aunque el trabajo cotidiano con archivos se ejecutara automáticamente. Activado por defecto.",
         "COMPUTE_EGRESS_MAX_HOSTS": "Cuántos sitios web puede listar una ejecución. Predeterminado: 8.",
         "COMPUTE_DEFAULT_TIMEOUT_SEC": "Segundos predeterminados que puede durar una ejecución.",
@@ -539,8 +539,8 @@
         "COMPUTE_DEFAULT_PIDS": "Límite de procesos predeterminado para una ejecución.",
         "COMPUTE_DEFAULT_OUTPUT_MB": "Límite de tamaño predeterminado en megabytes para los archivos que la ejecución puede crear.",
         "COMPUTE_MAX_TIMEOUT_SEC": "Tope duro en segundos para una ejecución.",
-        "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un asistente no puede relajar esto.",
-        "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un asistente no puede relajar esto.",
+        "COMPUTE_POLICY_INTERACTIVE": "Cuando la persona propietaria está presente (chat o una llamada API en vivo): ejecutar el trabajo automáticamente, preguntar primero o no ejecutarlo nunca. Un agente no puede relajar esto.",
+        "COMPUTE_POLICY_UNATTENDED": "Cuando una tarea guardada ejecuta trabajo con archivos por su cuenta: preguntar primero (predeterminado), ejecutar automáticamente o no ejecutarlo nunca. Un agente no puede relajar esto.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Cuántos días puede permanecer sin uso una carpeta de trabajo con archivos antes de que la limpieza la elimine. Predeterminado: 90.",
         "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, en Apps › Synaplan Desktop. Un equipo vinculado puede chatear en la app y recoger tareas en espera. Si está apagado, esa página se oculta, la vinculación se detiene, la app no puede chatear y las tareas en espera no se recogen hasta que lo actives. Aún no hay instalador: la app se compila desde el repositorio de código.",
         "FEATURE_SEARCH_AI_ENABLED": "Ayuda de IA en la paleta de búsqueda (Ctrl/Cmd+K): ante una pregunta en lenguaje normal, el modelo de herramientas elige el resultado que mejor encaja y lo explica en una frase. Nunca cambia nada por sí mismo. Cada uso es una llamada breve a la IA. Desactivado: se mantienen la búsqueda por palabras clave y por significado."
@@ -1106,7 +1106,7 @@
       "resourceKind": {
         "conversation": "Chat",
         "knowledge_folder": "Carpeta",
-        "assistant": "Asistente de IA",
+        "assistant": "Tema",
         "saved_task": "Tarea guardada",
         "widget": "Widget de chat",
         "agent": "Agente",
@@ -1155,12 +1155,37 @@
         "admin_user_level_change": "Nivel de usuario cambiado",
         "messages_gateway_flags": "Ajustes de la puerta de enlace cambiados",
         "messages_gateway_upstream": "Dirección de la puerta de enlace cambiada",
-        "messages_gateway_aliases": "Alias de modelos cambiados"
+        "messages_gateway_aliases": "Alias de modelos cambiados",
+        "tool_executed": "Llamadas a herramientas"
       },
       "what": "Qué ocurrió",
       "emptyNote": "Este registro indica quién hizo qué. No abre el contenido de chats ni de archivos.",
       "someone": "Alguien",
       "anItem": "un elemento",
+      "tool": {
+        "empty": "Todavía no hay llamadas a herramientas.",
+        "emptyAction": "Abrir aprobaciones",
+        "approvalLink": "Aprobación #{id}",
+        "unnamed": "una herramienta",
+        "outcome": {
+          "done": "Hecho",
+          "failed": "Ha fallado",
+          "refused": "Se ha rechazado",
+          "needs_approval": "Está esperando una aprobación",
+          "timed_out": "Se ha agotado el tiempo",
+          "other": "Terminado"
+        },
+        "source": {
+          "document": "{who} editó un documento con {tool}. {outcome}.",
+          "mcp": "{who} ejecutó {tool} en un servidor conectado. {outcome}.",
+          "custom": "{who} llamó a {tool}. {outcome}.",
+          "compute": "{who} ejecutó código con {tool}. {outcome}.",
+          "skill": "{who} usó la habilidad {tool}. {outcome}.",
+          "plugin": "{who} usó una herramienta de una app, {tool}. {outcome}.",
+          "builtin": "{who} usó una herramienta integrada, {tool}. {outcome}.",
+          "unknown": "{who} ejecutó {tool}. {outcome}."
+        }
+      },
       "sentence": {
         "shareGrant": "{who} compartió «{resource}» con {subject}.",
         "shareRevoke": "{who} dejó de compartir «{resource}» con {subject}.",
@@ -1290,12 +1315,12 @@
         "WORKFLOWS_BUILDER_ENABLED": "Editor de pasos",
         "CHAT_EXPORT_ENABLED": "Exportar chats",
         "CHAT_SHARE_ENABLED": "Compartir chats",
-        "AGENTS_PUBLISH_REVIEW": "Revisión antes de compartir un asistente con todos"
+        "AGENTS_PUBLISH_REVIEW": "Revisión antes de compartir un agente con todos"
       }
     },
     "intro": {
       "users": "Todos los usuarios con cuenta aquí. Cambia un nivel, verifica una dirección o desactiva una cuenta.",
-      "groups": "Los grupos reúnen usuarios para compartir asistentes y fijar reglas una sola vez para todas.",
+      "groups": "Los grupos reúnen usuarios para compartir agentes y fijar reglas una sola vez para todas.",
       "policies": "Las políticas deciden qué puede usar un grupo, por ejemplo qué funciones o modelos.",
       "moderation": "Contenido que los usuarios han denunciado. Revísalo y consérvalo o elimínalo.",
       "audit": "Un registro de quién cambió qué en este servidor, lo más reciente primero.",
@@ -1352,14 +1377,14 @@
     "owner": "Propietario",
     "fileUnavailable": "Este archivo ya no está disponible.",
     "kind": {
-      "assistant": "Asistente de IA",
+      "assistant": "Tema",
       "saved_task": "Tarea guardada",
       "widget": "Widget de chat"
     },
     "runCopy": "Ejecutar como mi copia",
     "runCopyConfirm": "¿Crear tu propia copia de esta tarea guardada? Se ejecutará solo cuando tú la inicies.",
-    "assistantNotShared": "El asistente de IA de esta tarea no está compartido contigo.",
-    "assistantNotSharedNamed": "El asistente de IA «{name}» no está compartido contigo. Pide a quien lo tiene que lo comparta y vuelve a intentarlo.",
+    "assistantNotShared": "El agente de IA de esta tarea no está compartido contigo.",
+    "assistantNotSharedNamed": "El agente de IA «{name}» no está compartido contigo. Pide a quien lo tiene que lo comparta y vuelve a intentarlo.",
     "sharedBy": "De {name}",
     "continueAsCopy": "Continuar como mi copia",
     "continueFailed": "No se pudo crear su copia. Inténtelo de nuevo.",
@@ -1373,9 +1398,9 @@
         "sourceDirect": "Esta carpeta pertenece a {owner}. Se compartió con usted personalmente."
       },
       "assistant": {
-        "sourceGroup": "Este asistente pertenece a {owner}. Le llegó a través del grupo «{name}».",
-        "sourceEveryone": "Este asistente pertenece a {owner}. Se compartió con todos los usuarios que tienen una cuenta.",
-        "sourceDirect": "Este asistente pertenece a {owner}. Se compartió con usted personalmente."
+        "sourceGroup": "Este agente pertenece a {owner}. Le llegó a través del grupo «{name}».",
+        "sourceEveryone": "Este agente pertenece a {owner}. Se compartió con todos los usuarios que tienen una cuenta.",
+        "sourceDirect": "Este agente pertenece a {owner}. Se compartió con usted personalmente."
       },
       "saved_task": {
         "sourceGroup": "Esta tarea guardada pertenece a {owner}. Le llegó a través del grupo «{name}».",
@@ -1435,8 +1460,8 @@
         },
         "assistant": {
           "read": "Puede ver — pueden ver la tarjeta y clonarla.",
-          "use": "Puede usar — pueden iniciar un chat con este asistente.",
-          "edit": "Puede editar — pueden cambiar este asistente."
+          "use": "Puede usar — pueden iniciar un chat con este agente.",
+          "edit": "Puede editar — pueden cambiar este agente."
         },
         "saved_task": {
           "read": "Puede ver — pueden ver la tarjeta.",
@@ -1451,7 +1476,7 @@
       "find": {
         "conversation": "Lo encontrarán en Chats entrantes.",
         "knowledge_folder": "Aparece en sus Fuentes como compartido.",
-        "assistant": "Lo encontrarán en Asistentes → Compartido conmigo.",
+        "assistant": "Lo encontrarán en Agentes → Compartido conmigo.",
         "saved_task": "Pueden usarlo como plantilla en Automatizaciones.",
         "widget": "Lo encontrarán en Widgets de Chat."
       }

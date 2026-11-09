@@ -566,7 +566,7 @@ export const selectors = {
     noResults: '[data-testid="apps-no-results"]',
   },
   assistants: {
-    /** Gallery rendered by /ai/assistants (and by /ai/instructions while AGENTS.ENABLED is on) */
+    /** Gallery rendered by /ai/agents (and by /ai/instructions while AGENTS.ENABLED is on) */
     gallery: '[data-testid="section-assistant-gallery"]',
     builder: '[data-testid="section-assistant-builder"]',
     name: '[data-testid="input-assistant-name"]',
@@ -721,6 +721,12 @@ export const selectors = {
     sectionPolicyLocks: '[data-testid="section-policy-locks"]',
     selectPolicyGroup: '[data-testid="select-policy-group"]',
     tabSignupCodes: '[data-testid="tab-signup-codes"]',
+    tabAudit: '[data-testid="tab-audit"]',
+    auditFilters: '[data-testid="audit-filters"]',
+    auditToolCalls: '[data-testid="audit-filter-tool.executed"]',
+    auditEmpty: '[data-testid="audit-empty"]',
+    auditEmptyApprovals: '[data-testid="audit-empty-approvals"]',
+    auditRow: '[data-testid="audit-row-what"]',
   },
   signupCodes: {
     section: '[data-testid="section-signup-codes"]',

@@ -25,15 +25,16 @@ types, red flags), [`docs/ARCHITECTURE.md`](../../../docs/ARCHITECTURE.md),
 | **Copilot** | First review when a non-draft pull request opens; a re-review on request | — |
 | **Owner** | Ticks §0; answers stop-rule questions (§12); approves and merges in order; walks the journeys with the agent's walk record; flips production flags | — |
 
-**Autonomy (decided 2026-10-21): "merge-ready, then pause".** The agent
-runs one step uninterrupted — read, characterize, implement, gates, pull
-request, Copilot rounds, CI — until §11 is fully ticked, and then it
-*stops and reports*. Merging, the soak stages of §5 and production
-rollouts are planned pauses between sessions, never something a session
-waits on with the checkout occupied. A step that reaches a soak stage
-closes its STATUS entry with the soak's start date and the name of the
-signal that ends it (an event-ring summary, a capacity-page reading), so
-the next session resumes from STATUS alone.
+**Autonomy (updated 2026-11-08): the sprint does not stop.** The agent
+runs the open step — read, characterize, implement, gates, pull request,
+Copilot, CI — and then the next step of the same sprint, stacked, until
+that sprint's exit criteria are met. A red check, a cancelled run, or a
+Copilot finding is the next edit, not a place to pause. Merging and
+production soaks stay with the owner: the agent does not merge and does
+not wait with the checkout idle for a soak. A step that reaches a soak
+closes its STATUS entry with the soak's start date and the signal that
+ends it, then the agent continues the next step that does not need that
+soak. The only pause is a §12 stop rule.
 
 **Model routing (decided 2026-10-21).** One lead model executes every
 step of the track — style, names and context stay continuous; a second
@@ -281,12 +282,12 @@ gh api "repos/metadist/synaplan/issues/<PR>/timeline?per_page=100" \
 | **Out of scope or wrong** | Reply with the reason and a reference (plan row, code line, doc), resolve. A valid out-of-scope point goes into STATUS as "carried". |
 | **Product question** | Ask the owner; the thread stays open until answered. |
 
-Copilot's overview is not a thread: copy its named risks into the review log
-and answer them in the description. **At most three rounds** (confirmed by
-the owner 2026-10-21): within the cap the loop runs until no actionable
-finding remains; a fourth round is never requested by the agent — it means
-the step is unclear, the session pauses (§1), and the owner decides whether
-the step is re-briefed, split or re-planned.
+Copilot's overview is not a thread, and it still counts. A named risk in
+the overview — including one listed as "previously missed" under "No open
+issues" — is fixed or answered in the pull request the same way as a
+thread. Keep requesting a re-review after each fix until the latest
+review of the current head has no new actionable finding. Do not stop
+because a round count was reached while a finding or a red check remains.
 
 ---
 
@@ -303,6 +304,13 @@ python3 _devextras/e2e/playwright-trace-timeline.py <trace.zip>
   new commit. Do not amend reviewed commits.
 - **Red before any test ran** (`Unable to download artifact`): Actions
   infrastructure; `gh run rerun <run-id> --failed`, note it in STATUS.
+- **Cancelled is not a result.** A pull-request run whose jobs are
+  `cancelled`, with no failing test in the log, does not finish the step.
+  Re-run that workflow for the current head after the cancelled attempt
+  has completed (`gh run rerun <run-id>`). Do not start a second attempt
+  while one is queued or running: the workflow cancels the older one.
+  Do not push while you are waiting on a run unless the push is the fix
+  for a failure you have already reproduced.
 - **A flake:** timeline first, then the cause. One rerun with the timeline in
   STATUS; a second failure is a bug.
 - **Never:** raise a timeout as a fix, add a retry loop, tag a test `@noci`,
@@ -326,12 +334,10 @@ never run against production.
 - [ ] The description carries the final numbers, the class, the flag and,
       for egress, tools and runtime steps, the security impact.
 
-The agent's session ends here (§1: merge-ready, then pause): it reports
-the pull request, the sprint-test record and any soak that follows, and
-stops. The owner merges with the title unchanged; the next session — the
-owner's word, or a stacked child whose parent has merged — resumes from
-STATUS. A stacked child is moved onto the
-merge and pushed, which starts its CI:
+The step is merge-ready when the list above is ticked. The session does
+not end there. Stack the next step of the same sprint on this branch and
+run it the same way. The owner merges with the title unchanged. A stacked
+child is moved onto the merge and pushed, which starts its CI:
 
 ```bash
 git fetch origin --prune

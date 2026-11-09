@@ -173,7 +173,7 @@
     "tabFiles": "Files",
     "tabSearch": "Search",
     "tabVectors": "Vectors",
-    "intro": "Files marked Searchable by AI can be used in chats and assistants.",
+    "intro": "Files marked Searchable by AI can be used in chats and agents.",
     "introCta": "Add files to your sources…",
     "useInChat": "Use in chat",
     "startedChatWithFolder": "Started a new chat with {folder}.",
@@ -283,9 +283,9 @@
       "noGroup": "No group"
     },
     "help": {
-      "vectorized": "When a file is searchable by AI, its contents are added to your knowledge base so the assistant can use them to answer you.",
-      "notSearchable": "The assistant cannot use this file in answers yet. Make it searchable to add it to your knowledge.",
-      "processing": "This file is being prepared so the assistant can use it.",
+      "vectorized": "When a file is searchable by AI, its contents are added to your knowledge base so the AI can use them to answer you.",
+      "notSearchable": "The AI cannot use this file in answers yet. Make it searchable to add it to your knowledge.",
+      "processing": "This file is being prepared so the AI can use it.",
       "failed": "This file could not be made searchable. You can try again.",
       "group": "Knowledge folders bundle files together. When the AI searches a folder, it can use every file in it.",
       "source": "Where this file came from — an upload, a chat, Outlook, Nextcloud, OpenCloud, WhatsApp, the widget, the API, or AI-generated.",
@@ -382,7 +382,7 @@
       "loadMore": "Load more"
     },
     "explainer": {
-      "text": "Everything you upload or create lives here. The assistant can use files marked searchable by AI. Photos, recordings, and AI-created files need you to make them searchable first.",
+      "text": "Everything you upload or create lives here. The AI can use files marked searchable by AI. Photos, recordings, and AI-created files need you to make them searchable first.",
       "dismiss": "Got it",
       "reopen": "What is this?"
     },

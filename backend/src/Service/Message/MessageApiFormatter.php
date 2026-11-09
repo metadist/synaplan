@@ -8,9 +8,9 @@ use App\AI\Exception\ChatFailureReason;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Auth\ProviderDiagnosticsAccess;
 use App\Service\Chat\Stream\StreamMessageMeta;
 use App\Service\File\DataUrlFixer;
-use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Serializes a persisted Message entity into the canonical API row shape.
@@ -28,7 +28,7 @@ final readonly class MessageApiFormatter
         private MessageRepository $messageRepository,
         private SearchResultRepository $searchResultRepository,
         private DataUrlFixer $dataUrlFixer,
-        private Security $security,
+        private ProviderDiagnosticsAccess $diagnostics,
     ) {
     }
 
@@ -198,7 +198,8 @@ final readonly class MessageApiFormatter
 
         $originalTopic = $m->getMeta('original_topic');
         $originalMediaType = $m->getMeta('original_media_type');
-        $errorFields = $this->buildErrorFields($m);
+        $split = StoredAdminDiagnostics::split((string) $m->getText());
+        $errorFields = $this->buildErrorFields($m, $split['debug']);
 
         // Quoted reference the user attached when composing this message
         // ("Mention in chat"). Stored as message meta so it survives reload.
@@ -206,7 +207,7 @@ final readonly class MessageApiFormatter
         $quotedMessageIdMeta = $m->getMeta('quoted_message_id');
 
         $mediaJob = $this->decodeMediaJobMeta($m);
-        $text = $m->getText();
+        $text = $split['text'];
         if ('' === trim((string) $text) && null !== $mediaJob && 'running' === ($mediaJob['state'] ?? null)) {
             $text = match ($mediaJob['type'] ?? 'video') {
                 'image' => '__IMAGE_GENERATING__',
@@ -436,6 +437,33 @@ final readonly class MessageApiFormatter
             return null;
         }
 
+        $maySeeDiagnostics = $this->diagnostics->viewerMaySee();
+        $nodeDebug = $maySeeDiagnostics ? $this->nodeErrorDebug($m) : [];
+        foreach ($decoded['cards'] as &$card) {
+            if (!is_array($card)) {
+                continue;
+            }
+            $storedCardDebug = isset($card['errorDebug']) && is_string($card['errorDebug']) && '' !== $card['errorDebug']
+                ? $card['errorDebug']
+                : null;
+            unset($card['errorDebug']);
+            if (isset($card['error']) && is_string($card['error'])) {
+                $split = StoredAdminDiagnostics::split($card['error']);
+                $card['error'] = $split['text'];
+                if (null !== $split['debug']) {
+                    $storedCardDebug = $split['debug'];
+                }
+            }
+            if ($maySeeDiagnostics && null !== $storedCardDebug) {
+                $card['errorDebug'] = $storedCardDebug;
+            }
+            $nodeId = $card['nodeId'] ?? null;
+            if ($maySeeDiagnostics && is_string($nodeId) && isset($nodeDebug[$nodeId]) && '' !== $nodeDebug[$nodeId]) {
+                $card['errorDebug'] = $nodeDebug[$nodeId];
+            }
+        }
+        unset($card);
+
         return $decoded;
     }
 
@@ -459,13 +487,42 @@ final readonly class MessageApiFormatter
             return null;
         }
 
+        unset($decoded['errorDebug'], $decoded['error_debug']);
+        if (isset($decoded['error']) && is_string($decoded['error'])) {
+            $decoded['error'] = StoredAdminDiagnostics::userText($decoded['error']);
+        }
+
         return $decoded;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function nodeErrorDebug(Message $m): array
+    {
+        $raw = $m->getMeta('node_error_debug');
+        if (!is_string($raw) || '' === $raw) {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $debug = [];
+        foreach ($decoded as $nodeId => $value) {
+            if (is_string($nodeId) && is_string($value) && '' !== $value) {
+                $debug[$nodeId] = $value;
+            }
+        }
+
+        return $debug;
     }
 
     /**
      * @return array{errorReason: ?string, canRetryModel: ?bool, errorDebug: ?string}
      */
-    private function buildErrorFields(Message $m): array
+    private function buildErrorFields(Message $m, ?string $embeddedDebug): array
     {
         if ('IN' === $m->getDirection()) {
             return [
@@ -480,7 +537,7 @@ final readonly class MessageApiFormatter
             ? ChatFailureReason::tryFrom($reasonRaw)
             : null;
 
-        if (null === $reason && 'ERROR' !== $m->getTopic()) {
+        if (null === $reason && 'ERROR' !== $m->getTopic() && null === $embeddedDebug) {
             return [
                 'errorReason' => null,
                 'canRetryModel' => null,
@@ -489,7 +546,14 @@ final readonly class MessageApiFormatter
         }
 
         $resolved = $reason ?? ChatFailureReason::Unknown;
-        $debug = $this->security->isGranted('ROLE_ADMIN') ? ($m->getMeta('error_debug') ?: null) : null;
+        $debug = null;
+        // The account that hit the error is not an admin. An impersonating
+        // administrator still receives the dump; the account's own session
+        // does not, because the gate checks the signed token and the stash.
+        if ($this->diagnostics->viewerMaySee()) {
+            $stored = $m->getMeta('error_debug');
+            $debug = is_string($stored) && '' !== $stored ? $stored : $embeddedDebug;
+        }
 
         return [
             'errorReason' => $resolved->value,

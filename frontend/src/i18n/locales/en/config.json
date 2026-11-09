@@ -351,8 +351,8 @@
       "aiModel": "AI Model",
       "aiModelHelp": "Select which AI model to use for this prompt. Models are grouped by their capabilities.",
       "automated": "Automated (Best Model)",
-      "availableTools": "Available Agents",
-      "availableToolsHelp": "Enable agents that will be available when using this prompt",
+      "availableTools": "Tools",
+      "availableToolsHelp": "Enable tools that will be available when using this prompt",
       "internetSearch": {
         "label": "Internet Search",
         "help": "The AI searches the web only when a message needs current information, such as weather, prices or news. To search for a single message, use Tools → Web Search in the chat. \"Off\" disables web search for this prompt.",

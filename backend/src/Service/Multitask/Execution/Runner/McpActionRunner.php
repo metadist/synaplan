@@ -196,7 +196,12 @@ final readonly class McpActionRunner implements TaskRunner
                 new ToolInvocation(
                     $gateName,
                     $arguments,
-                    new ToolCaller((int) $userId, ToolChannel::MCP_ACTION, unattended: $unattended),
+                    new ToolCaller(
+                        (int) $userId,
+                        ToolChannel::MCP_ACTION,
+                        unattended: $unattended,
+                        approvalId: $context->grantedApprovalId($node->id),
+                    ),
                     decision: new GateRequest(
                         $actor instanceof User ? $actor : null,
                         $unattended ? PolicyContext::Unattended : PolicyContext::Interactive,

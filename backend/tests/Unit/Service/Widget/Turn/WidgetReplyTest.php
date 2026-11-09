@@ -70,6 +70,29 @@ final class WidgetReplyTest extends TestCase
         self::assertSame([['store', 'Hel<think>Hm</think>lo']], $this->steps);
     }
 
+    public function testAFailedMediaTurnDoesNotLeakAdminDiagnosticsInTheCompleteFrame(): void
+    {
+        $result = [
+            'success' => true,
+            'classification' => ['topic' => 'mediamaker'],
+            'response' => [
+                'metadata' => [
+                    'provider' => 'openai',
+                    'model' => 'gpt-image-1',
+                    'error' => 'Sorry, the image could not be generated right now.',
+                    'chat_error_reason' => 'unknown',
+                    'chat_error_debug' => 'Provider: openai\nError: safety block',
+                ],
+            ],
+        ];
+        $frames = $this->frames($this->reply(chunks: ['Sorry, the image could not be generated right now.'], result: $result));
+
+        self::assertSame(['data', 'complete'], array_column($frames, 'status'));
+        self::assertArrayNotHasKey('chat_error_debug', $frames[1]['metadata']['response']);
+        self::assertArrayNotHasKey('errorDebug', $frames[1]['metadata']['response']);
+        self::assertSame('unknown', $frames[1]['metadata']['response']['chat_error_reason']);
+    }
+
     public function testAFailedAnswerMarksTheMessageAndEndsInOneErrorFrame(): void
     {
         $message = new Message();

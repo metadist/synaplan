@@ -15,7 +15,7 @@ Synaplan separates everyday work from configuration and administration along fiv
 | --------- | ----------- | ---------------- |
 | **Chats** | Everyone | Everyday conversations, live voice, research reports, generated media, and the **Incoming chats** inbox for shared threads. |
 | **Library** | Everyone | Uploaded documents, knowledge folders, generated media gallery, persistent **Workspace** files from Python/Node runs, and shared folders. |
-| **Assistants** | Everyone | Custom AI assistants (instructions, knowledge folders, tools, triggers), **Saved Tasks** (scheduled or webhook workflows), and the **Approvals** inbox. |
+| **Agents** | Everyone | Custom AI agents (instructions, knowledge folders, tools, triggers), **Saved Tasks** (scheduled or webhook workflows), and the **Approvals** inbox. |
 | **Apps** | Everyone | Connected external systems (Microsoft 365, Dropbox, Nextcloud/WebDAV, CalDAV, IMAP, MCP servers), **Chat Widgets**, **WhatsApp**, **Email**, **Synaplan Desktop**, and **Coding Clients** (`/v1` & `/v1/messages`). |
 | **Admin** | Administrators | System overview, **System status** (`/admin/features`), **AI infrastructure** (provider keys, model health, extraction, RAG, reranking), **Users & groups**, and **System configuration**. |
 
@@ -31,7 +31,7 @@ Instead of locking a workspace to one vendor, Synaplan routes each capability sl
 - **Real Cost on Every Answer** — Every model carries its official provider rate (`priceIn` / `priceOut` per 1M tokens, or per image/second/character). The model picker displays a **Free / Low / Mid / High** badge, and every chat reply records the exact cost in USD.
 - **Adaptive Effort Routing** — On each message, the sorter (`tools:sort`) decides whether the question needs a direct **answer**, a quick web **lookup**, or a multi-round **[Deep Research](RESEARCH.md)** run with cross-model fact checking.
 - **Web Search Plugs** — Administrators choose between Brave, self-hosted **SearXNG**, Tavily, Exa, Firecrawl, or Perplexity under **Admin → System configuration → Web search**, with an optional fallback and per-user override.
-- **Self-Aware `/help` Assistant** — Ask *"What can you do here?"* or type `/help`; the assistant answers from a live capability inventory of this specific installation (`PlatformCapabilityInventory`) and the synced documentation corpus, never from a generic brochure.
+- **Self-Aware `/help`** — Ask *"What can you do here?"* or type `/help`; the AI answers from a live capability inventory of this specific installation (`PlatformCapabilityInventory`) and the synced documentation corpus, never from a generic brochure.
 
 ---
 

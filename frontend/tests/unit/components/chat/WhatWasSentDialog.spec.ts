@@ -37,7 +37,7 @@ describe('WhatWasSentDialog', () => {
 
     expect(view.text()).toContain('Instructions')
     expect(view.text()).toContain('You')
-    expect(view.text()).toContain('Assistant')
+    expect(view.text()).toContain('Agent')
     expect(view.text()).toContain('Be brief.')
     expect(view.text()).toContain('This stays on this screen until you leave the chat.')
     expect(view.find('[data-testid="text-what-was-sent-empty"]').exists()).toBe(false)
@@ -86,7 +86,7 @@ describe('WhatWasSentDialog', () => {
     expect(history.text()).toContain('Earlier question')
     expect(history.text()).toContain('Earlier answer')
     expect(history.text()).toContain('You')
-    expect(history.text()).toContain('Assistant')
+    expect(history.text()).toContain('Agent')
 
     const instructions = view.get('[data-testid="section-what-was-sent-instructions"]')
     const preview = instructions.get('.prompt-transcript-md')

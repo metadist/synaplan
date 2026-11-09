@@ -139,13 +139,14 @@ final class PasswordChangeRequiredSubscriberTest extends TestCase
                 .'cover it; PasswordChangeRequiredSubscriber has to guard all requests instead.',
                 $name,
             ));
-            $this->assertMatchesRegularExpression('#^\^/[\w./-]+$#', $pattern, sprintf(
-                'This test derives a sample path by stripping the leading ^ off a firewall pattern, which '
-                .'the "%s" firewall no longer allows. Extend it rather than dropping the case.',
+            $this->assertMatchesRegularExpression('#^\^/[\w./-]+#', $pattern, sprintf(
+                'This test derives a sample path from the literal prefix of a firewall pattern, which '
+                .'the "%s" firewall no longer has. Extend it rather than dropping the case.',
                 $name,
             ));
+            preg_match('#^\^(/[\w./-]+)#', $pattern, $prefix);
 
-            $paths[(string) $name] = substr($pattern, 1);
+            $paths[(string) $name] = $prefix[1];
         }
 
         $this->assertNotEmpty($paths, 'No authenticating firewall was found, so this test proves nothing');

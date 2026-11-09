@@ -224,7 +224,7 @@ test.describe('@ci @smoke Widget', () => {
     await openWidgetOnTestPage(page, widgetInfo.widgetId, apiUrl)
     const notice = page.locator(selectors.widget.host).locator('[data-testid="privacy-notice"]')
     await expect(notice).toBeVisible()
-    await expect(notice).toContainText('AI assistant')
+    await expect(notice).toContainText('You are chatting with an AI')
     await expect(notice).toContainText('Northwind')
     await notice.getByRole('button', { name: 'Dismiss privacy notice' }).click()
     await expect(notice).toHaveCount(0)

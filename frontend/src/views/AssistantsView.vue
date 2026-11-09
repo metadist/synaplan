@@ -23,7 +23,7 @@
             type="button"
             class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="btn-back-gallery"
-            @click="router.push('/ai/assistants')"
+            @click="router.push('/ai/agents')"
           >
             {{ $t('assistants.title') }}
           </button>

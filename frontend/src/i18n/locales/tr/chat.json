@@ -41,7 +41,7 @@
     "examplePrompt": "Özellikleri kabaca anlat",
     "helpCommand": {
       "label": "Yardım",
-      "description": "Bu AI asistanının burada neler yapabileceğini sor"
+      "description": "Bu yapay zekânın burada neler yapabileceğini sor"
     },
     "docPill": {
       "tooltip": "Dokümantasyonda aç",
@@ -423,7 +423,7 @@
       "filterPlaceholder": "Modelleri filtrele…",
       "clearFilter": "Filtreyi temizle",
       "noMatch": "“{query}” ile eşleşen model yok.",
-      "assistants": "Asistanlar"
+      "assistants": "Ajanlar"
     },
     "defaultModelOffer": {
       "body": "{name} son bir saatte {count} kez ulaşılamadı.",
@@ -462,10 +462,10 @@
     "copy": "Mesajı kopyala",
     "whatWasSent": "Gönderilen metin",
     "whatWasSentTitle": "Gönderilen metin",
-    "whatWasSentBody": "Sorunuz, önceki mesajlar ve asistanınızın aldığı talimatlar.",
+    "whatWasSentBody": "Sorunuz, önceki mesajlar ve ajanınızın aldığı talimatlar.",
     "whatWasSentInstructions": "Talimatlar",
     "whatWasSentYou": "Siz",
-    "whatWasSentAssistant": "Asistan",
+    "whatWasSentAssistant": "Ajan",
     "whatWasSentQuestion": "Sorunuz",
     "whatWasSentHistory": "Önceki mesajlar",
     "whatWasSentAfter": "Sorunuzdan sonra gönderilen",
@@ -1012,22 +1012,22 @@
   },
   "approvals": {
     "title": "Onaylar",
-    "subtitle": "Bir asistan veya görev e-posta göndermeden, takvime yazmadan, dosya kaydetmeden ya da harici bir araç çağırmadan önce burada onayınızı bekleyebilir. Bir asistanı herkesle paylaşma isteği de burada bekler.",
+    "subtitle": "Bir ajan veya görev e-posta göndermeden, takvime yazmadan, dosya kaydetmeden ya da harici bir araç çağırmadan önce burada onayınızı bekleyebilir. Bir ajanı herkesle paylaşma isteği de burada bekler.",
     "pending": "Bekliyor",
     "decided": "Karar verilenler",
-    "emptyPending": "Onayını bekleyen bir şey yok. Kayıtlı bir görev veya sohbet bir şeyi değiştirmek istediğinde ya da bir asistan herkesle paylaşılmayı beklediğinde kartlar burada görünür.",
+    "emptyPending": "Onayını bekleyen bir şey yok. Kayıtlı bir görev veya sohbet bir şeyi değiştirmek istediğinde ya da bir ajan herkesle paylaşılmayı beklediğinde kartlar burada görünür.",
     "emptyDecided": "Henüz önceki karar yok.",
     "approve": "Onayla",
     "reject": "Reddet",
     "sendBack": "Geri gönder",
-    "sendBackReason": "Ne değiştirmeli? Siz onaylayana kadar asistan o kişide kalır.",
+    "sendBackReason": "Ne değiştirmeli? Siz onaylayana kadar ajan o kişide kalır.",
     "shareAssistant": "{name} herkesle paylaşılsın. Kullanabilirler, değiştiremezler. Siz onaylayana kadar hiçbir şey paylaşılmaz.",
     "shareAssistantWaiting": "{name} henüz paylaşılmadı. Yönetici erişimi olan başka biri onayladığında diğer kişiler kullanabilir, değiştiremez.",
     "sharedWithEveryone": "Herkesle paylaşıldı. Kullanabilirler, değiştiremezler.",
-    "sentBackToast": "Geri gönderildi. Asistan onu oluşturan kişide kalır. Hiçbir şey paylaşılmadı.",
-    "waitingForAnotherAdmin": "Yönetici erişimi olan başka bir kişi onaylamalı. Kendi asistanınızı onaylayamazsınız.",
+    "sentBackToast": "Geri gönderildi. Ajan onu oluşturan kişide kalır. Hiçbir şey paylaşılmadı.",
+    "waitingForAnotherAdmin": "Yönetici erişimi olan başka bir kişi onaylamalı. Kendi ajanınızı onaylayamazsınız.",
     "sharingOff": "Herkesle paylaşma kapalı, bu yüzden hiçbir şey paylaşılmadı.",
-    "alwaysAllow": "Bu asistan için her zaman izin ver",
+    "alwaysAllow": "Bu ajan için her zaman izin ver",
     "rejectReason": "Bunu neden reddediyorsun?",
     "rejectReasonPlaceholder": "İsteğe bağlı not",
     "expired": "Bu istek süresi doldu",

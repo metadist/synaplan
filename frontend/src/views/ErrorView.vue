@@ -211,16 +211,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const { t } = useI18n()
-const { isAdmin, isImpersonating } = useAuth()
+const { canSeeAdminDiagnostics: canSeeDebugDetails } = useAuth()
 const router = useRouter()
-
-/**
- * Admins always see the full diagnostic payload. Impersonating admins do too,
- * even though the CURRENT principal (the impersonated user) is not an admin —
- * otherwise the operator would lose visibility into errors triggered while
- * acting as someone else, defeating the point of impersonation.
- */
-const canSeeDebugDetails = computed(() => isAdmin.value || isImpersonating.value)
 
 const stackExpanded = ref(false)
 const copied = ref(false)

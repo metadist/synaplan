@@ -70,18 +70,18 @@ final class ChatTurnCompletedListener
         if (!$entity instanceof Message || 'OUT' !== $entity->getDirection() || 'complete' !== $entity->getStatus()) {
             return;
         }
-        // A first save, a status flip to complete, or a later append onto an
-        // already-complete reply (continuations flush text without touching
-        // status). Other updates of a finished row stay quiet.
+        // A first save, a status flip to complete, or any later change of an
+        // already-complete reply. A resumed plan can replace a placeholder
+        // with a shorter sentence, and watchers still need that update.
         $becameComplete = [] === $changeSet
             || (isset($changeSet['status']) && 'complete' === $changeSet['status'][1]);
-        $textAppended = false;
+        $textChanged = false;
         if (isset($changeSet['text'])) {
             $previousText = is_string($changeSet['text'][0] ?? null) ? $changeSet['text'][0] : '';
             $currentText = is_string($changeSet['text'][1] ?? null) ? $changeSet['text'][1] : '';
-            $textAppended = mb_strlen($currentText) > mb_strlen($previousText);
+            $textChanged = $currentText !== $previousText;
         }
-        if (!$becameComplete && !$textAppended) {
+        if (!$becameComplete && !$textChanged) {
             return;
         }
 

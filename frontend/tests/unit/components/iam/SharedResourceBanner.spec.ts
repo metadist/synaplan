@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 
 describe('SharedResourceBanner', () => {
-  it('names owner, group and kind-specific consequence for an assistant', () => {
+  it('names owner, group and kind-specific consequence for an agent', () => {
     const wrapper = mount(SharedResourceBanner, {
       props: {
         kind: 'assistant',
@@ -15,12 +15,12 @@ describe('SharedResourceBanner', () => {
     })
 
     expect(wrapper.get('[data-testid="text-shared-resource-source"]').text()).toBe(
-      'This assistant belongs to Ada. It reached you through the group "Legal".'
+      'This agent belongs to Ada. It reached you through the group "Legal".'
     )
     expect(wrapper.get('[data-testid="text-shared-resource-owner"]').text()).toContain('Ada')
     expect(wrapper.get('[data-testid="text-shared-resource-permission"]').text()).toBe('Can use')
     expect(wrapper.get('[data-testid="text-shared-resource-consequence"]').text()).toContain(
-      'start a chat with this assistant'
+      'start a chat with this agent'
     )
   })
 

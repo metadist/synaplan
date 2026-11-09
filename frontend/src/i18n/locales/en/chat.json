@@ -41,7 +41,7 @@
     "examplePrompt": "Give me a rough overview of the features",
     "helpCommand": {
       "label": "Help",
-      "description": "Ask what this AI assistant can do here"
+      "description": "Ask what this AI can do here"
     },
     "docPill": {
       "tooltip": "Open in the documentation",
@@ -426,7 +426,7 @@
       "filterPlaceholder": "Filter models…",
       "clearFilter": "Clear filter",
       "noMatch": "No model matches “{query}”.",
-      "assistants": "Assistants"
+      "assistants": "Agents"
     },
     "defaultModelOffer": {
       "body": "{name} has been unreachable {count} times in the last hour.",
@@ -466,10 +466,10 @@
     "messageDetails": "Message details",
     "whatWasSent": "What was sent",
     "whatWasSentTitle": "What was sent",
-    "whatWasSentBody": "Your question, any earlier messages, and the instructions your assistant was given.",
+    "whatWasSentBody": "Your question, any earlier messages, and the instructions your agent was given.",
     "whatWasSentInstructions": "Instructions",
     "whatWasSentYou": "You",
-    "whatWasSentAssistant": "Assistant",
+    "whatWasSentAssistant": "Agent",
     "whatWasSentQuestion": "Your question",
     "whatWasSentHistory": "Earlier messages",
     "whatWasSentAfter": "Sent after your question",
@@ -1071,22 +1071,22 @@
   },
   "approvals": {
     "title": "Approvals",
-    "subtitle": "Before an assistant or a task sends mail, writes to a calendar, saves a file or calls an outside tool, it can wait here for your OK. A request to share an assistant with everyone waits here too.",
+    "subtitle": "Before an agent or a task sends mail, writes to a calendar, saves a file or calls an outside tool, it can wait here for your OK. A request to share an agent with everyone waits here too.",
     "pending": "Waiting",
     "decided": "Decided",
-    "emptyPending": "Nothing needs your approval. Cards appear here when a saved task or a chat wants to change something, or when an assistant is waiting to be shared with everyone.",
+    "emptyPending": "Nothing needs your approval. Cards appear here when a saved task or a chat wants to change something, or when an agent is waiting to be shared with everyone.",
     "emptyDecided": "No earlier decisions yet.",
     "approve": "Approve",
     "reject": "Reject",
     "sendBack": "Send back",
-    "sendBackReason": "What should they change? The assistant stays only with them until you approve.",
+    "sendBackReason": "What should they change? The agent stays only with them until you approve.",
     "shareAssistant": "Share {name} with everyone. They can use it but not change it. Nothing is shared until you approve.",
     "shareAssistantWaiting": "{name} is not shared yet. People will be able to use it but not change it once another admin approves.",
     "sharedWithEveryone": "Shared with everyone. They can use it but not change it.",
-    "sentBackToast": "Sent back. The assistant stays with the person who created it. Nothing was shared.",
-    "waitingForAnotherAdmin": "Another admin has to approve this. You cannot approve your own assistant.",
+    "sentBackToast": "Sent back. The agent stays with the person who created it. Nothing was shared.",
+    "waitingForAnotherAdmin": "Another admin has to approve this. You cannot approve your own agent.",
     "sharingOff": "Sharing with everyone is turned off, so nothing was shared.",
-    "alwaysAllow": "Always allow for this assistant",
+    "alwaysAllow": "Always allow for this agent",
     "rejectReason": "Why are you rejecting this?",
     "rejectReasonPlaceholder": "Optional note",
     "expired": "This request expired",

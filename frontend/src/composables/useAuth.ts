@@ -18,6 +18,7 @@ export function useAuth() {
     isTeam: computed(() => authStore.isTeam),
     isAdmin: computed(() => authStore.isAdmin),
     isImpersonating: computed(() => authStore.isImpersonating),
+    canSeeAdminDiagnostics: computed(() => authStore.canSeeAdminDiagnostics),
 
     // Actions
     login: authStore.login,

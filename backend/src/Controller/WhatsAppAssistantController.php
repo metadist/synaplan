@@ -90,7 +90,7 @@ final class WhatsAppAssistantController extends AbstractController
     )]
     #[OA\Response(
         response: 400,
-        description: 'Assistants disabled or assistant not usable',
+        description: 'Agents disabled or agent not usable',
         content: new OA\JsonContent(
             required: ['success', 'error'],
             properties: [

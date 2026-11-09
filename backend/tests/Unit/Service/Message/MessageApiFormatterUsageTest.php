@@ -7,10 +7,10 @@ namespace App\Tests\Unit\Service\Message;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Auth\ProviderDiagnosticsAccess;
 use App\Service\File\DataUrlFixer;
 use App\Service\Message\MessageApiFormatter;
 use PHPUnit\Framework\TestCase;
-use Symfony\Bundle\SecurityBundle\Security;
 
 /**
  * Covers the taximeter `usage` serialization added to the history/message API
@@ -28,7 +28,7 @@ final class MessageApiFormatterUsageTest extends TestCase
             $this->createMock(MessageRepository::class),
             $this->createMock(SearchResultRepository::class),
             $this->createMock(DataUrlFixer::class),
-            $this->createMock(Security::class),
+            $this->createStub(ProviderDiagnosticsAccess::class),
         );
     }
 

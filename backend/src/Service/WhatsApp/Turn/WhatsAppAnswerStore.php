@@ -173,6 +173,14 @@ final readonly class WhatsAppAnswerStore
             if (null !== $docs) {
                 $outgoingMessage->setMeta('docs', $docs);
             }
+            $errorReason = $aiMetadata['chat_error_reason'] ?? null;
+            if (is_string($errorReason) && '' !== $errorReason) {
+                $outgoingMessage->setMeta('error_reason', $errorReason);
+            }
+            $errorDebug = $aiMetadata['chat_error_debug'] ?? null;
+            if (is_string($errorDebug) && '' !== trim($errorDebug)) {
+                $outgoingMessage->setMeta('error_debug', mb_substr(trim($errorDebug), 0, 4000));
+            }
         }
     }
 }

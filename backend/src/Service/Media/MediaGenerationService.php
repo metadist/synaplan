@@ -87,11 +87,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         $modelConfig = $resolved['modelConfig'];
         $resolvedModelId = $resolved['modelId'];
 
-        if ('video' === $type) {
-            $resolution = $this->normalizeResolution($resolution, $modelConfig);
-        } else {
-            $resolution = null;
-        }
+        $resolution = 'video' === $type ? $this->normalizeResolution($resolution, $modelConfig) : null;
 
         $this->logger->info('Media generation request', [
             'user_id' => $user->getId(),
@@ -383,7 +379,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             $result = ['done' => true, 'videoUri' => $jobData['videoUri'], 'error' => null];
         } else {
             try {
-                $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider']);
+                $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider'], $user->getId());
             } catch (ProviderException $e) {
                 $jobData['status'] = 'failed';
                 $jobData['error'] = $e->getMessage();
@@ -418,7 +414,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
 
         try {
             $videoBytes = $this->aiFacade->downloadVideoRaw($result['videoUri'], $jobData['provider']);
-            $localPath = $this->saveRawVideo($videoBytes, $user->getId(), $jobData['provider']);
+            $localPath = $this->saveRawVideo($videoBytes, $user, $jobData['provider']);
         } catch (\Throwable $e) {
             $jobData['status'] = 'processing';
             $this->storeVideoJobState($jobId, $jobData);
@@ -644,10 +640,10 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         return $first['data'] ?? null;
     }
 
-    private function saveRawVideo(string $content, int $userId, string $provider): ?string
+    private function saveRawVideo(string $content, User $user, string $provider): ?string
     {
-        $filename = $this->buildFilename($userId, $provider, 'mp4');
-        $relativePath = $this->buildRelativePath($userId, $filename);
+        $filename = $this->buildFilename((int) $user->getId(), $provider, 'mp4');
+        $relativePath = $this->buildRelativePath((int) $user->getId(), $filename);
         $absolutePath = $this->uploadDir.'/'.$relativePath;
 
         if (!FileHelper::ensureParentDirectory($absolutePath)) {
@@ -657,6 +653,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         if (false === FileHelper::writeFile($absolutePath, $content)) {
             return null;
         }
+        $this->registerGeneratedFile($user, $relativePath, $this->guessMimeType($relativePath, 'video'));
 
         return $relativePath;
     }

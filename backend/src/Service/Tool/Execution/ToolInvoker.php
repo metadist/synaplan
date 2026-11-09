@@ -59,7 +59,7 @@ final readonly class ToolInvoker
         $outcome = new ToolOutcome(
             $execution->isError ? ToolOutcomeKind::Failed : ToolOutcomeKind::Done,
             ToolLimits::clamp($execution->text),
-            null,
+            $this->grantedApprovalId($invocation),
             $execution->document,
             0,
             null,
@@ -74,9 +74,9 @@ final readonly class ToolInvoker
      * (file work runs in the sidecar after the gate). A policy-only
      * check does not call this.
      */
-    public function recordRan(ToolDescriptor $tool, int $actorId, string $requestId, ToolOutcomeKind $kind, int $durationMs): void
+    public function recordRan(ToolDescriptor $tool, int $actorId, string $requestId, ToolOutcomeKind $kind, int $durationMs, ?int $approvalId = null): void
     {
-        $this->writeAudit($tool, $actorId, $requestId, $kind, $durationMs, null);
+        $this->writeAudit($tool, $actorId, $requestId, $kind, $durationMs, null !== $approvalId && $approvalId > 0 ? $approvalId : null);
     }
 
     /**
@@ -188,6 +188,13 @@ final readonly class ToolInvoker
         }
 
         return $observed;
+    }
+
+    private function grantedApprovalId(ToolInvocation $invocation): ?int
+    {
+        $id = $invocation->caller->approvalId;
+
+        return null !== $id && $id > 0 ? $id : null;
     }
 
     private function classified(ToolDescriptor $tool, SideEffect $effect): ToolDescriptor

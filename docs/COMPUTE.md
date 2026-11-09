@@ -126,7 +126,7 @@ are refused on save.
   path.
 - API keys need the `compute:run` scope to offer `code_execution` on the
   `/v1` gateways. Session chat uses the product flags, not that scope.
-- Assistants stay opted out until `code_run` is listed on the assistant.
+- Agents stay opted out until `code_run` is listed on the agent.
 
 ## Policy
 

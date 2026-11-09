@@ -13,8 +13,9 @@ import { Icon } from '@iconify/vue'
  * - Rendered directly on the page background, never inside a surface-card.
  * - Exactly one h1 per page, always text-2xl font-semibold.
  * - `icon` takes an Iconify name; heroicon components go into the #icon slot.
- * - Action buttons / filter pills belong in #actions (top-right, wraps under
- *   the title on small screens).
+ * - Action buttons / filter pills belong in #actions (top-right). The title
+ *   keeps its width. When the actions do not fit beside it, the row wraps
+ *   them under the title instead of letting the title paint through them.
  * - Conditional actions: put the v-if on the <template #actions> itself
  *   (`<template v-if="cond" #actions>`), not on the content inside — otherwise
  *   $slots.actions stays truthy and an empty wrapper adds phantom flex-gap
@@ -56,8 +57,8 @@ const showTourButton = computed(() => !embedded && hasTour(props.tourId))
     </div>
   </header>
   <header v-else class="mb-6">
-    <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div class="flex items-start gap-3 min-w-0">
+    <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+      <div class="flex items-start gap-3 max-w-full shrink-0">
         <span
           v-if="icon || $slots.icon"
           class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--brand-alpha-light)] txt-brand"
@@ -89,7 +90,7 @@ const showTourButton = computed(() => !embedded && hasTour(props.tourId))
       </div>
       <div
         v-if="$slots.actions"
-        class="flex flex-wrap items-center gap-2 sm:flex-shrink-0 w-full sm:w-auto"
+        class="flex w-full min-w-0 max-w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0"
       >
         <slot name="actions" />
       </div>

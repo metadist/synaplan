@@ -41,7 +41,7 @@ describe('useNavSections', () => {
     expect(keys).toEqual(['chats'])
   })
 
-  it('splits signed-in navigation into Chats, Library, Assistants and Channels', () => {
+  it('splits signed-in navigation into Chats, Library, Agents and Channels', () => {
     const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
     const keys = wrapper.vm.sections.map((section: { key: string }) => section.key)
     expect(keys).toEqual(['chats', 'library', 'assistants', 'channels'])
@@ -62,8 +62,8 @@ describe('useNavSections', () => {
     expect(wrapper.vm.sectionKeyForPath('/channels/widgets')).toBe('channels')
     expect(wrapper.vm.sectionKeyForPath('/ai/models')).toBe('assistants')
     expect(wrapper.vm.sectionKeyForPath('/ai/routing')).toBe('assistants')
-    expect(wrapper.vm.sectionKeyForPath('/ai/assistants')).toBe('assistants')
-    expect(wrapper.vm.sectionKeyForPath('/ai/assistants/4')).toBe('assistants')
+    expect(wrapper.vm.sectionKeyForPath('/ai/agents')).toBe('assistants')
+    expect(wrapper.vm.sectionKeyForPath('/ai/agents/4')).toBe('assistants')
     expect(wrapper.vm.sectionKeyForPath('/ai/instructions')).toBe('assistants')
     expect(wrapper.vm.sectionKeyForPath('/channels/tasks')).toBe('assistants')
     expect(wrapper.vm.sectionKeyForPath('/channels/approvals')).toBe('assistants')
@@ -71,7 +71,7 @@ describe('useNavSections', () => {
     expect(wrapper.vm.sectionKeyForPath('/profile')).toBeNull()
   })
 
-  it('puts the apps under Apps and tasks, approvals and shortcuts under Assistants', () => {
+  it('puts the apps under Apps and tasks, approvals and shortcuts under Agents', () => {
     const wrapper = mountSections({ email: 'user@test.com', level: 'PRO' })
     expect(wrapper.vm.sectionKeyForPath('/apps')).toBe('channels')
     expect(wrapper.vm.sectionKeyForPath('/apps/connected')).toBe('channels')

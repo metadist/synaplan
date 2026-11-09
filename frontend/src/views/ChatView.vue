@@ -292,7 +292,7 @@
               @click-memory="handleClickMemory"
               @continue="handleContinueResponse(message)"
               @look-deeper="handleLookDeeper(message)"
-              @media-job-update="message.mediaJob = $event"
+              @media-job-update="onMediaJobUpdate(message, $event)"
               @media-job-completed="handleMediaJobCompleted(message, $event)"
               @media-job-cancel="mediaJobsStore.cancel($event)"
             />
@@ -690,7 +690,7 @@ import {
 } from '@/composables/useScrollToMessage'
 import { useFirstRunSetup } from '@/composables/useFirstRunSetup'
 import LimitReachedModal from '@/components/common/LimitReachedModal.vue'
-import { useHistoryStore, type Message, type Part } from '@/stores/history'
+import { useHistoryStore, type MediaJobInfo, type Message, type Part } from '@/stores/history'
 import { useChatsStore } from '@/stores/chats'
 import { iamApi } from '@/services/api/iamApi'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
@@ -792,6 +792,7 @@ import {
   parseContentWithThinking,
   IN_PROGRESS_TURN_ID,
 } from '@/utils/messageMapper'
+import { chatErrorSuggestsOtherModel } from '@/utils/chatErrorDisplay'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
@@ -2495,6 +2496,23 @@ watch(
 )
 
 let isViewUnmounted = false
+
+function onMediaJobUpdate(message: Message, job: MediaJobInfo): void {
+  const becameFailed = job.state === 'failed' && message.mediaJob?.state !== 'failed'
+  message.mediaJob = job
+  if (becameFailed) {
+    if (job.errorReason && !message.errorReason) {
+      message.errorReason = job.errorReason
+      message.canRetryModel = chatErrorSuggestsOtherModel(job.errorReason)
+    }
+    if (job.error && !message.errorMessage) {
+      message.errorMessage = job.error
+    }
+    if (message.backendMessageId) {
+      void historyStore.reconcileMessage(message.id, message.backendMessageId)
+    }
+  }
+}
 
 function handleMediaJobCompleted(message: Message, payload: { url: string; type: string }): void {
   // Shared with the realtime mediaJobs store so the poll and push completion

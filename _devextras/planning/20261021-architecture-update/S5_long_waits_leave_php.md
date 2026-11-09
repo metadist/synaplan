@@ -59,6 +59,16 @@ worker waits — and with either part off, everything runs as today.
 2. `LongWaitGateTest` baseline: only the streaming transports remain.
 3. Media and multitask E2E specs green.
 
+### As delivered
+
+A media step that a later step needs no longer keeps the web request in the
+render. The request returns while the job runs. When the job finishes, a
+worker continues the plan from that file. `POST /api/v1/media/generate` with
+`type=video` starts the same kind of job and answers 202; it does not call
+the blocking video render. Incognito turns still render in the request.
+`LongWaitGateTest` freezes every remaining `sleep`, `usleep`, and
+`set_time_limit` outside handlers and commands.
+
 ---
 
 ## AU28 — Spike: watchdog relay and stream pump end to end (STATUS entry; branch never merged)

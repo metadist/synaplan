@@ -223,7 +223,7 @@ describe('ConfigField — locale overlay for backend schema copy', () => {
     })
 
     expect(wrapper.text()).toContain(
-      'Let the assistant do short file work (Python or Node) on copies of files you chose.'
+      'Let the AI do short file work (Python or Node) on copies of files you chose.'
     )
     expect(wrapper.text()).not.toContain('English schema fallback that must not appear.')
   })

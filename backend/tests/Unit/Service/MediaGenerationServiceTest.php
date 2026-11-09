@@ -320,7 +320,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $this->aiFacade->expects($this->once())
             ->method('pollVideoOperation')
-            ->with('ops/123', 'google')
+            ->with('ops/123', 'google', 1)
             ->willReturn(['done' => false, 'videoUri' => null, 'error' => null]);
 
         $result = $this->service->checkVideoJob($user, $jobId);
@@ -358,7 +358,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $this->aiFacade->expects($this->once())
             ->method('pollVideoOperation')
-            ->with('ops/123', 'google')
+            ->with('ops/123', 'google', 1)
             ->willReturn(['done' => true, 'videoUri' => 'https://example.com/vid.mp4', 'error' => null]);
 
         $this->aiFacade->expects($this->once())
@@ -728,20 +728,23 @@ class MediaGenerationServiceTest extends TestCase
         $model = $this->createModel('Google', 'veo-3.1', 'Veo 3.1');
         $this->setUpModelResolution(45, $model);
 
-        $mp4Data = str_repeat("\0", 100);
-        $b64 = base64_encode($mp4Data);
         $this->aiFacade->expects(self::once())
             ->method('generateVideo')
             ->willReturn([
-                'videos' => ['data:video/mp4;base64,'.$b64],
+                'videos' => ['data:video/mp4;base64,'.base64_encode('fake-mp4')],
                 'provider' => 'google',
                 'model' => 'veo-3.1',
+                'resolution' => '1080p',
             ]);
+        $this->aiFacade->expects(self::never())->method('startVideoGeneration');
 
         $result = $this->service->generate($this->createUser(), 'a timelapse', 'video', 45);
 
         self::assertTrue($result['success']);
         self::assertSame('video', $result['file']['type']);
+        self::assertStringContainsString('/api/v1/files/uploads/', $result['file']['url']);
+        self::assertArrayNotHasKey('jobId', $result);
+        self::assertSame('1080p', $result['resolution']);
     }
 
     public function testGenerateVideoExposesUsedResolutionInResponseEvenWhenVideosArrayIsStringUrl(): void
@@ -763,12 +766,10 @@ class MediaGenerationServiceTest extends TestCase
         ]);
         $this->setUpModelResolution(45, $model);
 
-        $mp4Data = str_repeat("\0", 100);
-        $b64 = base64_encode($mp4Data);
         $this->aiFacade->expects(self::once())
             ->method('generateVideo')
             ->willReturn([
-                'videos' => ['data:video/mp4;base64,'.$b64],
+                'videos' => ['data:video/mp4;base64,'.base64_encode('fake-mp4')],
                 'provider' => 'google',
                 'model' => 'veo-3.1',
                 'resolution' => '1080p',
@@ -777,6 +778,7 @@ class MediaGenerationServiceTest extends TestCase
         $result = $this->service->generate($this->createUser(), 'a wide shot', 'video', 45, '1080p');
 
         self::assertSame('1080p', $result['resolution']);
+        self::assertSame('video', $result['file']['type']);
     }
 
     public function testGenerateImageDoesNotIncludeResolutionInResponse(): void

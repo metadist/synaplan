@@ -93,16 +93,16 @@
     "findInFiles": "Dosyalar → AI oluşturdu'da bul"
   },
   "channels": {
-    "whatsappAssistant": "WhatsApp asistanı",
-    "whatsappAssistantHint": "Gelen WhatsApp iletilerini bu yayımlanmış asistan yanıtlar.",
-    "whatsappAssistantNone": "Asistan yok — olağan sohbet",
+    "whatsappAssistant": "WhatsApp ajanı",
+    "whatsappAssistantHint": "Gelen WhatsApp iletilerini bu yayımlanmış ajan yanıtlar.",
+    "whatsappAssistantNone": "Ajan yok — olağan sohbet",
     "aiNoticeLabel": "YZ bildirimi",
     "aiNoticeHelp": "İnsanlar bir yapay zekayla konuştuklarını bilir. Cümleyi değiştirebilirsiniz. Boş bırakamazsınız.",
     "aiNoticeSave": "YZ bildirimini kaydet",
     "aiNoticeSaved": "YZ bildirimi kaydedildi",
     "aiNoticeFailed": "YZ bildirimi kaydedilmedi.",
-    "whatsappAssistantSaved": "WhatsApp artık bu asistanı kullanıyor",
-    "whatsappAssistantFailed": "WhatsApp asistanı kaydedilemedi",
+    "whatsappAssistantSaved": "WhatsApp artık bu ajanı kullanıyor",
+    "whatsappAssistantFailed": "WhatsApp ajanı kaydedilemedi",
     "keywordSaved": "E-posta anahtar kelimesi başarıyla kaydedildi",
     "keywordPlaceholder": "anahtar kelime",
     "apiDocumentation": {
@@ -152,7 +152,7 @@
       "whoElseLabel": "Başka kim",
       "connectedWhoElse": "Yalnızca sizin Telegram hesabınız. Başka herkes bir cümle alır ve hiçbir şey kaydedilmez.",
       "touchesLabel": "Neyi etkiler",
-      "connectedTouches": "Bu sohbetteki mesajlar, fotoğraflar, dosyalar, sesli mesajlar, videolar ve konumlar. AI asistanınız bunları web sohbetindeki gibi yanıtlar, oluşturulan görselleri, videoları, sesleri ve belgeleri geri gönderir ve her şey sınırlarınıza sayılır. Dosyalar Synaplan dosyalarınıza kaydedilir.",
+      "connectedTouches": "Bu sohbetteki mesajlar, fotoğraflar, dosyalar, sesli mesajlar, videolar ve konumlar. AI ajanınız bunları web sohbetindeki gibi yanıtlar, oluşturulan görselleri, videoları, sesleri ve belgeleri geri gönderir ve her şey sınırlarınıza sayılır. Dosyalar Synaplan dosyalarınıza kaydedilir.",
       "stopLabel": "Nasıl durdurulur",
       "connectedStop": "Bu kartta bağlantıyı kesin. Bot yanıt vermeyi bırakır. Sohbet geçmişiniz kalır.",
       "fromLabel": "Nereden geldi",
@@ -202,9 +202,9 @@
     "deleteAfterHelp": "İşlemden sonra e-postaları kaldır (yalnızca POP3)",
     "testConnection": "Bağlantıyı Test Et",
     "departments": "E-posta Departmanları",
-    "assistant": "Asistan",
-    "assistantHint": "Eşleşen postayı bu asistan yanıtlar. İleti yine de iletilir.",
-    "assistantNone": "Asistan yok — yalnızca ilet",
+    "assistant": "Ajan",
+    "assistantHint": "Eşleşen postayı bu ajan yanıtlar. İleti yine de iletilir.",
+    "assistantNone": "Ajan yok — yalnızca ilet",
     "departmentsDescription": "İşlenen e-postaları iletmek için en fazla 10 hedef e-posta adresi yapılandırın",
     "departmentNote": "En az bir departmanı VARSAYILAN olarak ayarlamalısınız.",
     "emailAddress": "E-posta Adresi:",
@@ -289,14 +289,14 @@
     "title": "MCP Sunucuları",
     "description": "MCP uyumlu herhangi bir araç sunucusunu bağlayın — bir CRM, wiki, talep sistemi, otomasyon platformu veya kendi barındırdığınız bir hizmet. Keşfedilen araçlar görev planlayıcısına sunulur.",
     "clientOnTitle": "MCP çağrıları açık",
-    "clientOnText": "Asistan, MCP veri kaynaklarına izin veren her görevde bağlı sunucuları kullanabilir.",
+    "clientOnText": "Yapay zekâ, MCP veri kaynaklarına izin veren her görevde bağlı sunucuları kullanabilir.",
     "clientOffTitle": "MCP çağrıları kapalı",
-    "clientOffAdminText": "Kayıtlı sunucular burada kalır, ancak siz bu kurulum için bunu açana kadar asistan onları çağırmaz.",
+    "clientOffAdminText": "Kayıtlı sunucular burada kalır, ancak siz bu kurulum için bunu açana kadar yapay zekâ onları çağırmaz.",
     "clientOffUserText": "Bir yöneticinin bunu bu kurulum için açması gerekir. Kayıtlı sunucular o zamana kadar burada kalır.",
     "clientAdminLink": "Sistem Yapılandırmasında aç",
     "clientEnable": "MCP çağrılarını aç",
     "clientToggle": "MCP çağrılarına izin ver",
-    "clientEnabledNotice": "Asistan artık bağlı MCP sunucularını çağırabilir",
+    "clientEnabledNotice": "Yapay zekâ artık bağlı MCP sunucularını çağırabilir",
     "clientDisabledNotice": "MCP çağrıları kapalı — kayıtlı sunucular yerinde kalır",
     "clientUpdateFailed": "MCP ayarı güncellenemedi",
     "listTitle": "Bağlı sunucular",
@@ -344,11 +344,11 @@
     "deleted": "Sunucu kaldırıldı",
     "deleteFailed": "Sunucu kaldırılamadı",
     "deleteTitle": "MCP sunucusunu kaldır",
-    "deleteMessage": "\"{name}\" bağlantısı kaldırılsın mı? Asistan artık bu sunucunun araçlarını kullanamaz.",
+    "deleteMessage": "\"{name}\" bağlantısı kaldırılsın mı? Yapay zekâ artık bu sunucunun araçlarını kullanamaz.",
     "loadFailed": "MCP sunucuları yüklenemedi",
     "usageTitle": "Bu sunucuları hangi görevler kullanabilir",
-    "usageDescription": "Her görev, asistanın yanıt verirken bağlı sunucularınızdan veri çekip çekemeyeceğine kendisi karar verir. Kullanması gereken her görev için etkinleştirin — normal sohbet soruları için bu \"General Chat\" görevidir.",
-    "usageNotUsedWarning": "Bağlı sunucularınız henüz kullanılmıyor: hiçbir görev MCP veri kaynaklarına izin vermiyor. Aşağıda en az bir görevi etkinleştirin, aksi halde asistan bu sunucuları asla çağırmaz.",
+    "usageDescription": "Her görev, yapay zekânın yanıt verirken bağlı sunucularınızdan veri çekip çekemeyeceğine kendisi karar verir. Kullanması gereken her görev için etkinleştirin — normal sohbet soruları için bu \"General Chat\" görevidir.",
+    "usageNotUsedWarning": "Bağlı sunucularınız henüz kullanılmıyor: hiçbir görev MCP veri kaynaklarına izin vermiyor. Aşağıda en az bir görevi etkinleştirin, aksi halde yapay zekâ bu sunucuları asla çağırmaz.",
     "usageOn": "İzinli",
     "usageOff": "Kapalı",
     "usageEnabled": "Bu görev için MCP veri kaynakları etkinleştirildi",
@@ -373,7 +373,7 @@
       "n8n": {
         "name": "n8n",
         "summary": "Otomasyon iş akışları",
-        "hint": "Asistanın otomasyon iş akışlarınızı incelemesi veya tetiklemesi için bir n8n MCP sunucusu bağlayın. n8n örneğinizdeki MCP uç noktası URL'sini ve erişim token'ını yapıştırın."
+        "hint": "Yapay zekânın otomasyon iş akışlarınızı incelemesi veya tetiklemesi için bir n8n MCP sunucusu bağlayın. n8n örneğinizdeki MCP uç noktası URL'sini ve erişim token'ını yapıştırın."
       },
       "notion": {
         "name": "Notion",
@@ -429,7 +429,7 @@
     },
     "savedSignInNotStarted": "\"{name}\" kaydedildi. Oturum açma başlamadı: {reason}",
     "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
-    "allowWriteHint": "Etkinleştirildiğinde asistan, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
+    "allowWriteHint": "Etkinleştirildiğinde yapay zekâ, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
     "writeBadge": "Yazma izinli"
   },
   "messagesGateway": {
@@ -465,7 +465,7 @@
     "saveKeyError": "API anahtarı kaydedilemedi",
     "clearKeySuccess": "API anahtarı kaldırıldı",
     "clearKeyError": "API anahtarı kaldırılamadı",
-    "webSearchLabel": "Bağlı AI asistanları için web araması",
+    "webSearchLabel": "Bağlı AI araçları için web araması",
     "webSearchModeAuto": "Otomatik (önerilen)",
     "webSearchModeSynaplan": "Her zaman Synaplan'ın web aramasını kullan",
     "webSearchModePassthrough": "İsteği AI sağlayıcısına ilet",
@@ -482,7 +482,7 @@
     "knowledgeToolsAll": "Ağ geçidindeki her anahtar",
     "knowledgeToolsOff": "Klasör araması yok",
     "knowledgeToolsHint": "Bir bilgi klasörü sabitlendiğinde, ilk parçalar yetmezse model klasörde yeniden arayabilir ve bir dosya açabilir. Yalnızca Desktop önerilen ayardır.",
-    "visionLabel": "Bağlı AI asistanları için görüntü anlama",
+    "visionLabel": "Bağlı AI araçları için görüntü anlama",
     "visionModeAuto": "Otomatik (önerilen)",
     "visionModeSynaplan": "Her zaman Synaplan'ın görüntü modelini kullan",
     "visionModePassthrough": "Görüntüleri AI sağlayıcısına ilet",
@@ -512,7 +512,7 @@
         },
         "tools": {
           "title": "Araç çağrıları",
-          "description": "Bağlı AI asistanlarının yanıt vermenin dışında neler yapabileceği: çalışma alanınızın araçlarını kullanmak ve web'de arama yapmak."
+          "description": "Bağlı AI araçlarının yanıt vermenin dışında neler yapabileceği: çalışma alanınızın araçlarını kullanmak ve web'de arama yapmak."
         },
         "vision": {
           "title": "Görseller",
@@ -529,8 +529,8 @@
       },
       "activeTools": {
         "title": "Şu anda sizin adınıza çalışıyor",
-        "empty": "Synaplan kendi araçlarından hiçbirini çalıştırmıyor. Bağlı AI asistanları yalnızca kendi programlarının sunduğu araçları alır.",
-        "hint": "Tek bir mesaj bunlardan birini yine de atlayabilir: kendi programı aynı adda bir araç getiriyorsa onu kullanır ve web araması yalnızca asistan istediğinde çalışır. Sayfa okuma, sayfa sınırında durur. Klasör araması yalnızca bir bilgi klasörü sabitliyken çalışır.",
+        "empty": "Synaplan kendi araçlarından hiçbirini çalıştırmıyor. Bağlı AI araçları yalnızca kendi programlarının sunduğu araçları alır.",
+        "hint": "Tek bir mesaj bunlardan birini yine de atlayabilir: kendi programı aynı adda bir araç getiriyorsa onu kullanır ve web araması yalnızca yapay zekâ istediğinde çalışır. Sayfa okuma, sayfa sınırında durur. Klasör araması yalnızca bir bilgi klasörü sabitliyken çalışır.",
         "mcpServers": "ayrıca 1 bağlı araç sunucusunun araçları | ayrıca {count} bağlı araç sunucusunun araçları",
         "tools": {
           "web_search": "Web araması",
@@ -549,25 +549,25 @@
         "description": "Kendi Anthropic anahtarı olmayan kullanıcılar bu örneğin anahtarını kullanır ve maliyet Synaplan bütçelerinden düşülür."
       },
       "mcpTools": {
-        "label": "AI asistanlarının araçlarınızı kullanmasına izin ver",
-        "description": "Synaplan, bağlı araç sunucularınızın araçlarını kendisi çalıştırır ve sonucu asistana geri verir.",
+        "label": "AI araçlarının araçlarınızı kullanmasına izin ver",
+        "description": "Synaplan, bağlı araç sunucularınızın araçlarını kendisi çalıştırır ve sonucu AI aracına geri verir.",
         "noneConfigured": "Henüz bağlı bir araç sunucusu yok. Uygulamalar › Araç sunucuları (MCP) bölümünden ekleyebilirsiniz."
       },
       "mcpWithClientTools": {
         "label": "Aracı aracının kendi araçları olsa da sizinkileri sun",
-        "description": "Claude Code zaten eksiksiz bir araç seti getirir. Bunu yalnızca kendi araçlarınız da sunulacaksa açın — çok uzun bir araç listesi asistanı daha az isabetli yapar."
+        "description": "Claude Code zaten eksiksiz bir araç seti getirir. Bunu yalnızca kendi araçlarınız da sunulacaksa açın — çok uzun bir araç listesi bir AI aracını daha az isabetli yapar."
       },
       "toolRounds": {
         "label": "Mesaj başına en fazla araç turu",
-        "description": "Bir AI asistanının yanıt vermek zorunda kalmadan önce kaç kez araç kullanıp yeniden düşünebileceği. Yüksek değerler daha titiz çalışmaya izin verir ve daha pahalıdır."
+        "description": "Bir AI aracının yanıt vermek zorunda kalmadan önce kaç kez araç kullanıp yeniden düşünebileceği. Yüksek değerler daha titiz çalışmaya izin verir ve daha pahalıdır."
       },
       "webSearchRounds": {
         "label": "Yanıttan önce web aramaları",
-        "description": "Bir mesajda bu kadar aramadan sonra asistan bulduklarından yanıt verir ve her kaynağı adlandırır. Kısa bir soru için 2 yeterlidir. İlk sonuçlar yetmezse yükseltin."
+        "description": "Bir mesajda bu kadar aramadan sonra yapay zekâ bulduklarından yanıt verir ve her kaynağı adlandırır. Kısa bir soru için 2 yeterlidir. İlk sonuçlar yetmezse yükseltin."
       },
       "webFetchPages": {
         "label": "Bir mesajda açılacak sayfalar",
-        "description": "Bir mesajda bu kadar sayfadan sonra asistan daha fazlasını açmaz ve okuduklarından yanıt verir. Normal bir soru için 3 yeterlidir. 0, sayfa açılmadığı anlamına gelir."
+        "description": "Bir mesajda bu kadar sayfadan sonra yapay zekâ daha fazlasını açmaz ve okuduklarından yanıt verir. Normal bir soru için 3 yeterlidir. 0, sayfa açılmadığı anlamına gelir."
       },
       "imageDetail": {
         "label": "Görsel kalitesi",
@@ -584,11 +584,11 @@
       },
       "contextInjection": {
         "label": "Çalışma alanınızdan bilgi ekle",
-        "description": "Synaplan her isteğe çalışma alanınızdan ilgili bilgileri ekler, böylece AI asistanı bağlamınızı bilir."
+        "description": "Synaplan her isteğe çalışma alanınızdan ilgili bilgileri ekler, böylece yapay zekâ bağlamınızı bilir."
       },
       "budgetNotice": {
         "label": "Bütçe azaldığında uyar",
-        "description": "Synaplan bütçeniz neredeyse tükendiğinde AI asistanı yanıtında kısa bir not alır."
+        "description": "Synaplan bütçeniz neredeyse tükendiğinde yapay zekâ yanıtında kısa bir not alır."
       },
       "sessionSummary": {
         "label": "Her oturumun özetini sakla",
@@ -700,7 +700,7 @@
     "kindHints": {
       "email_search": "Bağlı postakutuya bakar.",
       "summarize": "Önceki sonucu kısaltır.",
-      "chat": "Bu görevin asistanını kullanır.",
+      "chat": "Bu görevin yapay zekâsını kullanır.",
       "email_me": "Sana bir e-posta gönderir.",
       "tool_call": "Önceden bağladığın bir aracı çalıştırır.",
       "condition": "Değer uymazsa sonraki adımları durdurur.",
@@ -726,7 +726,7 @@
     "useTemplate": "Şablonu kullan",
     "useTemplateConfirm": "Kendi kopyanız oluşturulsun mu? Siz açana kadar kapalı kalır. Başka bir sistem bunu başlatabiliyorsa yeni bir adres oluşturulur.",
     "useTemplateDone": "Kopya oluşturuldu. Siz açana kadar kapalı.",
-    "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik asistanı, aracı veya bağlantıyı bağlayın.",
+    "useTemplateNeedsSetup": "Kopya oluşturuldu ve kapalı bırakıldı. Açmadan önce eksik ajanı, aracı veya bağlantıyı bağlayın.",
     "useTemplateNeedsSetupItems": "Kopya oluşturuldu ve kapalı bırakıldı. Hâlâ gerekli: {items}.",
     "notionPage": "Notion sayfası",
     "notionPageHint": "Sayfanın bağlantısını yapıştır. Her çalıştırma altına yeni bir sayfa ekler.",
@@ -744,7 +744,7 @@
     "chats": {
       "rail": {
         "title": "Alanlar",
-        "body": "Bu simgeler alanı değiştirir: Sohbetler, Kütüphane, Asistanlar ve Uygulamalar. Yönetim yalnızca bu kurulumu yöneten kişilerde görünür. Bir tıklama o alanın menüsünü yanında açar."
+        "body": "Bu simgeler alanı değiştirir: Sohbetler, Kütüphane, Ajanlar ve Uygulamalar. Yönetim yalnızca bu kurulumu yöneten kişilerde görünür. Bir tıklama o alanın menüsünü yanında açar."
       },
       "new": {
         "title": "Yeni bir sohbet",
@@ -760,17 +760,17 @@
       },
       "model": {
         "title": "Hangi model yanıtlar",
-        "body": "Buradaki ad bu yanıtın modelidir. Başkasını seçmek için dokunun. Herkes için geçerli olanı Asistanlar altında, AI ayarlarında belirlersiniz."
+        "body": "Buradaki ad bu yanıtın modelidir. Başkasını seçmek için dokunun. Herkes için geçerli olanı Ajanlar altında, AI ayarlarında belirlersiniz."
       },
       "search": {
         "title": "Bir şeyi yeniden bulun",
-        "body": "Bu alan sohbetleri, dosyaları, asistanları ve sayfaları arar. Aynı arama her yerden Ctrl+K veya ⌘K ile açılır."
+        "body": "Bu alan sohbetleri, dosyaları, ajanları ve sayfaları arar. Aynı arama her yerden Ctrl+K veya ⌘K ile açılır."
       }
     },
     "chatsGuest": {
       "rail": {
         "title": "Neyi açabilirsiniz",
-        "body": "Misafir olarak Sohbetler’desiniz. Kütüphane, Asistanlar ve Uygulamalar, bir planı veya davet kodu olan bir hesabınız olana kadar kapalı kalır. Bu yüzden her simge henüz çalışmaz."
+        "body": "Misafir olarak Sohbetler’desiniz. Kütüphane, Ajanlar ve Uygulamalar, bir planı veya davet kodu olan bir hesabınız olana kadar kapalı kalır. Bu yüzden her simge henüz çalışmaz."
       },
       "input": {
         "title": "Sadece sorun",
@@ -786,7 +786,7 @@
       },
       "plan": {
         "title": "Önce hesap, sonra plan",
-        "body": "Bir hesabın bir plana veya davet koduna ihtiyacı vardır. Böylece Kütüphane, Asistanlar ve Uygulamalar açılır."
+        "body": "Bir hesabın bir plana veya davet koduna ihtiyacı vardır. Böylece Kütüphane, Ajanlar ve Uygulamalar açılır."
       }
     },
     "library": {
@@ -805,12 +805,12 @@
     },
     "assistants": {
       "create": {
-        "title": "Asistan oluşturun",
-        "body": "Bir asistan talimatları, dosyaları ve araçları hatırlar. Bunu bir kez ayarlarsınız. Onunla her sohbet bunu zaten bilir."
+        "title": "Ajan oluşturun",
+        "body": "Bir ajan talimatları, dosyaları ve araçları hatırlar. Bunu bir kez ayarlarsınız. Onunla her sohbet bunu zaten bilir."
       },
       "gallery": {
         "title": "Liste",
-        "body": "Bunlar zaten sahip olduğunuz asistanlardır. Sohbet etmek, değiştirmek veya ekibinizle paylaşmak için birini açın."
+        "body": "Bunlar zaten sahip olduğunuz ajanlardır. Sohbet etmek, değiştirmek veya ekibinizle paylaşmak için birini açın."
       },
       "more": {
         "title": "Bu menüde de var",
@@ -848,7 +848,7 @@
       },
       "add": {
         "title": "Birini ekleyin",
-        "body": "Bir hesabın bir plana veya davet koduna ihtiyacı vardır. Sonra kişi burada görünür ve Kütüphane, Asistanlar ve Uygulamaları kullanabilir."
+        "body": "Bir hesabın bir plana veya davet koduna ihtiyacı vardır. Sonra kişi burada görünür ve Kütüphane, Ajanlar ve Uygulamaları kullanabilir."
       },
       "menu": {
         "title": "Yönetim sayfaları",
@@ -870,8 +870,8 @@
           "where": "Yapay zekanın daha sonra yanıtlayabileceği bir belge veya fotoğraf."
         },
         "assistant": {
-          "title": "Asistan oluşturun",
-          "where": "Talimatları, dosyaları ve araçları bir kez ayarlayın. Bu asistanla her sohbet bunları zaten bilir."
+          "title": "Ajan oluşturun",
+          "where": "Talimatları, dosyaları ve araçları bir kez ayarlayın. Bu ajanla her sohbet bunları zaten bilir."
         },
         "app": {
           "title": "Bir uygulama bağlayın",
@@ -937,19 +937,19 @@
     "items": {
       "telegram": {
         "name": "Telegram",
-        "tagline": "Telegram'da asistanınızla sohbet edin.",
-        "about": "Kendi Telegram botunuz asistanınızla yanıt verir. Yalnızca sizin mesajlarınız Synaplan'a ulaşır; botu başka kimse kullanamaz.",
+        "tagline": "Telegram'da ajanınızla sohbet edin.",
+        "about": "Kendi Telegram botunuz ajanınızla yanıt verir. Yalnızca sizin mesajlarınız Synaplan'a ulaşır; botu başka kimse kullanamaz.",
         "stop": "Aşağıdan bağlantıyı kesin. Bot hemen yanıt vermeyi bırakır."
       },
       "whatsapp": {
         "name": "WhatsApp",
         "tagline": "Synaplan'a WhatsApp'tan sorun.",
-        "about": "Telefon numaranızı doğrulayın, ardından Synaplan numarasına yazın. Aşağıda seçtiğiniz asistan yanıt verir.",
-        "stop": "Aşağıda asistan seçmeyin veya doğrulanmış numaranızı kaldırın."
+        "about": "Telefon numaranızı doğrulayın, ardından Synaplan numarasına yazın. Aşağıda seçtiğiniz ajan yanıt verir.",
+        "stop": "Aşağıda ajan seçmeyin veya doğrulanmış numaranızı kaldırın."
       },
       "widgets": {
         "name": "Sohbet widget'ları",
-        "tagline": "Web sitenize bir AI asistanı ekleyin."
+        "tagline": "Web sitenize bir AI sohbeti ekleyin."
       },
       "email": {
         "name": "Synaplan'a e-posta",
@@ -965,7 +965,7 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Asistanınız için Outlook e-postası ve takvimi.",
+        "tagline": "Ajanınız için Outlook e-postası ve takvimi.",
         "about": "Microsoft ile oturum açtıktan sonra yapay zeka Outlook e-postalarınızı okuyabilir, takviminize etkinlik ekleyebilir ve sonuçları kendi posta kutunuzdan gönderebilir.",
         "stop": "Aşağıdan bağlantıyı kaldırın. Erişim hemen sona erer."
       },
@@ -983,19 +983,19 @@
       },
       "nextcloud": {
         "name": "Nextcloud'da Synaplan",
-        "tagline": "Asistanlarınızı Nextcloud içinde kullanın.",
+        "tagline": "Ajanlarınızı Nextcloud içinde kullanın.",
         "about": "Nextcloud'a Synaplan uygulamasını kurun ve orada oturum açın. Nextcloud bu hesabı kullanır; hiçbir zaman anahtar kopyalamazsınız.",
         "stop": "Aşağıdaki listede sunucunun bağlantısını kesin."
       },
       "owncloud": {
         "name": "ownCloud'da Synaplan",
-        "tagline": "Asistanlarınızı ownCloud içinde kullanın.",
+        "tagline": "Ajanlarınızı ownCloud içinde kullanın.",
         "about": "ownCloud'a Synaplan uygulamasını kurun ve orada oturum açın. ownCloud bu hesabı kullanır; hiçbir zaman anahtar kopyalamazsınız.",
         "stop": "Aşağıdaki listede sunucunun bağlantısını kesin."
       },
       "outlook": {
         "name": "Outlook'ta Synaplan",
-        "tagline": "Outlook'ta asistanınızla e-postaları yanıtlayın ve özetleyin.",
+        "tagline": "Outlook'ta ajanınızla e-postaları yanıtlayın ve özetleyin.",
         "about": "Outlook'a Synaplan eklentisini ekleyin ve orada oturum açın. Eklenti bu hesabı kullanır.",
         "stop": "Aşağıdaki listeden bağlantısını kesin."
       },
@@ -1032,7 +1032,7 @@
       },
       "desktop": {
         "name": "Synaplan Desktop",
-        "tagline": "Asistanınız bilgisayarınızdaki dosyalarla çalışsın.",
+        "tagline": "Ajanınız bilgisayarınızdaki dosyalarla çalışsın.",
         "about": "Masaüstü uygulamasını bir kodla eşleyin. Sohbetten başlattığınız işleri kendi bilgisayarınızda çalıştırır.",
         "stop": "Aşağıdan cihazı kaldırın. Çalışan işler iptal edilir."
       },

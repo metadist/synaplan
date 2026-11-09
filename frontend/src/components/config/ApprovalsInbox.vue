@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import PageHeader from '@/components/PageHeader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { isSavedTasksEnabled } from '@/composables/useSavedTasksFeature'
@@ -12,14 +12,15 @@ import { approvalsApi, type Approval } from '@/services/api/approvalsApi'
 import { ApiError } from '@/services/api/httpClient'
 import { useDateFormat } from '@/composables/useDateFormat'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
+import { useFocusedApproval } from '@/composables/useFocusedApproval'
 
 const { t, te } = useI18n()
 const { formatDateTime } = useDateFormat()
-const route = useRoute()
 const router = useRouter()
 const store = useApprovalsStore()
 const { success, error: showError } = useNotification()
 const tab = ref<'pending' | 'decided'>('pending')
+const { focusedApproval, openFocusedApproval, rows } = useFocusedApproval(tab)
 const notifyMode = ref<'instant' | 'digest'>('instant')
 const mailConfigured = ref(true)
 
@@ -27,7 +28,7 @@ onMounted(async () => {
   if (!isApprovalsEnabled()) {
     return
   }
-  await store.load('pending')
+  await openFocusedApproval()
   try {
     const setting = await approvalsApi.getNotifyMode()
     notifyMode.value = setting.mode
@@ -35,19 +36,6 @@ onMounted(async () => {
   } catch {
     // Setting is optional; inbox still works.
   }
-})
-
-const taskFilter = computed(() => {
-  const raw = route.query.task
-  if (typeof raw !== 'string' || raw === '') return null
-  const id = Number(raw)
-  return Number.isFinite(id) ? id : null
-})
-
-const rows = computed(() => {
-  const list = tab.value === 'pending' ? store.pending : store.decided
-  if (taskFilter.value === null) return list
-  return list.filter((row) => row.requestedBy.taskId === taskFilter.value)
 })
 
 const switchTab = async (next: 'pending' | 'decided') => {
@@ -74,7 +62,7 @@ const openContext = (approval: Approval) => {
     return
   }
   if (ref.kind === 'agent_publish' && ref.agentId) {
-    void router.push({ path: `/ai/assistants/${ref.agentId}` })
+    void router.push({ path: `/ai/agents/${ref.agentId}` })
   }
 }
 
@@ -82,6 +70,7 @@ const onApprove = async (id: number, alwaysAllow = false) => {
   const row = rows.value.find((item) => item.id === id)
   try {
     await store.approve(id, alwaysAllow)
+    if (focusedApproval.value?.id === id) focusedApproval.value = null
     success(
       row?.tool === 'agent.publish'
         ? t('approvals.sharedWithEveryone')
@@ -102,6 +91,7 @@ const onReject = async (id: number, reason?: string) => {
   const row = rows.value.find((item) => item.id === id)
   try {
     await store.reject(id, reason)
+    if (focusedApproval.value?.id === id) focusedApproval.value = null
     success(
       row?.tool === 'agent.publish' ? t('approvals.sentBackToast') : t('approvals.rejectedToast')
     )
@@ -200,9 +190,9 @@ const decidedLine = (row: Approval): string => {
     </p>
 
     <ul class="space-y-3">
-      <li v-for="row in rows" :key="row.id">
+      <li v-for="row in rows" :key="row.id" :data-testid="`approval-row-${row.id}`">
         <ApprovalCard
-          v-if="tab === 'pending'"
+          v-if="tab === 'pending' && row.canDecide !== false"
           :approval="row"
           :can-always-allow="row.canAlwaysAllow"
           show-open-context
@@ -217,6 +207,7 @@ const decidedLine = (row: Approval): string => {
             {{ decidedLine(row) || statusLabel(row.status) }}
           </p>
           <button
+            v-if="row.canDecide !== false"
             type="button"
             class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
             data-testid="approval-open-context"

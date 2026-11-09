@@ -254,7 +254,7 @@
     "tabFiles": "Archivos",
     "tabSearch": "Búsqueda",
     "tabVectors": "Vectores",
-    "intro": "Los archivos marcados como consultables por IA se pueden usar en chats y asistentes.",
+    "intro": "Los archivos marcados como consultables por IA se pueden usar en chats y agentes.",
     "introCta": "Añade archivos a tus fuentes…",
     "useInChat": "Usar en el chat",
     "startedChatWithFolder": "Se inició un chat nuevo con {folder}.",
@@ -365,9 +365,9 @@
       "noGroup": "Sin grupo"
     },
     "help": {
-      "vectorized": "Cuando un archivo es consultable por IA, su contenido se añade a tu base de conocimiento para que el asistente pueda usarlo al responderte.",
-      "notSearchable": "El asistente aún no puede usar este archivo en las respuestas. Hazlo consultable para añadirlo a tu conocimiento.",
-      "processing": "Este archivo se está preparando para que el asistente pueda usarlo.",
+      "vectorized": "Cuando un archivo es consultable por IA, su contenido se añade a tu base de conocimiento para que la IA pueda usarlo al responderte.",
+      "notSearchable": "La IA aún no puede usar este archivo en las respuestas. Hazlo consultable para añadirlo a tu conocimiento.",
+      "processing": "Este archivo se está preparando para que la IA pueda usarlo.",
       "failed": "No se pudo hacer consultable este archivo. Puedes intentarlo de nuevo.",
       "group": "Las carpetas de conocimiento agrupan archivos. Cuando la IA busca en una carpeta, puede usar cada archivo.",
       "source": "De dónde viene este archivo: una subida, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, el widget, la API o generado por IA.",
@@ -464,7 +464,7 @@
       "loadMore": "Cargar más"
     },
     "explainer": {
-      "text": "Todo lo que subes o creas está aquí. El asistente puede usar los archivos marcados como consultables por IA. Fotos, grabaciones y archivos creados por IA necesitan que los hagas consultables primero.",
+      "text": "Todo lo que subes o creas está aquí. La IA puede usar los archivos marcados como consultables por IA. Fotos, grabaciones y archivos creados por IA necesitan que los hagas consultables primero.",
       "dismiss": "Entendido",
       "reopen": "¿Qué es esto?"
     },

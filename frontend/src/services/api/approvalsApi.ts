@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { httpClient } from './httpClient'
 import {
   GetApiApprovalsListResponseSchema,
+  GetApiApprovalsShowResponseSchema,
   GetApiApprovalsNotifyGetResponseSchema,
   PatchApiApprovalsNotifyPatchResponseSchema,
   PostApiApprovalsApproveResponseSchema,
@@ -20,6 +21,13 @@ export const approvalsApi = {
       schema: GetApiApprovalsListResponseSchema,
     })
     return { pendingCount: data.pendingCount, approvals: data.approvals }
+  },
+
+  async get(id: number): Promise<Approval> {
+    const data = await httpClient(`/api/v1/approvals/${id}`, {
+      schema: GetApiApprovalsShowResponseSchema,
+    })
+    return data.approval
   },
 
   async approve(id: number, alwaysAllow = false, assistantKey?: string): Promise<Approval> {

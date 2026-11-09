@@ -530,11 +530,11 @@
         "BRAVE_SEARCH_ENABLED": "Websuche einschalten",
         "BRAVE_SEARCH_API_KEY": "Brave-Search-API-Schlüssel",
         "BRAVE_SEARCH_COUNT": "Treffer pro Suche",
-        "MEDIA_ASYNC_JOBS_ENABLED": "Bilder, Videos und Audio im Hintergrund erzeugen, damit der Chat nicht blockiert. Der Assistent zeigt den Status live und eine Meldung, wenn es fertig ist. Aus: die Antwort wartet, bis die Datei da ist. Braucht den Worker-Container.",
-        "COMPUTE_ENABLED": "Der Assistent darf kurze Dateiarbeit (Python oder Node) auf Kopien der von dir gewählten Dateien machen. Braucht den Compute-Sidecar (COMPUTE_URL + COMPUTE_TOKEN). Ein lokales docker compose up startet den Sidecar und schaltet das ein.",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Bilder, Videos und Audio im Hintergrund erzeugen, damit der Chat nicht blockiert. Die KI zeigt den Status live und eine Meldung, wenn es fertig ist. Aus: die Antwort wartet, bis die Datei da ist. Braucht den Worker-Container.",
+        "COMPUTE_ENABLED": "Die KI darf kurze Dateiarbeit (Python oder Node) auf Kopien der von dir gewählten Dateien machen. Braucht den Compute-Sidecar (COMPUTE_URL + COMPUTE_TOKEN). Ein lokales docker compose up startet den Sidecar und schaltet das ein.",
         "COMPUTE_REQUIRE_TIER": "Mindest-Isolierung, die der Sidecar melden muss, bevor Dateiarbeit an geht: Standard (normales Docker), Starke Isolierung (gVisor) oder Virtuelle Maschine (microVM). Synaplan Cloud verlangt starke Isolierung.",
-        "COMPUTE_WORKSPACES_ENABLED": "Einen Ordner zwischen den Läufen behalten, damit der Assistent frühere Dateiarbeit fortsetzen kann. Dateien → Arbeitsbereich zeigt den Inhalt. Dateiarbeit selbst muss ebenfalls an sein.",
-        "COMPUTE_EGRESS_ENABLED": "Ein Dateiarbeits-Lauf darf eine kurze Liste öffentlicher Websites holen, die der Assistent genannt hat. Standardmäßig aus — Läufe bleiben offline. Private oder lokale Adressen werden immer abgelehnt. Nur einschaltbar, wenn der Sidecar Website-Zugriff anbietet.",
+        "COMPUTE_WORKSPACES_ENABLED": "Einen Ordner zwischen den Läufen behalten, damit die KI frühere Dateiarbeit fortsetzen kann. Dateien → Arbeitsbereich zeigt den Inhalt. Dateiarbeit selbst muss ebenfalls an sein.",
+        "COMPUTE_EGRESS_ENABLED": "Ein Dateiarbeits-Lauf darf eine kurze Liste öffentlicher Websites holen, die die KI genannt hat. Standardmäßig aus — Läufe bleiben offline. Private oder lokale Adressen werden immer abgelehnt. Nur einschaltbar, wenn der Sidecar Website-Zugriff anbietet.",
         "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Wenn ein Lauf ins Web geht, zuerst die Besitzerin oder den Besitzer fragen — auch wenn alltägliche Dateiarbeit sonst automatisch liefe. Standardmäßig an.",
         "COMPUTE_EGRESS_MAX_HOSTS": "Wie viele Websites ein Dateiarbeits-Lauf nennen darf. Standard 8.",
         "COMPUTE_DEFAULT_TIMEOUT_SEC": "Standard-Sekunden, die ein Dateiarbeits-Lauf dauern darf.",
@@ -543,8 +543,8 @@
         "COMPUTE_DEFAULT_PIDS": "Standard-Prozesslimit für einen Dateiarbeits-Lauf.",
         "COMPUTE_DEFAULT_OUTPUT_MB": "Standard-Größenlimit in Megabyte für Dateien, die der Lauf anlegen darf.",
         "COMPUTE_MAX_TIMEOUT_SEC": "Harte Obergrenze in Sekunden für einen Dateiarbeits-Lauf.",
-        "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Assistent kann das nicht lockern.",
-        "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Assistent kann das nicht lockern.",
+        "COMPUTE_POLICY_INTERACTIVE": "Wenn die Person da ist (Chat oder ein laufender API-Aufruf): Dateiarbeit automatisch ausführen, zuerst fragen oder nie ausführen. Ein Agent kann das nicht lockern.",
+        "COMPUTE_POLICY_UNATTENDED": "Wenn eine gespeicherte Aufgabe Dateiarbeit allein ausführt: zuerst fragen (Standard), automatisch ausführen oder nie ausführen. Ein Agent kann das nicht lockern.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Wie viele Tage ein Dateiarbeits-Ordner ungenutzt liegen darf, bevor die Bereinigung ihn entfernen kann. Standard 90.",
         "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop unter Apps › Synaplan Desktop. Ein verbundener Computer kann in der App chatten und wartende Aufgaben übernehmen. Wenn der Schalter aus ist, ist die Seite ausgeblendet, neue Computer lassen sich nicht verbinden, die App kann nicht chatten, und wartende Aufgaben werden nicht übernommen, bis der Schalter wieder an ist. Es gibt noch kein Installationsprogramm — die App wird aus dem Quell-Repository gebaut.",
         "FEATURE_SEARCH_AI_ENABLED": "KI-Hilfe in der Suchpalette (Strg/Cmd+K): Bei einer Frage in normalen Worten wählt das Tools-Modell den passendsten Treffer und begründet ihn in einem Satz. Es ändert selbst nichts. Jede Nutzung ist ein kurzer KI-Aufruf. Aus: Stichwort- und Bedeutungssuche bleiben."
@@ -1110,7 +1110,7 @@
       "resourceKind": {
         "conversation": "Chat",
         "knowledge_folder": "Ordner",
-        "assistant": "KI-Assistent",
+        "assistant": "Thema",
         "saved_task": "Gespeicherte Aufgabe",
         "widget": "Chat-Widget",
         "agent": "Agent",
@@ -1159,12 +1159,37 @@
         "admin_user_level_change": "Benutzer-Level geändert",
         "messages_gateway_flags": "Gateway-Einstellungen geändert",
         "messages_gateway_upstream": "Gateway-Adresse geändert",
-        "messages_gateway_aliases": "Modell-Aliase geändert"
+        "messages_gateway_aliases": "Modell-Aliase geändert",
+        "tool_executed": "Werkzeugaufrufe"
       },
       "what": "Was passiert ist",
       "emptyNote": "Dieses Protokoll hält fest, wer was getan hat. Es öffnet keine Chat- oder Dateiinhalte.",
       "someone": "Jemand",
       "anItem": "ein Element",
+      "tool": {
+        "empty": "Es sind noch keine Werkzeugaufrufe aufgezeichnet.",
+        "emptyAction": "Freigaben öffnen",
+        "approvalLink": "Freigabe #{id}",
+        "unnamed": "ein Werkzeug",
+        "outcome": {
+          "done": "Erledigt",
+          "failed": "Es ist fehlgeschlagen",
+          "refused": "Es wurde abgelehnt",
+          "needs_approval": "Es wartet auf eine Freigabe",
+          "timed_out": "Die Zeit ist abgelaufen",
+          "other": "Abgeschlossen"
+        },
+        "source": {
+          "document": "{who} hat ein Dokument mit {tool} bearbeitet. {outcome}.",
+          "mcp": "{who} hat {tool} auf einem verbundenen Server ausgeführt. {outcome}.",
+          "custom": "{who} hat {tool} aufgerufen. {outcome}.",
+          "compute": "{who} hat Code mit {tool} ausgeführt. {outcome}.",
+          "skill": "{who} hat die Fertigkeit {tool} verwendet. {outcome}.",
+          "plugin": "{who} hat ein App-Werkzeug verwendet, {tool}. {outcome}.",
+          "builtin": "{who} hat ein eingebautes Werkzeug verwendet, {tool}. {outcome}.",
+          "unknown": "{who} hat {tool} ausgeführt. {outcome}."
+        }
+      },
       "sentence": {
         "shareGrant": "{who} hat „{resource}“ mit {subject} geteilt.",
         "shareRevoke": "{who} hat die Freigabe von „{resource}“ für {subject} beendet.",
@@ -1294,12 +1319,12 @@
         "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor",
         "CHAT_EXPORT_ENABLED": "Chats exportieren",
         "CHAT_SHARE_ENABLED": "Chats teilen",
-        "AGENTS_PUBLISH_REVIEW": "Prüfung, bevor ein Assistent mit allen geteilt wird"
+        "AGENTS_PUBLISH_REVIEW": "Prüfung, bevor ein Agent mit allen geteilt wird"
       }
     },
     "intro": {
       "users": "Alle mit einem Konto hier. Stufe ändern, Adresse bestätigen oder ein Konto abschalten.",
-      "groups": "Gruppen fassen Benutzer zusammen, damit du Assistenten teilen und Regeln einmal für alle festlegen kannst.",
+      "groups": "Gruppen fassen Benutzer zusammen, damit du Agenten teilen und Regeln einmal für alle festlegen kannst.",
       "policies": "Richtlinien legen fest, was eine Gruppe nutzen darf, zum Beispiel welche Funktionen oder Modelle.",
       "moderation": "Von Benutzern gemeldete Inhalte. Prüfe sie und behalte oder entferne sie.",
       "audit": "Ein Protokoll, wer was auf diesem Server geändert hat, neueste zuerst.",
@@ -1356,14 +1381,14 @@
     "owner": "Eigentümer",
     "fileUnavailable": "Diese Datei ist nicht mehr verfügbar.",
     "kind": {
-      "assistant": "KI-Assistent",
+      "assistant": "Thema",
       "saved_task": "Gespeicherte Aufgabe",
       "widget": "Chat-Widget"
     },
     "runCopy": "Als meine Kopie ausführen",
     "runCopyConfirm": "Eine eigene Kopie dieser gespeicherten Aufgabe anlegen? Sie läuft nur, wenn Sie sie starten.",
-    "assistantNotShared": "Der KI-Assistent dieser Aufgabe ist nicht mit Ihnen geteilt.",
-    "assistantNotSharedNamed": "Der KI-Assistent „{name}“ ist nicht mit Ihnen geteilt. Bitten Sie die Person, die ihn besitzt, ihn zu teilen, und versuchen Sie es erneut.",
+    "assistantNotShared": "Der KI-Agent dieser Aufgabe ist nicht mit Ihnen geteilt.",
+    "assistantNotSharedNamed": "Der KI-Agent „{name}“ ist nicht mit Ihnen geteilt. Bitten Sie die Person, die ihn besitzt, ihn zu teilen, und versuchen Sie es erneut.",
     "sharedBy": "Von {name}",
     "continueAsCopy": "Als meine Kopie fortsetzen",
     "continueFailed": "Ihre Kopie konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
@@ -1377,9 +1402,9 @@
         "sourceDirect": "Dieser Ordner gehört {owner}. Er wurde persönlich mit Ihnen geteilt."
       },
       "assistant": {
-        "sourceGroup": "Dieser Assistent gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
-        "sourceEveryone": "Dieser Assistent gehört {owner}. Er wurde mit allen geteilt, die ein Konto haben.",
-        "sourceDirect": "Dieser Assistent gehört {owner}. Er wurde persönlich mit Ihnen geteilt."
+        "sourceGroup": "Dieser Agent gehört {owner}. Er hat Sie über die Gruppe „{name}“ erreicht.",
+        "sourceEveryone": "Dieser Agent gehört {owner}. Er wurde mit allen geteilt, die ein Konto haben.",
+        "sourceDirect": "Dieser Agent gehört {owner}. Er wurde persönlich mit Ihnen geteilt."
       },
       "saved_task": {
         "sourceGroup": "Diese gespeicherte Aufgabe gehört {owner}. Sie hat Sie über die Gruppe „{name}“ erreicht.",
@@ -1439,8 +1464,8 @@
         },
         "assistant": {
           "read": "Darf ansehen — sie können die Karte sehen und sie klonen.",
-          "use": "Darf nutzen — sie können einen Chat mit diesem Assistenten starten.",
-          "edit": "Darf bearbeiten — sie können diesen Assistenten ändern."
+          "use": "Darf nutzen — sie können einen Chat mit diesem Agenten starten.",
+          "edit": "Darf bearbeiten — sie können diesen Agenten ändern."
         },
         "saved_task": {
           "read": "Darf ansehen — sie können die Karte sehen.",
@@ -1455,7 +1480,7 @@
       "find": {
         "conversation": "Sie finden ihn unter Eingehende Chats.",
         "knowledge_folder": "Er erscheint bei ihnen unter Quellen als geteilt.",
-        "assistant": "Sie finden ihn unter Assistenten → Mit mir geteilt.",
+        "assistant": "Sie finden ihn unter Agenten → Mit mir geteilt.",
         "saved_task": "Sie können sie unter Automatisierungen als Vorlage nutzen.",
         "widget": "Sie finden es unter Chat-Widgets."
       }

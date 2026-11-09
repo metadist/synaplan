@@ -11,7 +11,7 @@
             <button
               v-if="canGoBack"
               type="button"
-              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
+              class="btn-secondary inline-flex shrink-0 items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium"
               data-testid="btn-memories-back"
               @click="router.back()"
             >
@@ -20,7 +20,7 @@
             </button>
             <!-- View Toggle -->
             <div
-              class="flex flex-wrap items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto"
+              class="flex max-w-full flex-wrap items-center gap-2 surface-chip p-1 rounded-lg w-full sm:w-auto"
             >
               <button
                 class="flex-1 sm:flex-none px-3 md:px-4 py-2 rounded-xl transition-colors text-sm nav-item"

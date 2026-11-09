@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\PlatformLink;
 
+use App\Entity\PlatformInstance;
 use App\Repository\PlatformInstanceRepository;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 
@@ -13,7 +14,6 @@ use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 final readonly class DeliveryAddressService
 {
     public function __construct(
-        private PlatformInstanceService $instances,
         private PlatformInstanceRepository $platforms,
         private DeliveryOriginPolicy $origins,
         private DeliveryProbe $probe,
@@ -27,16 +27,13 @@ final readonly class DeliveryAddressService
      * @return array{delivery_url: string, app_capabilities: list<string>, reachable: ?bool, oidc_client_id: string, app_version: string, server_id: string}
      */
     public function update(
-        string $instanceId,
-        string $secret,
+        PlatformInstance $instance,
         ?string $url,
         ?array $capabilities,
         ?string $oidcClientId = null,
         ?string $appVersion = null,
         ?string $serverId = null,
     ): array {
-        $instance = $this->instances->requireInstance($instanceId);
-        $this->instances->assertSecret($instance, $secret);
         if (null !== $url) {
             $url = trim($url);
             if ('' === $url) {

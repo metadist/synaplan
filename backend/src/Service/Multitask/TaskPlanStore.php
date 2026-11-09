@@ -235,13 +235,13 @@ final readonly class TaskPlanStore
      * All persisted nodes for a message, including hidden assembler nodes.
      * Used to rehydrate a DAG resume.
      *
-     * @return list<array{nodeId: string, status: string, text: ?string, error: ?string}>
+     * @return list<array{nodeId: string, status: string, text: ?string, url: ?string, type: ?string, jobKey: ?string, error: ?string}>
      */
     public function loadRows(int $messageId): array
     {
         try {
             $rows = $this->connection->fetchAllAssociative(
-                'SELECT BNODEID, BSTATUS, BRESULTREF, BERROR FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
+                'SELECT BNODEID, BSTATUS, BRESULTREF, BERROR, BJOBKEY FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
                 [$messageId],
             );
         } catch (\Throwable $e) {
@@ -257,10 +257,14 @@ final readonly class TaskPlanStore
         foreach ($rows as $row) {
             $decoded = $this->decodeResultPayload($row['BRESULTREF'] ?? null);
             $error = $row['BERROR'] ?? null;
+            $jobKey = $row['BJOBKEY'] ?? null;
             $out[] = [
                 'nodeId' => (string) $row['BNODEID'],
                 'status' => (string) $row['BSTATUS'],
                 'text' => is_string($decoded['text'] ?? null) ? $decoded['text'] : null,
+                'url' => is_string($decoded['url'] ?? null) ? $decoded['url'] : null,
+                'type' => is_string($decoded['type'] ?? null) ? $decoded['type'] : null,
+                'jobKey' => is_string($jobKey) && '' !== $jobKey ? $jobKey : null,
                 'error' => is_string($error) && '' !== $error ? $error : null,
             ];
         }
