@@ -445,6 +445,29 @@ class ModelCatalog
             'successor' => 'google:gemini-3.5-flash-lite:pic2text',
             'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01.',
         ],
+
+        // --- 2026-10-22 (Gemini API: Veo 3.1 preview shutdown) ---
+        // Google stopped serving these three ids on 2026-10-22. A request that
+        // still names one gets a 404. Gemini Omni Flash is the Gemini API
+        // replacement and is already in this catalog.
+        45 => [
+            'providerId' => 'veo-3.1-generate-preview',
+            'retiredOn' => '2026-10-22',
+            'successor' => 'google:gemini-omni-1.2-flash:text2vid',
+            'reason' => 'Shut down by Google on 2026-10-22. Migrate to Gemini Omni Flash.',
+        ],
+        195 => [
+            'providerId' => 'veo-3.1-fast-generate-preview',
+            'retiredOn' => '2026-10-22',
+            'successor' => 'google:gemini-omni-1.2-flash:text2vid',
+            'reason' => 'Shut down by Google on 2026-10-22. Migrate to Gemini Omni Flash.',
+        ],
+        196 => [
+            'providerId' => 'veo-3.1-lite-generate-preview',
+            'retiredOn' => '2026-10-22',
+            'successor' => 'google:gemini-omni-1.2-flash:text2vid',
+            'reason' => 'Shut down by Google on 2026-10-22. Migrate to Gemini Omni Flash.',
+        ],
     ];
 
     /**
@@ -2941,8 +2964,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Veo 3.1 Standard',
             'tag' => 'text2vid',
-            'selectable' => 1,
-            'active' => 1,
+            // Shut down 2026-10-22. See ModelCatalog::RETIREMENTS[45].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'veo-3.1-generate-preview',
             'priceIn' => 0,
             'inUnit' => '-',
@@ -2973,8 +2997,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Veo 3.1 Fast',
             'tag' => 'text2vid',
-            'selectable' => 1,
-            'active' => 1,
+            // Shut down 2026-10-22. See ModelCatalog::RETIREMENTS[195].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'veo-3.1-fast-generate-preview',
             'priceIn' => 0,
             'inUnit' => '-',
@@ -3000,8 +3025,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Veo 3.1 Lite',
             'tag' => 'text2vid',
-            'selectable' => 1,
-            'active' => 1,
+            // Shut down 2026-10-22. See ModelCatalog::RETIREMENTS[196].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'veo-3.1-lite-generate-preview',
             'priceIn' => 0,
             'inUnit' => '-',
@@ -3900,28 +3926,27 @@ class ModelCatalog
         [
             'id' => 359,
             'service' => 'Google',
-            'name' => 'Gemini Omni Flash',
+            'name' => 'Gemini Omni 1.2 Flash',
             'tag' => 'text2vid',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'gemini-omni-1.1-flash',
+            'providerId' => 'gemini-omni-1.2-flash',
             'priceIn' => 0,
             'inUnit' => '-',
-            // Google bills Omni video at $17.50/1M output tokens, 5792 tokens
-            // per second of 720p ≈ $0.10/sec. Only 720p is catalogued because
-            // no official per-tier table is published for 1080p/4K.
-            'priceOut' => 0.10,
+            // Google bills Omni 1.2 video at $12/1M output tokens, 5792 tokens
+            // per second of 720p ≈ $0.07/sec. 720p is the default tier.
+            'priceOut' => 0.07,
             'outUnit' => 'persec',
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Gemini Omni 1.1 Flash - video generation and conversational editing with native audio via the Interactions API. 720p: $0.10/sec. 3-10 second clips.',
-                'params' => ['model' => 'gemini-omni-1.1-flash'],
+                'description' => 'Google Gemini Omni 1.2 Flash - video generation and conversational editing with native audio via the Interactions API. Replaces Veo 3.1 preview. 720p: $0.07/sec. 3-15 second clips.',
+                'params' => ['model' => 'gemini-omni-1.2-flash'],
                 'pricing_mode' => 'per_second',
                 'allowed_resolutions' => ['720p'],
                 'default_resolution' => '720p',
                 'resolution_prices' => [
-                    '720p' => 0.10,
+                    '720p' => 0.07,
                 ],
                 'default_duration' => 8,
                 'max_duration' => 10,

@@ -1847,11 +1847,11 @@ class ModelCatalogTest extends TestCase
         $this->assertSame('per_image', $bananaLite[0]['json']['pricing_mode'] ?? null);
         $this->assertEqualsWithDelta(0.0336, (float) $bananaLite[0]['priceOut'], 1e-9);
 
-        $omni = ModelCatalog::find('google:gemini-omni-1.1-flash:text2vid');
+        $omni = ModelCatalog::find('google:gemini-omni-1.2-flash:text2vid');
         $this->assertCount(1, $omni);
         $this->assertSame(359, $omni[0]['id']);
         $this->assertSame('per_second', $omni[0]['json']['pricing_mode'] ?? null);
-        $this->assertEqualsWithDelta(0.10, (float) $omni[0]['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.07, (float) $omni[0]['priceOut'], 1e-9);
         $this->assertSame(['720p'], $omni[0]['json']['allowed_resolutions'] ?? null);
 
         $stt = ModelCatalog::find('google:gemini-3.5-transcribe:sound2text');

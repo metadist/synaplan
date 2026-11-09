@@ -108,6 +108,35 @@ final class ModelCatalogRetirementTest extends TestCase
     }
 
     /**
+     * Google shut the three Veo 3.1 preview ids down on 2026-10-22. Gemini Omni
+     * Flash is the Gemini API replacement already in the catalog.
+     */
+    public function testTheVeo31PreviewRowsRetireToGeminiOmniFlash(): void
+    {
+        $omni = ModelCatalog::findBidByKey('google:gemini-omni-1.2-flash:text2vid');
+        self::assertSame(359, $omni);
+
+        foreach ([
+            45 => 'veo-3.1-generate-preview',
+            195 => 'veo-3.1-fast-generate-preview',
+            196 => 'veo-3.1-lite-generate-preview',
+        ] as $bid => $providerId) {
+            $record = ModelCatalog::retirement($bid);
+            self::assertNotNull($record, $providerId.' must be retired');
+            self::assertSame($providerId, $record['providerId']);
+            self::assertSame('2026-10-22', $record['retiredOn']);
+            self::assertSame('google:gemini-omni-1.2-flash:text2vid', $record['successor']);
+            self::assertSame($omni, ModelCatalog::successorBid($bid));
+        }
+
+        self::assertFalse(ModelCatalog::isRetired(359));
+        self::assertSame(
+            359,
+            \App\Seed\DefaultModelConfigSeeder::getRecommendedDefaults()['TEXT2VID'],
+        );
+    }
+
+    /**
      * A retirement whose row is still active is worse than no retirement: the
      * registry claims the model is dead while the seeder keeps shipping it as
      * usable. The catalog derives the flags from the registry, so this asserts

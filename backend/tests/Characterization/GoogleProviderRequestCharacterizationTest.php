@@ -283,11 +283,11 @@ final class GoogleProviderRequestCharacterizationTest extends TestCase
             ],
             'video.veo_start_disallowed_resolution' => [
                 'responses' => [self::json(['name' => 'models/veo-3.1-generate-preview/operations/op-2'])],
-                'call' => static fn (GoogleProvider $p): array => $p->startVideoOperation('A drone shot', ['duration' => '7', 'resolution' => '4K', 'modelConfig' => ['allowed_resolutions' => ['720p', '1080p'], 'default_resolution' => '720p']]),
+                'call' => static fn (GoogleProvider $p): array => $p->startVideoOperation('A drone shot', ['model' => 'veo-3.1-generate-preview', 'duration' => '7', 'resolution' => '4K', 'modelConfig' => ['allowed_resolutions' => ['720p', '1080p'], 'default_resolution' => '720p']]),
             ],
             'video.veo_start_error' => [
                 'responses' => [self::json(['error' => ['code' => 400, 'message' => 'Unsupported aspect ratio.']], 400)],
-                'call' => static fn (GoogleProvider $p): array => $p->startVideoOperation('A drone shot', ['aspect_ratio' => '1:1']),
+                'call' => static fn (GoogleProvider $p): array => $p->startVideoOperation('A drone shot', ['model' => 'veo-3.1-generate-preview', 'aspect_ratio' => '1:1']),
             ],
             'video.omni_start' => [
                 'responses' => [self::json(['id' => 'int-77', 'status' => 'in_progress'], 201)],
