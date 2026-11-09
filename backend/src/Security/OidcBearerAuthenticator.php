@@ -105,6 +105,9 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         }
 
         $this->attribution->attribute($user, $claims);
+        if ($this->attribution->isCloudClient($claims)) {
+            $request->attributes->set(OAuthBearerAuthenticator::SCOPES_ATTRIBUTE, ApiKeyScope::platformLinkScopes(true));
+        }
 
         $this->logger->debug('OIDC bearer token authenticated', [
             'user_id' => $user->getId(),

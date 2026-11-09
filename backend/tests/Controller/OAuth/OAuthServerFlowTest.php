@@ -149,6 +149,35 @@ final class OAuthServerFlowTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'the access token ended with the grant');
     }
 
+    public function testTheCloudPausesAndResumesAPersonWithoutThemConnectingAgain(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $user = $this->person();
+        $verifier = bin2hex(random_bytes(32));
+        $code = $this->consent($clientId, $user, $verifier, 'ada');
+        $this->client->getCookieJar()->clear();
+        $tokens = $this->tokenRequest($this->assertion($clientId, '/oauth/token'), [
+            'grant_type' => 'authorization_code',
+            'code' => $code,
+            'redirect_uri' => $this->redirectUri(),
+            'code_verifier' => $verifier,
+        ]);
+        $bearer = ['HTTP_AUTHORIZATION' => 'Bearer '.$tokens['access_token']];
+
+        $this->lifecycle($clientId, 'ada', 'disabled');
+        self::assertResponseIsSuccessful((string) $this->client->getResponse()->getContent());
+        $this->client->request('GET', '/api/v1/files', server: $bearer);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN, 'paused while the cloud disabled the person');
+
+        $this->lifecycle($clientId, 'ada', 'enabled');
+        self::assertResponseIsSuccessful((string) $this->client->getResponse()->getContent());
+        $this->client->request('GET', '/api/v1/files', server: $bearer);
+        self::assertResponseIsSuccessful('resumed with the same grant');
+
+        $this->client->request('POST', '/oauth/register/'.$clientId.'/lifecycle', server: ['CONTENT_TYPE' => 'application/json'], content: '{"external_id":"ada","event":"disabled"}');
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'only the client itself reports');
+    }
+
     public function testAuthorizeNeedsPkceAndTheCloudsAccountName(): void
     {
         $clientId = (string) $this->register(self::IAT)['client_id'];
@@ -214,6 +243,14 @@ final class OAuthServerFlowTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND, 'a consent request is used once');
 
         return (string) $back['code'];
+    }
+
+    private function lifecycle(string $clientId, string $externalId, string $event): void
+    {
+        $this->client->request('POST', '/oauth/register/'.$clientId.'/lifecycle', server: [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->assertion($clientId, '/oauth/register/'.$clientId.'/lifecycle'),
+        ], content: (string) json_encode(['external_id' => $externalId, 'event' => $event]));
     }
 
     /**
