@@ -6,7 +6,9 @@ namespace CloudFixture;
 
 /**
  * Calls Synaplan the way an app does: on the internal address, with the
- * instance credential in `X-Instance-Id` / `X-Instance-Secret`.
+ * instance credential in `X-Instance-Id` / `X-Instance-Secret` for calls
+ * about the cloud, or with a person's own key (`asPerson`) for everything
+ * done for that person.
  */
 final class Synaplan
 {
@@ -16,7 +18,17 @@ final class Synaplan
         private readonly string $base,
         private readonly string $instanceId,
         private readonly string $secret,
+        private readonly string $personKey = '',
     ) {
+    }
+
+    /**
+     * The same client, acting for one person with that person's key. The
+     * instance credential is not sent along.
+     */
+    public function asPerson(string $key): self
+    {
+        return new self($this->base, $this->instanceId, $this->secret, $key);
     }
 
     /**
@@ -99,7 +111,9 @@ final class Synaplan
     private function headers(array $base, array $extra): array
     {
         $headers = $base;
-        if ('' !== $this->instanceId) {
+        if ('' !== $this->personKey) {
+            $headers[] = 'X-API-Key: '.$this->personKey;
+        } elseif ('' !== $this->instanceId) {
             $headers[] = 'X-Instance-Id: '.$this->instanceId;
             $headers[] = 'X-Instance-Secret: '.$this->secret;
         }

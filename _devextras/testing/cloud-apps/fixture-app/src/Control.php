@@ -36,7 +36,7 @@ final class Control
             'POST' === $method && 'sso-status' === $route => $this->ssoStatus($body),
             'POST' === $method && 'bind' === $route => $this->bind($body),
             'POST' === $method && 'adopt' === $route => $this->adopt($body),
-            'POST' === $method && 'watch-index' === $route => $this->watchIndex($body),
+            'POST' === $method && 'watch-list' === $route => $this->watchList($body),
             'POST' === $method && 'watch-file' === $route => $this->watchFile($body),
             'POST' === $method && 'watch-reconcile' === $route => $this->watchReconcile($body),
             'GET' === $method && 'written' === $route => Response::json(200, ['written' => $this->store->written()]),
@@ -221,7 +221,11 @@ final class Control
 
             return $s;
         });
-        $reported = Synaplan::from($state)->json('PUT', '/api/v1/platform-links/read-scope', [
+        $key = Store::personKey($state, $person);
+        if ('' === $key) {
+            return Response::json(200, ['scope' => $state['scopes'][$person], 'reported' => ['error' => 'not_linked']]);
+        }
+        $reported = Synaplan::from($state)->asPerson($key)->json('PUT', '/api/v1/platform-links/read-scope', [
             'external_id' => $person,
             'mode' => $mode,
             'folders' => array_map(static fn (string $path): array => [
@@ -318,12 +322,15 @@ final class Control
     }
 
     /** @param array<mixed> $body */
-    private function watchIndex(array $body): Response
+    private function watchList(array $body): Response
     {
-        $answer = (new Watches(Synaplan::from($this->store->state())))->index(
-            is_string($body['cursor'] ?? null) ? $body['cursor'] : null,
-            is_string($body['since'] ?? null) ? $body['since'] : null,
-        );
+        $person = Store::person(is_string($body['person'] ?? null) ? $body['person'] : '');
+        $state = $this->store->state();
+        $key = Store::personKey($state, $person);
+        if ('' === $key) {
+            return Response::json(409, ['error' => 'not_linked']);
+        }
+        $answer = (new Watches(Synaplan::from($state)))->list($key);
 
         return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
     }

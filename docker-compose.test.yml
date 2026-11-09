@@ -46,6 +46,8 @@ services:
       # Real Qdrant for memory/vector E2E flows (overrides the empty
       # QDRANT_URL in backend/.env.test, which keeps PHPUnit Qdrant-free).
       QDRANT_URL: http://qdrant_test:6333
+      # Cloud copies and folder reads hand out one-time tickets in Redis.
+      REDIS_DSN: redis://redis_test:6379
       AI_DEFAULT_PROVIDER: test
       MAILER_DSN: smtp://mailhog_test:1025
       AUTO_DOWNLOAD_MODELS: "false"
@@ -84,6 +86,8 @@ services:
       telegram-stub:
         condition: service_started
       qdrant_test:
+        condition: service_started
+      redis_test:
         condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/api/health"]
@@ -128,6 +132,13 @@ services:
   qdrant_test:
     image: qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
     container_name: synaplan-qdrant-test
+    restart: "no"
+    networks:
+      - synaplan-test-network
+
+  redis_test:
+    image: redis:8.10-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
+    container_name: synaplan-redis-test
     restart: "no"
     networks:
       - synaplan-test-network

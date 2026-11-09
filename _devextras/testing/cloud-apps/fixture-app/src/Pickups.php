@@ -20,7 +20,7 @@ final class Pickups
     /**
      * @return array<string, mixed>
      */
-    public function handle(string $id): array
+    public function handle(string $id, string $expectedPerson): array
     {
         $base = '/api/v1/platform-links/pickups/'.rawurlencode($id);
         $claim = $this->synaplan->json('POST', $base.'/claim');
@@ -29,6 +29,9 @@ final class Pickups
         }
         $request = $claim['body'];
         $person = (string) ($request['external_id'] ?? '');
+        if ($person !== $expectedPerson) {
+            return $this->finish($base, ['status' => 'failed', 'error_code' => 'not_found', 'listed' => 0, 'sent' => 0]);
+        }
         $selector = is_array($request['selector'] ?? null) ? $request['selector'] : [];
         $profile = (string) $this->store->state()['profile'];
         $folder = $this->folder($person, $profile, $selector);
