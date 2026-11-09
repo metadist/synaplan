@@ -526,11 +526,11 @@
         "BRAVE_SEARCH_ENABLED": "Web aramasını aç",
         "BRAVE_SEARCH_API_KEY": "Brave Search API anahtarı",
         "BRAVE_SEARCH_COUNT": "Arama başına sonuç",
-        "MEDIA_ASYNC_JOBS_ENABLED": "Sohbetin kilitlenmemesi için görüntü, video ve ses üretimini arka planda çalıştır. Asistan canlı durum gösterir ve bitince bir bildirim verir. Kapalıyken tur, dosya hazır olana kadar bekler. Worker konteyneri gerekir.",
-        "COMPUTE_ENABLED": "Asistan, seçtiğin dosyaların kopyaları üzerinde kısa dosya çalışması (Python veya Node) yapabilir. Compute sidecar’ı gerekir (COMPUTE_URL + COMPUTE_TOKEN). Yerel bir docker compose up bu sidecar’ı başlatır ve bunu açar.",
+        "MEDIA_ASYNC_JOBS_ENABLED": "Sohbetin kilitlenmemesi için görüntü, video ve ses üretimini arka planda çalıştır. Yapay zekâ canlı durum gösterir ve bitince bir bildirim verir. Kapalıyken tur, dosya hazır olana kadar bekler. Worker konteyneri gerekir.",
+        "COMPUTE_ENABLED": "Yapay zekâ, seçtiğin dosyaların kopyaları üzerinde kısa dosya çalışması (Python veya Node) yapabilir. Compute sidecar’ı gerekir (COMPUTE_URL + COMPUTE_TOKEN). Yerel bir docker compose up bu sidecar’ı başlatır ve bunu açar.",
         "COMPUTE_REQUIRE_TIER": "Dosya çalışması açılmadan önce sidecar’ın bildirmesi gereken en düşük yalıtım: Standart (düz Docker), Güçlü yalıtım (gVisor) veya Sanal makine (microVM). Synaplan Cloud güçlü yalıtım ister.",
-        "COMPUTE_WORKSPACES_ENABLED": "Asistanın önceki çalışmayı sürdürebilmesi için dosya çalışması koşuları arasında bir klasör tut. Dosyalar → Çalışma alanı içeriği gösterir. Dosya çalışmasının kendisinin de açık olması gerekir.",
-        "COMPUTE_EGRESS_ENABLED": "Bir dosya çalışması koşusu, asistanın adlandırdığı kısa bir genel web sitesi listesinden indirme yapabilir. Varsayılan kapalı — koşular çevrimdışı kalır. Özel veya yerel adresler her zaman reddedilir. Yalnızca sidecar web sitesi erişimi sunuyorsa açılabilir.",
+        "COMPUTE_WORKSPACES_ENABLED": "Yapay zekânın önceki çalışmayı sürdürebilmesi için dosya çalışması koşuları arasında bir klasör tut. Dosyalar → Çalışma alanı içeriği gösterir. Dosya çalışmasının kendisinin de açık olması gerekir.",
+        "COMPUTE_EGRESS_ENABLED": "Bir dosya çalışması koşusu, yapay zekânın adlandırdığı kısa bir genel web sitesi listesinden indirme yapabilir. Varsayılan kapalı — koşular çevrimdışı kalır. Özel veya yerel adresler her zaman reddedilir. Yalnızca sidecar web sitesi erişimi sunuyorsa açılabilir.",
         "COMPUTE_EGRESS_REQUIRES_APPROVAL": "Bir koşu web’den indirecekse, günlük dosya çalışması otomatik çalışacak olsa bile önce sahibine sor. Varsayılan açık.",
         "COMPUTE_EGRESS_MAX_HOSTS": "Bir dosya çalışması koşusunun listeleyebileceği web sitesi sayısı. Varsayılan 8.",
         "COMPUTE_DEFAULT_TIMEOUT_SEC": "Bir dosya çalışması koşusunun alabileceği varsayılan saniye.",
@@ -539,8 +539,8 @@
         "COMPUTE_DEFAULT_PIDS": "Bir dosya çalışması koşusu için varsayılan süreç tavanı.",
         "COMPUTE_DEFAULT_OUTPUT_MB": "Koşunun oluşturabileceği dosyalar için megabayt cinsinden varsayılan boyut tavanı.",
         "COMPUTE_MAX_TIMEOUT_SEC": "Bir dosya çalışması koşusu için saniye cinsinden sert üst sınır.",
-        "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
-        "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir asistan bunu gevşetemez.",
+        "COMPUTE_POLICY_INTERACTIVE": "Sahip oradayken (sohbet veya canlı bir API çağrısı): dosya çalışmasını otomatik çalıştır, önce sor veya hiç çalıştırma. Bir ajan bunu gevşetemez.",
+        "COMPUTE_POLICY_UNATTENDED": "Kayıtlı bir görev dosya çalışmasını kendi başına çalıştırdığında: önce sor (varsayılan), otomatik çalıştır veya hiç çalıştırma. Bir ajan bunu gevşetemez.",
         "COMPUTE_WORKSPACE_TTL_DAYS": "Bir dosya çalışması klasörünün temizlik onu kaldırmadan önce kaç gün kullanılmadan durabileceği. Varsayılan 90.",
         "FEATURE_DESKTOP_AGENT_ENABLED": "Synaplan Desktop, Uygulamalar › Synaplan Desktop altında. Eşleşmiş bir bilgisayar uygulamada sohbet edebilir ve bekleyen görevleri alabilir. Bu kapalıyken sayfa gizlenir, eşleştirme durur, uygulama sohbet edemez ve siz yeniden açana kadar bekleyen görevler alınmaz. Henüz bir yükleyici yok — uygulama kaynak deposundan derlenir.",
         "FEATURE_SEARCH_AI_ENABLED": "Arama paletinde AI yardımı (Ctrl/Cmd+K): Günlük dilde sorulan bir soruda araç modeli en uygun sonucu seçer ve nedenini tek cümleyle söyler. Kendi başına hiçbir şeyi değiştirmez. Her kullanım kısa bir AI çağrısıdır. Kapalıyken anahtar kelime ve anlam araması çalışmaya devam eder."
@@ -1106,7 +1106,7 @@
       "resourceKind": {
         "conversation": "Sohbet",
         "knowledge_folder": "Klasör",
-        "assistant": "AI asistanı",
+        "assistant": "Konu",
         "saved_task": "Kayıtlı görev",
         "widget": "Sohbet widget'ı",
         "agent": "Ajan",
@@ -1290,12 +1290,12 @@
         "WORKFLOWS_BUILDER_ENABLED": "Görev adımları düzenleyicisi",
         "CHAT_EXPORT_ENABLED": "Sohbetleri dışa aktar",
         "CHAT_SHARE_ENABLED": "Sohbetleri paylaş",
-        "AGENTS_PUBLISH_REVIEW": "Bir asistan herkesle paylaşılmadan önce inceleme"
+        "AGENTS_PUBLISH_REVIEW": "Bir ajan herkesle paylaşılmadan önce inceleme"
       }
     },
     "intro": {
       "users": "Burada hesabı olan herkes. Seviye değiştirin, adres doğrulayın veya bir hesabı kapatın.",
-      "groups": "Gruplar kullanıcıları bir araya getirir; asistanları paylaşır ve kuralları herkes için bir kez belirlersiniz.",
+      "groups": "Gruplar kullanıcıları bir araya getirir; ajanları paylaşır ve kuralları herkes için bir kez belirlersiniz.",
       "policies": "Politikalar bir grubun neleri kullanabileceğini belirler, örneğin hangi özellikleri veya modelleri.",
       "moderation": "Kullanıcıların bildirdiği içerikler. İnceleyin, sonra tutun veya kaldırın.",
       "audit": "Bu sunucuda kimin neyi değiştirdiğinin kaydı, en yenisi önce.",
@@ -1352,14 +1352,14 @@
     "owner": "Sahip",
     "fileUnavailable": "Bu dosya artık kullanılamıyor.",
     "kind": {
-      "assistant": "AI asistanı",
+      "assistant": "Konu",
       "saved_task": "Kayıtlı görev",
       "widget": "Sohbet widget'ı"
     },
     "runCopy": "Kendi kopyam olarak çalıştır",
     "runCopyConfirm": "Bu kayıtlı görevin kendi kopyanızı oluşturulsun mu? Yalnızca siz başlattığınızda çalışır.",
-    "assistantNotShared": "Bu görevin AI asistanı sizinle paylaşılmamış.",
-    "assistantNotSharedNamed": "“{name}” AI asistanı sizinle paylaşılmamış. Sahibinden paylaşmasını isteyin, sonra yeniden deneyin.",
+    "assistantNotShared": "Bu görevin AI ajanı sizinle paylaşılmamış.",
+    "assistantNotSharedNamed": "“{name}” AI ajanı sizinle paylaşılmamış. Sahibinden paylaşmasını isteyin, sonra yeniden deneyin.",
     "sharedBy": "{name} tarafından",
     "continueAsCopy": "Kendi kopyam olarak devam et",
     "continueFailed": "Kopyanız oluşturulamadı. Lütfen tekrar deneyin.",
@@ -1373,9 +1373,9 @@
         "sourceDirect": "Bu klasör {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
       },
       "assistant": {
-        "sourceGroup": "Bu asistan {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
-        "sourceEveryone": "Bu asistan {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
-        "sourceDirect": "Bu asistan {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
+        "sourceGroup": "Bu ajan {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
+        "sourceEveryone": "Bu ajan {owner} adlı kişiye aittir. Hesabı olan herkesle paylaşıldı.",
+        "sourceDirect": "Bu ajan {owner} adlı kişiye aittir. Sizinle kişisel olarak paylaşıldı."
       },
       "saved_task": {
         "sourceGroup": "Bu kayıtlı görev {owner} adlı kişiye aittir. Size \"{name}\" grubu üzerinden ulaştı.",
@@ -1435,8 +1435,8 @@
         },
         "assistant": {
           "read": "Görebilir — kartı görebilir ve kopyalayabilirler.",
-          "use": "Kullanabilir — bu asistanla bir sohbet başlatabilirler.",
-          "edit": "Düzenleyebilir — bu asistanı değiştirebilirler."
+          "use": "Kullanabilir — bu ajanla bir sohbet başlatabilirler.",
+          "edit": "Düzenleyebilir — bu ajanı değiştirebilirler."
         },
         "saved_task": {
           "read": "Görebilir — kartı görebilirler.",
@@ -1451,7 +1451,7 @@
       "find": {
         "conversation": "Gelen sohbetler altında bulacaklar.",
         "knowledge_folder": "Kaynaklar'da paylaşılan olarak görünür.",
-        "assistant": "Asistanlar → Benimle paylaşılan altında bulacaklar.",
+        "assistant": "Ajanlar → Benimle paylaşılan altında bulacaklar.",
         "saved_task": "Otomasyonlar altında şablon olarak kullanabilirler.",
         "widget": "Sohbet Widgetları listesinde bulurlar."
       }

@@ -254,7 +254,7 @@
     "tabFiles": "Dosyalar",
     "tabSearch": "Arama",
     "tabVectors": "Vektörler",
-    "intro": "Yapay zekâ ile aranabilir işaretli dosyalar sohbetlerde ve asistanlarda kullanılabilir.",
+    "intro": "Yapay zekâ ile aranabilir işaretli dosyalar sohbetlerde ve ajanlarda kullanılabilir.",
     "introCta": "Dosyaları kaynaklarınıza ekleyin…",
     "useInChat": "Sohbette kullan",
     "startedChatWithFolder": "{folder} ile yeni bir sohbet başlatıldı.",
@@ -365,9 +365,9 @@
       "noGroup": "Grup yok"
     },
     "help": {
-      "vectorized": "Bir dosya yapay zekâ ile aranabilir olduğunda içeriği bilgi tabanınıza eklenir; böylece asistan yanıt verirken bunu kullanabilir.",
-      "notSearchable": "Asistan bu dosyayı henüz yanıtlarda kullanamaz. Bilgiye eklemek için onu aranabilir yapın.",
-      "processing": "Bu dosya, asistanın kullanabilmesi için hazırlanıyor.",
+      "vectorized": "Bir dosya yapay zekâ ile aranabilir olduğunda içeriği bilgi tabanınıza eklenir; böylece yapay zekâ yanıt verirken bunu kullanabilir.",
+      "notSearchable": "Yapay zekâ bu dosyayı henüz yanıtlarda kullanamaz. Bilgiye eklemek için onu aranabilir yapın.",
+      "processing": "Bu dosya, yapay zekânın kullanabilmesi için hazırlanıyor.",
       "failed": "Bu dosya aranabilir yapılamadı. Yeniden deneyebilirsiniz.",
       "group": "Bilgi klasörleri dosyaları bir araya getirir. AI bir klasörde arama yaptığında içindeki her dosyayı kullanabilir.",
       "source": "Bu dosyanın nereden geldiği — yükleme, sohbet, Outlook, Nextcloud, OpenCloud, WhatsApp, widget, API veya yapay zekâ üretimi.",
@@ -464,7 +464,7 @@
       "loadMore": "Daha fazla yükle"
     },
     "explainer": {
-      "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. Asistan, yapay zekâ ile aranabilir işaretli dosyaları kullanabilir. Fotoğraflar, kayıtlar ve yapay zekânın ürettiği dosyalar için önce aranabilir yapmanız gerekir.",
+      "text": "Yüklediğiniz veya oluşturduğunuz her şey burada. Yapay zekâ, yapay zekâ ile aranabilir işaretli dosyaları kullanabilir. Fotoğraflar, kayıtlar ve yapay zekânın ürettiği dosyalar için önce aranabilir yapmanız gerekir.",
       "dismiss": "Anladım",
       "reopen": "Bu nedir?"
     },

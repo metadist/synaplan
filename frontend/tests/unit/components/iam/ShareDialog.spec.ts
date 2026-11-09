@@ -131,11 +131,11 @@ describe('ShareDialog', () => {
     expect(display('iam-share-find')).not.toContain('display: none')
   })
 
-  it('uses assistant copy and hides the public-link section', () => {
+  it('uses agent copy and hides the public-link section', () => {
     const wrapper = mountDialog({ kind: 'assistant', resourceName: 'Contract review' })
 
     expect(wrapper.get('[data-testid="iam-share-consequence"]').text()).toContain(
-      'start a chat with this assistant'
+      'start a chat with this agent'
     )
     expect(wrapper.get('[data-testid="iam-share-find"]').text()).toContain('Shared with me')
     expect(wrapper.find('[data-testid="btn-iam-public-link"]').exists()).toBe(false)

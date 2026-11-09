@@ -82,7 +82,7 @@ interface Item {
 const ITEM_TARGETS: Record<ItemId, string> = {
   provider: '/admin/setup',
   file: '/files',
-  assistant: '/ai/assistants',
+  assistant: '/ai/agents',
   app: '/apps',
 }
 

@@ -1570,10 +1570,10 @@ class WidgetController extends AbstractController
             throw new \InvalidArgumentException('agentId is invalid');
         }
         if (null === $this->agentConfig || !$this->agentConfig->isEnabled((int) $user->getId())) {
-            throw new \InvalidArgumentException('Assistants are not enabled');
+            throw new \InvalidArgumentException('Agents are not enabled');
         }
         if (null === $this->agentAccess) {
-            throw new \InvalidArgumentException('Assistants are not enabled');
+            throw new \InvalidArgumentException('Agents are not enabled');
         }
         try {
             $this->agentAccess->require($user, $id, Permission::Use);

@@ -93,16 +93,16 @@
     "findInFiles": "Buscar en Archivos → Creados por IA"
   },
   "channels": {
-    "whatsappAssistant": "Asistente para WhatsApp",
-    "whatsappAssistantHint": "Los mensajes de WhatsApp los responde este asistente publicado.",
-    "whatsappAssistantNone": "Sin asistente — chat habitual",
+    "whatsappAssistant": "Agente para WhatsApp",
+    "whatsappAssistantHint": "Los mensajes de WhatsApp los responde este agente publicado.",
+    "whatsappAssistantNone": "Sin agente — chat habitual",
     "aiNoticeLabel": "Aviso de IA",
     "aiNoticeHelp": "Las personas saben que hablan con una IA. Puedes reescribir la frase. No puede quedar vacía.",
     "aiNoticeSave": "Guardar aviso de IA",
     "aiNoticeSaved": "Aviso de IA guardado",
     "aiNoticeFailed": "El aviso de IA no se ha guardado.",
-    "whatsappAssistantSaved": "WhatsApp ahora usa este asistente",
-    "whatsappAssistantFailed": "No se pudo guardar el asistente de WhatsApp",
+    "whatsappAssistantSaved": "WhatsApp ahora usa este agente",
+    "whatsappAssistantFailed": "No se pudo guardar el agente de WhatsApp",
     "keywordSaved": "Palabra clave de correo guardada correctamente",
     "keywordPlaceholder": "palabra clave",
     "apiDocumentation": {
@@ -152,7 +152,7 @@
       "whoElseLabel": "Quién más",
       "connectedWhoElse": "Solo tu cuenta de Telegram. Cualquier otra persona recibe una frase y no se guarda nada.",
       "touchesLabel": "Qué toca",
-      "connectedTouches": "Mensajes, fotos, archivos, mensajes de voz, vídeos y ubicaciones en este chat. Tu asistente de IA los responde como en el chat web, devuelve las imágenes, vídeos, audios y documentos creados, y todo cuenta para tus límites. Los archivos se guardan en tus archivos de Synaplan.",
+      "connectedTouches": "Mensajes, fotos, archivos, mensajes de voz, vídeos y ubicaciones en este chat. Tu agente de IA los responde como en el chat web, devuelve las imágenes, vídeos, audios y documentos creados, y todo cuenta para tus límites. Los archivos se guardan en tus archivos de Synaplan.",
       "stopLabel": "Cómo detenerlo",
       "connectedStop": "Desconecta en esta tarjeta. El bot deja de responder. Tu historial de chat se queda.",
       "fromLabel": "De dónde viene",
@@ -202,9 +202,9 @@
     "deleteAfterHelp": "Eliminar correos después de procesar (solo POP3)",
     "testConnection": "Probar Conexión",
     "departments": "Departamentos de Correo",
-    "assistant": "Asistente",
-    "assistantHint": "El correo coincidente lo responde este asistente. El mensaje se sigue reenviando.",
-    "assistantNone": "Sin asistente — solo reenviar",
+    "assistant": "Agente",
+    "assistantHint": "El correo coincidente lo responde este agente. El mensaje se sigue reenviando.",
+    "assistantNone": "Sin agente — solo reenviar",
     "departmentsDescription": "Configura hasta 10 direcciones de correo destino para reenviar correos procesados",
     "departmentNote": "Debes establecer al menos un departamento como PREDETERMINADO.",
     "emailAddress": "Dirección de Correo:",
@@ -289,14 +289,14 @@
     "title": "Servidores MCP",
     "description": "Conecta cualquier servidor de herramientas compatible con MCP: un CRM, una wiki, un sistema de tickets, una plataforma de automatización o un servicio que alojes tú. Las herramientas descubiertas quedan disponibles para el planificador de tareas.",
     "clientOnTitle": "Las llamadas MCP están activadas",
-    "clientOnText": "El asistente puede usar los servidores conectados en cualquier tarea que permita fuentes de datos MCP.",
+    "clientOnText": "La IA puede usar los servidores conectados en cualquier tarea que permita fuentes de datos MCP.",
     "clientOffTitle": "Las llamadas MCP están desactivadas",
-    "clientOffAdminText": "Los servidores guardados se quedan aquí, pero el asistente no los llamará hasta que lo actives para esta instalación.",
+    "clientOffAdminText": "Los servidores guardados se quedan aquí, pero la IA no los llamará hasta que lo actives para esta instalación.",
     "clientOffUserText": "Un administrador tiene que activarlo para esta instalación. Los servidores guardados se quedan aquí hasta entonces.",
     "clientAdminLink": "Abrir en Configuración del sistema",
     "clientEnable": "Activar las llamadas MCP",
     "clientToggle": "Permitir llamadas MCP",
-    "clientEnabledNotice": "El asistente ya puede llamar a los servidores MCP conectados",
+    "clientEnabledNotice": "La IA ya puede llamar a los servidores MCP conectados",
     "clientDisabledNotice": "Las llamadas MCP están desactivadas — los servidores guardados se quedan",
     "clientUpdateFailed": "No se pudo actualizar el ajuste de MCP",
     "listTitle": "Servidores conectados",
@@ -344,11 +344,11 @@
     "deleted": "Servidor eliminado",
     "deleteFailed": "No se pudo eliminar el servidor",
     "deleteTitle": "Eliminar servidor MCP",
-    "deleteMessage": "¿Eliminar la conexión \"{name}\"? El asistente ya no podrá usar sus herramientas.",
+    "deleteMessage": "¿Eliminar la conexión \"{name}\"? La IA ya no podrá usar sus herramientas.",
     "loadFailed": "No se pudieron cargar los servidores MCP",
     "usageTitle": "Qué tareas pueden usar estos servidores",
-    "usageDescription": "Cada tarea decide por sí misma si el asistente puede obtener datos de tus servidores conectados al responder. Actívalo para cada tarea que deba usarlos — para preguntas de chat normales es \"General Chat\".",
-    "usageNotUsedWarning": "Tus servidores conectados aún no se usan: ninguna tarea permite fuentes de datos MCP. Activa al menos una tarea abajo, de lo contrario el asistente nunca llamará a estos servidores.",
+    "usageDescription": "Cada tarea decide por sí misma si la IA puede obtener datos de tus servidores conectados al responder. Actívalo para cada tarea que deba usarlos — para preguntas de chat normales es \"General Chat\".",
+    "usageNotUsedWarning": "Tus servidores conectados aún no se usan: ninguna tarea permite fuentes de datos MCP. Activa al menos una tarea abajo, de lo contrario la IA nunca llamará a estos servidores.",
     "usageOn": "Permitido",
     "usageOff": "No",
     "usageEnabled": "Fuentes de datos MCP activadas para esta tarea",
@@ -373,7 +373,7 @@
       "n8n": {
         "name": "n8n",
         "summary": "Flujos de automatización",
-        "hint": "Conecta un servidor MCP de n8n para que el asistente pueda inspeccionar o disparar tus flujos de automatización. Pega la URL del endpoint MCP y el token de acceso de tu instancia n8n."
+        "hint": "Conecta un servidor MCP de n8n para que la IA pueda inspeccionar o disparar tus flujos de automatización. Pega la URL del endpoint MCP y el token de acceso de tu instancia n8n."
       },
       "notion": {
         "name": "Notion",
@@ -429,7 +429,7 @@
     },
     "savedSignInNotStarted": "Se guardó «{name}». El inicio de sesión no comenzó: {reason}",
     "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
-    "allowWriteHint": "Cuando está activado, el asistente puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
+    "allowWriteHint": "Cuando está activado, la IA puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
     "writeBadge": "Escritura permitida"
   },
   "messagesGateway": {
@@ -465,7 +465,7 @@
     "saveKeyError": "No se pudo guardar la clave API",
     "clearKeySuccess": "Clave API eliminada",
     "clearKeyError": "No se pudo eliminar la clave API",
-    "webSearchLabel": "Búsqueda web para los asistentes de IA conectados",
+    "webSearchLabel": "Búsqueda web para las herramientas de IA conectadas",
     "webSearchModeAuto": "Automático (recomendado)",
     "webSearchModeSynaplan": "Usar siempre la búsqueda web de Synaplan",
     "webSearchModePassthrough": "Transferir la petición al proveedor de IA",
@@ -482,7 +482,7 @@
     "knowledgeToolsAll": "Cualquier clave de la pasarela",
     "knowledgeToolsOff": "Sin búsqueda en carpetas",
     "knowledgeToolsHint": "Cuando hay una carpeta de conocimiento fijada, el modelo puede volver a buscar en ella y abrir un archivo si los primeros fragmentos no bastan. Solo Desktop es el ajuste recomendado.",
-    "visionLabel": "Visión para los asistentes de IA conectados",
+    "visionLabel": "Visión para las herramientas de IA conectadas",
     "visionModeAuto": "Automático (recomendado)",
     "visionModeSynaplan": "Usar siempre el modelo de visión de Synaplan",
     "visionModePassthrough": "Transferir las imágenes al proveedor de IA",
@@ -512,7 +512,7 @@
         },
         "tools": {
           "title": "Llamadas a herramientas",
-          "description": "Qué pueden hacer los asistentes de IA conectados además de responder: usar las herramientas de su espacio de trabajo y buscar en la web."
+          "description": "Qué pueden hacer las herramientas de IA conectadas además de responder: usar las herramientas de su espacio de trabajo y buscar en la web."
         },
         "vision": {
           "title": "Imágenes",
@@ -529,8 +529,8 @@
       },
       "activeTools": {
         "title": "Ejecutándose en su nombre ahora mismo",
-        "empty": "Synaplan no ejecuta ninguna herramienta propia. Los asistentes de IA conectados solo reciben las herramientas que aporta su propio programa.",
-        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando el asistente la pide. La lectura de páginas se detiene en el límite de páginas. La búsqueda en la carpeta solo se ejecuta mientras hay una carpeta de conocimiento fijada.",
+        "empty": "Synaplan no ejecuta ninguna herramienta propia. Las herramientas de IA conectadas solo reciben las herramientas que aporta su propio programa.",
+        "hint": "Un mensaje concreto puede omitir alguna de ellas: si un programa aporta su propia herramienta con el mismo nombre, se queda con la suya, y la búsqueda web solo se ejecuta cuando la IA la pide. La lectura de páginas se detiene en el límite de páginas. La búsqueda en la carpeta solo se ejecuta mientras hay una carpeta de conocimiento fijada.",
         "mcpServers": "más las herramientas de 1 servidor de herramientas conectado | más las herramientas de {count} servidores de herramientas conectados",
         "tools": {
           "web_search": "Búsqueda web",
@@ -549,25 +549,25 @@
         "description": "Quienes no tengan su propia clave de Anthropic usarán la clave de esta instancia, y el coste se descuenta de su presupuesto de Synaplan."
       },
       "mcpTools": {
-        "label": "Permitir que los asistentes de IA usen sus herramientas",
-        "description": "Synaplan ejecuta las herramientas de sus servidores conectados y devuelve el resultado al asistente.",
+        "label": "Permitir que las herramientas de IA usen sus herramientas",
+        "description": "Synaplan ejecuta las herramientas de sus servidores conectados y devuelve el resultado a la herramienta de IA.",
         "noneConfigured": "Aún no hay ningún servidor de herramientas conectado. Puede añadir uno en Apps › Servidores de herramientas (MCP)."
       },
       "mcpWithClientTools": {
         "label": "Ofrecer sus herramientas aunque la herramienta de agente traiga las suyas",
-        "description": "Claude Code ya incluye un conjunto completo de herramientas. Active esto solo si sus herramientas deben ofrecerse además — una lista muy larga hace que el asistente sea menos preciso."
+        "description": "Claude Code ya incluye un conjunto completo de herramientas. Active esto solo si sus herramientas deben ofrecerse además — una lista muy larga hace que una herramienta de IA sea menos precisa."
       },
       "toolRounds": {
         "label": "Máximo de rondas de herramientas por mensaje",
-        "description": "Cuántas veces puede un asistente de IA usar una herramienta y volver a pensar antes de tener que responder. Valores más altos permiten un trabajo más minucioso y cuestan más."
+        "description": "Cuántas veces puede una herramienta de IA usar una herramienta y volver a pensar antes de tener que responder. Valores más altos permiten un trabajo más minucioso y cuestan más."
       },
       "webSearchRounds": {
         "label": "Búsquedas web antes de responder",
-        "description": "Tras este número de búsquedas en un mensaje, el asistente responde con lo que encontró y nombra cada fuente. 2 basta para una pregunta breve. Súbalo si los primeros resultados no alcanzan."
+        "description": "Tras este número de búsquedas en un mensaje, la herramienta de IA responde con lo que encontró y nombra cada fuente. 2 basta para una pregunta breve. Súbalo si los primeros resultados no alcanzan."
       },
       "webFetchPages": {
         "label": "Páginas que abrir en un mensaje",
-        "description": "Tras este número de páginas en un mensaje, el asistente deja de abrir más y responde con lo que leyó. 3 basta para una pregunta normal. 0 significa que no abre páginas."
+        "description": "Tras este número de páginas en un mensaje, la herramienta de IA deja de abrir más y responde con lo que leyó. 3 basta para una pregunta normal. 0 significa que no abre páginas."
       },
       "imageDetail": {
         "label": "Calidad de imagen",
@@ -584,11 +584,11 @@
       },
       "contextInjection": {
         "label": "Añadir conocimiento de su espacio de trabajo",
-        "description": "Synaplan añade a cada petición la información pertinente de su espacio de trabajo para que el asistente de IA conozca su contexto."
+        "description": "Synaplan añade a cada petición la información pertinente de su espacio de trabajo para que la herramienta de IA conozca su contexto."
       },
       "budgetNotice": {
         "label": "Avisar cuando el presupuesto se agote",
-        "description": "El asistente de IA recibe una nota breve en su respuesta cuando su presupuesto de Synaplan está casi agotado."
+        "description": "La herramienta de IA recibe una nota breve en su respuesta cuando su presupuesto de Synaplan está casi agotado."
       },
       "sessionSummary": {
         "label": "Conservar un resumen de cada sesión",
@@ -700,7 +700,7 @@
     "kindHints": {
       "email_search": "Busca en el buzón conectado.",
       "summarize": "Acorta el resultado anterior.",
-      "chat": "Usa el asistente de esta tarea.",
+      "chat": "Usa la IA de esta tarea.",
       "email_me": "Te envía un correo.",
       "tool_call": "Ejecuta una herramienta que ya conectaste.",
       "condition": "Detiene los pasos siguientes si el valor no coincide.",
@@ -726,7 +726,7 @@
     "useTemplate": "Usar plantilla",
     "useTemplateConfirm": "¿Crear tu propia copia? Permanecerá apagada hasta que la actives. Se crea una dirección nueva si otro sistema puede iniciar esta tarea.",
     "useTemplateDone": "Copia creada. Está apagada hasta que la actives.",
-    "useTemplateNeedsSetup": "Copia creada y dejada apagada. Conecta el asistente, la herramienta o la conexión que falte antes de activarla.",
+    "useTemplateNeedsSetup": "Copia creada y dejada apagada. Conecta el agente, la herramienta o la conexión que falte antes de activarla.",
     "useTemplateNeedsSetupItems": "Copia creada y dejada apagada. Aún falta: {items}.",
     "notionPage": "Página de Notion",
     "notionPageHint": "Pega el enlace de la página. Cada ejecución añade una página nueva debajo.",
@@ -744,7 +744,7 @@
     "chats": {
       "rail": {
         "title": "Las áreas",
-        "body": "Estos iconos cambian de área: Chats, Biblioteca, Asistentes y Apps. Administración aparece para quien gestiona esta instalación. Un clic abre el menú de esa área al lado."
+        "body": "Estos iconos cambian de área: Chats, Biblioteca, Agentes y Apps. Administración aparece para quien gestiona esta instalación. Un clic abre el menú de esa área al lado."
       },
       "new": {
         "title": "Un chat nuevo",
@@ -760,17 +760,17 @@
       },
       "model": {
         "title": "Qué modelo responde",
-        "body": "El nombre de aquí es el modelo de esta respuesta. Púlsalo para elegir otro. Lo que vale para todos se configura en Asistentes, en Ajustes de IA."
+        "body": "El nombre de aquí es el modelo de esta respuesta. Púlsalo para elegir otro. Lo que vale para todos se configura en Agentes, en Ajustes de IA."
       },
       "search": {
         "title": "Volver a encontrar algo",
-        "body": "Este campo busca chats, archivos, asistentes y páginas. La misma búsqueda se abre desde cualquier sitio con Ctrl+K o ⌘K."
+        "body": "Este campo busca chats, archivos, agentes y páginas. La misma búsqueda se abre desde cualquier sitio con Ctrl+K o ⌘K."
       }
     },
     "chatsGuest": {
       "rail": {
         "title": "Qué puedes abrir",
-        "body": "Como invitado estás en Chats. Biblioteca, Asistentes y Apps siguen cerrados hasta que tengas una cuenta con un plan o un código de invitación. Por eso no funciona cada icono."
+        "body": "Como invitado estás en Chats. Biblioteca, Agentes y Apps siguen cerrados hasta que tengas una cuenta con un plan o un código de invitación. Por eso no funciona cada icono."
       },
       "input": {
         "title": "Solo pregunta",
@@ -786,7 +786,7 @@
       },
       "plan": {
         "title": "Una cuenta, luego un plan",
-        "body": "Una cuenta necesita un plan o un código de invitación. Así llegan Biblioteca, Asistentes y Apps."
+        "body": "Una cuenta necesita un plan o un código de invitación. Así llegan Biblioteca, Agentes y Apps."
       }
     },
     "library": {
@@ -805,12 +805,12 @@
     },
     "assistants": {
       "create": {
-        "title": "Crea un asistente",
-        "body": "Un asistente recuerda instrucciones, archivos y herramientas. Lo defines una vez. Cada chat con él ya lo sabe."
+        "title": "Crea un agente",
+        "body": "Un agente recuerda instrucciones, archivos y herramientas. Lo defines una vez. Cada chat con él ya lo sabe."
       },
       "gallery": {
         "title": "La lista",
-        "body": "Estos son los asistentes que ya tienes. Abre uno para chatear, cambiarlo o compartirlo con tu equipo."
+        "body": "Estos son los agentes que ya tienes. Abre uno para chatear, cambiarlo o compartirlo con tu equipo."
       },
       "more": {
         "title": "También en este menú",
@@ -848,7 +848,7 @@
       },
       "add": {
         "title": "Añadir a alguien",
-        "body": "Una cuenta necesita un plan o un código de invitación. Entonces la persona aparece aquí y puede usar Biblioteca, Asistentes y Apps."
+        "body": "Una cuenta necesita un plan o un código de invitación. Entonces la persona aparece aquí y puede usar Biblioteca, Agentes y Apps."
       },
       "menu": {
         "title": "Las páginas de administración",
@@ -870,8 +870,8 @@
           "where": "Un documento o una foto a partir de los que la IA pueda responder más adelante."
         },
         "assistant": {
-          "title": "Crea un asistente",
-          "where": "Define instrucciones, archivos y herramientas una vez. Cada chat con este asistente ya los conoce."
+          "title": "Crea un agente",
+          "where": "Define instrucciones, archivos y herramientas una vez. Cada chat con este agente ya los conoce."
         },
         "app": {
           "title": "Conecta una app",
@@ -937,19 +937,19 @@
     "items": {
       "telegram": {
         "name": "Telegram",
-        "tagline": "Chatea con tu asistente en Telegram.",
-        "about": "Tu propio bot de Telegram responde con tu asistente. Solo tus mensajes llegan a Synaplan; nadie más puede usar el bot.",
+        "tagline": "Chatea con tu agente en Telegram.",
+        "about": "Tu propio bot de Telegram responde con tu agente. Solo tus mensajes llegan a Synaplan; nadie más puede usar el bot.",
         "stop": "Desconéctalo abajo. El bot deja de responder al instante."
       },
       "whatsapp": {
         "name": "WhatsApp",
         "tagline": "Pregunta a Synaplan desde WhatsApp.",
-        "about": "Verifica tu número de teléfono y escribe al número de Synaplan. Responde el asistente que elijas abajo.",
-        "stop": "No elijas ningún asistente abajo o elimina tu número verificado."
+        "about": "Verifica tu número de teléfono y escribe al número de Synaplan. Responde el agente que elijas abajo.",
+        "stop": "No elijas ningún agente abajo o elimina tu número verificado."
       },
       "widgets": {
         "name": "Widgets de chat",
-        "tagline": "Pon un asistente de IA en tu sitio web."
+        "tagline": "Pon un chat de IA en tu sitio web."
       },
       "email": {
         "name": "Correo a Synaplan",
@@ -965,7 +965,7 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Correo y calendario de Outlook para tu asistente.",
+        "tagline": "Correo y calendario de Outlook para tu agente.",
         "about": "Tras iniciar sesión con Microsoft, la IA puede leer tu correo de Outlook, añadir eventos a tu calendario y enviar resultados desde tu propio buzón.",
         "stop": "Elimina la conexión abajo. El acceso termina al instante."
       },
@@ -983,19 +983,19 @@
       },
       "nextcloud": {
         "name": "Synaplan en Nextcloud",
-        "tagline": "Usa tus asistentes dentro de Nextcloud.",
+        "tagline": "Usa tus agentes dentro de Nextcloud.",
         "about": "Instala la app de Synaplan en Nextcloud e inicia sesión allí. Nextcloud usará esta cuenta; nunca copias una clave.",
         "stop": "Desconecta el servidor en la lista de abajo."
       },
       "owncloud": {
         "name": "Synaplan en ownCloud",
-        "tagline": "Usa tus asistentes dentro de ownCloud.",
+        "tagline": "Usa tus agentes dentro de ownCloud.",
         "about": "Instala la app de Synaplan en ownCloud e inicia sesión allí. ownCloud usará esta cuenta; nunca copias una clave.",
         "stop": "Desconecta el servidor en la lista de abajo."
       },
       "outlook": {
         "name": "Synaplan en Outlook",
-        "tagline": "Responde y resume correos con tu asistente en Outlook.",
+        "tagline": "Responde y resume correos con tu agente en Outlook.",
         "about": "Añade el complemento de Synaplan en Outlook e inicia sesión allí. El complemento usará esta cuenta.",
         "stop": "Desconéctalo en la lista de abajo."
       },
@@ -1032,7 +1032,7 @@
       },
       "desktop": {
         "name": "Synaplan Desktop",
-        "tagline": "Deja que tu asistente trabaje con archivos de tu ordenador.",
+        "tagline": "Deja que tu agente trabaje con archivos de tu ordenador.",
         "about": "Vincula la app de escritorio con un código. Ejecuta en tu propio equipo los trabajos que inicies desde el chat.",
         "stop": "Elimina el dispositivo abajo. Los trabajos en curso se cancelan."
       },

@@ -58,7 +58,7 @@ final class DesktopAssistantController extends AbstractController
     #[OA\Response(response: 401, description: 'Authentication required')]
     #[OA\Response(
         response: 404,
-        description: 'Assistants are turned off (`assistants_disabled`)',
+        description: 'Agents are turned off (`assistants_disabled`)',
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(
@@ -137,7 +137,7 @@ final class DesktopAssistantController extends AbstractController
             return new JsonResponse(
                 [
                     'error' => [
-                        'message' => 'Assistants are turned off on this workspace.',
+                        'message' => 'Agents are turned off on this workspace.',
                         'type' => 'not_found_error',
                         'code' => self::DISABLED_CODE,
                     ],

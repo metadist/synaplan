@@ -108,9 +108,9 @@
     "helpTipContent": "La plupart des fournisseurs d’e-mail exigent des « mots de passe d’application » plutôt que votre mot de passe habituel. Consultez les réglages de sécurité de votre fournisseur.",
     "helpCommonProviders": "Fournisseurs d’e-mail courants :",
     "departments": "Services de messagerie",
-    "assistant": "Assistant",
-    "assistantHint": "Les e-mails correspondants sont répondus par cet assistant. Le message est tout de même transféré.",
-    "assistantNone": "Aucun assistant — transfert seulement",
+    "assistant": "Agent",
+    "assistantHint": "Les e-mails correspondants sont répondus par cet agent. Le message est tout de même transféré.",
+    "assistantNone": "Aucun agent — transfert seulement",
     "departmentsDescription": "Configurez jusqu’à 10 adresses e-mail cibles pour le transfert des e-mails traités",
     "departmentNote": "Vous devez définir au moins un service comme PAR DÉFAUT. Les e-mails traités seront transférés au service approprié selon l’analyse du contenu.",
     "emailAddress": "Adresse e-mail :",
@@ -253,16 +253,16 @@
     }
   },
   "channels": {
-    "whatsappAssistant": "Assistant pour WhatsApp",
-    "whatsappAssistantHint": "Les messages WhatsApp sont répondus par cet assistant publié.",
-    "whatsappAssistantNone": "Aucun assistant — discussion habituelle",
+    "whatsappAssistant": "Agent pour WhatsApp",
+    "whatsappAssistantHint": "Les messages WhatsApp sont répondus par cet agent publié.",
+    "whatsappAssistantNone": "Aucun agent — discussion habituelle",
     "aiNoticeLabel": "Mention IA",
     "aiNoticeHelp": "Les gens savent qu'ils parlent à une IA. Vous pouvez réécrire la phrase. Elle ne peut pas être vide.",
     "aiNoticeSave": "Enregistrer la mention IA",
     "aiNoticeSaved": "Mention IA enregistrée",
     "aiNoticeFailed": "La mention IA n'a pas été enregistrée.",
-    "whatsappAssistantSaved": "WhatsApp utilise maintenant cet assistant",
-    "whatsappAssistantFailed": "Impossible d’enregistrer l’assistant WhatsApp",
+    "whatsappAssistantSaved": "WhatsApp utilise maintenant cet agent",
+    "whatsappAssistantFailed": "Impossible d’enregistrer l’agent WhatsApp",
     "keywordSaved": "Mot-clé e-mail enregistré avec succès",
     "keywordPlaceholder": "mot-clé",
     "apiDocumentation": {
@@ -312,7 +312,7 @@
       "whoElseLabel": "Qui d'autre",
       "connectedWhoElse": "Uniquement votre compte Telegram. Toute autre personne reçoit une phrase et rien n'est enregistré.",
       "touchesLabel": "Ce que cela touche",
-      "connectedTouches": "Les messages, photos, fichiers, messages vocaux, vidéos et positions de cette conversation. Votre assistant IA y répond comme dans le chat web, renvoie les images, vidéos, audios et documents créés, et tout compte dans vos limites. Les fichiers sont enregistrés dans vos fichiers Synaplan.",
+      "connectedTouches": "Les messages, photos, fichiers, messages vocaux, vidéos et positions de cette conversation. Votre agent IA y répond comme dans le chat web, renvoie les images, vidéos, audios et documents créés, et tout compte dans vos limites. Les fichiers sont enregistrés dans vos fichiers Synaplan.",
       "stopLabel": "Comment l'arrêter",
       "connectedStop": "Déconnectez sur cette carte. Le bot cesse de répondre. Votre historique reste.",
       "fromLabel": "D'où cela vient",
@@ -363,14 +363,14 @@
     "title": "Serveurs MCP",
     "description": "Connectez n’importe quel serveur d’outils compatible MCP — un CRM, un wiki, un système de tickets, une plateforme d’automatisation, ou un service que vous hébergez vous-même. Les outils découverts deviennent disponibles pour le planificateur de tâches.",
     "clientOnTitle": "Les appels MCP sont activés",
-    "clientOnText": "L’assistant peut utiliser les serveurs connectés dans toute tâche qui autorise les sources de données MCP.",
+    "clientOnText": "L’IA peut utiliser les serveurs connectés dans toute tâche qui autorise les sources de données MCP.",
     "clientOffTitle": "Les appels MCP sont désactivés",
-    "clientOffAdminText": "Les serveurs enregistrés restent ici, mais l’assistant ne les appellera pas tant que vous n’aurez pas activé ceci pour l’installation.",
+    "clientOffAdminText": "Les serveurs enregistrés restent ici, mais l’IA ne les appellera pas tant que vous n’aurez pas activé ceci pour l’installation.",
     "clientOffUserText": "Un administrateur doit activer ceci pour l’installation. Les serveurs enregistrés restent ici jusqu’alors.",
     "clientAdminLink": "Ouvrir dans la configuration système",
     "clientEnable": "Activer les appels MCP",
     "clientToggle": "Autoriser les appels MCP",
-    "clientEnabledNotice": "L’assistant peut maintenant appeler les serveurs MCP connectés",
+    "clientEnabledNotice": "L’IA peut maintenant appeler les serveurs MCP connectés",
     "clientDisabledNotice": "Les appels MCP sont désactivés — les serveurs enregistrés restent en place",
     "clientUpdateFailed": "Impossible de mettre à jour le réglage MCP",
     "listTitle": "Serveurs connectés",
@@ -418,11 +418,11 @@
     "deleted": "Serveur retiré",
     "deleteFailed": "Impossible de retirer le serveur",
     "deleteTitle": "Retirer le serveur MCP",
-    "deleteMessage": "Retirer la connexion « {name} » ? L’assistant ne pourra plus utiliser ses outils.",
+    "deleteMessage": "Retirer la connexion « {name} » ? L’IA ne pourra plus utiliser ses outils.",
     "loadFailed": "Impossible de charger les serveurs MCP",
     "usageTitle": "Quelles tâches peuvent utiliser ces serveurs",
-    "usageDescription": "Chaque tâche décide elle-même si l’assistant peut extraire des données de vos serveurs connectés en répondant. Activez-le pour chaque tâche qui doit les utiliser — pour les questions de chat normales, c’est « Chat général ».",
-    "usageNotUsedWarning": "Vos serveurs connectés ne sont pas encore utilisés : aucune tâche n’autorise les sources de données MCP. Activez au moins une tâche ci-dessous, sinon l’assistant n’appellera jamais ces serveurs.",
+    "usageDescription": "Chaque tâche décide elle-même si l’IA peut extraire des données de vos serveurs connectés en répondant. Activez-le pour chaque tâche qui doit les utiliser — pour les questions de chat normales, c’est « Chat général ».",
+    "usageNotUsedWarning": "Vos serveurs connectés ne sont pas encore utilisés : aucune tâche n’autorise les sources de données MCP. Activez au moins une tâche ci-dessous, sinon l’IA n’appellera jamais ces serveurs.",
     "usageOn": "Autorisé",
     "usageOff": "Désactivé",
     "usageEnabled": "Sources de données MCP activées pour cette tâche",
@@ -447,7 +447,7 @@
       "n8n": {
         "name": "n8n",
         "summary": "Automatisations",
-        "hint": "Connectez un serveur MCP n8n afin que l’assistant puisse inspecter ou déclencher vos automatisations. Collez l’URL du point de terminaison MCP et le jeton d’accès de votre instance n8n."
+        "hint": "Connectez un serveur MCP n8n afin que l’IA puisse inspecter ou déclencher vos automatisations. Collez l’URL du point de terminaison MCP et le jeton d’accès de votre instance n8n."
       },
       "notion": {
         "name": "Notion",
@@ -503,7 +503,7 @@
     },
     "savedSignInNotStarted": "« {name} » est enregistré. La connexion n’a pas démarré : {reason}",
     "allowWriteLabel": "Autoriser les actions d’écriture (créer/mettre à jour)",
-    "allowWriteHint": "Lorsqu’elles sont activées, l’assistant peut créer ou mettre à jour du contenu dans ce système lorsque vous le demandez. Les actions de suppression ne sont jamais autorisées.",
+    "allowWriteHint": "Lorsqu’elles sont activées, l’IA peut créer ou mettre à jour du contenu dans ce système lorsque vous le demandez. Les actions de suppression ne sont jamais autorisées.",
     "writeBadge": "Écritures autorisées"
   },
   "messagesGateway": {
@@ -539,7 +539,7 @@
     "saveKeyError": "Impossible d’enregistrer la clé API",
     "clearKeySuccess": "Clé API retirée",
     "clearKeyError": "Impossible de retirer la clé API",
-    "webSearchLabel": "Recherche Web pour les assistants IA connectés",
+    "webSearchLabel": "Recherche Web pour les outils IA connectés",
     "webSearchModeAuto": "Automatique (recommandé)",
     "webSearchModeSynaplan": "Toujours utiliser la recherche Web de Synaplan",
     "webSearchModePassthrough": "Transmettre la requête au fournisseur IA",
@@ -556,7 +556,7 @@
     "knowledgeToolsAll": "Toutes les clés de la passerelle",
     "knowledgeToolsOff": "Pas de recherche dans les dossiers",
     "knowledgeToolsHint": "Lorsqu’un dossier de connaissances est épinglé, le modèle peut y chercher à nouveau et ouvrir un fichier si les premiers passages ne suffisent pas. Desktop uniquement est le réglage recommandé.",
-    "visionLabel": "Vision pour les assistants IA connectés",
+    "visionLabel": "Vision pour les outils IA connectés",
     "visionModeAuto": "Automatique (recommandé)",
     "visionModeSynaplan": "Toujours utiliser le modèle de vision de Synaplan",
     "visionModePassthrough": "Transmettre les images au fournisseur IA",
@@ -586,7 +586,7 @@
         },
         "tools": {
           "title": "Appel d’outils",
-          "description": "Ce que les assistants IA connectés peuvent faire en plus de répondre : utiliser les outils de votre espace et rechercher sur le Web."
+          "description": "Ce que les outils IA connectés peuvent faire en plus de répondre : utiliser les outils de votre espace et rechercher sur le Web."
         },
         "vision": {
           "title": "Images",
@@ -603,8 +603,8 @@
       },
       "activeTools": {
         "title": "En cours d’exécution en votre nom",
-        "empty": "Synaplan n’exécute aucun outil qui lui soit propre. Les assistants IA connectés n’obtiennent que les outils que leur propre programme apporte.",
-        "hint": "Un seul message peut encore en sauter un : un programme qui apporte son propre outil du même nom le conserve, et la recherche Web ne s’exécute que lorsque l’assistant la demande. La lecture de pages s’arrête à la limite de pages. La recherche dans le dossier ne s’exécute que tant qu’un dossier de connaissances est épinglé.",
+        "empty": "Synaplan n’exécute aucun outil qui lui soit propre. Les outils IA connectés n’obtiennent que les outils que leur propre programme apporte.",
+        "hint": "Un seul message peut encore en sauter un : un programme qui apporte son propre outil du même nom le conserve, et la recherche Web ne s’exécute que lorsque l’IA la demande. La lecture de pages s’arrête à la limite de pages. La recherche dans le dossier ne s’exécute que tant qu’un dossier de connaissances est épinglé.",
         "mcpServers": "plus les outils de 1 serveur d’outils connecté | plus les outils de {count} serveurs d’outils connectés",
         "tools": {
           "web_search": "Recherche Web",
@@ -623,25 +623,25 @@
         "description": "Les utilisateurs sans clé Anthropic personnelle utilisent alors la clé de cette instance, et le coût est débité de leur budget Synaplan."
       },
       "mcpTools": {
-        "label": "Laisser les assistants IA utiliser vos outils",
-        "description": "Synaplan exécute lui-même les outils de vos serveurs d’outils connectés et renvoie le résultat à l’assistant.",
+        "label": "Laisser les outils IA utiliser vos outils",
+        "description": "Synaplan exécute lui-même les outils de vos serveurs d’outils connectés et renvoie le résultat à l’outil IA.",
         "noneConfigured": "Aucun serveur d’outils n’est encore connecté. Vous pouvez en ajouter un sous Apps › Serveurs d'outils (MCP)."
       },
       "mcpWithClientTools": {
         "label": "Proposer vos outils même lorsque l’outil d’agent apporte les siens",
-        "description": "Claude Code fournit déjà un ensemble complet d’outils. N’activez ceci que si vos propres outils doivent être proposés en plus — une très longue liste d’outils rend un assistant moins précis."
+        "description": "Claude Code fournit déjà un ensemble complet d’outils. N’activez ceci que si vos propres outils doivent être proposés en plus — une très longue liste d’outils rend un outil IA moins précis."
       },
       "toolRounds": {
         "label": "Nombre maximal de tours d’outils par message",
-        "description": "Combien de fois un assistant IA peut utiliser un outil et réfléchir encore avant de devoir répondre. Des valeurs plus élevées permettent un travail plus approfondi et coûtent plus cher."
+        "description": "Combien de fois un outil IA peut utiliser un outil et réfléchir encore avant de devoir répondre. Des valeurs plus élevées permettent un travail plus approfondi et coûtent plus cher."
       },
       "webSearchRounds": {
         "label": "Recherches web avant la réponse",
-        "description": "Après ce nombre de recherches dans un message, l’assistant répond à partir de ce qu’il a trouvé et nomme chaque source. 2 suffit pour une question courte. Augmentez-le si les premiers résultats ne suffisent pas."
+        "description": "Après ce nombre de recherches dans un message, l’outil IA répond à partir de ce qu’il a trouvé et nomme chaque source. 2 suffit pour une question courte. Augmentez-le si les premiers résultats ne suffisent pas."
       },
       "webFetchPages": {
         "label": "Pages à ouvrir dans un message",
-        "description": "Après ce nombre de pages dans un message, l’assistant n’en ouvre plus et répond à partir de ce qu’il a lu. 3 suffit pour une question normale. 0 signifie qu’aucune page n’est ouverte."
+        "description": "Après ce nombre de pages dans un message, l’outil IA n’en ouvre plus et répond à partir de ce qu’il a lu. 3 suffit pour une question normale. 0 signifie qu’aucune page n’est ouverte."
       },
       "imageDetail": {
         "label": "Qualité d’image",
@@ -658,11 +658,11 @@
       },
       "contextInjection": {
         "label": "Ajouter des connaissances de votre espace",
-        "description": "Synaplan ajoute à chaque requête les informations correspondantes de votre espace, afin que l’assistant IA connaisse votre contexte."
+        "description": "Synaplan ajoute à chaque requête les informations correspondantes de votre espace, afin que l’outil IA connaisse votre contexte."
       },
       "budgetNotice": {
         "label": "Avertir lorsque le budget s’épuise",
-        "description": "L’assistant IA reçoit une courte note dans sa réponse lorsque votre budget Synaplan est presque épuisé."
+        "description": "L’outil IA reçoit une courte note dans sa réponse lorsque votre budget Synaplan est presque épuisé."
       },
       "sessionSummary": {
         "label": "Conserver un résumé de chaque session",
@@ -774,7 +774,7 @@
     "kindHints": {
       "email_search": "Regarde dans la boîte connectée.",
       "summarize": "Raccourcit le résultat précédent.",
-      "chat": "Utilise l’assistant de cette tâche.",
+      "chat": "Utilise l’IA de cette tâche.",
       "email_me": "Vous envoie un e-mail.",
       "tool_call": "Exécute un outil déjà connecté.",
       "condition": "Arrête les étapes suivantes si la valeur ne correspond pas.",
@@ -800,7 +800,7 @@
     "useTemplate": "Utiliser le modèle",
     "useTemplateConfirm": "Créer votre propre copie ? Elle reste désactivée jusqu’à ce que vous l’activiez. Une nouvelle adresse est créée si un autre système peut démarrer cette tâche.",
     "useTemplateDone": "Copie créée. Elle est désactivée jusqu’à ce que vous l’activiez.",
-    "useTemplateNeedsSetup": "Copie créée et laissée désactivée. Reliez l’assistant, l’outil ou la connexion manquant avant de l’activer.",
+    "useTemplateNeedsSetup": "Copie créée et laissée désactivée. Reliez l’agent, l’outil ou la connexion manquant avant de l’activer.",
     "useTemplateNeedsSetupItems": "Copie créée et laissée désactivée. Encore nécessaire : {items}.",
     "notionPage": "Page Notion",
     "notionPageHint": "Collez le lien de la page. Chaque exécution ajoute une nouvelle page en dessous.",
@@ -818,7 +818,7 @@
     "chats": {
       "rail": {
         "title": "Les espaces",
-        "body": "Ces icônes changent d’espace : Chats, Bibliothèque, Assistants et Apps. Administration n’apparaît que pour les personnes qui gèrent cette installation. Un clic ouvre le menu de cet espace à côté."
+        "body": "Ces icônes changent d’espace : Chats, Bibliothèque, Agents et Apps. Administration n’apparaît que pour les personnes qui gèrent cette installation. Un clic ouvre le menu de cet espace à côté."
       },
       "new": {
         "title": "Un nouveau chat",
@@ -834,17 +834,17 @@
       },
       "model": {
         "title": "Quel modèle répond",
-        "body": "Le nom ici est le modèle de cette réponse. Appuyez dessus pour en choisir un autre. Ce qui s’applique à tout le monde se règle sous Assistants, dans Réglages IA."
+        "body": "Le nom ici est le modèle de cette réponse. Appuyez dessus pour en choisir un autre. Ce qui s’applique à tout le monde se règle sous Agents, dans Réglages IA."
       },
       "search": {
         "title": "Retrouver quelque chose",
-        "body": "Ce champ cherche dans les chats, fichiers, assistants et pages. La même recherche s’ouvre de n’importe où avec Ctrl+K ou ⌘K."
+        "body": "Ce champ cherche dans les chats, fichiers, agents et pages. La même recherche s’ouvre de n’importe où avec Ctrl+K ou ⌘K."
       }
     },
     "chatsGuest": {
       "rail": {
         "title": "Ce que vous pouvez ouvrir",
-        "body": "En tant qu’invité, vous êtes dans Chats. Bibliothèque, Assistants et Apps restent fermés jusqu’à un compte avec un forfait ou un code d’invitation. C’est pour cela que chaque icône ne fonctionne pas encore."
+        "body": "En tant qu’invité, vous êtes dans Chats. Bibliothèque, Agents et Apps restent fermés jusqu’à un compte avec un forfait ou un code d’invitation. C’est pour cela que chaque icône ne fonctionne pas encore."
       },
       "input": {
         "title": "Posez simplement la question",
@@ -860,7 +860,7 @@
       },
       "plan": {
         "title": "Un compte, puis un forfait",
-        "body": "Un compte a besoin d’un forfait ou d’un code d’invitation. Cela ouvre Bibliothèque, Assistants et Apps."
+        "body": "Un compte a besoin d’un forfait ou d’un code d’invitation. Cela ouvre Bibliothèque, Agents et Apps."
       }
     },
     "library": {
@@ -879,12 +879,12 @@
     },
     "assistants": {
       "create": {
-        "title": "Créer un assistant",
-        "body": "Un assistant retient les instructions, les fichiers et les outils. Vous les définissez une fois. Chaque chat avec lui les connaît déjà."
+        "title": "Créer un agent",
+        "body": "Un agent retient les instructions, les fichiers et les outils. Vous les définissez une fois. Chaque chat avec lui les connaît déjà."
       },
       "gallery": {
         "title": "La liste",
-        "body": "Voici les assistants que vous avez déjà. Ouvrez-en un pour discuter, le modifier ou le partager avec votre équipe."
+        "body": "Voici les agents que vous avez déjà. Ouvrez-en un pour discuter, le modifier ou le partager avec votre équipe."
       },
       "more": {
         "title": "Aussi dans ce menu",
@@ -922,7 +922,7 @@
       },
       "add": {
         "title": "Ajouter quelqu’un",
-        "body": "Un compte a besoin d’un forfait ou d’un code d’invitation. La personne apparaît alors ici et peut utiliser Bibliothèque, Assistants et Apps."
+        "body": "Un compte a besoin d’un forfait ou d’un code d’invitation. La personne apparaît alors ici et peut utiliser Bibliothèque, Agents et Apps."
       },
       "menu": {
         "title": "Les pages d’administration",
@@ -944,8 +944,8 @@
           "where": "Un document ou une photo dont l’IA pourra se servir plus tard pour répondre."
         },
         "assistant": {
-          "title": "Créer un assistant",
-          "where": "Définissez une fois les instructions, les fichiers et les outils. Chaque chat avec cet assistant les connaît déjà."
+          "title": "Créer un agent",
+          "where": "Définissez une fois les instructions, les fichiers et les outils. Chaque chat avec cet agent les connaît déjà."
         },
         "app": {
           "title": "Connecter une app",
@@ -1011,19 +1011,19 @@
     "items": {
       "telegram": {
         "name": "Telegram",
-        "tagline": "Discutez avec votre assistant dans Telegram.",
-        "about": "Votre propre bot Telegram répond avec votre assistant. Seuls vos messages arrivent dans Synaplan ; personne d'autre ne peut utiliser le bot.",
+        "tagline": "Discutez avec votre agent dans Telegram.",
+        "about": "Votre propre bot Telegram répond avec votre agent. Seuls vos messages arrivent dans Synaplan ; personne d'autre ne peut utiliser le bot.",
         "stop": "Déconnectez-le ci-dessous. Le bot cesse aussitôt de répondre."
       },
       "whatsapp": {
         "name": "WhatsApp",
         "tagline": "Interrogez Synaplan depuis WhatsApp.",
-        "about": "Vérifiez votre numéro de téléphone, puis écrivez au numéro de Synaplan. L'assistant choisi ci-dessous répond.",
-        "stop": "Ne choisissez aucun assistant ci-dessous ou supprimez votre numéro vérifié."
+        "about": "Vérifiez votre numéro de téléphone, puis écrivez au numéro de Synaplan. L'agent choisi ci-dessous répond.",
+        "stop": "Ne choisissez aucun agent ci-dessous ou supprimez votre numéro vérifié."
       },
       "widgets": {
         "name": "Widgets de chat",
-        "tagline": "Placez un assistant IA sur votre site web."
+        "tagline": "Placez un chat IA sur votre site web."
       },
       "email": {
         "name": "E-mail vers Synaplan",
@@ -1039,7 +1039,7 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Messagerie et calendrier Outlook pour votre assistant.",
+        "tagline": "Messagerie et calendrier Outlook pour votre agent.",
         "about": "Après la connexion à Microsoft, l'IA peut lire votre messagerie Outlook, ajouter des événements à votre calendrier et envoyer des résultats depuis votre propre boîte.",
         "stop": "Supprimez la connexion ci-dessous. L'accès prend fin immédiatement."
       },
@@ -1057,19 +1057,19 @@
       },
       "nextcloud": {
         "name": "Synaplan dans Nextcloud",
-        "tagline": "Utilisez vos assistants dans Nextcloud.",
+        "tagline": "Utilisez vos agents dans Nextcloud.",
         "about": "Installez l'app Synaplan dans Nextcloud et connectez-vous-y. Nextcloud utilise alors ce compte ; vous ne copiez jamais de clé.",
         "stop": "Déconnectez le serveur dans la liste ci-dessous."
       },
       "owncloud": {
         "name": "Synaplan dans ownCloud",
-        "tagline": "Utilisez vos assistants dans ownCloud.",
+        "tagline": "Utilisez vos agents dans ownCloud.",
         "about": "Installez l'app Synaplan dans ownCloud et connectez-vous-y. ownCloud utilise alors ce compte ; vous ne copiez jamais de clé.",
         "stop": "Déconnectez le serveur dans la liste ci-dessous."
       },
       "outlook": {
         "name": "Synaplan dans Outlook",
-        "tagline": "Répondez aux e-mails et résumez-les avec votre assistant dans Outlook.",
+        "tagline": "Répondez aux e-mails et résumez-les avec votre agent dans Outlook.",
         "about": "Ajoutez le complément Synaplan dans Outlook et connectez-vous-y. Le complément utilise alors ce compte.",
         "stop": "Déconnectez-le dans la liste ci-dessous."
       },
@@ -1106,7 +1106,7 @@
       },
       "desktop": {
         "name": "Synaplan Desktop",
-        "tagline": "Laissez votre assistant travailler avec les fichiers de votre ordinateur.",
+        "tagline": "Laissez votre agent travailler avec les fichiers de votre ordinateur.",
         "about": "Associez l'application de bureau avec un code. Elle exécute sur votre machine les tâches lancées depuis le chat.",
         "stop": "Supprimez l'appareil ci-dessous. Les tâches en cours sont annulées."
       },

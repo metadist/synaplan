@@ -8,6 +8,6 @@ final class AgentNotAccessibleException extends \RuntimeException
 {
     public static function forId(int $agentId): self
     {
-        return new self(sprintf('Assistant %d was not found', $agentId));
+        return new self(sprintf('Agent %d was not found', $agentId));
     }
 }

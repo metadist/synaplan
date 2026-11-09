@@ -514,7 +514,7 @@ PROMPT;
         $purpose = $collectedAnswers[3] ?? 'general assistance';
 
         return [
-            'title' => mb_substr(sprintf('%s Assistant', ucfirst($widget->getName())), 0, 50),
+            'title' => mb_substr(sprintf('%s AI', ucfirst($widget->getName())), 0, 50),
             'description' => mb_substr(sprintf('AI assistant for %s - %s', $widget->getName(), $purpose), 0, 150),
         ];
     }

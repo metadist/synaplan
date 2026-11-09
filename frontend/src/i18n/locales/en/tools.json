@@ -193,9 +193,9 @@
     "portPlaceholder": "993",
     "emailAddressPlaceholder": "department at company.com",
     "department": "Department",
-    "assistant": "Assistant",
-    "assistantHint": "Matching mail is answered by this assistant. The message is still forwarded.",
-    "assistantNone": "No assistant — only forward",
+    "assistant": "Agent",
+    "assistantHint": "Matching mail is answered by this agent. The message is still forwarded.",
+    "assistantNone": "No agent — only forward",
     "removeDepartment": "Remove department",
     "smtpConfig": "SMTP Configuration (Forwarding)",
     "enableSmtp": "Enable SMTP for Email Forwarding",
@@ -253,16 +253,16 @@
     }
   },
   "channels": {
-    "whatsappAssistant": "Assistant for WhatsApp",
-    "whatsappAssistantHint": "Incoming WhatsApp messages are answered by this published assistant.",
-    "whatsappAssistantNone": "No assistant — use the usual chat",
+    "whatsappAssistant": "Agent for WhatsApp",
+    "whatsappAssistantHint": "Incoming WhatsApp messages are answered by this published agent.",
+    "whatsappAssistantNone": "No agent — use the usual chat",
     "aiNoticeLabel": "AI notice",
     "aiNoticeHelp": "People are told they are talking to an AI. You can rewrite the sentence. You cannot leave it empty.",
     "aiNoticeSave": "Save AI notice",
     "aiNoticeSaved": "AI notice saved",
     "aiNoticeFailed": "The AI notice was not saved.",
-    "whatsappAssistantSaved": "WhatsApp now uses this assistant",
-    "whatsappAssistantFailed": "Could not save the WhatsApp assistant",
+    "whatsappAssistantSaved": "WhatsApp now uses this agent",
+    "whatsappAssistantFailed": "Could not save the WhatsApp agent",
     "keywordSaved": "Email keyword saved successfully",
     "keywordPlaceholder": "keyword",
     "apiDocumentation": {
@@ -312,7 +312,7 @@
       "whoElseLabel": "Who else",
       "connectedWhoElse": "Only your Telegram account. Anyone else gets one sentence and nothing is saved.",
       "touchesLabel": "What it touches",
-      "connectedTouches": "Messages, photos, files, voice messages, videos and locations in this chat. Your AI assistant answers them like in the web chat, sends created images, videos, audio and documents back, and everything counts toward your limits. Files are saved in your Synaplan files.",
+      "connectedTouches": "Messages, photos, files, voice messages, videos and locations in this chat. Your AI agent answers them like in the web chat, sends created images, videos, audio and documents back, and everything counts toward your limits. Files are saved in your Synaplan files.",
       "stopLabel": "How to stop it",
       "connectedStop": "Disconnect on this card. The bot stops replying. Your chat history stays.",
       "fromLabel": "Where it came from",
@@ -363,14 +363,14 @@
     "title": "MCP Servers",
     "description": "Connect any MCP-compatible tool server — a CRM, wiki, ticket system, automation platform, or a service you host yourself. Discovered tools become available to the task planner.",
     "clientOnTitle": "MCP calls are on",
-    "clientOnText": "The assistant can use connected servers in any task that allows MCP data sources.",
+    "clientOnText": "The AI can use connected servers in any task that allows MCP data sources.",
     "clientOffTitle": "MCP calls are off",
-    "clientOffAdminText": "Saved servers stay here, but the assistant will not call them until you turn this on for the installation.",
+    "clientOffAdminText": "Saved servers stay here, but the AI will not call them until you turn this on for the installation.",
     "clientOffUserText": "An administrator needs to turn this on for the installation. Saved servers stay here until then.",
     "clientAdminLink": "Open in System Configuration",
     "clientEnable": "Turn on MCP calls",
     "clientToggle": "Allow MCP calls",
-    "clientEnabledNotice": "The assistant can now call connected MCP servers",
+    "clientEnabledNotice": "The AI can now call connected MCP servers",
     "clientDisabledNotice": "MCP calls are off — saved servers stay in place",
     "clientUpdateFailed": "Could not update the MCP setting",
     "listTitle": "Connected servers",
@@ -418,11 +418,11 @@
     "deleted": "Server removed",
     "deleteFailed": "Could not remove the server",
     "deleteTitle": "Remove MCP server",
-    "deleteMessage": "Remove the connection \"{name}\"? The assistant will no longer be able to use its tools.",
+    "deleteMessage": "Remove the connection \"{name}\"? The AI will no longer be able to use its tools.",
     "loadFailed": "Could not load MCP servers",
     "usageTitle": "Which tasks may use these servers",
-    "usageDescription": "Each task decides on its own whether the assistant may pull data from your connected servers while answering. Enable it for every task that should use them — for normal chat questions that is \"General Chat\".",
-    "usageNotUsedWarning": "Your connected servers are not used yet: no task allows MCP data sources. Enable at least one task below, otherwise the assistant will never call these servers.",
+    "usageDescription": "Each task decides on its own whether the AI may pull data from your connected servers while answering. Enable it for every task that should use them — for normal chat questions that is \"General Chat\".",
+    "usageNotUsedWarning": "Your connected servers are not used yet: no task allows MCP data sources. Enable at least one task below, otherwise the AI will never call these servers.",
     "usageOn": "Allowed",
     "usageOff": "Off",
     "usageEnabled": "MCP data sources enabled for this task",
@@ -447,7 +447,7 @@
       "n8n": {
         "name": "n8n",
         "summary": "Automation workflows",
-        "hint": "Connect an n8n MCP server so the assistant can inspect or trigger your automation workflows. Paste the MCP endpoint URL and access token from your n8n instance."
+        "hint": "Connect an n8n MCP server so the AI can inspect or trigger your automation workflows. Paste the MCP endpoint URL and access token from your n8n instance."
       },
       "notion": {
         "name": "Notion",
@@ -503,7 +503,7 @@
     },
     "savedSignInNotStarted": "Saved \"{name}\". Sign-in did not start: {reason}",
     "allowWriteLabel": "Allow write actions (create/update)",
-    "allowWriteHint": "When enabled, the assistant may create or update content in this system when you ask for it. Delete actions are never allowed.",
+    "allowWriteHint": "When enabled, the AI may create or update content in this system when you ask for it. Delete actions are never allowed.",
     "writeBadge": "Writes allowed"
   },
   "messagesGateway": {
@@ -539,7 +539,7 @@
     "saveKeyError": "Could not save API key",
     "clearKeySuccess": "API key removed",
     "clearKeyError": "Could not remove API key",
-    "webSearchLabel": "Web search for connected AI assistants",
+    "webSearchLabel": "Web search for connected AI tools",
     "webSearchModeAuto": "Automatic (recommended)",
     "webSearchModeSynaplan": "Always use Synaplan's web search",
     "webSearchModePassthrough": "Pass the request on to the AI provider",
@@ -556,7 +556,7 @@
     "knowledgeToolsAll": "Every key on the coding gateway",
     "knowledgeToolsOff": "No folder search",
     "knowledgeToolsHint": "When a knowledge folder is pinned, the model can search it again and open a file if the first passages are not enough. Desktop only is the recommended setting.",
-    "visionLabel": "Vision for connected AI assistants",
+    "visionLabel": "Vision for connected AI tools",
     "visionModeAuto": "Automatic (recommended)",
     "visionModeSynaplan": "Always use Synaplan's vision model",
     "visionModePassthrough": "Pass images on to the AI provider",
@@ -586,7 +586,7 @@
         },
         "tools": {
           "title": "Tool calling",
-          "description": "What connected AI assistants may do besides answering: use the tools of your workspace and search the web."
+          "description": "What connected AI tools may do besides answering: use the tools of your workspace and search the web."
         },
         "vision": {
           "title": "Images",
@@ -603,8 +603,8 @@
       },
       "activeTools": {
         "title": "Running on your behalf right now",
-        "empty": "Synaplan runs no tools of its own. Connected AI assistants only get the tools their own program brings along.",
-        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the assistant asks for it. Page reading stops at the page limit. Folder search runs only while a knowledge folder is pinned.",
+        "empty": "Synaplan runs no tools of its own. Connected AI tools only get the tools their own program brings along.",
+        "hint": "A single message can still skip one of these: a program that brings its own tool of the same name keeps it, and web search only runs when the AI tool asks for it. Page reading stops at the page limit. Folder search runs only while a knowledge folder is pinned.",
         "mcpServers": "plus the tools of 1 connected tool server | plus the tools of {count} connected tool servers",
         "tools": {
           "web_search": "Web search",
@@ -623,25 +623,25 @@
         "description": "Users without their own Anthropic key then use the key of this instance, and the cost counts against their Synaplan budget."
       },
       "mcpTools": {
-        "label": "Let AI assistants use your tools",
-        "description": "Synaplan runs the tools of your connected tool servers itself and passes the result back to the assistant.",
+        "label": "Let AI tools use your tools",
+        "description": "Synaplan runs the tools of your connected tool servers itself and passes the result back to the AI tool.",
         "noneConfigured": "No tool server is connected yet. You can add one under Apps › Tool servers (MCP)."
       },
       "mcpWithClientTools": {
         "label": "Offer your tools even when the agent tool brings its own",
-        "description": "Claude Code already ships a full set of tools. Turn this on only if your own tools should be offered on top — a very long tool list makes an assistant less precise."
+        "description": "Claude Code already ships a full set of tools. Turn this on only if your own tools should be offered on top — a very long tool list makes an AI tool less precise."
       },
       "toolRounds": {
         "label": "Maximum tool rounds per message",
-        "description": "How often an AI assistant may use a tool and think again before it has to answer. Higher values allow more thorough work and cost more."
+        "description": "How often an AI tool may use a tool and think again before it has to answer. Higher values allow more thorough work and cost more."
       },
       "webSearchRounds": {
         "label": "Web searches before an answer",
-        "description": "After this many searches in one message, the assistant answers from what it found and names each source. 2 is enough for a short question. Raise it when the first results are not enough."
+        "description": "After this many searches in one message, the AI tool answers from what it found and names each source. 2 is enough for a short question. Raise it when the first results are not enough."
       },
       "webFetchPages": {
         "label": "Pages to open in one message",
-        "description": "After this many pages in one message, the assistant stops opening more and answers from what it read. 3 is enough for a normal question. 0 means it does not open pages."
+        "description": "After this many pages in one message, the AI tool stops opening more and answers from what it read. 3 is enough for a normal question. 0 means it does not open pages."
       },
       "imageDetail": {
         "label": "Image quality",
@@ -658,11 +658,11 @@
       },
       "contextInjection": {
         "label": "Add knowledge from your workspace",
-        "description": "Synaplan adds matching information from your workspace to each request, so the AI assistant knows your context."
+        "description": "Synaplan adds matching information from your workspace to each request, so the AI tool knows your context."
       },
       "budgetNotice": {
         "label": "Warn when the budget runs low",
-        "description": "The AI assistant receives a short note in its answer once your Synaplan budget is nearly used up."
+        "description": "The AI tool receives a short note in its answer once your Synaplan budget is nearly used up."
       },
       "sessionSummary": {
         "label": "Keep a summary of each session",
@@ -774,7 +774,7 @@
     "kindHints": {
       "email_search": "Looks in the connected mailbox.",
       "summarize": "Shortens the previous result.",
-      "chat": "Uses this task’s assistant.",
+      "chat": "Uses this task’s AI.",
       "email_me": "Sends you an email.",
       "tool_call": "Runs a tool you already connected.",
       "condition": "Stops later steps when the value does not match.",
@@ -800,7 +800,7 @@
     "useTemplate": "Use template",
     "useTemplateConfirm": "Create your own copy? It stays off until you turn it on. A new address is created if another system can start this task.",
     "useTemplateDone": "Copy created. It is off until you turn it on.",
-    "useTemplateNeedsSetup": "Copy created and left off. Connect the missing assistant, tool, or connection before you turn it on.",
+    "useTemplateNeedsSetup": "Copy created and left off. Connect the missing agent, tool, or connection before you turn it on.",
     "useTemplateNeedsSetupItems": "Copy created and left off. Still needed: {items}.",
     "notionPage": "Notion page",
     "notionPageHint": "Paste the link of the page. Each run adds a new page under it.",
@@ -818,7 +818,7 @@
     "chats": {
       "rail": {
         "title": "The areas",
-        "body": "These icons switch area: Chats, Library, Assistants and Apps. Admin appears for people who manage this installation. A click opens that area’s menu beside it."
+        "body": "These icons switch area: Chats, Library, Agents and Apps. Admin appears for people who manage this installation. A click opens that area’s menu beside it."
       },
       "new": {
         "title": "A new chat",
@@ -834,17 +834,17 @@
       },
       "model": {
         "title": "Which model answers",
-        "body": "The name here is the model for this answer. Tap it to choose another. What applies to everyone is set under Assistants, in AI settings."
+        "body": "The name here is the model for this answer. Tap it to choose another. What applies to everyone is set under Agents, in AI settings."
       },
       "search": {
         "title": "Find something again",
-        "body": "This field searches chats, files, assistants and pages. The same search opens from anywhere with Ctrl+K or ⌘K."
+        "body": "This field searches chats, files, agents and pages. The same search opens from anywhere with Ctrl+K or ⌘K."
       }
     },
     "chatsGuest": {
       "rail": {
         "title": "What you can open",
-        "body": "As a guest you are in Chats. Library, Assistants and Apps stay closed until you have an account with a plan or an invitation code. That is why not every icon works yet."
+        "body": "As a guest you are in Chats. Library, Agents and Apps stay closed until you have an account with a plan or an invitation code. That is why not every icon works yet."
       },
       "input": {
         "title": "Just ask",
@@ -860,7 +860,7 @@
       },
       "plan": {
         "title": "An account, then a plan",
-        "body": "An account needs a plan or an invitation code. That unlocks Library, Assistants and Apps."
+        "body": "An account needs a plan or an invitation code. That unlocks Library, Agents and Apps."
       }
     },
     "library": {
@@ -879,12 +879,12 @@
     },
     "assistants": {
       "create": {
-        "title": "Create an assistant",
-        "body": "An assistant remembers instructions, files and tools. You set that once. Every chat with it already knows."
+        "title": "Create an agent",
+        "body": "An agent remembers instructions, files and tools. You set that once. Every chat with it already knows."
       },
       "gallery": {
         "title": "The list",
-        "body": "These are the assistants you already have. Open one to chat, to change it, or to share it with your team."
+        "body": "These are the agents you already have. Open one to chat, to change it, or to share it with your team."
       },
       "more": {
         "title": "Also in this menu",
@@ -922,7 +922,7 @@
       },
       "add": {
         "title": "Add someone",
-        "body": "An account needs a plan or an invitation code. Then the person shows up here and can use Library, Assistants and Apps."
+        "body": "An account needs a plan or an invitation code. Then the person shows up here and can use Library, Agents and Apps."
       },
       "menu": {
         "title": "The admin pages",
@@ -944,8 +944,8 @@
           "where": "A document or a photo the AI can answer from later."
         },
         "assistant": {
-          "title": "Create an assistant",
-          "where": "Set instructions, files and tools once. Every chat with this assistant already knows them."
+          "title": "Create an agent",
+          "where": "Set instructions, files and tools once. Every chat with this agent already knows them."
         },
         "app": {
           "title": "Connect an app",
@@ -1011,19 +1011,19 @@
     "items": {
       "telegram": {
         "name": "Telegram",
-        "tagline": "Chat with your assistant in Telegram.",
-        "about": "Your own Telegram bot answers with your assistant. Only your messages reach Synaplan; nobody else can use the bot.",
+        "tagline": "Chat with your agent in Telegram.",
+        "about": "Your own Telegram bot answers with your agent. Only your messages reach Synaplan; nobody else can use the bot.",
         "stop": "Disconnect below. The bot stops answering at once."
       },
       "whatsapp": {
         "name": "WhatsApp",
         "tagline": "Ask Synaplan from WhatsApp.",
-        "about": "Verify your phone number, then message the Synaplan number. The assistant you pick below answers.",
-        "stop": "Pick no assistant below or remove your verified number."
+        "about": "Verify your phone number, then message the Synaplan number. The agent you pick below answers.",
+        "stop": "Pick no agent below or remove your verified number."
       },
       "widgets": {
         "name": "Chat widgets",
-        "tagline": "Put an AI assistant on your website."
+        "tagline": "Put an AI chat on your website."
       },
       "email": {
         "name": "Email to Synaplan",
@@ -1039,7 +1039,7 @@
       },
       "microsoft365": {
         "name": "Microsoft 365",
-        "tagline": "Outlook mail and calendar for your assistant.",
+        "tagline": "Outlook mail and calendar for your agent.",
         "about": "After you sign in with Microsoft, the AI can read your Outlook mail, add events to your calendar and send results from your own mailbox.",
         "stop": "Remove the connection below. Access ends immediately."
       },
@@ -1057,19 +1057,19 @@
       },
       "nextcloud": {
         "name": "Synaplan in Nextcloud",
-        "tagline": "Use your assistants inside Nextcloud.",
+        "tagline": "Use your agents inside Nextcloud.",
         "about": "Install the Synaplan app in Nextcloud and sign in there. Nextcloud then uses this account; you never copy a key.",
         "stop": "Disconnect the server in the list below."
       },
       "owncloud": {
         "name": "Synaplan in ownCloud",
-        "tagline": "Use your assistants inside ownCloud.",
+        "tagline": "Use your agents inside ownCloud.",
         "about": "Install the Synaplan app in ownCloud and sign in there. ownCloud then uses this account; you never copy a key.",
         "stop": "Disconnect the server in the list below."
       },
       "outlook": {
         "name": "Synaplan in Outlook",
-        "tagline": "Answer and summarise mail with your assistant in Outlook.",
+        "tagline": "Answer and summarise mail with your agent in Outlook.",
         "about": "Add the Synaplan add-in in Outlook and sign in there. The add-in then uses this account.",
         "stop": "Disconnect it in the list below."
       },
@@ -1106,7 +1106,7 @@
       },
       "desktop": {
         "name": "Synaplan Desktop",
-        "tagline": "Let your assistant work with files on your computer.",
+        "tagline": "Let your agent work with files on your computer.",
         "about": "Pair the desktop app with a code. It runs jobs you start from chat on your own machine.",
         "stop": "Remove the device below. Running jobs are cancelled."
       },

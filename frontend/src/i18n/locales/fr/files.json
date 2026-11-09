@@ -173,7 +173,7 @@
     "tabFiles": "Fichiers",
     "tabSearch": "Recherche",
     "tabVectors": "Vecteurs",
-    "intro": "Les fichiers marqués recherchables par l’IA peuvent servir dans les chats et les assistants.",
+    "intro": "Les fichiers marqués recherchables par l’IA peuvent servir dans les chats et les agents.",
     "introCta": "Ajouter des fichiers à vos sources…",
     "useInChat": "Utiliser dans le chat",
     "startedChatWithFolder": "Nouvelle discussion démarrée avec {folder}.",
@@ -283,9 +283,9 @@
       "noGroup": "Aucun groupe"
     },
     "help": {
-      "vectorized": "Lorsqu’un fichier est recherchable par l’IA, son contenu est ajouté à votre base de connaissances afin que l’assistant puisse s’en servir pour vous répondre.",
-      "notSearchable": "L’assistant ne peut pas encore utiliser ce fichier dans ses réponses. Rendez-le recherchable pour l’ajouter à vos connaissances.",
-      "processing": "Ce fichier est en cours de préparation pour que l’assistant puisse l’utiliser.",
+      "vectorized": "Lorsqu’un fichier est recherchable par l’IA, son contenu est ajouté à votre base de connaissances afin que l’IA puisse s’en servir pour vous répondre.",
+      "notSearchable": "L’IA ne peut pas encore utiliser ce fichier dans ses réponses. Rendez-le recherchable pour l’ajouter à vos connaissances.",
+      "processing": "Ce fichier est en cours de préparation pour que l’IA puisse l’utiliser.",
       "failed": "Impossible de rendre ce fichier recherchable. Vous pouvez réessayer.",
       "group": "Les dossiers de connaissances regroupent des fichiers. Lorsque l’IA recherche un dossier, elle peut utiliser chaque fichier qu’il contient.",
       "source": "D’où vient ce fichier — un téléversement, un chat, Outlook, Nextcloud, OpenCloud, WhatsApp, le widget, l’API, ou généré par l’IA.",
@@ -382,7 +382,7 @@
       "loadMore": "Charger plus"
     },
     "explainer": {
-      "text": "Tout ce que vous téléversez ou créez se trouve ici. L’assistant peut utiliser les fichiers marqués recherchables par l’IA. Photos, enregistrements et fichiers créés par l’IA doivent d’abord être rendus recherchables.",
+      "text": "Tout ce que vous téléversez ou créez se trouve ici. L’IA peut utiliser les fichiers marqués recherchables par l’IA. Photos, enregistrements et fichiers créés par l’IA doivent d’abord être rendus recherchables.",
       "dismiss": "Compris",
       "reopen": "Qu’est-ce que c’est ?"
     },

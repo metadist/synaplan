@@ -52,7 +52,7 @@ final readonly class HumanTakeoverService
         $session->takeOver($operator->getId());
 
         // Create system message in the chat
-        $systemMessage = 'You are now connected with a support agent.';
+        $systemMessage = 'You are now connected with a person from our team.';
         $message = $this->createSystemMessage($session, $operator, $systemMessage);
 
         // Update session's last message preview

@@ -72,7 +72,7 @@ const navMessages = {
     filesDescription: 'Sources',
     manage: 'Manage',
     manageDescription: 'Manage',
-    groupAssistants: 'Assistants',
+    groupAssistants: 'Agents',
     groupAutomations: 'Automations',
     groupTools: 'Tools',
     channels: 'Channels',
@@ -88,7 +88,7 @@ const navMessages = {
     prompts: 'Shortcuts',
     savedTasks: 'Tasks',
     approvals: 'Approvals',
-    assistants: 'Assistants',
+    assistants: 'Agents',
     configAiModels: 'AI settings',
     plugins: 'Plugins',
     admin: 'Admin',
@@ -164,11 +164,11 @@ describe('isNavChildActive', () => {
 describe('groupNavChildren', () => {
   it('keeps consecutive group keys together', () => {
     const groups = groupNavChildren([
-      { key: 'a', path: '/a', label: 'A', group: 'Assistants', groupKey: 'assistants' },
+      { key: 'a', path: '/a', label: 'A', group: 'Agents', groupKey: 'assistants' },
       { key: 'b', path: '/b', label: 'B', group: 'Channels', groupKey: 'channels' },
     ])
     expect(groups.map((g) => g.key)).toEqual(['assistants', 'channels'])
-    expect(groups.map((g) => g.group)).toEqual(['Assistants', 'Channels'])
+    expect(groups.map((g) => g.group)).toEqual(['Agents', 'Channels'])
   })
 })
 
@@ -252,14 +252,14 @@ describe('useNavItems rail', () => {
     expect(child?.groupKey).toBe('automations')
   })
 
-  it('lists AI settings first and Assistants when the flag is on', () => {
+  it('lists AI settings first and Agents when the flag is on', () => {
     runtimeFeatures.agentsEnabled = true
     const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
     const manage = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'manage')
     const children = (manage?.children ?? []) as Array<{ key: string; path: string }>
     expect(children[0]?.key).toBe('ai-models')
     expect(children[0]?.path).toBe('/ai/models')
-    expect(children.find((child) => child.key === 'assistants')?.path).toBe('/ai/assistants')
+    expect(children.find((child) => child.key === 'assistants')?.path).toBe('/ai/agents')
   })
 
   it('keeps All apps highlighted on the connected filter and on an app page', () => {

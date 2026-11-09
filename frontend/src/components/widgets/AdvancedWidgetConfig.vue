@@ -2509,7 +2509,7 @@ Be friendly, professional, and concise in your responses.`
     // Update local state to show the form
     const widgetName = props.widget.name || 'this'
     promptData.id = result.promptId
-    promptData.name = `${widgetName} Assistant`
+    promptData.name = `${widgetName} AI`
     promptData.rules = ''
     promptData.aiModel = DEFAULT_AI_MODEL
     promptData.content = defaultPromptContent

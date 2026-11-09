@@ -495,7 +495,7 @@
       "aiModel": "AI Modeli",
       "aiModelHelp": "Bu prompt için hangi AI modelini kullanacağınızı seçin. Modeller yeteneklerine göre gruplandırılmıştır.",
       "automated": "Otomatik (En İyi Model)",
-      "availableTools": "Mevcut Araçlar",
+      "availableTools": "Araçlar",
       "availableToolsHelp": "Bu promptu kullanırken mevcut olacak araçları etkinleştirin",
       "internetSearch": {
         "label": "İnternet Araması",

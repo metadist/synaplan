@@ -32,7 +32,7 @@ final class WidgetControllerAgentIdTest extends WebTestCase
         $this->em->flush();
     }
 
-    public function testBindAgentIdIs400WhenAssistantsOff(): void
+    public function testBindAgentIdIs400WhenAgentsOff(): void
     {
         $user = $this->createUser('widget-agent-off@synaplan.internal');
         $this->authenticateClient($this->client, $user);
@@ -54,7 +54,7 @@ final class WidgetControllerAgentIdTest extends WebTestCase
         self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode(), (string) $this->client->getResponse()->getContent());
         $body = json_decode((string) $this->client->getResponse()->getContent(), true);
         self::assertIsArray($body);
-        self::assertStringContainsString('Assistants are not enabled', (string) ($body['error'] ?? ''));
+        self::assertStringContainsString('Agents are not enabled', (string) ($body['error'] ?? ''));
     }
 
     private function ensureDefaultPromptExists(): void

@@ -101,7 +101,7 @@ final class AgentTemplateController extends AbstractController
                 ),
             ),
             new OA\Response(response: 401, description: 'Not authenticated'),
-            new OA\Response(response: 404, description: 'Assistants are turned off'),
+            new OA\Response(response: 404, description: 'Agents are turned off'),
         ],
     )]
     public function list(#[CurrentUser] ?User $user): JsonResponse
@@ -135,7 +135,7 @@ final class AgentTemplateController extends AbstractController
             new OA\Property(property: 'tryIt', type: 'array', items: new OA\Items(type: 'string')),
         ])),
         responses: [
-            new OA\Response(response: 200, description: 'Assistant created, or the person already has it', content: new OA\JsonContent(
+            new OA\Response(response: 200, description: 'Agent created, or the person already has it', content: new OA\JsonContent(
                 required: ['success', 'agentId', 'alreadyInstalled', 'shared', 'sharingOff', 'waitingForReview'],
                 properties: [
                     new OA\Property(property: 'success', type: 'boolean', example: true),
