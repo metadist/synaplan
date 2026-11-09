@@ -9,6 +9,7 @@ use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Security\OidcBearerAuthenticator;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
 use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
@@ -425,14 +426,14 @@ final class PlatformLinkController extends AbstractController
             new OA\Response(response: 404, description: 'Feature disabled'),
         ]
     )]
-    public function lifecycle(Request $request): JsonResponse
+    public function lifecycle(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard(null);
         $body = $this->jsonBody($request);
 
         try {
             $result = $this->lifecycle->apply(
-                $this->credential($request),
+                $caller->instance,
                 is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
                 is_string($body['event'] ?? null) ? $body['event'] : '',
                 $request->getClientIp() ?? '',

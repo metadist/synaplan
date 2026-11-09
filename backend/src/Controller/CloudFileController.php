@@ -5,14 +5,11 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\File\CloudFileRequestException;
 use App\Service\File\CloudFilesConfig;
 use App\Service\File\CloudFileStatus;
 use App\Service\File\CloudSourceEvents;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
-use App\Service\PlatformLink\InstanceCredential;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,7 +27,6 @@ final class CloudFileController extends AbstractController
         private readonly CloudFilesConfig $cloudFiles,
         private readonly CloudFileStatus $status,
         private readonly CloudSourceEvents $events,
-        private readonly InstanceCredential $instances,
     ) {
     }
 
@@ -125,24 +121,16 @@ final class CloudFileController extends AbstractController
             new OA\Response(response: 404, description: 'Cloud file state is turned off'),
         ],
     )]
-    public function events(Request $request): JsonResponse
+    public function events(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $absent = $this->absent();
         if ($absent instanceof JsonResponse) {
             return $absent;
         }
         try {
-            $instance = $this->instances->require(
-                (string) $request->headers->get('X-Instance-Id', ''),
-                (string) $request->headers->get('X-Instance-Secret', ''),
-            );
-            $answer = $this->events->apply($instance, $this->body($request), $request->getClientIp() ?? '');
+            $answer = $this->events->apply($caller->instance, $this->body($request), $request->getClientIp() ?? '');
         } catch (CloudFileRequestException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_BAD_REQUEST);
-        } catch (PlatformInstanceNotFoundException) {
-            return $this->json(['error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
-        } catch (PlatformInstanceSecretException|PlatformInstanceNotActiveException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_UNAUTHORIZED);
         }
 
         return $this->json($answer);

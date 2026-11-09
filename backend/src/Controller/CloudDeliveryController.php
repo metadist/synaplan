@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\PlatformInstance;
 use App\Exception\CloudDeliveryException;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\PlatformLink\CloudDeliveryService;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
-use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/api/v1/platform-links/deliveries', name: 'platform_link_deliveries_')]
 #[OA\Tag(name: 'Platform Links')]
@@ -27,7 +25,6 @@ final class CloudDeliveryController extends AbstractController
 {
     public function __construct(
         private PlatformLinksConfig $platformLinksConfig,
-        private PlatformInstanceService $instances,
         private CloudDeliveryService $deliveries,
     ) {
     }
@@ -52,11 +49,11 @@ final class CloudDeliveryController extends AbstractController
             new OA\Response(response: 429, description: 'Too many failed claims'),
         ]
     )]
-    public function claim(int $id, Request $request): JsonResponse
+    public function claim(int $id, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         try {
-            return $this->json($this->deliveries->claim($this->instance($request), $id));
+            return $this->json($this->deliveries->claim($caller->instance, $id));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -80,12 +77,12 @@ final class CloudDeliveryController extends AbstractController
             new OA\Response(response: 410, description: 'Ticket already used or unknown'),
         ]
     )]
-    public function download(int $id, Request $request): Response
+    public function download(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): Response
     {
         $this->guard();
         try {
             $file = $this->deliveries->download(
-                $this->instance($request),
+                $caller->instance,
                 $id,
                 (string) $request->query->get('ticket', ''),
                 $request->isMethod('GET'),
@@ -117,12 +114,12 @@ final class CloudDeliveryController extends AbstractController
             new OA\Response(response: 404, description: 'Unknown delivery'),
         ]
     )]
-    public function result(int $id, Request $request): JsonResponse
+    public function result(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
         try {
-            return $this->json($this->deliveries->result($this->instance($request), $id, is_array($body) ? $body : []));
+            return $this->json($this->deliveries->result($caller->instance, $id, is_array($body) ? $body : []));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -133,19 +130,5 @@ final class CloudDeliveryController extends AbstractController
         if (!$this->platformLinksConfig->isEnabled(null)) {
             throw new NotFoundHttpException();
         }
-    }
-
-    private function instance(Request $request): PlatformInstance
-    {
-        try {
-            $instance = $this->instances->requireInstance((string) $request->headers->get('X-Instance-Id', ''));
-            $this->instances->assertSecret($instance, (string) $request->headers->get('X-Instance-Secret', ''));
-        } catch (PlatformInstanceNotFoundException) {
-            throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
-        } catch (PlatformInstanceSecretException) {
-            throw new CloudDeliveryException(Response::HTTP_UNAUTHORIZED, 'unauthorized');
-        }
-
-        return $instance;
     }
 }

@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\CloudWatch\CloudWatchException;
 use App\Service\CloudWatch\CloudWatchIndex;
 use App\Service\CloudWatch\CloudWatchService;
 use App\Service\CloudWatch\WatchDialogOptions;
 use App\Service\CloudWatch\WatchUpload;
 use App\Service\File\CloudFilesConfig;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
-use App\Service\PlatformLink\InstanceCredential;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -36,7 +33,6 @@ final class CloudWatchController extends AbstractController
         private readonly WatchDialogOptions $dialogOptions,
         private readonly WatchUpload $uploads,
         private readonly CloudWatchIndex $index,
-        private readonly InstanceCredential $instances,
     ) {
     }
 
@@ -236,24 +232,16 @@ final class CloudWatchController extends AbstractController
             new OA\Response(response: 410, description: 'The cursor is older than 7 days'),
         ],
     )]
-    public function index(Request $request): JsonResponse|Response
+    public function index(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse|Response
     {
         $absent = $this->absent();
         if ($absent instanceof JsonResponse) {
             return $absent;
         }
         try {
-            $instance = $this->instances->require(
-                (string) $request->headers->get('X-Instance-Id', ''),
-                (string) $request->headers->get('X-Instance-Secret', ''),
-            );
-            $feed = $this->index->feed($instance, $request, time());
+            $feed = $this->index->feed($caller->instance, $request, time());
         } catch (CloudWatchException $e) {
             return $this->json(['error' => $e->error, 'message' => $e->getMessage()], $e->status);
-        } catch (PlatformInstanceNotFoundException) {
-            return $this->json(['error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
-        } catch (PlatformInstanceSecretException|PlatformInstanceNotActiveException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_UNAUTHORIZED);
         }
         if (304 === $feed['status']) {
             return new Response('', Response::HTTP_NOT_MODIFIED, ['ETag' => $feed['etag']]);

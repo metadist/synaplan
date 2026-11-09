@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\PlatformInstance;
 use App\Exception\CloudDeliveryException;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\PlatformLink\PickupService;
-use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,6 +16,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/api/v1/platform-links', name: 'platform_link_pickups_')]
 #[OA\Tag(name: 'Platform Links')]
@@ -26,7 +24,6 @@ final class PickupController extends AbstractController
 {
     public function __construct(
         private PlatformLinksConfig $platformLinksConfig,
-        private PlatformInstanceService $instances,
         private PickupService $pickups,
     ) {
     }
@@ -62,12 +59,12 @@ final class PickupController extends AbstractController
             new OA\Response(response: 410, description: 'Expired'),
         ]
     )]
-    public function claim(int $id, Request $request): JsonResponse
+    public function claim(int $id, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
 
         try {
-            return $this->json($this->pickups->claim($this->instance($request), $id));
+            return $this->json($this->pickups->claim($caller->instance, $id));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -108,14 +105,14 @@ final class PickupController extends AbstractController
             ])),
         ]
     )]
-    public function listing(int $id, Request $request): JsonResponse
+    public function listing(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
         $items = is_array($body) && is_array($body['items'] ?? null) ? $body['items'] : [];
 
         try {
-            return $this->json($this->pickups->listing($this->instance($request), $id, $items));
+            return $this->json($this->pickups->listing($caller->instance, $id, $items));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -144,11 +141,10 @@ final class PickupController extends AbstractController
             new OA\Response(response: 409, description: 'Not requested, too large, or a names-only pickup'),
         ]
     )]
-    public function files(int $id, Request $request): JsonResponse
+    public function files(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         try {
-            $instance = $this->instance($request);
             $upload = $request->files->get('file');
             if (!$upload instanceof UploadedFile || !$upload->isValid()) {
                 return $this->json(['success' => false, 'error' => 'not_requested'], Response::HTTP_CONFLICT);
@@ -158,7 +154,7 @@ final class PickupController extends AbstractController
                 return $this->json(['success' => false, 'error' => 'not_requested'], Response::HTTP_CONFLICT);
             }
             $fileId = $this->pickups->storeFile(
-                $instance,
+                $caller->instance,
                 $id,
                 (string) $request->request->get('id', ''),
                 (string) $request->request->get('version', ''),
@@ -197,13 +193,13 @@ final class PickupController extends AbstractController
             ])),
         ]
     )]
-    public function result(int $id, Request $request): JsonResponse
+    public function result(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
 
         try {
-            return $this->json($this->pickups->result($this->instance($request), $id, is_array($body) ? $body : []));
+            return $this->json($this->pickups->result($caller->instance, $id, is_array($body) ? $body : []));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -234,7 +230,7 @@ final class PickupController extends AbstractController
             new OA\Response(response: 404, description: 'Unknown person'),
         ]
     )]
-    public function readScope(Request $request): JsonResponse
+    public function readScope(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
@@ -242,7 +238,7 @@ final class PickupController extends AbstractController
 
         try {
             $this->pickups->reportScope(
-                $this->instance($request),
+                $caller->instance,
                 is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
                 is_string($body['mode'] ?? null) ? $body['mode'] : '',
                 is_array($body['folders'] ?? null) ? $body['folders'] : [],
@@ -259,19 +255,5 @@ final class PickupController extends AbstractController
         if (!$this->platformLinksConfig->isEnabled(null)) {
             throw new NotFoundHttpException();
         }
-    }
-
-    private function instance(Request $request): PlatformInstance
-    {
-        try {
-            $instance = $this->instances->requireInstance((string) $request->headers->get('X-Instance-Id', ''));
-            $this->instances->assertSecret($instance, (string) $request->headers->get('X-Instance-Secret', ''));
-        } catch (PlatformInstanceNotFoundException) {
-            throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
-        } catch (PlatformInstanceSecretException) {
-            throw new CloudDeliveryException(Response::HTTP_UNAUTHORIZED, 'unauthorized');
-        }
-
-        return $instance;
     }
 }

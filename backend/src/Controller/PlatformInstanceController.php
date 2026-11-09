@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Security\PlatformInstanceAuthenticator;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\File\CloudFilesConfig;
 use App\Service\Http\ClientAddress;
 use App\Service\PlatformLink\DeliveryAddressService;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
 use App\Service\PlatformLink\Exception\PlatformLinkLimitException;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 use App\Service\PlatformLink\PlatformInstanceService;
@@ -94,7 +95,7 @@ final class PlatformInstanceController extends AbstractController
         return $this->json(['success' => true, ...$result], Response::HTTP_CREATED);
     }
 
-    #[Route('/self', name: 'self', methods: ['GET'])]
+    #[Route('/self', name: 'self', methods: ['GET'], defaults: [PlatformInstanceAuthenticator::ALLOW_PENDING => true])]
     #[OA\Get(
         path: '/api/v1/platform-links/instances/self',
         operationId: 'getPlatformInstanceSelf',
@@ -139,27 +140,18 @@ final class PlatformInstanceController extends AbstractController
             new OA\Response(response: 404, description: 'Feature disabled or unknown instance'),
         ]
     )]
-    public function self(Request $request): JsonResponse
+    public function self(#[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard(null);
-        $instanceId = (string) $request->headers->get('X-Instance-Id', '');
-        $secret = (string) $request->headers->get('X-Instance-Secret', '');
-
-        try {
-            $result = $this->instanceService->describeSelf($instanceId, $secret);
-            if ($this->cloudFiles->isEnabled()) {
-                $result['capabilities'] = [...$result['capabilities'], 'cloud_status', 'source_events', 'watches'];
-            }
-        } catch (PlatformInstanceNotFoundException) {
-            return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
-        } catch (PlatformInstanceSecretException $e) {
-            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_UNAUTHORIZED);
+        $result = $this->instanceService->describeSelf($caller->instance);
+        if ($this->cloudFiles->isEnabled()) {
+            $result['capabilities'] = [...$result['capabilities'], 'cloud_status', 'source_events', 'watches'];
         }
 
         return $this->json(['success' => true, ...$result]);
     }
 
-    #[Route('/self', name: 'delivery_url', methods: ['PATCH'])]
+    #[Route('/self', name: 'delivery_url', methods: ['PATCH'], defaults: [PlatformInstanceAuthenticator::ALLOW_PENDING => true])]
     #[OA\Patch(
         path: '/api/v1/platform-links/instances/self',
         operationId: 'setPlatformInstanceDeliveryUrl',
@@ -194,7 +186,7 @@ final class PlatformInstanceController extends AbstractController
             new OA\Response(response: 422, description: 'Address is not on this cloud'),
         ]
     )]
-    public function deliveryUrl(Request $request): JsonResponse
+    public function deliveryUrl(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard(null);
         $body = json_decode($request->getContent(), true);
@@ -219,18 +211,13 @@ final class PlatformInstanceController extends AbstractController
 
         try {
             $saved = $this->deliveryAddress->update(
-                (string) $request->headers->get('X-Instance-Id', ''),
-                (string) $request->headers->get('X-Instance-Secret', ''),
+                $caller->instance,
                 $url,
                 $capabilities,
                 $text('oidc_client_id'),
                 $text('app_version'),
                 $text('server_id'),
             );
-        } catch (PlatformInstanceNotFoundException) {
-            return $this->json(['success' => false, 'error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
-        } catch (PlatformInstanceSecretException $e) {
-            return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_UNAUTHORIZED);
         } catch (PlatformLinkValidationException $e) {
             return $this->json(['success' => false, 'error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
         }

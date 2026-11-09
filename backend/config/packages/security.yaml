@@ -39,6 +39,16 @@ security:
                 - App\Security\OidcBearerAuthenticator
                 - App\Security\ApiKeyAuthenticator
 
+        # Calls a connected cloud makes as itself (X-Instance-Id +
+        # X-Instance-Secret). A firewall of its own, so a person's cookie,
+        # bearer or key can never stand in for the instance on these paths.
+        platform_instance:
+            pattern: ^/api/v1/platform-links/(instances/self$|deliveries/|pickups/|read-scope$|sources/events$|watches$|lifecycle$)
+            stateless: true
+            entry_point: App\Security\PlatformInstanceAuthenticator
+            custom_authenticators:
+                - App\Security\PlatformInstanceAuthenticator
+
         api:
             pattern: ^/api
             stateless: true
@@ -160,18 +170,20 @@ security:
         - { path: ^/api/v1/desktop/pair$, roles: PUBLIC_ACCESS }
 
         # Partner-instance handshake: anonymous register (pending), public
-        # confirm-card lookup, instance self-check, and code exchange. All
-        # 404 when PLATFORM_LINKS.ENABLED is off. Session routes stay auth'd.
+        # confirm-card lookup, and code exchange (the instance secret travels
+        # in the body there). All 404 when PLATFORM_LINKS.ENABLED is off.
         - { path: ^/api/v1/platform-links/instances$, methods: [POST], roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/instances/self$, roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/deliveries/, roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/pickups/, roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/read-scope$, roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/sources/events$, methods: [POST], roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/watches$, methods: [GET], roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/lifecycle$, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/instances/[^/]+/public$, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/exchange$, methods: [POST], roles: PUBLIC_ACCESS }
+
+        # The platform_instance firewall: PlatformInstanceAuthenticator.
+        - { path: ^/api/v1/platform-links/instances/self$, roles: ROLE_PLATFORM_INSTANCE }
+        - { path: ^/api/v1/platform-links/deliveries/, roles: ROLE_PLATFORM_INSTANCE }
+        - { path: ^/api/v1/platform-links/pickups/, roles: ROLE_PLATFORM_INSTANCE }
+        - { path: ^/api/v1/platform-links/read-scope$, roles: ROLE_PLATFORM_INSTANCE }
+        - { path: ^/api/v1/platform-links/sources/events$, roles: ROLE_PLATFORM_INSTANCE }
+        - { path: ^/api/v1/platform-links/watches$, roles: ROLE_PLATFORM_INSTANCE }
+        - { path: ^/api/v1/platform-links/lifecycle$, roles: ROLE_PLATFORM_INSTANCE }
 
         # Partner handshake. The invite preview and the signed connect call
         # prove themselves (unguessable token, Ed25519 signature). Admin routes
