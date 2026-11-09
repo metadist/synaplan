@@ -67,6 +67,10 @@ class PlatformInstance
     private string $secretHash = '';
 
     /** @var list<string>|null */
+    /** The cloud's public keys (a JWK Set as JSON): it authenticates by private_key_jwt. */
+    #[ORM\Column(name: 'BJWKS', type: 'text', nullable: true)]
+    private ?string $jwks = null;
+
     #[ORM\Column(name: 'BREDIRECTURIS', type: 'json', nullable: true)]
     private ?array $redirectUris = null;
 
@@ -195,6 +199,32 @@ class PlatformInstance
     /**
      * @return list<string>
      */
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getJwks(): ?array
+    {
+        $decoded = null === $this->jwks ? null : json_decode($this->jwks, true);
+
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * @param array<string, mixed>|null $jwks
+     */
+    public function setJwks(?array $jwks): void
+    {
+        $this->jwks = null === $jwks ? null : json_encode($jwks, \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param list<string> $redirectUris
+     */
+    public function setRedirectUris(array $redirectUris): void
+    {
+        $this->redirectUris = $redirectUris;
+    }
+
     public function getRedirectUris(): array
     {
         return $this->redirectUris ?? [];

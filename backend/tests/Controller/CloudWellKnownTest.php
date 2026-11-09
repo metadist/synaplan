@@ -34,6 +34,9 @@ final class CloudWellKnownTest extends WebTestCase
         self::assertNotEmpty($body['keys']);
         $key = $body['keys'][0];
         self::assertSame(['OKP', 'Ed25519', 'sig', 'EdDSA'], [$key['kty'], $key['crv'], $key['use'], $key['alg']]);
+        $rsa = array_values(array_filter($body['keys'], static fn (array $k): bool => 'RSA' === $k['kty']));
+        self::assertCount(1, $rsa, 'the access token key');
+        self::assertSame(['sig', 'RS256'], [$rsa[0]['use'], $rsa[0]['alg']]);
         self::assertSame(32, strlen((string) base64_decode(strtr($key['x'], '-_', '+/'), true)));
         self::assertNotSame('', $key['kid']);
     }

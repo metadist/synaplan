@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Service\OAuth\Server\AccessTokenKeyStore;
 use App\Service\PlatformLink\NotifyKeyStore;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use OpenApi\Attributes as OA;
@@ -19,14 +20,16 @@ use Symfony\Component\Routing\Attribute\Route;
  * `iss` and where the keys are, in the shape of OAuth2 authorization server
  * metadata (RFC 8414), so a cloud that reaches Synaplan by an internal
  * address still learns the public one. The keys are a JWK Set (RFC 7517,
- * Ed25519 per RFC 8037). When Synaplan issues OAuth2 tokens, its RFC 8414
- * metadata names the same issuer and set.
+ * Ed25519 per RFC 8037), with the RS256 key Synaplan's OAuth2 access tokens
+ * are signed with; /.well-known/oauth-authorization-server names the same
+ * issuer and set.
  */
 #[OA\Tag(name: 'Platform Links')]
 final class CloudWellKnownController extends AbstractController
 {
     public function __construct(
         private readonly NotifyKeyStore $notifyKeys,
+        private readonly AccessTokenKeyStore $accessTokenKeys,
         private readonly PlatformLinksConfig $platformLinks,
         #[Autowire('%env(APP_URL)%')]
         private readonly string $appUrl,
@@ -113,6 +116,7 @@ final class CloudWellKnownController extends AbstractController
                 'alg' => 'EdDSA',
             ];
         }
+        $keys[] = $this->accessTokenKeys->publicJwk();
         $response = $this->json(['keys' => $keys]);
         $response->setPublic();
         $response->setMaxAge(300);
