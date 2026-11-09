@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\PlatformLink;
 
-use App\Service\Federation\FederationException;
-use App\Service\Federation\FederationSigner;
+use App\Service\PlatformLink\NotificationToken;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -14,37 +13,35 @@ use PHPUnit\Framework\TestCase;
  */
 final class NotifyVectorTest extends TestCase
 {
-    public function testTheSharedVectorsMatchTheSigner(): void
+    public function testTheSharedVectorsMatchTheVerifier(): void
     {
         $path = dirname(__DIR__, 3).'/Fixtures/cloud-apps-contract/notify-vectors.json';
         $doc = json_decode((string) file_get_contents($path), true);
         self::assertIsArray($doc);
-        $signer = new FederationSigner();
 
         foreach ($doc['vectors'] as $vector) {
-            self::assertSame($vector['expect'], $this->verdict($signer, $doc, $vector['body']), $vector['name']);
+            self::assertSame(
+                $vector['expect'],
+                NotificationToken::verdict($vector['token'], (string) $doc['issuer'], (string) $doc['receiver_instance_id'], [(string) $doc['public_key']], (int) $doc['now']),
+                $vector['name'],
+            );
         }
     }
 
-    /**
-     * @param array<string, mixed> $doc
-     * @param array<string, mixed> $body
-     */
-    private function verdict(FederationSigner $signer, array $doc, array $body): string
+    public function testATokenCarriesThePersonAndVerifiesWithItsKey(): void
     {
-        try {
-            $signer->verifyBody($body, (string) $doc['public_key']);
-        } catch (FederationException) {
-            return 'bad_signature';
-        }
-        if (($body['instance_id'] ?? null) !== $doc['receiver_instance_id']) {
-            return 'wrong_instance';
-        }
-        $ts = (int) ($body['ts'] ?? 0);
-        if (abs((int) $doc['now'] - $ts) > (int) $doc['window_seconds']) {
-            return 'stale';
-        }
+        $pair = sodium_crypto_sign_keypair();
+        $b64 = static fn (string $raw): string => rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+        $secret = 'ed25519:'.$b64(sodium_crypto_sign_secretkey($pair));
+        $public = 'ed25519:'.$b64(sodium_crypto_sign_publickey($pair));
+        $token = NotificationToken::encode(NotificationToken::claimsFor('https://synaplan.example', 'pickup', '15', 'oidc-cloud', 'ada', 1_700_000_000), $secret, 'k1');
 
-        return 'ok';
+        self::assertSame(NotificationToken::OK, NotificationToken::verdict($token, 'https://synaplan.example', 'oidc-cloud', [$public], 1_700_000_100));
+        self::assertSame(NotificationToken::STALE, NotificationToken::verdict($token, 'https://synaplan.example', 'oidc-cloud', [$public], 1_700_000_400));
+        self::assertSame(NotificationToken::WRONG_ISSUER, NotificationToken::verdict($token, 'https://other.example', 'oidc-cloud', [$public], 1_700_000_100));
+        $claims = NotificationToken::verifiedClaims($token, [$public]);
+        self::assertSame(['oidc-cloud', 'ada', 'pickup', '15'], [$claims['aud'] ?? null, $claims['sub'] ?? null, $claims['type'] ?? null, $claims['id'] ?? null]);
+        $header = json_decode((string) base64_decode(strtr(explode('.', $token)[0], '-_', '+/')), true);
+        self::assertSame(['alg' => 'EdDSA', 'typ' => NotificationToken::TYPE, 'kid' => 'k1'], $header);
     }
 }

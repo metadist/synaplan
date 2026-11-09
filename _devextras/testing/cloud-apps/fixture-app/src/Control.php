@@ -53,11 +53,20 @@ final class Control
      */
     public static function refreshKeys(Store $store): array
     {
-        $self = Synaplan::from($store->state())->json('GET', '/api/v1/platform-links/instances/self');
-        $keys = is_array($self['body']['notify_keys'] ?? null) ? array_values(array_filter($self['body']['notify_keys'], 'is_array')) : [];
-        if (200 === $self['status']) {
-            $store->update(static function (array $s) use ($keys): array {
+        $synaplan = Synaplan::from($store->state());
+        $configuration = $synaplan->json('GET', '/.well-known/synaplan-configuration');
+        $jwks = $synaplan->json('GET', '/.well-known/jwks.json');
+        $issuer = is_string($configuration['body']['issuer'] ?? null) ? $configuration['body']['issuer'] : '';
+        $keys = [];
+        foreach (is_array($jwks['body']['keys'] ?? null) ? $jwks['body']['keys'] : [] as $jwk) {
+            if (is_array($jwk) && 'OKP' === ($jwk['kty'] ?? null) && 'Ed25519' === ($jwk['crv'] ?? null) && is_string($jwk['x'] ?? null)) {
+                $keys[] = ['publicKey' => 'ed25519:'.$jwk['x'], 'kid' => is_string($jwk['kid'] ?? null) ? $jwk['kid'] : ''];
+            }
+        }
+        if (200 === $configuration['status'] && 200 === $jwks['status'] && '' !== $issuer) {
+            $store->update(static function (array $s) use ($keys, $issuer): array {
                 $s['notify_keys'] = $keys;
+                $s['issuer'] = $issuer;
 
                 return $s;
             });
