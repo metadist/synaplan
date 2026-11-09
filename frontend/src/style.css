@@ -473,9 +473,12 @@
      --keyboard-inset-height on every frame (iOS display link, Android inset
      animation). A CSS transition would ease on its own clock, so the keyboard
      arrives first and covers the composer. No transition: the chat is where
-     the keyboard is. */
+     the keyboard is. The page reads --chat-keyboard-lift, never the raw
+     overlap: an Android WebView that already shrank above the keyboard would
+     otherwise rise a second time and leave an empty band
+     (services/keyboardChatLift.ts). */
   html.synaplan-keyboard-dock [data-testid='page-chat'] {
-    transform: translateY(calc(var(--keyboard-inset-height, 0px) * -1));
+    transform: translateY(calc(var(--chat-keyboard-lift, 0px) * -1));
     transition: none;
   }
 
@@ -493,7 +496,7 @@
   }
 
   html.synaplan-keyboard-dock .chat-top-edge {
-    transform: translateY(var(--keyboard-inset-height, 0px));
+    transform: translateY(var(--chat-keyboard-lift, 0px));
   }
 
   /* Web fallback: mobile browsers DO shrink visualViewport, so useKeyboardOpen

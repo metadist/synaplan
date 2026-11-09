@@ -168,6 +168,8 @@ export const selectors = {
   chat: {
     newChatButton: '[data-testid="btn-chat-new-dropdown"]',
     chatBtnToggle: '[data-testid="btn-chat-toggle"]',
+    /** Sticky composer bar; its bottom edge must meet the keyboard */
+    composer: '[data-testid="comp-chat-input"]',
     textInput: '[data-testid="input-chat-message"]',
     sendBtn: '[data-testid="btn-chat-send"]',
     /** Slash-command menu, open while the composer text starts with "/" */

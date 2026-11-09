@@ -6,6 +6,7 @@
  * the field being edited. Other inputs stay on the overlay scroll-assist.
  * Absent bridge (plain web): no-op.
  */
+import { initChatKeyboardLift } from '@/services/keyboardChatLift'
 import { editableFieldFrom } from '@/services/keyboardReveal'
 
 const COMPOSER_SELECTOR = '.chat-composer-sticky'
@@ -53,6 +54,7 @@ let installed = false
 export function initKeyboardChatDock(): void {
   if (installed || !chatKeyboardApi()) return
   installed = true
+  const lift = initChatKeyboardLift()
   let docked = false
   let chromePointerAt = 0
   let chromeBlurTimer: ReturnType<typeof setTimeout> | null = null
@@ -67,6 +69,7 @@ export function initKeyboardChatDock(): void {
   const setDocked = (enabled: boolean): void => {
     if (docked === enabled) return
     docked = enabled
+    if (enabled) lift.rememberLayoutHeight()
     chatKeyboardApi()?.setDocked(enabled)
   }
 
