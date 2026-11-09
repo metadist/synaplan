@@ -24,8 +24,11 @@ final class Inbound
 
         $keys = is_array($state['notify_keys']) ? $state['notify_keys'] : [];
         $outcome = Notification::verify($token, (string) ($state['issuer'] ?? ''), $state['instance']['id'], $keys, time());
-        if (Notification::BAD_SIGNATURE === $outcome && is_string($kid) && !self::knows($keys, $kid)) {
-            // A key the fixture has not seen: read Synaplan's current keys once.
+        $unknownKey = Notification::BAD_SIGNATURE === $outcome && is_string($kid) && !self::knows($keys, $kid);
+        $noIssuer = Notification::WRONG_ISSUER === $outcome && '' === (string) ($state['issuer'] ?? '');
+        if ($unknownKey || $noIssuer) {
+            // A key the fixture has not seen, or a registration from before the
+            // issuer was kept: read Synaplan's current configuration once.
             $keys = Control::refreshKeys($store);
             $outcome = Notification::verify($token, (string) ($store->state()['issuer'] ?? ''), $state['instance']['id'], $keys, time());
         }
