@@ -6380,7 +6380,7 @@ class ModelCatalog
         // https://www.scaleway.com/en/developers/api/generative-apis
         // https://www.scaleway.com/en/docs/generative-apis/reference-content/supported-models/
         [
-            'id' => 404,
+            'id' => 427,
             'service' => 'Scaleway',
             'name' => 'GLM 5.3',
             'tag' => 'chat',
@@ -6402,7 +6402,7 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 405,
+            'id' => 428,
             'service' => 'Scaleway',
             'name' => 'DeepSeek V4.1 Flash',
             'tag' => 'chat',
@@ -6425,7 +6425,7 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 406,
+            'id' => 429,
             'service' => 'Scaleway',
             'name' => 'DeepSeek V4.1 Flash (Vision)',
             'tag' => 'pic2text',
@@ -6448,7 +6448,7 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 407,
+            'id' => 430,
             'service' => 'Scaleway',
             'name' => 'LightOnOCR 3 0.8B',
             'tag' => 'chat',
