@@ -17,6 +17,7 @@ use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 
 /**
  * When a render another step needs has finished, run the rest of the plan
@@ -24,6 +25,9 @@ use Symfony\Component\Lock\LockFactory;
  */
 final readonly class MediaDependentPlanContinuation
 {
+    /** Longer than the longest inline step a resumed plan can still run. */
+    private const PLAN_LOCK_SECONDS = 900.0;
+
     public function __construct(
         private MessageRepository $messages,
         private MediaJobService $jobs,
@@ -54,12 +58,12 @@ final readonly class MediaDependentPlanContinuation
             return true;
         }
         $planMessageId = $this->planMessageId($job, $visible);
-        $lock = $this->locks->createLock('media-plan:'.$planMessageId, 120);
+        $lock = $this->locks->createLock('media-plan:'.$planMessageId, self::PLAN_LOCK_SECONDS);
         if (!$lock->acquire()) {
             return false;
         }
         try {
-            $this->continueLocked($visible, $planMessageId, $nodeId, $job);
+            $this->continueLocked($visible, $planMessageId, $nodeId, $job, $lock);
         } finally {
             $lock->release();
         }
@@ -67,7 +71,7 @@ final readonly class MediaDependentPlanContinuation
         return true;
     }
 
-    private function continueLocked(Message $visible, int $planMessageId, string $nodeId, MediaJob $job): void
+    private function continueLocked(Message $visible, int $planMessageId, string $nodeId, MediaJob $job, LockInterface $lock): void
     {
         $planMessage = $this->messages->find($planMessageId) ?? $visible;
         $definition = $this->definition($visible, $planMessage);
@@ -79,14 +83,13 @@ final readonly class MediaDependentPlanContinuation
             return;
         }
 
-        $options = [];
-        $trackId = $job->getTrackId();
-        if (null !== $trackId && '' !== $trackId) {
-            $options['track_id'] = $trackId;
-        }
-        $context = $this->rehydrator->fromMessage($planMessage, $options);
+        [$options, $classification] = $this->resumedTurn($job);
+        $context = $this->rehydrator->fromMessage($planMessage, $options, $classification, $this->capabilities($plan));
         $context->setResult($nodeId, $this->settled($job));
-        $assembled = $this->dag->execute($plan, $context);
+        $lock->refresh(self::PLAN_LOCK_SECONDS);
+        $assembled = $this->dag->execute($plan, $context, function (array $update) use ($lock): void {
+            $lock->refresh(self::PLAN_LOCK_SECONDS);
+        });
         $this->plans->persistWithStatuses(
             $planMessageId,
             $plan,
@@ -130,6 +133,43 @@ final readonly class MediaDependentPlanContinuation
                 $this->rebinder->rebind($jobKey, $visibleId);
             }
         }
+    }
+
+    /**
+     * @return array{0: array<string, mixed>, 1: array<string, mixed>}
+     */
+    private function resumedTurn(MediaJob $job): array
+    {
+        $options = [];
+        $trackId = $job->getTrackId();
+        if (null !== $trackId && '' !== $trackId) {
+            $options['track_id'] = $trackId;
+        }
+        $stored = $job->getOptions()['plan_resume'] ?? null;
+        $classification = [];
+        if (is_array($stored)) {
+            if (is_array($stored['classification'] ?? null)) {
+                $classification = $stored['classification'];
+            }
+            if (is_array($stored['runtime_profile'] ?? null)) {
+                $options['runtime_profile'] = $stored['runtime_profile'];
+            }
+        }
+
+        return [$options, $classification];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function capabilities(TaskPlan $plan): array
+    {
+        $capabilities = [];
+        foreach ($plan->nodes as $node) {
+            $capabilities[] = $node->capability->value;
+        }
+
+        return $capabilities;
     }
 
     /**
@@ -217,7 +257,8 @@ final readonly class MediaDependentPlanContinuation
                 continue;
             }
             $type = is_string($file['type'] ?? null) ? $file['type'] : 'file';
-            $registered = $this->files->register((int) $message->getUserId(), $path, $type, $messageId);
+            $sourceText = is_string($file['source_text'] ?? null) ? $file['source_text'] : null;
+            $registered = $this->files->register((int) $message->getUserId(), $path, $type, $messageId, fileText: $sourceText);
             if (null !== $registered) {
                 $message->addFile($registered);
             }

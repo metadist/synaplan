@@ -112,10 +112,21 @@ final readonly class MediaGenerationRunner implements TaskRunner
             $handlerOptions['node_id'] = $node->id;
         }
 
-        // Incognito turns must not queue a job. Every other render, including
-        // one a later step needs, detaches. The plan continues on the worker.
-        if (!empty($context->options['force_inline_media'])) {
+        // Incognito and saved-task runs stay in this process. A saved task
+        // has no reply to rebind and settles the run itself. A chat render
+        // detaches, and the plan continues on the worker.
+        if (!empty($context->options['force_inline_media']) || !empty($context->options['saved_task'])) {
             $handlerOptions['force_inline_media'] = true;
+        }
+        $resume = json_encode([
+            'classification' => $context->classification,
+            'runtime_profile' => $context->options['runtime_profile'] ?? null,
+        ]);
+        if (is_string($resume)) {
+            $decoded = json_decode($resume, true);
+            if (is_array($decoded)) {
+                $handlerOptions['plan_resume'] = $decoded;
+            }
         }
 
         // Media-to-media chaining (issue #1144): when this node depends on an

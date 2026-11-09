@@ -320,7 +320,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $this->aiFacade->expects($this->once())
             ->method('pollVideoOperation')
-            ->with('ops/123', 'google')
+            ->with('ops/123', 'google', 1)
             ->willReturn(['done' => false, 'videoUri' => null, 'error' => null]);
 
         $result = $this->service->checkVideoJob($user, $jobId);
@@ -358,7 +358,7 @@ class MediaGenerationServiceTest extends TestCase
 
         $this->aiFacade->expects($this->once())
             ->method('pollVideoOperation')
-            ->with('ops/123', 'google')
+            ->with('ops/123', 'google', 1)
             ->willReturn(['done' => true, 'videoUri' => 'https://example.com/vid.mp4', 'error' => null]);
 
         $this->aiFacade->expects($this->once())

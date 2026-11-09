@@ -40,8 +40,10 @@ final readonly class NodeContextRehydrator
 
     /**
      * @param array<string, mixed> $options
+     * @param array<string, mixed> $classification
+     * @param list<string>         $planCapabilities
      */
-    public function fromMessage(Message $message, array $options = []): NodeContext
+    public function fromMessage(Message $message, array $options = [], array $classification = [], array $planCapabilities = []): NodeContext
     {
         $messageId = $message->getId();
         if (null === $messageId) {
@@ -52,8 +54,9 @@ final readonly class NodeContextRehydrator
             $message,
             [],
             $message->getUserId(),
-            [],
+            $classification,
             $options,
+            $planCapabilities,
         );
 
         foreach ($this->planStore->loadRows($messageId) as $row) {

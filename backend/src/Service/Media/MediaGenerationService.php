@@ -382,7 +382,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             $result = ['done' => true, 'videoUri' => $jobData['videoUri'], 'error' => null];
         } else {
             try {
-                $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider']);
+                $result = $this->aiFacade->pollVideoOperation($jobData['operationName'], $jobData['provider'], $user->getId());
             } catch (ProviderException $e) {
                 $jobData['status'] = 'failed';
                 $jobData['error'] = $e->getMessage();

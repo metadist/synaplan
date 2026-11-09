@@ -99,7 +99,9 @@ final readonly class MediaJobDetach
             'nodeId' => '' !== (string) $nodeId ? $nodeId : null,
             'trackId' => '' !== $trackId ? $trackId : null,
             'inputRef' => $inputRef,
-            'options' => $mediaOptions + ['planMessageId' => $message->getId()],
+            'options' => $mediaOptions
+                + ['planMessageId' => $message->getId()]
+                + (is_array($options['plan_resume'] ?? null) ? ['plan_resume' => $options['plan_resume']] : []),
         ]);
 
         if (!$this->mediaJobDispatcher->dispatch($job)) {

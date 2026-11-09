@@ -19,8 +19,8 @@ final class LongWaitGateTest extends TestCase
     {
         $found = $this->scan();
         $baseline = $this->baseline();
-        $added = array_values(array_diff($found, $baseline));
-        $gone = array_values(array_diff($baseline, $found));
+        $added = self::extra($found, $baseline);
+        $gone = self::extra($baseline, $found);
 
         self::assertSame(
             [],
@@ -32,6 +32,39 @@ final class LongWaitGateTest extends TestCase
             $gone,
             "These waits are gone. Delete them from longWaitBaseline.json:\n  ".implode("\n  ", $gone),
         );
+    }
+
+    public function testARepeatedWaitCountsAsNew(): void
+    {
+        self::assertSame(['File.php:usleep(1);'], self::extra(
+            ['File.php:usleep(1);', 'File.php:usleep(1);'],
+            ['File.php:usleep(1);'],
+        ));
+        self::assertSame(['Other.php:sleep(2);'], self::extra(
+            ['Other.php:sleep(2);'],
+            [],
+        ));
+    }
+
+    /**
+     * @param list<string> $left
+     * @param list<string> $right
+     *
+     * @return list<string>
+     */
+    private static function extra(array $left, array $right): array
+    {
+        $remaining = array_count_values($right);
+        $extra = [];
+        foreach ($left as $site) {
+            if (($remaining[$site] ?? 0) > 0) {
+                --$remaining[$site];
+                continue;
+            }
+            $extra[] = $site;
+        }
+
+        return $extra;
     }
 
     /**

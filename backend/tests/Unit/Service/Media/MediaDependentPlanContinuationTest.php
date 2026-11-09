@@ -73,7 +73,7 @@ final class MediaDependentPlanContinuationTest extends TestCase
     {
         $seen = null;
         $dag = $this->createMock(DagExecutor::class);
-        $dag->method('execute')->willReturnCallback(function (TaskPlan $plan, NodeContext $context) use (&$seen): array {
+        $dag->method('execute')->willReturnCallback(function (TaskPlan $plan, NodeContext $context, ?callable $progress = null) use (&$seen): array {
             $seen = $context;
 
             return [
@@ -92,7 +92,9 @@ final class MediaDependentPlanContinuationTest extends TestCase
 
         self::assertTrue($continued);
         self::assertInstanceOf(NodeContext::class, $seen);
-        self::assertSame(['track_id' => 'track-1'], $seen->options);
+        self::assertSame('track-1', $seen->options['track_id'] ?? null);
+        self::assertSame(['instructions' => 'be brief'], $seen->options['runtime_profile'] ?? null);
+        self::assertSame(41, $seen->classification['model_id'] ?? null);
     }
 
     private function continuation(InMemoryStore $store, DagExecutor $dag, ?MediaJobRebinder $rebinder = null): MediaDependentPlanContinuation
@@ -100,7 +102,13 @@ final class MediaDependentPlanContinuationTest extends TestCase
         $job = (new MediaJob('job-1'))
             ->setStatus(MediaJob::STATUS_COMPLETED)
             ->setTrackId('track-1')
-            ->setOptions(['planMessageId' => 1001])
+            ->setOptions([
+                'planMessageId' => 1001,
+                'plan_resume' => [
+                    'classification' => ['model_id' => 41, 'language' => 'en'],
+                    'runtime_profile' => ['instructions' => 'be brief'],
+                ],
+            ])
             ->setResult(['file' => ['url' => '/api/v1/files/uploads/a.png', 'type' => 'image']]);
         $message = $this->createStub(Message::class);
         $message->method('getId')->willReturn(1001);
@@ -126,7 +134,7 @@ final class MediaDependentPlanContinuationTest extends TestCase
         $jobs->method('findByKey')->willReturn($job);
         $rehydrator = $this->createStub(NodeContextRehydrator::class);
         $rehydrator->method('fromMessage')->willReturnCallback(
-            static fn (Message $source, array $options): NodeContext => new NodeContext($source, [], 7, [], $options),
+            static fn (Message $source, array $options, array $classification = [], array $capabilities = []): NodeContext => new NodeContext($source, [], 7, $classification, $options, $capabilities),
         );
 
         return new MediaDependentPlanContinuation(

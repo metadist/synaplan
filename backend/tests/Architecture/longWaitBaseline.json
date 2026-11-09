@@ -1,6 +1,8 @@
 [
   "AI/Messages/Translator/AnthropicPassthroughTranslator.php:set_time_limit(0);",
+  "AI/Messages/Translator/AnthropicPassthroughTranslator.php:set_time_limit(0);",
   "AI/Messages/Translator/GeminiMessagesTranslator.php:set_time_limit(0);",
+  "AI/Messages/Translator/OpenAiMessagesTranslator.php:set_time_limit(0);",
   "AI/Messages/Translator/OpenAiMessagesTranslator.php:set_time_limit(0);",
   "AI/Provider/Google/GoogleChat.php:usleep(1_000_000); // 1 s backoff",
   "AI/Provider/Google/GoogleVideoGeneration.php:set_time_limit(max(30, $seconds));",
@@ -13,6 +15,7 @@
   "AI/Provider/XaiProvider.php:set_time_limit(max(30, $seconds));",
   "AI/Provider/XaiProvider.php:sleep($this->pollIntervalSeconds);",
   "Controller/AudioTranscriptionController.php:usleep(400_000);",
+  "Controller/MessagesApiController.php:set_time_limit(0);",
   "Controller/MessagesApiController.php:set_time_limit(0);",
   "Controller/OpenAICompatibleController.php:set_time_limit(0);",
   "Controller/StreamAttachController.php:set_time_limit(0);",
