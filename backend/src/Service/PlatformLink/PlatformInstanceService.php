@@ -121,10 +121,8 @@ final readonly class PlatformInstanceService
      *     notify_keys: list<array{publicKey: string, kid: string}>
      * }
      */
-    public function describeSelf(string $instanceId, string $secret): array
+    public function describeSelf(PlatformInstance $instance): array
     {
-        $instance = $this->requireInstance($instanceId);
-        $this->assertSecret($instance, $secret);
         $instance->touchLastSeen();
         $this->instanceRepository->save($instance);
 
