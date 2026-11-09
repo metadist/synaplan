@@ -152,7 +152,7 @@ services:
 
   # Vue.js Frontend
   frontend:
-    image: node:26@sha256:6d2c7d5d074bf72f81ddc252b4fbb5d625bc028eeda49cb4b8c2ff8eda1ee617
+    image: node:26@sha256:438603bbb5cda404b9416f0b5c8026f61501ab911760d861ec28c36b5d675725
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -198,7 +198,7 @@ services:
   # Memory-limited to prevent unbounded growth from Chokidar polling (#515).
   # Container auto-restarts on OOM thanks to restart policy.
   frontend-widgets:
-    image: node:26@sha256:6d2c7d5d074bf72f81ddc252b4fbb5d625bc028eeda49cb4b8c2ff8eda1ee617
+    image: node:26@sha256:438603bbb5cda404b9416f0b5c8026f61501ab911760d861ec28c36b5d675725
     container_name: synaplan-frontend-widgets
     working_dir: /app
     # Wait for the generated Zod schemas before the first build: src/generated/
@@ -351,7 +351,7 @@ services:
     # Pinned to Redis 7.4 for Centrifugo pub/sub compatibility (see
     # docker-compose.yml for the full rationale). Redis 8.x dropped publication
     # fan-out to the Centrifugo node and broke realtime delivery.
-    image: redis:8.10-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
+    image: redis:8.10-alpine@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80
     container_name: synaplan-redis
     command: >-
       redis-server
