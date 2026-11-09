@@ -175,7 +175,7 @@ services:
 
   # Vue.js Frontend
   frontend:
-    image: node:26@sha256:6d2c7d5d074bf72f81ddc252b4fbb5d625bc028eeda49cb4b8c2ff8eda1ee617
+    image: node:26@sha256:438603bbb5cda404b9416f0b5c8026f61501ab911760d861ec28c36b5d675725
     container_name: synaplan-frontend
     working_dir: /app
     entrypoint: ["/usr/local/bin/docker-entrypoint.sh"]
@@ -255,7 +255,7 @@ services:
   # rendering chunks (native binary + JS heap), which OOM-killed every build
   # and left dist-widget without widget.js.
   frontend-widgets:
-    image: node:26@sha256:6d2c7d5d074bf72f81ddc252b4fbb5d625bc028eeda49cb4b8c2ff8eda1ee617
+    image: node:26@sha256:438603bbb5cda404b9416f0b5c8026f61501ab911760d861ec28c36b5d675725
     container_name: synaplan-frontend-widgets
     working_dir: /app
     # Wait for the generated Zod schemas before the first build: src/generated/
@@ -906,7 +906,7 @@ services:
     # client publications from 7.x, whereas Redis 8.x dropped pub/sub fan-out to
     # the Centrifugo node (control messages arrived, publications did not),
     # which silently broke realtime delivery to dashboard + widget clients.
-    image: redis:8.10-alpine@sha256:21090af93f8324db2f0f0f4f38a7c60369d47d917e000c3423d89d2ae2883537
+    image: redis:8.10-alpine@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80
     container_name: synaplan-redis
     command: >-
       redis-server
@@ -1100,7 +1100,7 @@ services:
   # then set FREEAPI_BASE_URL=http://freeapi-fake:8787 and FEATURE_FREEAPI_ENABLED=true.
   # Canned answers, in-memory state; see _devextras/freeapi-fake/README.md.
   freeapi-fake:
-    image: node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
+    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
     container_name: synaplan-freeapi-fake
     profiles: [freeapi-fake]
     restart: unless-stopped
@@ -1177,7 +1177,7 @@ services:
   # and point TELEGRAM_API_BASE_URL at http://telegram-stub:3998 on backend and worker.
   telegram-stub:
     profiles: [telegram-stub]
-    image: node:26-alpine@sha256:c6ad9e9c1d80f6eb607c26b4b0a132ff7a2344fad1c78ea3baa2a7d4c8de6d94
+    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
     container_name: synaplan-telegram-stub
     user: node
     working_dir: /app
@@ -1224,7 +1224,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b
+    image: quay.io/keycloak/keycloak:26.8@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -1259,7 +1259,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.8@sha256:3879c623248408de29a5303178b5816c77e8dfef3890c361f8c0bbeaa979ba3b
+    image: quay.io/keycloak/keycloak:26.8@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:

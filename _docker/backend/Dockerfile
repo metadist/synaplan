@@ -30,7 +30,7 @@ FROM ghcr.io/metadist/synaplan-base-php:1.2.1@sha256:e10e74c5047cd9218ad8337b8e3
 # into `dev` below, so the dev and prod images both carry it. A stage has to
 # be declared before COPY --from can name it, which is why it sits here and
 # not at the top.
-FROM golang:1.27-bookworm@sha256:d9b6a1beb9474adc2a1ce842573639b44b2a0dd49b6669f51d3821baf9ec37c9 AS watchdog
+FROM golang:1.27-bookworm@sha256:dc0963f32053e4bc451d24d87e3892d42d01021b61f093e98eb95c0352bb84b0 AS watchdog
 WORKDIR /src
 COPY sidecars/synaplan-watchdog/go.mod sidecars/synaplan-watchdog/go.sum ./
 RUN go mod download
