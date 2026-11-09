@@ -41,6 +41,8 @@ nelmio_api_doc:
     areas:
         path_patterns:
             - ^/api(?!/doc$) # Accepts all routes except /api/doc
+            # Discovery documents a cloud reads before it trusts a notification.
+            - ^/\.well-known/(synaplan-configuration|jwks\.json)$
             # Desktop project companion (paired keys). The rest of /v1 stays
             # out of the published spec — it is the OpenAI/Anthropic gateway.
             - ^/v1/models/catalog
