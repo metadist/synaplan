@@ -16,6 +16,10 @@ test.describe('@ci Assistants knowledge upload', () => {
     })
 
     await page.getByTestId('btn-create-assistant-header').click()
+    await expect(page.getByTestId('section-template-gallery')).toBeVisible({
+      timeout: TIMEOUTS.STANDARD,
+    })
+    await page.getByTestId('card-template-empty').click()
     await expect(page).toHaveURL(/\/ai\/assistants\/\d+/, { timeout: TIMEOUTS.STANDARD })
     await expect(page.getByTestId('section-builder-knowledge')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,

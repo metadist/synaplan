@@ -130,7 +130,7 @@
       "directSaved": "Saved. The next OpenAI conversation uses this setting.",
       "directFailed": "Could not save the direct connection setting."
     },
-    "title": "Operate",
+    "title": "Admin",
     "description": "Your server at a glance: users, sign-ups and usage.",
     "tabs": {
       "overview": "Overview",
@@ -1045,7 +1045,7 @@
       "signupCodes": "Invitation codes"
     },
     "openPeople": "Open Users",
-    "backToOperate": "Back to Operate",
+    "backToOperate": "Back to Admin",
     "myGroups": {
       "subtitle": "Groups you belong to on this instance.",
       "emptyMember": "You are not in a group yet. An administrator can add you on the Users page.",
@@ -1318,7 +1318,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Custom HTTP tools",
         "WORKFLOWS_BUILDER_ENABLED": "Task steps editor",
         "CHAT_EXPORT_ENABLED": "Export chats",
-        "CHAT_SHARE_ENABLED": "Share chats"
+        "CHAT_SHARE_ENABLED": "Share chats",
+        "AGENTS_PUBLISH_REVIEW": "Review before an assistant is shared with everyone"
       }
     },
     "intro": {
@@ -1616,7 +1617,7 @@
     "inviteReady": "Invite ready. Send the address to the other admin.",
     "loadFailed": "Partners could not be loaded. Try again.",
     "joinTitle": "You are invited",
-    "joinBody": "{name} ({domain}) invited your company. On your Synaplan, open Operate, then Partners, and paste this address.",
+    "joinBody": "{name} ({domain}) invited your company. On your Synaplan, open Admin, then Partners, and paste this address.",
     "joinInvalid": "This invite is not valid or has expired.",
     "errors": {
       "not_reachable": "Your server runs on a private address, so other companies can't reach it. Partners need a public https address.",

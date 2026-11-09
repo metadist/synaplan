@@ -22,8 +22,8 @@ Synaplan reads configuration from three places, and it matters which one you rea
 | Where | What belongs there | Takes effect |
 |-------|--------------------|--------------|
 | `backend/.env` (or `deploy/.env`) | Infrastructure and boot settings: database, Redis, public URLs, `APP_SECRET`, channel credentials, and `FEATURE_*` pins | When the container starts |
-| **Operate → AI infrastructure → Providers & keys** (`/admin/setup`) | AI provider API keys — validated live, stored AES-256-CBC encrypted in the database | Immediately, no restart |
-| **Operate → System configuration** (`/admin/config`), backed by `BCONFIG` rows | Behavior switches: multi-task routing, async media jobs, access policy, white-label branding | Immediately, no restart |
+| **Admin → AI infrastructure → Providers & keys** (`/admin/setup`) | AI provider API keys — validated live, stored AES-256-CBC encrypted in the database | Immediately, no restart |
+| **Admin → System configuration** (`/admin/config`), backed by `BCONFIG` rows | Behavior switches: multi-task routing, async media jobs, access policy, white-label branding | Immediately, no restart |
 
 Provider keys are the common case and belong in the UI — see [AI Providers](#ai-providers) below. Environment variables remain supported for scripted and orchestrated deploys.
 
@@ -626,7 +626,7 @@ Media generation (image, video, audio) can run as **background jobs** instead of
 blocking the chat turn: the assistant shows a live status banner, a completion
 toast fires when the render is ready, and a global Jobs tray tracks everything.
 Configured via **BCONFIG** (not env vars). Admins manage the master switch in the
-UI (**Operate → AI infrastructure → Chat behavior → Background media generation**); the rest can be set per
+UI (**Admin → AI infrastructure → Chat behavior → Background media generation**); the rest can be set per
 group in the `BCONFIG` table. Resolution is per-user row → global row
 (`BOWNERID=0`) → built-in code default.
 
@@ -640,7 +640,7 @@ group in the `BCONFIG` table. Resolution is per-user row → global row
 
 ¹ Existing installations are grandfathered to `0` by migration
 (`Version20260629120000`) so behavior doesn't change on upgrade — each user
-opts in via **Operate → AI infrastructure → Chat behavior → Background media generation** (or set the
+opts in via **Admin → AI infrastructure → Chat behavior → Background media generation** (or set the
 group/per-user row directly).
 
 > **Requires the `worker` container.** Async jobs are consumed by the dedicated
@@ -821,7 +821,7 @@ AUTH_COOKIE_SECURE=
 
 ## Users, sharing and directory (`IAM`)
 
-The four feature switches live in **Operate → System configuration → Features
+The four feature switches live in **Admin → System configuration → Features
 → Users & sharing**, the remaining settings under **Access → Sharing & audit**
 (`BCONFIG` group `IAM`, owner 0). They take effect immediately — no restart.
 The switches are **on by default**; pin one off for an automated deployment
@@ -935,19 +935,19 @@ migration to roll out a new default.
 Unknown chain keys are skipped. Keys that FileProcessor does not already
 implement (today: `docling`) run first, then the built-in strategies. A
 down extra adapter never fails an upload. Fresh installs do **not** put
-`docling` on the document chain — an admin adds it under **Operate →
+`docling` on the document chain — an admin adds it under **Admin →
 AI infrastructure → Document reading**.
 
 `DOCLING_BASE_URL` (empty = off) points at the optional `docling`
 Compose profile (`docker compose --profile docling up -d`). The CPU
 image needs about 4 GB during OCR; there is no `mem_limit` in dev.
 `DOCLING_TIMEOUT_MS` defaults to `120000`; `DOCLING_MAX_BYTES` defaults
-to 50 MB. Admins edit those the same way as Tika: **Operate → AI
+to 50 MB. Admins edit those the same way as Tika: **Admin → AI
 infrastructure → Document reading → Reading services → Docling** (URL,
 timeout, max bytes, then **Test connection**). Markdown from Docling is chunked heading-aware
 (tables stay together; oversized tables repeat the header row).
 
-Web search providers (admin picker on **Operate → System configuration →
+Web search providers (admin picker on **Admin → System configuration →
 Web search**, next to the Brave key and result count):
 
 | Key | Sovereignty | Capabilities | Key / URL |
@@ -967,7 +967,7 @@ present”, not a live probe — **Test query** is the live call.
 
 Rerank models are catalog rows with tag `rerank` (TEI
 `openaicompatible`, Jina, Cohere, Voyage). Bind one on
-**Operate → AI infrastructure → Knowledge search → Reranking** (`DEFAULTMODEL.RERANK`).
+**Admin → AI infrastructure → Knowledge search → Reranking** (`DEFAULTMODEL.RERANK`).
 Jina / Cohere / Voyage keys use `JINA_API_KEY`, `COHERE_API_KEY`,
 `VOYAGE_API_KEY` or **plug_keys**. A TEI `/rerank` endpoint is an
 OpenAI-compatible endpoint with the `rerank` capability. With rerank
@@ -981,7 +981,7 @@ and [AI plugs](ADMIN.md#ai-plugs-s1s5).
 Every feature from the September 2026 waves — people & sharing, AI assistants,
 tool registry and approvals, saved-task steps, watched pages, linked
 platforms, Synaplan Desktop, office document tools, optional module gates — is a
-`BCONFIG` flag that is **on by default** and editable under **Operate → System
+`BCONFIG` flag that is **on by default** and editable under **Admin → System
 configuration → Features**. Automated deployments pin a flag with
 `FEATURE_<GROUP>_<SETTING>=false` (or `true`); the toggle then shows as locked.
 The complete table with keys, defaults and shipping PRs is in

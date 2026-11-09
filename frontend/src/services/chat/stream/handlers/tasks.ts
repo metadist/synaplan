@@ -7,6 +7,7 @@ import { isTaskCardKind, isTaskCardState, type TaskCard } from '@/stores/history
 import type { StreamEventMetadata } from '@/types/chatStream'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { cardTraceFrom } from '@/utils/cardTrace'
+import { stripStoredAdminDiagnostics } from '@/utils/storedAdminDiagnostics'
 import { parseFolderRead } from '@/utils/folderRead'
 import { findTaskCard, isAskUserPayload } from '../messageUpdates'
 import type { StreamHandlers, StreamStatusHandler, StreamTurn } from '../streamTurn'
@@ -43,7 +44,9 @@ const planDiscarded: StreamStatusHandler<StreamTurn> = (_data, turn) => {
 }
 
 function applyStepTrace(card: TaskCard, meta: StreamEventMetadata): void {
-  if (typeof meta.error === 'string' && meta.error) card.error = meta.error
+  if (typeof meta.error === 'string' && meta.error) {
+    card.error = stripStoredAdminDiagnostics(meta.error)
+  }
   if (typeof meta.text === 'string' && meta.text) card.text = meta.text
   if (typeof meta.prompt === 'string' && meta.prompt) card.prompt = meta.prompt
   if (typeof meta.query === 'string' && meta.query) card.query = meta.query

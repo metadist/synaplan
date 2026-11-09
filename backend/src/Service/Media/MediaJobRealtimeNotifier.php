@@ -53,6 +53,7 @@ final readonly class MediaJobRealtimeNotifier
                     'state' => $status['state'],
                     'percent' => $status['percent'],
                     'error' => $status['error'],
+                    'error_reason' => $status['error_reason'],
                     'file' => $status['file'],
                 ],
             );

@@ -15,6 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class SignupBlockedException extends \RuntimeException
 {
+    public const CODE_CLOSED = 'SIGNUP_CLOSED';
     public const CODE_PAUSED = 'SIGNUP_PAUSED';
     public const CODE_RATE_LIMITED = 'SIGNUP_RATE_LIMITED';
     public const CODE_CHALLENGE_REQUIRED = 'SIGNUP_CHALLENGE_REQUIRED';
@@ -29,6 +30,16 @@ final class SignupBlockedException extends \RuntimeException
         private readonly int $retryAfterSeconds,
     ) {
         parent::__construct($message);
+    }
+
+    public static function closed(): self
+    {
+        return new self(
+            self::CODE_CLOSED,
+            'There is no account for this address here, and new accounts cannot be created. Sign in with the account you already have, or ask your administrator.',
+            Response::HTTP_FORBIDDEN,
+            0,
+        );
     }
 
     public static function paused(): self

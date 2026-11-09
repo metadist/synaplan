@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 const config = {
-  auth: { registrationEnabled: true },
+  auth: { registrationEnabled: true, signupPaused: false },
   branding: { name: 'Synaplan', homepageUrl: 'https://synaplan.com', showPoweredBy: false },
   setup: { demoLoginHint: false },
   billing: { enabled: false },
@@ -82,6 +82,7 @@ describe('LoginView registration closed', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     config.auth.registrationEnabled = true
+    config.auth.signupPaused = false
     authState.error.value = ''
     authState.errorCode.value = null
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => ({ providers: [] }) }))
@@ -102,6 +103,38 @@ describe('LoginView registration closed', () => {
 
     expect(wrapper.find('[data-testid="link-signup"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="login-registration-closed"]').exists()).toBe(true)
+    expect(wrapper.find('#email').exists()).toBe(true)
+    expect(wrapper.find('#password').exists()).toBe(true)
+  })
+
+  it('keeps every social sign-in when registration is off or paused', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: async () => ({
+          providers: [
+            { id: 'google', name: 'Google' },
+            { id: 'github', name: 'GitHub' },
+          ],
+        }),
+      })
+    )
+
+    config.auth.registrationEnabled = false
+    const closed = await mountView()
+    await flushPromises()
+    expect(closed.find('[data-testid="btn-social-google"]').exists()).toBe(true)
+    expect(closed.find('[data-testid="btn-social-github"]').exists()).toBe(true)
+    expect(closed.find('[data-testid="link-signup"]').exists()).toBe(false)
+
+    config.auth.registrationEnabled = true
+    config.auth.signupPaused = true
+    const paused = await mountView()
+    await flushPromises()
+    expect(paused.find('[data-testid="btn-social-google"]').exists()).toBe(true)
+    expect(paused.find('[data-testid="btn-social-github"]').exists()).toBe(true)
+    expect(paused.find('[data-testid="link-signup"]').exists()).toBe(false)
+    expect(paused.find('#password').exists()).toBe(true)
   })
 })
 

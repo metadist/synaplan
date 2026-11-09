@@ -130,7 +130,7 @@
       "directSaved": "Enregistré. La prochaine conversation OpenAI utilise ce réglage.",
       "directFailed": "Impossible d’enregistrer la connexion directe."
     },
-    "title": "Exploitation",
+    "title": "Administration",
     "description": "Votre serveur en un coup d’œil : utilisateurs, inscriptions et utilisation.",
     "tabs": {
       "overview": "Aperçu",
@@ -1045,7 +1045,7 @@
       "signupCodes": "Codes d'invitation"
     },
     "openPeople": "Ouvrir Utilisateurs",
-    "backToOperate": "Retour à Exploitation",
+    "backToOperate": "Retour à Administration",
     "myGroups": {
       "subtitle": "Groupes auxquels vous appartenez sur cette instance.",
       "emptyMember": "Vous n’êtes encore dans aucun groupe. Un administrateur peut vous ajouter sur la page Utilisateurs.",
@@ -1318,7 +1318,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Outils HTTP personnalisés",
         "WORKFLOWS_BUILDER_ENABLED": "Éditeur d’étapes",
         "CHAT_EXPORT_ENABLED": "Exporter les chats",
-        "CHAT_SHARE_ENABLED": "Partager les chats"
+        "CHAT_SHARE_ENABLED": "Partager les chats",
+        "AGENTS_PUBLISH_REVIEW": "Vérification avant de partager un assistant avec tout le monde"
       }
     },
     "intro": {
@@ -1616,7 +1617,7 @@
     "inviteReady": "Invitation prête. Envoyez l’adresse à l’autre administrateur.",
     "loadFailed": "Les partenaires n’ont pas pu être chargés. Réessayez.",
     "joinTitle": "Vous êtes invité",
-    "joinBody": "{name} ({domain}) a invité votre entreprise. Dans votre Synaplan, ouvrez Exploiter, puis Partenaires, et collez cette adresse.",
+    "joinBody": "{name} ({domain}) a invité votre entreprise. Dans votre Synaplan, ouvrez Administration, puis Partenaires, et collez cette adresse.",
     "joinInvalid": "Cette invitation n’est pas valable ou a expiré.",
     "errors": {
       "not_reachable": "Votre serveur a une adresse privée, les autres entreprises ne peuvent pas l’atteindre. Les partenaires ont besoin d’une adresse https publique.",

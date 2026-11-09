@@ -218,7 +218,7 @@ final readonly class ApprovalService
             'resolvedRequest' => $this->resolvedRequest($approval),
             'requestedBy' => $reference->toArray(),
             'canAlwaysAllow' => $approval->isPending() && $this->canAlwaysAllow($approval),
-            'canDecide' => true,
+            'canDecide' => 'agent.publish' !== $approval->getTool(),
         ];
     }
 

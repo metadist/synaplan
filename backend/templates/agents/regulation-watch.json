@@ -1,0 +1,89 @@
+{
+  "schema": "synaplan-bundle.v1",
+  "createdAt": "2026-11-02T09:00:00Z",
+  "sourceInstance": "sha256:builtin-templates",
+  "sourceVersion": "2026.11.1",
+  "scope": "user",
+  "template": {
+    "id": "regulation-watch",
+    "version": "2026.11.1",
+    "titleKey": "templates.regulationWatch.title",
+    "summaryKey": "templates.regulationWatch.summary",
+    "category": "work",
+    "requires": [
+      {
+        "kind": "capability",
+        "value": "chat"
+      },
+      {
+        "kind": "watch",
+        "value": "url",
+        "hintKey": "templates.regulationWatch.needsPage"
+      }
+    ],
+    "tryIt": [
+      "templates.regulationWatch.try1",
+      "templates.regulationWatch.try2"
+    ]
+  },
+  "sections": [
+    {
+      "kind": "agents",
+      "version": 1,
+      "items": [
+        {
+          "key": "regulation-watch",
+          "name": "Regulation watch",
+          "description": "Reports a change on a page you watch and cites the page.",
+          "icon": "mdi:scale-balance",
+          "instruction": "You report a change only when the text you were given actually differs from the earlier text. Cite the page. If the page is unchanged, say that nothing material changed. If no page is watched, say that the person still needs to add a page, and do not invent a change. This is not legal advice. Answer in the user's language.",
+          "definition": {
+            "schema": "agent.v1",
+            "models": {
+              "chat": null,
+              "vision": null,
+              "vectorize": null
+            },
+            "knowledge": {
+              "ownFolder": true,
+              "folders": [],
+              "fileIds": [],
+              "includeUserFiles": false,
+              "ragLimit": 8,
+              "ragMinScore": 0.6
+            },
+            "tools": {
+              "internet": false,
+              "files": false,
+              "mcpServers": [],
+              "allow": [],
+              "deny": []
+            },
+            "skills": {
+              "allow": [],
+              "deny": []
+            },
+            "parameters": {
+              "temperature": 0.2,
+              "maxTokens": 4000,
+              "language": "auto",
+              "responseSchema": null
+            },
+            "behaviour": {
+              "greeting": "",
+              "starterPrompts": [
+                "What changed on the pages I watch?",
+                "Did the fee schedule change, or is it unchanged?"
+              ],
+              "memory": "user"
+            },
+            "triggers": {
+              "events": [],
+              "schedules": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

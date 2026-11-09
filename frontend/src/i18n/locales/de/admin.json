@@ -130,7 +130,7 @@
       "directSaved": "Gespeichert. Das nächste OpenAI-Gespräch verwendet diese Einstellung.",
       "directFailed": "Die Direktverbindung konnte nicht gespeichert werden."
     },
-    "title": "Betrieb",
+    "title": "Admin",
     "description": "Dein Server auf einen Blick: Benutzer, Registrierungen und Nutzung.",
     "tabs": {
       "overview": "Übersicht",
@@ -1045,7 +1045,7 @@
       "signupCodes": "Einladungscodes"
     },
     "openPeople": "Benutzer öffnen",
-    "backToOperate": "Zurück zu Betrieb",
+    "backToOperate": "Zurück zu Admin",
     "myGroups": {
       "subtitle": "Gruppen, in denen Sie auf dieser Instanz Mitglied sind.",
       "emptyMember": "Sie sind noch in keiner Gruppe. Ein Administrator kann Sie auf der Seite Benutzer hinzufügen.",
@@ -1318,7 +1318,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Eigene HTTP-Werkzeuge",
         "WORKFLOWS_BUILDER_ENABLED": "Schritte-Editor",
         "CHAT_EXPORT_ENABLED": "Chats exportieren",
-        "CHAT_SHARE_ENABLED": "Chats teilen"
+        "CHAT_SHARE_ENABLED": "Chats teilen",
+        "AGENTS_PUBLISH_REVIEW": "Prüfung, bevor ein Assistent mit allen geteilt wird"
       }
     },
     "intro": {
@@ -1616,7 +1617,7 @@
     "inviteReady": "Einladung bereit. Senden Sie die Adresse an die andere Administration.",
     "loadFailed": "Partner konnten nicht geladen werden. Versuchen Sie es erneut.",
     "joinTitle": "Sie sind eingeladen",
-    "joinBody": "{name} ({domain}) hat Ihr Unternehmen eingeladen. Öffnen Sie in Ihrem Synaplan Operate, dann Partner, und fügen Sie diese Adresse ein.",
+    "joinBody": "{name} ({domain}) hat Ihr Unternehmen eingeladen. Öffnen Sie in Ihrem Synaplan Admin, dann Partner, und fügen Sie diese Adresse ein.",
     "joinInvalid": "Diese Einladung ist ungültig oder abgelaufen.",
     "errors": {
       "not_reachable": "Ihr Server hat eine private Adresse, andere Unternehmen erreichen ihn nicht. Partner brauchen eine öffentliche https-Adresse.",

@@ -11,7 +11,7 @@
 
 Every outbound HTTP call from the PHP backend (76 services injecting Symfony's `HttpClientInterface`, plus the OpenAI-compatible SDKs, Ollama, Stripe, Google Play, and reCAPTCHA) passes through a single policy layer (`EgressPolicy`, contract in [`03_contracts.md`](../_devextras/planning/20261021-architecture-update/03_contracts.md) §3).
 
-Operators configure the mode on **Operate → System configuration → Outbound traffic** (guide: [Runtime and outbound traffic](https://docs.synaplan.com/runtime-setup); settings summary: [RUNTIME_OPTIONS.md](RUNTIME_OPTIONS.md)):
+Operators configure the mode on **Admin → System configuration → Outbound traffic** (guide: [Runtime and outbound traffic](https://docs.synaplan.com/runtime-setup); settings summary: [RUNTIME_OPTIONS.md](RUNTIME_OPTIONS.md)):
 
 | Mode / Setting | Default | Behavior |
 | -------------- | ------- | -------- |

@@ -158,7 +158,7 @@ PDFs with tables and two-column layouts extract more cleanly when the
 (`profiles: [docling]`). Compose sets `DOCLING_BASE_URL=http://docling:5001`;
 leave that empty in `.env` to keep Docling off. A down sidecar never fails
 an upload — Tika stays the fallback. Enable Docling in
-**Operate → AI infrastructure → Document reading** (add `docling` to the
+**Admin → AI infrastructure → Document reading** (add `docling` to the
 document chain). URL, timeout and **Test connection** match Tika under
 **Reading services → Docling** on the same tab. Then:
 
@@ -178,7 +178,7 @@ default** (`profiles: [searxng]`). Compose sets
 keep SearXNG off. Health is “URL set”, not a live probe — a down
 sidecar fails that provider and the configured fallback (or an empty
 result set) is used. Enable SearXNG in
-**Operate → System configuration → Web search**. Then:
+**Admin → System configuration → Web search**. Then:
 
 ```bash
 docker compose --profile searxng up -d

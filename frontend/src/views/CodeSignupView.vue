@@ -102,8 +102,14 @@
             {{ $t(errorKey) }}
           </p>
           <p v-if="errorKey === 'codeSignup.off'" class="text-sm">
-            <router-link to="/register" class="txt-primary underline" data-testid="link-register">
-              {{ $t('codeSignup.createAccount') }}
+            <router-link
+              :to="isSelfSignupOpen(config.auth) ? '/register' : '/login'"
+              class="txt-primary underline"
+              data-testid="link-register"
+            >
+              {{
+                isSelfSignupOpen(config.auth) ? $t('codeSignup.createAccount') : $t('auth.signIn')
+              }}
             </router-link>
           </p>
           <p
@@ -144,6 +150,7 @@ import { resetPrincipalClientState } from '@/services/resetPrincipalClientState'
 import { setSessionHint } from '@/services/sessionHint'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 
 const route = useRoute()
 const { locale } = useI18n()

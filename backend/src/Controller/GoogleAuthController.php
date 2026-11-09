@@ -8,6 +8,7 @@ use App\Repository\UserRepository;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
+use App\Service\Auth\SignupDoor;
 use App\Service\Http\ClientAddress;
 use App\Service\OAuth\OAuthStateService;
 use OpenApi\Attributes as OA;
@@ -202,15 +203,7 @@ class GoogleAuthController extends AbstractController
             ]);
         } else {
             $isNewUser = true;
-            $user = new User();
-            $user->setMail($email);
-            $user->setType('WEB');
-            $user->setProviderId('google');
-            $user->setUserLevel('NEW');
-            $user->setEmailVerified(true);
-            $user->setCreated(date('Y-m-d H:i:s'));
-            $user->setUserDetails([]);
-            $user->setPaymentDetails([]);
+            $user = $this->signupGate->createAccount(SignupDoor::Google, $email, true);
 
             $this->logger->info('Creating new user from Google OAuth', [
                 'email' => $email,

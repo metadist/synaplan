@@ -79,7 +79,7 @@ After the planning step:
 
 | Area | Details |
 | ---- | ------- |
-| **Admin Switch** | `BCONFIG` group `RESEARCH`, setting `AUTO_ENABLED`, owner `0` (seeded `1`). Located on **Operate → AI infrastructure → Research** under the main Research toggle. When off (or when `RESEARCH_ENABLED=0`), chat answers every question directly and **Look deeper** is hidden; runs already in flight finish. Audited as `research.settings.update`. `PUT /api/v1/admin/research` accepts `autoEnabled` (returns `409 research_off` if Research itself is off). |
+| **Admin Switch** | `BCONFIG` group `RESEARCH`, setting `AUTO_ENABLED`, owner `0` (seeded `1`). Located on **Admin → AI infrastructure → Research** under the main Research toggle. When off (or when `RESEARCH_ENABLED=0`), chat answers every question directly and **Look deeper** is hidden; runs already in flight finish. Audited as `research.settings.update`. `PUT /api/v1/admin/research` accepts `autoEnabled` (returns `409 research_off` if Research itself is off). |
 | **Capabilities API** | Exposes `automatic` (boolean) and `auto_limits { minutes, cost_cap }` from the standard budget. |
 | **Router Evaluation** | `php bin/console app:research:router-eval --user=<id>` scores `backend/tests/Eval/research/router.json` against that account's sorting model. Gate thresholds: agreement ≥ 90%, over-escalation ≤ 5%, under-escalation ≤ 10%, no vote ≤ 2%. |
 | **Messages Gateway** | `POST /v1/messages` with header `x-synaplan-effort: auto` runs the same `AutoResearchGate::decideFor` check. When a run starts, the gateway returns the notice sentence as one assistant message plus `x-synaplan-research-run: <id>`, and the caller polls `GET /v1/research/{id}`. Without the header, the gateway never rates. See [ANTHROPIC_COMPATIBLE_API.md — Effort](ANTHROPIC_COMPATIBLE_API.md#effort-x-synaplan-effort). |
@@ -187,7 +187,7 @@ A Saved Task can include a `research` step when both `MULTITASK.RESEARCH_ENABLED
 
 ## Operator
 
-The **Operate → System status** page displays the count of active research runs when Research is enabled. Stalled runs, expired clarifying questions (~10 min), and unconfirmed thorough plans (24h) are reaped automatically by `app:research:reap` on the scheduler tick.
+The **Admin → System status** page displays the count of active research runs when Research is enabled. Stalled runs, expired clarifying questions (~10 min), and unconfirmed thorough plans (24h) are reaped automatically by `app:research:reap` on the scheduler tick.
 
 ---
 

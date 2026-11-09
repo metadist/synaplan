@@ -7,17 +7,19 @@ run are entries here, not chat messages.
 
 | Id | State |
 | -- | ----- |
-| D1–D10 | open — owner |
+| D1 | accepted — registration off closes every self-sign-up door; an existing account still signs in; a code does not bypass it |
+| D2 | accepted — directory provisioning stays on `OIDC_ALLOW_USER_PROVISIONING` only |
+| D3–D10 | open — owner |
 
 ## Steps
 
 | Step | Pull request | State |
 | ---- | ------------ | ----- |
 | IC0 | | not started — private note |
-| IC1 | [#3027](https://github.com/metadist/synaplan/pull/3027) | in review |
+| IC1 | [#3027](https://github.com/metadist/synaplan/pull/3027) | merged |
 | PC1 | | not started (`synaplan-platform`) |
 | PC2 | | waits for D4 |
-| IC2+IC3 | | one pull request after D1 and D2 — same files |
+| IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | in review |
 | IC4 | | not started — own pull request, the fixes the matrix finds |
 | IC5+IC5b | | waits for D6 and D10 — one pull request, schema then the People row |
 | IC6+IC8 | | waits for IC2 and IC5 — one pull request, the guide and the journeys |
@@ -25,7 +27,7 @@ run are entries here, not chat messages.
 | IC7 | | waits for D7 — own pull request |
 | PC3 | | waits for D5 |
 
-Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. IC2 still waits for the owner's D1 and D2: registration off closes every self-sign-up door, and directory provisioning stays on its own switch. IC5 still waits for D6 and D10 before a `BUSER_LEVEL_GRANTS` table is added.
+Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. IC5 still waits for D6 and D10 before a `BUSER_LEVEL_GRANTS` table is added.
 
 ## Audit 2026-10-25
 

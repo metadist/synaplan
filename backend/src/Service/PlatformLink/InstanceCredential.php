@@ -19,7 +19,7 @@ final readonly class InstanceCredential
     ) {
     }
 
-    public function require(string $instanceId, string $secret): PlatformInstance
+    public function require(string $instanceId, string $secret, bool $allowPending = false): PlatformInstance
     {
         if ('' === trim($instanceId) || '' === $secret) {
             throw new PlatformInstanceSecretException('Invalid instance credentials.');
@@ -27,7 +27,7 @@ final readonly class InstanceCredential
 
         $instance = $this->instances->requireInstance(trim($instanceId));
         $this->instances->assertSecret($instance, $secret);
-        if (!$instance->isActive()) {
+        if (!$allowPending && !$instance->isActive()) {
             throw new PlatformInstanceNotActiveException('This platform is waiting for approval by the Synaplan administrator.');
         }
 

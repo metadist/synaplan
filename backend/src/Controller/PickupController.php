@@ -4,12 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\PlatformInstance;
 use App\Exception\CloudDeliveryException;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\PlatformLink\PickupService;
-use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -19,6 +16,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 #[Route('/api/v1/platform-links', name: 'platform_link_pickups_')]
 #[OA\Tag(name: 'Platform Links')]
@@ -26,7 +24,6 @@ final class PickupController extends AbstractController
 {
     public function __construct(
         private PlatformLinksConfig $platformLinksConfig,
-        private PlatformInstanceService $instances,
         private PickupService $pickups,
     ) {
     }
@@ -37,10 +34,9 @@ final class PickupController extends AbstractController
         operationId: 'claimCloudPickup',
         summary: 'Claim a pickup and receive its selector',
         tags: ['Platform Links'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
         ],
         responses: [
             new OA\Response(response: 200, description: 'Claimed', content: new OA\JsonContent(required: ['id', 'external_id', 'mode', 'selector', 'read_scope', 'limits', 'expires_at'], properties: [
@@ -56,18 +52,20 @@ final class PickupController extends AbstractController
                 ]),
                 new OA\Property(property: 'expires_at', type: 'integer'),
             ])),
-            new OA\Response(response: 403, description: 'Wrong instance'),
-            new OA\Response(response: 404, description: 'Unknown pickup'),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Wrong instance, or instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown pickup, or unknown instance (unknown_instance)'),
             new OA\Response(response: 409, description: 'Already claimed'),
             new OA\Response(response: 410, description: 'Expired'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
-    public function claim(int $id, Request $request): JsonResponse
+    public function claim(int $id, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
 
         try {
-            return $this->json($this->pickups->claim($this->instance($request), $id));
+            return $this->json($this->pickups->claim($caller->instance, $id));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -79,10 +77,9 @@ final class PickupController extends AbstractController
         operationId: 'listCloudPickup',
         summary: 'Send a file listing and learn what to upload',
         tags: ['Platform Links'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['items'], properties: [
             new OA\Property(property: 'items', type: 'array', items: new OA\Items(required: ['id'], properties: [
@@ -106,16 +103,20 @@ final class PickupController extends AbstractController
                     new OA\Property(property: 'reason', type: 'string', enum: ['too_large', 'type_not_read', 'over_limit']),
                 ])),
             ])),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
-    public function listing(int $id, Request $request): JsonResponse
+    public function listing(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
         $items = is_array($body) && is_array($body['items'] ?? null) ? $body['items'] : [];
 
         try {
-            return $this->json($this->pickups->listing($this->instance($request), $id, $items));
+            return $this->json($this->pickups->listing($caller->instance, $id, $items));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -127,10 +128,9 @@ final class PickupController extends AbstractController
         operationId: 'uploadCloudPickupFile',
         summary: 'Upload one file into a pickup',
         tags: ['Platform Links'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'multipart/form-data', schema: new OA\Schema(required: ['file', 'id', 'version'], properties: [
             new OA\Property(property: 'file', type: 'string', format: 'binary'),
@@ -141,14 +141,17 @@ final class PickupController extends AbstractController
             new OA\Response(response: 200, description: 'Stored', content: new OA\JsonContent(required: ['file_id'], properties: [
                 new OA\Property(property: 'file_id', type: 'integer'),
             ])),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
             new OA\Response(response: 409, description: 'Not requested, too large, or a names-only pickup'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
-    public function files(int $id, Request $request): JsonResponse
+    public function files(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         try {
-            $instance = $this->instance($request);
             $upload = $request->files->get('file');
             if (!$upload instanceof UploadedFile || !$upload->isValid()) {
                 return $this->json(['success' => false, 'error' => 'not_requested'], Response::HTTP_CONFLICT);
@@ -158,7 +161,7 @@ final class PickupController extends AbstractController
                 return $this->json(['success' => false, 'error' => 'not_requested'], Response::HTTP_CONFLICT);
             }
             $fileId = $this->pickups->storeFile(
-                $instance,
+                $caller->instance,
                 $id,
                 (string) $request->request->get('id', ''),
                 (string) $request->request->get('version', ''),
@@ -179,10 +182,9 @@ final class PickupController extends AbstractController
         operationId: 'recordCloudPickupResult',
         summary: 'Close a pickup',
         tags: ['Platform Links'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
         ],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['status'], properties: [
             new OA\Property(property: 'status', type: 'string', enum: ['done', 'partial', 'failed']),
@@ -195,15 +197,19 @@ final class PickupController extends AbstractController
             new OA\Response(response: 200, description: 'Current state', content: new OA\JsonContent(required: ['state'], properties: [
                 new OA\Property(property: 'state', type: 'string', enum: ['queued', 'claimed', 'done', 'partial', 'failed']),
             ])),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
-    public function result(int $id, Request $request): JsonResponse
+    public function result(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
 
         try {
-            return $this->json($this->pickups->result($this->instance($request), $id, is_array($body) ? $body : []));
+            return $this->json($this->pickups->result($caller->instance, $id, is_array($body) ? $body : []));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -215,10 +221,7 @@ final class PickupController extends AbstractController
         operationId: 'reportCloudReadScope',
         summary: 'Report what a person lets Synaplan read',
         tags: ['Platform Links'],
-        parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-        ],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['external_id', 'mode', 'folders'], properties: [
             new OA\Property(property: 'external_id', type: 'string'),
             new OA\Property(property: 'mode', type: 'string', enum: ['watched', 'allowed', 'all']),
@@ -231,10 +234,13 @@ final class PickupController extends AbstractController
             new OA\Response(response: 200, description: 'Saved', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
             ])),
-            new OA\Response(response: 404, description: 'Unknown person'),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown person, or unknown instance (unknown_instance)'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
-    public function readScope(Request $request): JsonResponse
+    public function readScope(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
@@ -242,7 +248,7 @@ final class PickupController extends AbstractController
 
         try {
             $this->pickups->reportScope(
-                $this->instance($request),
+                $caller->instance,
                 is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
                 is_string($body['mode'] ?? null) ? $body['mode'] : '',
                 is_array($body['folders'] ?? null) ? $body['folders'] : [],
@@ -259,19 +265,5 @@ final class PickupController extends AbstractController
         if (!$this->platformLinksConfig->isEnabled(null)) {
             throw new NotFoundHttpException();
         }
-    }
-
-    private function instance(Request $request): PlatformInstance
-    {
-        try {
-            $instance = $this->instances->requireInstance((string) $request->headers->get('X-Instance-Id', ''));
-            $this->instances->assertSecret($instance, (string) $request->headers->get('X-Instance-Secret', ''));
-        } catch (PlatformInstanceNotFoundException) {
-            throw new CloudDeliveryException(Response::HTTP_NOT_FOUND, 'unknown_delivery');
-        } catch (PlatformInstanceSecretException) {
-            throw new CloudDeliveryException(Response::HTTP_UNAUTHORIZED, 'unauthorized');
-        }
-
-        return $instance;
     }
 }

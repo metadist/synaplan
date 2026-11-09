@@ -246,6 +246,7 @@ final readonly class WidgetReply
     private function completion(StoredVisitorMessage $stored, array $result, ?string $finishReason): array
     {
         $metadata = $result['response']['metadata'] ?? [];
+        unset($metadata['chat_error_debug'], $metadata['errorDebug'], $metadata['error_debug']);
         $completion = [
             'messageId' => $stored->message->getId(),
             'chatId' => $stored->chat->getId(),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Media;
 
+use App\AI\Exception\ChatFailureReason;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobService;
 use App\Service\Media\MediaJobStore;
@@ -151,6 +152,69 @@ class MediaJobServiceTest extends TestCase
         self::assertFalse($service->markCompleted($job, ['file' => ['url' => '/late.png']]));
         self::assertSame(MediaJob::STATUS_TIMED_OUT, $job->getStatus());
         self::assertSame('Render worker stopped responding', $job->getError());
+    }
+
+    public function testLostTerminalRaceAdoptsTheWinnersFailureDiagnostics(): void
+    {
+        $job = (new MediaJob('job-race'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_RUNNING)
+            ->setOptions([
+                'lang' => 'de',
+                MediaJob::OPT_ERROR_REASON => ChatFailureReason::ContentFiltered->value,
+                MediaJob::OPT_ERROR_DEBUG => 'worker provider dump',
+            ]);
+        $stored = (new MediaJob('job-race'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_TIMED_OUT)
+            ->setError('Das Video hat zu lange gedauert.')
+            ->setFinishedAt(1_700_000_000)
+            ->setOptions([
+                'lang' => 'de',
+                MediaJob::OPT_ERROR_REASON => ChatFailureReason::Timeout->value,
+                MediaJob::OPT_ERROR_DEBUG => 'reaper diagnostics',
+            ]);
+
+        $store = $this->createMock(MediaJobStore::class);
+        $store->method('find')->willReturn($stored);
+        $store->expects(self::never())->method('save');
+        $service = new MediaJobService($store, new NullLogger());
+
+        self::assertFalse($service->markFailed($job, 'Content was filtered.'));
+        self::assertSame(MediaJob::STATUS_TIMED_OUT, $job->getStatus());
+        self::assertSame('Das Video hat zu lange gedauert.', $job->getError());
+        self::assertSame(ChatFailureReason::Timeout->value, $job->getOptions()[MediaJob::OPT_ERROR_REASON]);
+        self::assertSame('reaper diagnostics', $job->getOptions()[MediaJob::OPT_ERROR_DEBUG]);
+        self::assertSame('de', $job->getOptions()['lang']);
+    }
+
+    public function testLostSaveDropsFailureDiagnosticsTheWinnerDidNotStore(): void
+    {
+        $job = (new MediaJob('job-race'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_RUNNING)
+            ->setOptions([
+                'lang' => 'en',
+                MediaJob::OPT_ERROR_REASON => ChatFailureReason::Unknown->value,
+                MediaJob::OPT_ERROR_DEBUG => 'worker provider dump',
+            ]);
+        $winner = (new MediaJob('job-race'))
+            ->setUserId(1)
+            ->setStatus(MediaJob::STATUS_COMPLETED)
+            ->setFinishedAt(1_700_000_100)
+            ->setResult(['file' => ['url' => '/api/v1/files/uploads/done.png']])
+            ->setOptions(['lang' => 'en']);
+
+        $store = $this->createMock(MediaJobStore::class);
+        $store->method('find')->willReturn(null);
+        $store->expects(self::once())->method('save')->willReturn($winner);
+        $service = new MediaJobService($store, new NullLogger());
+
+        self::assertFalse($service->markFailed($job, 'provider exploded'));
+        self::assertSame(MediaJob::STATUS_COMPLETED, $job->getStatus());
+        self::assertArrayNotHasKey(MediaJob::OPT_ERROR_REASON, $job->getOptions());
+        self::assertArrayNotHasKey(MediaJob::OPT_ERROR_DEBUG, $job->getOptions());
+        self::assertSame('en', $job->getOptions()['lang']);
     }
 
     public function testPercentIsClampedToValidRange(): void

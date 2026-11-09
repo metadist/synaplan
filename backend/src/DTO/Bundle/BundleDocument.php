@@ -26,6 +26,22 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'sourceVersion', type: 'string', example: '4.7.2'),
         new OA\Property(property: 'scope', type: 'string', enum: ['user', 'instance']),
         new OA\Property(
+            property: 'template',
+            description: 'Present when this bundle is an assistant template. Omitted on ordinary exports.',
+            required: ['id', 'version', 'titleKey', 'summaryKey', 'category', 'requires', 'tryIt'],
+            properties: [
+                new OA\Property(property: 'id', type: 'string', example: 'offer-writer'),
+                new OA\Property(property: 'version', type: 'string', example: '2026.11.1'),
+                new OA\Property(property: 'titleKey', type: 'string', example: 'templates.offerWriter.title'),
+                new OA\Property(property: 'summaryKey', type: 'string', example: 'templates.offerWriter.summary'),
+                new OA\Property(property: 'category', type: 'string', example: 'sales'),
+                new OA\Property(property: 'requires', type: 'array', items: new OA\Items(type: 'object', additionalProperties: true)),
+                new OA\Property(property: 'tryIt', type: 'array', items: new OA\Items(type: 'string')),
+            ],
+            type: 'object',
+            nullable: true,
+        ),
+        new OA\Property(
             property: 'sections',
             type: 'array',
             maxItems: BundleEnvelopeValidator::MAX_SECTIONS,

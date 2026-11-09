@@ -7,6 +7,7 @@ namespace App\Service\Chat\Stream;
 use App\Entity\GuestSession;
 use App\Entity\User;
 use App\Entity\WidgetSession;
+use App\Service\Auth\ProviderDiagnosticsAccess;
 use App\Service\Chat\GuestChatConfig;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Widget\WidgetService;
@@ -40,6 +41,7 @@ final readonly class StreamCallerResolver
         private GuestChatConfig $guestChatConfig,
         private EntityManagerInterface $em,
         private Security $security,
+        private ProviderDiagnosticsAccess $diagnostics,
         private LoggerInterface $logger,
     ) {
     }
@@ -73,6 +75,7 @@ final readonly class StreamCallerResolver
             widgetSession: $widgetSession,
             guestSession: $guestSession,
             widgetTaskPrompt: $widgetTaskPrompt,
+            providerDiagnostics: $this->diagnostics->viewerMaySee(),
         );
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Service\Message\Handler\Media;
 
+use App\AI\Exception\ChatFailureReason;
 use App\Service\Media\MediaJob;
 use App\Service\Media\MediaJobConfig;
 use App\Service\Media\MediaJobDispatcher;
@@ -177,10 +178,11 @@ final readonly class MediaJobDetach
      */
     private function undeliverable(MediaJob $job, string $type, MediaTurnRequest $request, string $lang, callable $streamCallback, ?callable $progressCallback): array
     {
-        $errorMessage = $this->errorMessageBuilder->buildErrorMessage(
-            new \RuntimeException('Background queue unreachable'),
-            $type,
-            $lang,
+        $failure = new \RuntimeException('Background queue unreachable');
+        $errorMessage = $this->errorMessageBuilder->buildErrorMessage($failure, $type, $lang);
+        $job->rememberFailure(
+            ChatFailureReason::UpstreamUnavailable->value,
+            $this->errorMessageBuilder->diagnostics($failure),
         );
         $this->mediaJobService->markFailed($job, $errorMessage);
         $this->mediaJobMessageSync->syncTerminalState($job);

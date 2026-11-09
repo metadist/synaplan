@@ -74,7 +74,7 @@ final readonly class StreamFailureReporter
     {
         $intended = $state->intendedChat;
         $errorLang = self::errorLanguage($result, $turn->caller->uiLanguage);
-        $errorView = $this->present($result, $errorLang);
+        $errorView = $this->present($result, $errorLang, $turn->caller);
         $this->chatErrorNotifier->notify($errorView, $intended['provider'] ?? ($result['provider'] ?? null), $turn->caller->user->getId(), [
             'model' => $intended['name'] ?? null,
             'chat_id' => $state->chat?->getId(),
@@ -154,7 +154,7 @@ final readonly class StreamFailureReporter
 
         $intended = $state->intendedChat;
         $fallbackProvider = $providerName ?? 'system';
-        $errorView = $this->present($failure, $turn->caller->uiLanguage);
+        $errorView = $this->present($failure, $turn->caller->uiLanguage, $turn->caller);
         $this->chatErrorNotifier->notify($errorView, $intended['provider'] ?? $fallbackProvider, $user->getId(), [
             'model' => $intended['name'] ?? null,
             'chat_id' => $state->chat?->getId(),
@@ -189,7 +189,7 @@ final readonly class StreamFailureReporter
     {
         $incoming = $state->incoming();
         $errorLang = self::errorLanguage($result, $incoming->getLanguage() ?: 'en');
-        $errorView = $this->present($result, $errorLang);
+        $errorView = $this->present($result, $errorLang, $turn->caller);
         $this->chatErrorNotifier->notify($errorView, $result['provider'] ?? null, $turn->caller->user->getId(), [
             'model' => $intendedModelId ? $this->modelConfigService->getModelName($intendedModelId) : null,
             'chat_id' => $state->chat?->getId(),
@@ -245,7 +245,7 @@ final readonly class StreamFailureReporter
             'trace' => $e->getTraceAsString(),
         ]);
         $errorLang = $state->incoming()->getLanguage() ?: 'en';
-        $errorView = $this->present(['exception' => $e, 'error' => $e->getMessage()], $errorLang);
+        $errorView = $this->present(['exception' => $e, 'error' => $e->getMessage()], $errorLang, $turn->caller);
         $this->chatErrorNotifier->notify($errorView, 'system', $turn->caller->user->getId(), [
             'chat_id' => $state->chat?->getId(),
         ]);
@@ -346,9 +346,18 @@ final readonly class StreamFailureReporter
     /**
      * @param array<string, mixed> $result
      */
-    private function present(array $result, string $language): ChatErrorView
+    private function present(array $result, string $language, StreamCaller $caller): ChatErrorView
     {
-        return $this->chatErrorPresenter->presentFromResult($result, $language, $this->authorization->isGranted('ROLE_ADMIN'));
+        // ROLE_ADMIN is the signed-in account. While impersonating, that
+        // account is the target, so it is not an admin; the caller flag is
+        // set only after the impersonation stash is checked. Widget and guest
+        // callers never carry the flag. The role check stays so an admin
+        // testing a widget (authenticated as themselves) still sees the dump
+        // they already saw before impersonation existed.
+        $include = $caller->seesProviderDiagnostics()
+            || $this->authorization->isGranted('ROLE_ADMIN');
+
+        return $this->chatErrorPresenter->presentFromResult($result, $language, $include);
     }
 
     /**

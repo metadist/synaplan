@@ -233,7 +233,7 @@ final class AgentController extends AbstractController
                                 ]),
                                 new OA\Property(property: 'canEdit', type: 'boolean', example: true),
                                 new OA\Property(property: 'canStartChat', type: 'boolean', example: true),
-                                new OA\Property(property: 'canClone', type: 'boolean', example: true),
+                                new OA\Property(property: 'canClone', type: 'boolean', example: true), new OA\Property(property: 'templateId', type: 'string', nullable: true, example: 'offer-writer'),
                             ]
                         )),
                     ]

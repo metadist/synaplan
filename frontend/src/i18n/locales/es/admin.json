@@ -130,7 +130,7 @@
       "directSaved": "Guardado. La siguiente conversación de OpenAI usa este ajuste.",
       "directFailed": "No se pudo guardar la conexión directa."
     },
-    "title": "Operar",
+    "title": "Administración",
     "description": "Tu servidor de un vistazo: usuarios, registros y uso.",
     "tabs": {
       "overview": "Resumen",
@@ -1041,7 +1041,7 @@
       "signupCodes": "Códigos de invitación"
     },
     "openPeople": "Abrir Usuarios",
-    "backToOperate": "Volver a Operar",
+    "backToOperate": "Volver a Administración",
     "myGroups": {
       "subtitle": "Grupos a los que pertenece en esta instancia.",
       "emptyMember": "Aún no está en ningún grupo. Un administrador puede añadirle en la página Usuarios.",
@@ -1314,7 +1314,8 @@
         "TOOLS_CUSTOM_HTTP_ENABLED": "Herramientas HTTP propias",
         "WORKFLOWS_BUILDER_ENABLED": "Editor de pasos",
         "CHAT_EXPORT_ENABLED": "Exportar chats",
-        "CHAT_SHARE_ENABLED": "Compartir chats"
+        "CHAT_SHARE_ENABLED": "Compartir chats",
+        "AGENTS_PUBLISH_REVIEW": "Revisión antes de compartir un asistente con todos"
       }
     },
     "intro": {
@@ -1612,7 +1613,7 @@
     "inviteReady": "Invitación lista. Envíe la dirección al otro administrador.",
     "loadFailed": "No se pudieron cargar los socios. Inténtelo de nuevo.",
     "joinTitle": "Está invitado",
-    "joinBody": "{name} ({domain}) invitó a su empresa. En su Synaplan abra Operar, luego Socios, y pegue esta dirección.",
+    "joinBody": "{name} ({domain}) invitó a su empresa. En su Synaplan abra Administración, luego Socios, y pegue esta dirección.",
     "joinInvalid": "Esta invitación no es válida o ha caducado.",
     "errors": {
       "not_reachable": "Su servidor tiene una dirección privada, así que otras empresas no pueden llegar. Los socios necesitan una dirección https pública.",

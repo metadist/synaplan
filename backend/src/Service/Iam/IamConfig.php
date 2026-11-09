@@ -29,7 +29,7 @@ use App\Service\Feature\FeatureFlagEnv;
  * fallback (OFF, only reached when no row was ever seeded).
  *
  * Since 4.8 the seeder writes the flags ON. Operators change them under
- * Operate → System configuration → Features, or pin them off for an automated
+ * Admin → System configuration → Features, or pin them off for an automated
  * deployment with `FEATURE_IAM_*=false`. Exception: USER_SEARCH_ENABLED
  * seeds OFF (#2060) — user-directory search is opt-in.
  */

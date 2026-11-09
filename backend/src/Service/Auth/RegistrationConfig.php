@@ -7,7 +7,11 @@ namespace App\Service\Auth;
 use App\Repository\ConfigRepository;
 
 /**
- * Switch for local email/password self-registration.
+ * Switch for every self-sign-up door: the email form, Google, GitHub, Apple
+ * and any other path that creates an account for a stranger.
+ *
+ * It never closes a sign-in. An existing account still gets in. Directory
+ * provisioning ({@see \App\Service\OidcUserService}) does not read this switch.
  *
  * Precedence, in this order:
  *
@@ -24,10 +28,10 @@ use App\Repository\ConfigRepository;
  * (issue #462), and that decision must not be overridable from the UI.
  *
  * Read at two seams:
- *   - the public runtime-config response (frontend hides the sign-up link and
- *     guards the /register route), and
- *   - {@see \App\Controller\AuthController::register()} (server-side refusal, so
- *     disabling it is not merely cosmetic).
+ *   - the public runtime-config response (the sign-up link disappears and
+ *     /register explains that new accounts cannot be created), and
+ *   - every self-sign-up door (server-side refusal, so hiding the link is
+ *     not the control).
  *
  * Besides on/off there is a mode ({@see mode()}): `open` is today's sign-up,
  * `admission` requires a paid plan or a sign-up code for every new account.
@@ -59,7 +63,18 @@ final readonly class RegistrationConfig
 
     public function __construct(
         private ConfigRepository $configRepository,
+        private ?SignupPauseSwitch $signupPause = null,
     ) {
+    }
+
+    /**
+     * The temporary pause. Separate from {@see isEnabled()}: a pause is lifted
+     * without turning self-sign-up back on, and an invitation code can pass a
+     * pause. It cannot pass {@see isEnabled()} being false.
+     */
+    public function isSignupPaused(): bool
+    {
+        return $this->signupPause?->isPaused() ?? false;
     }
 
     public function isEnabled(): bool

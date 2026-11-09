@@ -94,10 +94,15 @@ export async function startNativeAppleSignIn(admission?: {
         code: admission?.code,
       }),
     })
+    const data = await res.json().catch(() => null)
     if (!res.ok) {
-      return { success: false, error: 'Apple sign-in verification failed' }
+      return {
+        success: false,
+        error:
+          (typeof data?.error === 'string' && data.error) || 'Apple sign-in verification failed',
+        errorCode: typeof data?.code === 'string' ? data.code : undefined,
+      }
     }
-    const data = await res.json()
     setNativeTokens(data?.tokens)
     return { success: true }
   } catch {

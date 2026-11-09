@@ -36,6 +36,12 @@ final class MediaJob
     public const TYPE_IMAGE = 'image';
     public const TYPE_AUDIO = 'audio';
 
+    /** Options key: {@see \App\AI\Exception\ChatFailureReason} for the red error notice. */
+    public const OPT_ERROR_REASON = '_errorReason';
+
+    /** Options key: raw provider diagnostics. Copied to message meta; never put on the public job status. */
+    public const OPT_ERROR_DEBUG = '_errorDebug';
+
     public const STATUS_QUEUED = 'queued';
     public const STATUS_SUBMITTING = 'submitting';
     public const STATUS_RUNNING = 'running';
@@ -244,6 +250,20 @@ final class MediaJob
     public function getOptions(): array
     {
         return $this->options;
+    }
+
+    /**
+     * Remember why a render failed, separate from the sentence the user reads.
+     */
+    public function rememberFailure(string $reason, string $debug): self
+    {
+        $this->options[self::OPT_ERROR_REASON] = $reason;
+        $debug = trim($debug);
+        if ('' !== $debug) {
+            $this->options[self::OPT_ERROR_DEBUG] = mb_substr($debug, 0, 4000);
+        }
+
+        return $this;
     }
 
     /**

@@ -1,0 +1,45 @@
+id: daily-briefing
+version: "2026.11.1"
+mustMention:
+  - "do not invent messages"
+  - "Answer in the user's language."
+toolsOffered: []
+toolsNotOffered:
+  - files
+  - internet
+cases:
+  - utterance: "What in my mailbox needs a decision today?"
+    knowledge: |
+      mailbox.txt
+      Contract renewal needs a signature.
+      Newsletter: weekly offers.
+    expects:
+      answerContains:
+        - "Contract renewal needs a signature."
+      answerOmits:
+        - "Newsletter"
+        - "Source:"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "Skip newsletters and list only the messages I should answer."
+    knowledge: |
+      mailbox.txt
+      Contract renewal needs a signature.
+      Newsletter: weekly offers.
+    expects:
+      answerContains:
+        - "Contract renewal needs a signature."
+      answerOmits:
+        - "Newsletter"
+        - "Source:"
+      toolCalled: null
+      approvalRequested: false
+  - utterance: "What in my mailbox needs a decision today?"
+    expects:
+      answerContains:
+        - "mailbox"
+        - "do not invent messages"
+      answerOmits:
+        - "Contract renewal"
+      toolCalled: null
+      approvalRequested: false
