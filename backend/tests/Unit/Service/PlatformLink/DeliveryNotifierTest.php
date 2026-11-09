@@ -34,6 +34,16 @@ final class DeliveryNotifierTest extends TestCase
         self::assertNull($this->client($http)->post($instance, 'delivery', '9'));
     }
 
+    public function testAHostThatResolvesNowhereAcceptableIsNeverCalled(): void
+    {
+        $http = $this->createMock(HttpClientInterface::class);
+        $http->expects(self::never())->method('request');
+        $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
+        $instance->setDeliveryUrl('https://files.example.org/inbound');
+
+        self::assertNull($this->client($http, [])->post($instance, 'delivery', '9'));
+    }
+
     public function testATimeoutLeavesTheCopyUnconfirmed(): void
     {
         $http = $this->createMock(HttpClientInterface::class);
@@ -62,6 +72,7 @@ final class DeliveryNotifierTest extends TestCase
         $this->client($http)->post($instance, 'pickup', '15', 'ada');
 
         self::assertIsArray($sent);
+        self::assertSame(['files.example.org' => '203.0.113.10'], $sent['resolve'] ?? null, 'connects to the address the check resolved');
         self::assertSame('application/jwt', $sent['headers']['Content-Type'] ?? null);
         [$header, $payload] = explode('.', (string) $sent['body']);
         $decode = static fn (string $part): array => (array) json_decode((string) base64_decode(strtr($part, '-_', '+/')), true);
@@ -88,8 +99,14 @@ final class DeliveryNotifierTest extends TestCase
         self::assertSame('delivered', $answer['status'] ?? null);
     }
 
-    private function client(HttpClientInterface $http): SignedNotificationClient
+    /**
+     * @param list<string> $resolved what the stubbed DNS answers for any host
+     */
+    private function client(HttpClientInterface $http, array $resolved = ['203.0.113.10']): SignedNotificationClient
     {
+        $ssrf = $this->createStub(SsrfGuard::class);
+        $ssrf->method('pinnedIps')->willReturn($resolved);
+        $ssrf->method('isBlockedHost')->willReturn([] === $resolved);
         $saved = null;
         $configs = $this->createStub(ConfigRepository::class);
         $configs->method('getValue')->willReturnCallback(static function () use (&$saved): ?string {
@@ -107,7 +124,7 @@ final class DeliveryNotifierTest extends TestCase
             $http,
             new NotifyKeyStore($configs, new EncryptionService('test-secret', new NullLogger()), new FederationSigner(), $redis),
             new FederationSigner(),
-            new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard(), new OidcCloud('', '', '')),
+            new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), $ssrf, new OidcCloud('', '', '')),
             new NullLogger(),
             'https://synaplan.example/',
         );

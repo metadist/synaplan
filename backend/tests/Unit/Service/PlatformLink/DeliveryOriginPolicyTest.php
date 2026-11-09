@@ -107,4 +107,21 @@ final class DeliveryOriginPolicyTest extends TestCase
         self::assertTrue($policy->accepts($instance, 'http://host.docker.internal:9106/api/synaplan/inbound'));
         self::assertFalse($policy->accepts($instance, 'http://127.0.0.1:8000/not-configured'));
     }
+
+    public function testThePinnedAddressFollowsTheSameRulesAsTheCheck(): void
+    {
+        $ssrf = $this->createStub(SsrfGuard::class);
+        $ssrf->method('isBlockedHost')->willReturn(false);
+        $ssrf->method('resolvedIps')->willReturn(['10.0.0.5']);
+        $ssrf->method('pinnedIps')->willReturnCallback(
+            static fn (string $host, bool $privateAllowed = false): array => $privateAllowed ? ['10.0.0.5'] : [],
+        );
+        $policy = new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), $ssrf, new OidcCloud('', '', ''));
+        $registered = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
+        $approved = new PlatformInstance('nextcloud', 'pi_def', 'files.example.org');
+        $approved->setApprovedHosts(['cloud.internal']);
+
+        self::assertNull($policy->pinnedAddress($registered, 'https://files.example.org/inbound'), 'a registered host may not resolve into a private network');
+        self::assertSame('10.0.0.5', $policy->pinnedAddress($approved, 'https://cloud.internal/inbound'), 'an approved host may');
+    }
 }
