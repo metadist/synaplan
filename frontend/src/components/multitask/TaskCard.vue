@@ -6,6 +6,7 @@ import type { TaskCard } from '@/stores/history'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useNotification } from '@/composables/useNotification'
 import type { AIModel, Capability } from '@/types/ai-models'
+import AdminErrorDetails from '@/components/AdminErrorDetails.vue'
 import MessageText from '@/components/MessageText.vue'
 import TaskCardMedia from '@/components/multitask/TaskCardMedia.vue'
 import ComputeRunCard from '@/components/multitask/ComputeRunCard.vue'
@@ -392,9 +393,14 @@ const outputShown = computed(() =>
 
     <div v-else-if="card.state === 'failed'" class="space-y-2">
       <!-- Specific backend error when available, generic copy otherwise -->
-      <p class="text-sm txt-muted break-words" data-testid="task-card-error">
+      <p class="text-sm txt-muted break-words whitespace-pre-wrap" data-testid="task-card-error">
         {{ card.error || $t('taskPlan.failedBody') }}
       </p>
+      <AdminErrorDetails
+        :debug="card.errorDebug"
+        details-test-id="btn-task-card-error-details"
+        debug-test-id="task-card-error-debug"
+      />
       <button
         v-if="canRetry"
         type="button"

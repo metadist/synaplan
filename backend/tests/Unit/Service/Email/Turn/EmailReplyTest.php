@@ -60,6 +60,25 @@ final class EmailReplyTest extends TestCase
         self::assertSame([['discord', 'processing', 'raw failure'], ['mail', 'Please try again.', '<m1@example.com>', 'test', null, null]], $this->steps);
     }
 
+    public function testAFailedMediaAnswerStripsDiagnosticsFromTheRelayResponse(): void
+    {
+        $payload = $this->reply([
+            'success' => true,
+            'response' => [
+                'content' => 'Sorry, the image could not be generated right now.',
+                'metadata' => [
+                    'provider' => 'openai',
+                    'model' => 'gpt-image-1',
+                    'chat_error_reason' => 'unknown',
+                    'chat_error_debug' => 'Provider: openai\nError: safety block',
+                ],
+            ],
+        ])->answer($this->email(), $this->stored());
+
+        self::assertArrayNotHasKey('chat_error_debug', $payload['response']['metadata']);
+        self::assertSame('unknown', $payload['response']['metadata']['chat_error_reason']);
+    }
+
     public function testATurnThatBreaksIsReportedWithoutItsDetails(): void
     {
         $payload = $this->reply([])->failure($this->email(debug: true), new \RuntimeException('Database is down'));

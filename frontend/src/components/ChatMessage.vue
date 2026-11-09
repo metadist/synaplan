@@ -429,10 +429,10 @@
           </p>
 
           <ChatErrorNotice
-            v-if="role === 'assistant' && errorReason"
+            v-if="role === 'assistant' && noticeReason"
             class="m-3"
-            :error-reason="errorReason"
-            :error-message="errorMessage"
+            :error-reason="noticeReason"
+            :error-message="noticeMessage"
             :has-partial-answer="hasPartialAnswer"
             :can-retry-model="canRewrite !== false && canRetryModel"
             :error-debug="errorDebug"
@@ -1143,6 +1143,7 @@ import { useFeedbackStore } from '@/stores/userFeedback'
 import { useConfigStore } from '@/stores/config'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import ChatErrorNotice from './ChatErrorNotice.vue'
+import { stripStoredAdminDiagnostics } from '@/utils/storedAdminDiagnostics'
 import MessagePart from './MessagePart.vue'
 import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
 import LookDeeperAction from '@/components/research/LookDeeperAction.vue'
@@ -1788,8 +1789,26 @@ const isKnownModelName = (name?: string | null): boolean => {
   return n !== '' && n !== 'unknown'
 }
 
+// A failed render uses the same red notice as a chat error. The running
+// banner stays until the job ends; the notice then carries the sentence.
+const noticeReason = computed(() => {
+  if (props.errorReason) return props.errorReason
+  if (props.mediaJob?.state === 'failed') return props.mediaJob.errorReason || 'unknown'
+  return null
+})
+const noticeMessage = computed(() => {
+  const explicit = stripStoredAdminDiagnostics(props.errorMessage?.trim() ?? '')
+  if (explicit !== '') return explicit
+  if (props.mediaJob?.state === 'failed') {
+    const fromJob = stripStoredAdminDiagnostics(props.mediaJob.error?.trim() ?? '')
+    if (fromJob !== '') return fromJob
+  }
+  return null
+})
+
 const showMediaJobBanner = computed(() => {
   if (props.role !== 'assistant' || !props.mediaJob) return false
+  if (props.mediaJob.state === 'failed' && noticeReason.value) return false
   const state = props.mediaJob.state
   return state === 'running' || state === 'failed' || state === 'cancelled'
 })
@@ -2037,11 +2056,11 @@ const hasPartialAnswer = computed(() => {
     return false
   }
   const body = copyableText.value.trim()
-  const explanation = (props.errorMessage ?? '').trim()
+  const explanation = (noticeMessage.value ?? '').trim()
   if (explanation !== '' && body === explanation) {
     return false
   }
-  const catalogKey = chatErrorReasonKey(props.errorReason)
+  const catalogKey = chatErrorReasonKey(noticeReason.value)
   const catalog = te(catalogKey) ? t(catalogKey) : ''
   if (catalog !== '' && body === catalog) {
     return false
@@ -2053,7 +2072,7 @@ const researchTurn = useResearchTurn(() => props.researchRunId)
 const visibleContentParts = computed(() => {
   if (researchTurn.running.value) return []
   const parts =
-    !props.errorReason || hasPartialAnswer.value
+    !noticeReason.value || hasPartialAnswer.value
       ? contentParts.value
       : contentParts.value.filter((part) => part.type !== 'text')
   return parts.filter((part) => part.type !== 'text' || (part.content ?? '').trim() !== '')

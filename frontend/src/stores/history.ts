@@ -114,11 +114,11 @@ export interface MediaJobInfo {
   type: string
   state: string
   error?: string
+  errorReason?: string
   percent?: number
   elapsedSeconds?: number
   maxWaitSeconds?: number
   remainingSeconds?: number
-  /** Poll returned 404 — job snapshot expired from Redis. */
   lost?: boolean
   /** Backend hint: job has been queued too long, worker likely down. */
   stalled?: boolean

@@ -2,6 +2,7 @@
 
 namespace App\Service\Message\Handler;
 
+use App\AI\Exception\ChatFailureReason;
 use App\AI\Exception\ProviderException;
 
 class MediaErrorMessageBuilder
@@ -33,23 +34,73 @@ class MediaErrorMessageBuilder
     }
 
     /**
-     * Build a user-friendly, translated error message from the exception.
-     *
-     * @param bool $includeDiagnostics when true, append a raw technical
-     *                                 diagnostics block to the message. This is
-     *                                 reserved for ADMIN users so they can see
-     *                                 the underlying provider error/cause that is
-     *                                 deliberately hidden from regular users.
+     * The localized sentence every viewer may read. Provider internals stay
+     * in {@see diagnostics()} and are shown only inside the admin notice.
      */
-    public function buildErrorMessage(\Exception $e, string $mediaType, string $lang, bool $includeDiagnostics = false): string
+    public function buildErrorMessage(\Exception $e, string $mediaType, string $lang): string
     {
-        $message = $this->buildUserFacingMessage($e, $mediaType, $lang);
+        return $this->buildUserFacingMessage($e, $mediaType, $lang);
+    }
 
-        if ($includeDiagnostics) {
-            $message .= $this->buildAdminDiagnostics($e, $lang);
+    /**
+     * Coarse reason for the red chat-error notice. Structured provider data
+     * wins; anything else stays {@see ChatFailureReason::Unknown} so the
+     * specific sentence above is what the person reads.
+     */
+    public function failureReason(\Exception $e): ChatFailureReason
+    {
+        if ($e instanceof ProviderException) {
+            $blockReason = $e->getContext()['block_reason'] ?? null;
+            if (is_string($blockReason) && '' !== $blockReason) {
+                return ChatFailureReason::ContentFiltered;
+            }
         }
 
-        return $message;
+        return match ($this->classifyFailure($e)) {
+            'auth' => ChatFailureReason::AuthFailed,
+            'credits' => ChatFailureReason::QuotaExceeded,
+            'rate_limit' => ChatFailureReason::RateLimited,
+            'model' => ChatFailureReason::ModelUnavailable,
+            'timeout' => ChatFailureReason::Timeout,
+            default => ChatFailureReason::Unknown,
+        };
+    }
+
+    /**
+     * Raw provider, code, message and context. Never append this to the
+     * message body; the history API returns it only to an admin viewer.
+     */
+    public function diagnostics(\Exception $e): string
+    {
+        $lines = [];
+
+        if ($e instanceof ProviderException) {
+            $lines[] = 'Provider: '.$e->getProviderName();
+        }
+
+        $code = $e->getCode();
+        if (0 !== $code && '' !== (string) $code) {
+            $lines[] = 'Code: '.$code;
+        }
+
+        $lines[] = 'Error: '.$e->getMessage();
+
+        $previous = $e->getPrevious();
+        if (null !== $previous) {
+            $lines[] = 'Cause: '.$previous->getMessage();
+        }
+
+        if ($e instanceof ProviderException) {
+            $ctx = $e->getContext();
+            if (!empty($ctx)) {
+                $encoded = json_encode($ctx, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+                if (false !== $encoded) {
+                    $lines[] = 'Context: '.$encoded;
+                }
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
@@ -91,49 +142,6 @@ class MediaErrorMessageBuilder
         }
 
         return $this->getGenericMediaError($mediaType, $lang);
-    }
-
-    /**
-     * Raw technical diagnostics appended for ADMIN users only.
-     *
-     * Regular users get a clean, non-leaky message; admins additionally see the
-     * underlying provider, error code, raw message, root cause and any
-     * provider-supplied context so they can diagnose WHY a generation failed
-     * without digging through worker logs.
-     */
-    private function buildAdminDiagnostics(\Exception $e, string $lang): string
-    {
-        $lines = [];
-
-        if ($e instanceof ProviderException) {
-            $lines[] = 'Provider: '.$e->getProviderName();
-        }
-
-        $code = $e->getCode();
-        if (0 !== $code && '' !== (string) $code) {
-            $lines[] = 'Code: '.$code;
-        }
-
-        $lines[] = 'Error: '.$e->getMessage();
-
-        $previous = $e->getPrevious();
-        if (null !== $previous) {
-            $lines[] = 'Cause: '.$previous->getMessage();
-        }
-
-        if ($e instanceof ProviderException) {
-            $ctx = $e->getContext();
-            if (!empty($ctx)) {
-                $encoded = json_encode($ctx, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
-                if (false !== $encoded) {
-                    $lines[] = 'Context: '.$encoded;
-                }
-            }
-        }
-
-        $label = 'de' === $lang ? 'Admin-Diagnose (nur für dich sichtbar)' : 'Admin diagnostics (visible to you only)';
-
-        return "\n\n---\n**".$label."**\n```\n".implode("\n", $lines)."\n```";
     }
 
     /**

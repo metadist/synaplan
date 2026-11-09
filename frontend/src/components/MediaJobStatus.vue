@@ -3,6 +3,7 @@ import { computed, ref, toRef } from 'vue'
 import { Icon } from '@iconify/vue'
 import type { MediaJobInfo } from '@/stores/history'
 import type { MediaJobPollResult } from '@/services/api/mediaJobApi'
+import { stripStoredAdminDiagnostics } from '@/utils/storedAdminDiagnostics'
 import {
   useMediaJobPoll,
   formatElapsedDuration,
@@ -43,7 +44,8 @@ function applyPollStatus(status: MediaJobPollResult) {
     jobId: status.job_id,
     type: status.type,
     state: status.state,
-    error: status.error ?? undefined,
+    error: typeof status.error === 'string' ? stripStoredAdminDiagnostics(status.error) : undefined,
+    errorReason: status.error_reason ?? undefined,
     percent: status.percent ?? undefined,
     elapsedSeconds: status.elapsed_seconds,
     maxWaitSeconds: status.max_wait_seconds,

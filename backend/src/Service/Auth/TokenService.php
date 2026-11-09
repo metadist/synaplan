@@ -33,6 +33,14 @@ final readonly class TokenService
     public const ACCESS_COOKIE = 'access_token';
     public const REFRESH_COOKIE = 'refresh_token';
 
+    /**
+     * Request attribute holding the `impersonator_id` of the access token that
+     * authenticated this request. Set only after the signature and expiry
+     * check. Absent on a normal session. Not a privilege by itself — the
+     * stash cookie still has to name the same, still-active administrator.
+     */
+    public const IMPERSONATOR_ATTRIBUTE = 'access_token_impersonator_id';
+
     // Token types for DB
     public const TYPE_ACCESS = 'access';
     public const TYPE_REFRESH = 'refresh';
@@ -108,6 +116,13 @@ final readonly class TokenService
             'access_token_mbg',
             is_int($generation) || (is_string($generation) && ctype_digit($generation)) ? (int) $generation : 0,
         );
+
+        $impersonatorId = $payload['impersonator_id'] ?? null;
+        if (is_int($impersonatorId) || (is_string($impersonatorId) && ctype_digit($impersonatorId))) {
+            $request->attributes->set(self::IMPERSONATOR_ATTRIBUTE, (int) $impersonatorId);
+        } else {
+            $request->attributes->remove(self::IMPERSONATOR_ATTRIBUTE);
+        }
     }
 
     /**

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Service\Media;
 
+use App\AI\Exception\ChatFailureReason;
 use App\Repository\MessageRepository;
 use App\Service\File\ThumbnailService;
 use App\Service\Message\GeneratedMediaTextRenderer;
 use App\Service\Message\PlaceholderReply;
+use App\Service\Message\StoredAdminDiagnostics;
 use App\Service\Multitask\TaskPlanStore;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -98,6 +100,8 @@ final readonly class MediaJobMessageSync
             return;
         }
 
+        $this->persistFailureNotice($message, $job);
+
         $nodeId = $job->getNodeId();
         if (null !== $nodeId && '' !== $nodeId) {
             $this->syncMultitaskNodeJob($job, $message, $status['state']);
@@ -107,8 +111,12 @@ final readonly class MediaJobMessageSync
                 'type' => $job->getType(),
                 'state' => $status['state'],
             ];
-            if (null !== $job->getError() && '' !== $job->getError()) {
-                $mediaJobMeta['error'] = $job->getError();
+            if (null !== ($publicError = $this->publicError($job)) && '' !== $publicError) {
+                $mediaJobMeta['error'] = $publicError;
+            }
+            $reason = $job->getOptions()[MediaJob::OPT_ERROR_REASON] ?? null;
+            if (is_string($reason) && null !== ChatFailureReason::tryFrom($reason)) {
+                $mediaJobMeta['error_reason'] = $reason;
             }
 
             $message->setMeta(
@@ -117,7 +125,7 @@ final readonly class MediaJobMessageSync
             );
 
             if (MediaJob::STATUS_FAILED === $job->getStatus() || MediaJob::STATUS_TIMED_OUT === $job->getStatus()) {
-                $errorText = $job->getError();
+                $errorText = $this->publicError($job);
                 if (null !== $errorText && '' !== trim($errorText)) {
                     $message->setText($errorText);
                 }
@@ -167,6 +175,71 @@ final readonly class MediaJobMessageSync
         $this->realtimeNotifier->publishUpdate($job);
 
         $this->events->dispatch(new MediaJobTerminalEvent($job, $messageId));
+    }
+
+    /**
+     * The user-facing sentence stays on the job error. The reason drives the
+     * red notice; the raw dump is message meta and is returned only to admins.
+     * A multitask node keeps that dump off the assembled reply and on the card.
+     */
+    private function publicError(MediaJob $job): ?string
+    {
+        $error = $job->getError();
+        if (null === $error || '' === $error) {
+            return $error;
+        }
+
+        return StoredAdminDiagnostics::userText($error);
+    }
+
+    private function persistFailureNotice(\App\Entity\Message $message, MediaJob $job): void
+    {
+        if (MediaJob::STATUS_FAILED !== $job->getStatus() && MediaJob::STATUS_TIMED_OUT !== $job->getStatus()) {
+            return;
+        }
+
+        $reason = $job->getOptions()[MediaJob::OPT_ERROR_REASON] ?? null;
+        if (!is_string($reason) || null === ChatFailureReason::tryFrom($reason)) {
+            $reason = MediaJob::STATUS_TIMED_OUT === $job->getStatus()
+                ? ChatFailureReason::Timeout->value
+                : ChatFailureReason::Unknown->value;
+        }
+
+        $debug = $job->getOptions()[MediaJob::OPT_ERROR_DEBUG] ?? null;
+        $debug = is_string($debug) && '' !== $debug ? $debug : null;
+        if (null === $debug) {
+            $stored = $job->getError();
+            if (is_string($stored) && '' !== $stored) {
+                $debug = StoredAdminDiagnostics::split($stored)['debug'];
+            }
+        }
+        $nodeId = $job->getNodeId();
+        if (null !== $nodeId && '' !== $nodeId) {
+            if (null !== $debug) {
+                $this->rememberNodeDebug($message, $nodeId, $debug);
+            }
+
+            return;
+        }
+
+        $message->setMeta('error_reason', $reason);
+        if (null !== $debug) {
+            $message->setMeta('error_debug', $debug);
+        }
+    }
+
+    private function rememberNodeDebug(\App\Entity\Message $message, string $nodeId, string $debug): void
+    {
+        $raw = $message->getMeta('node_error_debug');
+        $map = is_string($raw) && '' !== $raw ? json_decode($raw, true) : [];
+        if (!is_array($map)) {
+            $map = [];
+        }
+        $map[$nodeId] = $debug;
+        $message->setMeta(
+            'node_error_debug',
+            (string) json_encode($map, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE),
+        );
     }
 
     /**
@@ -273,7 +346,7 @@ final readonly class MediaJobMessageSync
         $this->taskPlanStore->updateStatusByJobKey($job->getJobKey(), $state, [
             'url' => $fileUrl,
             'type' => $fileType,
-            'error' => null !== $job->getError() && '' !== $job->getError() ? $job->getError() : null,
+            'error' => $this->publicError($job),
         ]);
 
         $raw = $message->getMeta('task_plan');
@@ -291,8 +364,9 @@ final readonly class MediaJobMessageSync
                 continue;
             }
             $card['state'] = $state;
-            if (null !== $job->getError() && '' !== $job->getError()) {
-                $card['error'] = $job->getError();
+            $publicError = $this->publicError($job);
+            if (null !== $publicError && '' !== $publicError) {
+                $card['error'] = $publicError;
             }
             if (null !== $fileUrl) {
                 // Stored as the public upload URL — the frontend mapper's

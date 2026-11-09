@@ -9,6 +9,7 @@ use App\Controller\MessageController;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
+use App\Service\Auth\ProviderDiagnosticsAccess;
 use App\Service\Billing\BillingService;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\File\DataUrlFixer;
@@ -27,7 +28,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
@@ -73,7 +73,7 @@ final class MessageControllerDictationUploadTest extends TestCase
                     '/tmp',
                     new NullLogger(),
                 ),
-                $this->createMock(Security::class),
+                $this->createStub(ProviderDiagnosticsAccess::class),
             ),
             new PremiumFeatureGate(new BillingService('', '')),
             new NullLogger(),
