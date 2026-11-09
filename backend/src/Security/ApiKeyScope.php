@@ -499,14 +499,9 @@ final class ApiKeyScope
             return [self::ADDIN_MESSAGES, self::PLATFORM_CHAT];
         }
 
-        if (self::matchesPrefix($path, '/api/v1/chats')) {
-            return [self::ADDIN_CHATS, self::PLATFORM_CHAT];
-        }
-
-        // A chat key that started a video with POST /media/generate must be
-        // able to poll that job. The service still checks the job owner.
-        if ('GET' === strtoupper($method) && 1 === preg_match('#^/api/v1/media/video/jobs/[a-f0-9]{32}$#', $path)) {
-            return [self::PLATFORM_CHAT];
+        $chat = self::chatReadScopes($method, $path);
+        if (null !== $chat) {
+            return $chat;
         }
 
         if (self::matchesPrefix($path, '/api/v1/rag')) {
@@ -544,6 +539,25 @@ final class ApiKeyScope
         }
 
         return [];
+    }
+
+    /**
+     * Chat keys read their chats and poll a video job they started.
+     * The service still checks the job owner.
+     *
+     * @return list<string>|null
+     */
+    private static function chatReadScopes(string $method, string $path): ?array
+    {
+        if (self::matchesPrefix($path, '/api/v1/chats')) {
+            return [self::ADDIN_CHATS, self::PLATFORM_CHAT];
+        }
+
+        if ('GET' === strtoupper($method) && 1 === preg_match('#^/api/v1/media/video/jobs/[a-f0-9]{32}$#', $path)) {
+            return [self::PLATFORM_CHAT];
+        }
+
+        return null;
     }
 
     /** `$prefix` itself, or anything below `$prefix/` — never `$prefix<other-chars>`. */
