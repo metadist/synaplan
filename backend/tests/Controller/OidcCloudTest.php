@@ -10,6 +10,7 @@ use App\Repository\PlatformInstanceRepository;
 use App\Seed\OidcCloudSeeder;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\OidcCloud;
+use App\Service\PlatformLink\PlatformInstanceSupersession;
 use App\Service\PlatformLink\PlatformLinksConfig;
 use App\Service\PlatformLink\RedirectUriPolicy;
 use Doctrine\ORM\EntityManagerInterface;
@@ -62,10 +63,42 @@ final class OidcCloudTest extends WebTestCase
 
     public function testWithoutTheConfigurationNothingIsWritten(): void
     {
-        $seeder = new OidcCloudSeeder(new OidcCloud('', '', ''), $this->instances(), static::getContainer()->get(RedirectUriPolicy::class), static::getContainer()->get(AuditLogWriter::class));
+        $seeder = new OidcCloudSeeder(new OidcCloud('', '', ''), $this->instances(), static::getContainer()->get(RedirectUriPolicy::class), static::getContainer()->get(AuditLogWriter::class), static::getContainer()->get(PlatformInstanceSupersession::class));
         $seeder->seed();
 
         self::assertNull($this->instances()->findByInstanceId(PlatformInstance::OIDC_CLOUD_ID));
+    }
+
+    public function testRemovingTheConfigurationDeactivatesTheRowAndConfiguringAgainResumesIt(): void
+    {
+        $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
+        $id = $this->row()->getId();
+
+        $seeder = new OidcCloudSeeder(new OidcCloud('', '', ''), $this->instances(), static::getContainer()->get(RedirectUriPolicy::class), static::getContainer()->get(AuditLogWriter::class), static::getContainer()->get(PlatformInstanceSupersession::class));
+        $seeder->seed();
+        self::assertSame(PlatformInstance::STATUS_REVOKED, $this->row()->getStatus());
+        self::assertSame($id, $this->row()->getId());
+
+        $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
+        self::assertSame(PlatformInstance::STATUS_ACTIVE, $this->row()->getStatus());
+        self::assertSame($id, $this->row()->getId());
+    }
+
+    public function testTheConfiguredCloudTakesOverARegisteredTwin(): void
+    {
+        $twin = new PlatformInstance('opencloud', 'twin-'.bin2hex(random_bytes(4)), 'cloud.example.com', [], PlatformInstance::STATUS_ACTIVE);
+        $twin->setOidcClientId('zero-setup-people');
+        $twin->setSecretHash(password_hash('x', \PASSWORD_DEFAULT));
+        $this->instances()->save($twin);
+        $twinId = $twin->getInstanceId();
+
+        $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
+
+        $this->em->clear();
+        $older = $this->instances()->findByInstanceId($twinId);
+        self::assertInstanceOf(PlatformInstance::class, $older);
+        self::assertFalse($older->isActive(), 'one active instance per host and client, so person routes are not ambiguous');
+        self::assertTrue($this->row()->isActive());
     }
 
     public function testTheCloudHasNoCredentialForTheInstanceRoutes(): void
@@ -93,6 +126,7 @@ final class OidcCloudTest extends WebTestCase
             $this->instances(),
             static::getContainer()->get(RedirectUriPolicy::class),
             static::getContainer()->get(AuditLogWriter::class),
+            static::getContainer()->get(PlatformInstanceSupersession::class),
         );
         $seeder->seed();
         $this->em->clear();

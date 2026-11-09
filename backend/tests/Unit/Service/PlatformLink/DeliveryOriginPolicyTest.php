@@ -97,4 +97,14 @@ final class DeliveryOriginPolicyTest extends TestCase
         self::assertFalse($policy->accepts($configured, 'https://cloud.example.com/inbound'));
         self::assertFalse($policy->accepts(new PlatformInstance('opencloud', 'pi_abc', 'cloud.example.com'), 'http://synaplan-opencloud:9106/api/synaplan/inbound'));
     }
+
+    public function testWhileDevelopingTheConfiguredCloudIsStillCalledOnlyAtItsAddress(): void
+    {
+        $cloud = new OidcCloud('opencloud', 'https://cloud.example.com', 'people', 'http://host.docker.internal:9106');
+        $policy = new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'dev'), new SsrfGuard(), $cloud);
+        $instance = new PlatformInstance('opencloud', PlatformInstance::OIDC_CLOUD_ID, 'cloud.example.com', [], PlatformInstance::STATUS_ACTIVE);
+
+        self::assertTrue($policy->accepts($instance, 'http://host.docker.internal:9106/api/synaplan/inbound'));
+        self::assertFalse($policy->accepts($instance, 'http://127.0.0.1:8000/not-configured'));
+    }
 }
