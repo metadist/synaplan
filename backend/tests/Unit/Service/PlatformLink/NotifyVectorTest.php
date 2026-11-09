@@ -45,6 +45,6 @@ final class NotifyVectorTest extends TestCase
         $claims = NotificationToken::verifiedClaims($token, [$public]);
         self::assertSame(['oidc-cloud', 'ada', 'pickup', '15'], [$claims['aud'] ?? null, $claims['sub'] ?? null, $claims['type'] ?? null, $claims['id'] ?? null]);
         $header = json_decode((string) base64_decode(strtr(explode('.', $token)[0], '-_', '+/')), true);
-        self::assertSame(['alg' => 'EdDSA', 'typ' => NotificationToken::TYPE, 'kid' => 'k1'], $header);
+        self::assertEquals(['alg' => 'EdDSA', 'typ' => NotificationToken::TYPE, 'kid' => 'k1'], $header);
     }
 }
