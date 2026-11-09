@@ -61,6 +61,8 @@ export const getProviderIcon = (provider: string): string => {
     // A2Agent gateway — no brand glyph in Iconify; a transit hub reads as
     // "routed through a reseller" rather than a vendor logo.
     return 'mdi:transit-connection-variant'
+  } else if (providerLower.includes('scaleway')) {
+    return 'simple-icons:scaleway'
   }
 
   return 'mdi:robot'
@@ -105,7 +107,9 @@ export const getProviderFlag = (provider: string): string => {
   } else if (p.replace(/[\s_-]/g, '').includes('a2agent')) {
     // Mainland-China model vendors behind the A2Agent gateway.
     return 'circle-flags:cn'
-  } else if (p.includes('mistral')) {
+  } else if (p.includes('mistral') || p.includes('scaleway')) {
+    // Scaleway Generative APIs run in Paris. Every model on that provider
+    // is French infrastructure, including Llama, Qwen and Whisper rows.
     return 'circle-flags:fr'
   } else if (
     p.includes('openai') ||
