@@ -61,7 +61,8 @@ import { initOtaUpdates } from '@/services/otaUpdates'
 import { initBiometricLock } from '@/composables/useBiometricLock'
 import { initNativeStatusBar } from '@/services/nativeStatusBar'
 import { initNativeBackButton } from '@/services/nativeBackButton'
-import { initKeyboardChatDock } from '@/services/keyboardChatDock'
+import { initKeyboardDismiss } from '@/services/keyboardDismiss'
+import { initKeyboardFollow } from '@/services/keyboardFollow'
 import { initKeyboardScrollAssist } from '@/services/keyboardScrollAssist'
 import { isNativeApp } from '@/services/api/nativeRuntime'
 import { initNativeShortcuts } from '@/services/api/nativeShortcuts'
@@ -162,12 +163,14 @@ void initBiometricLock()
 // give Android a sane hardware back-button behavior. Both no-op on web.
 void initNativeStatusBar()
 void initNativeBackButton()
-// Lift any focused input above the soft keyboard (Keyboard.resize:'none' means
-// the WebView does not shrink, so ordinary form/dialog fields would otherwise
-// stay hidden behind it). The chat composer is the exception: it follows the
-// keyboard frame instead of the scroll assist. Both no-op on web.
+// Soft keyboard in the native shell (Keyboard.resize:'none', the WebView does
+// not shrink): the shell reports the keyboard's overlap frame by frame while a
+// field is focused and the content column shrinks by it (style.css); the
+// scroll assist then keeps the focused field where the user tapped it. Both
+// no-op on web. Tap-outside-to-dismiss runs everywhere, on every page.
 initKeyboardScrollAssist()
-initKeyboardChatDock()
+initKeyboardFollow()
+initKeyboardDismiss()
 
 // MOBILE-APP SEAM: iOS Shortcuts that need the composer (dictate / photo)
 // navigate to chat. The pending action itself is consumed in ChatView once

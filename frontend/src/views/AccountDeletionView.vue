@@ -1,6 +1,6 @@
 <template>
   <div
-    class="h-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative overflow-x-hidden overflow-y-auto scroll-thin"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative scroll-thin"
     data-testid="page-account-deletion"
   >
     <div class="absolute inset-0 overflow-hidden pointer-events-none">

@@ -128,6 +128,7 @@ import { useIncomingStore } from '../stores/incoming'
 import { useAuthStore } from '../stores/auth'
 import { useConfigStore } from '../stores/config'
 import { triggerHapticImpact } from '../services/api/nativeHaptics'
+import { isEditableField } from '../services/keyboardReveal'
 import SidebarV2 from './SidebarV2.vue'
 import MobileNav from './MobileNav.vue'
 import { useResearchBinding } from '../composables/useResearchBinding'
@@ -226,9 +227,9 @@ const openDrawer = () => {
   // input) must dismiss the on-screen keyboard first — a drag gesture moves
   // well past the tap-dismiss tolerance below, so it never triggered a blur
   // and the keyboard stayed open over the newly revealed drawer.
-  const active = document.activeElement as HTMLElement | null
-  if (isEditableEl(active)) {
-    active!.blur()
+  const active = document.activeElement
+  if (isEditableField(active)) {
+    active.blur()
   }
   sidebarStore.openMobileDrawer()
 }
@@ -348,78 +349,19 @@ const scrollToTopOnBandTap = (event: PointerEvent) => {
     .forEach((el) => el.scrollTo({ top: 0, behavior: 'smooth' }))
 }
 
-/**
- * Dismiss the on-screen keyboard when the user *taps* outside the focused
- * field. iOS keeps a text control focused (keyboard up) until it is explicitly
- * blurred, so a tap on empty page area would otherwise never close it.
- *
- * Crucially we must distinguish a TAP from a SCROLL: blurring on `pointerdown`
- * would kill the keyboard the moment the user starts scrolling the chat. So we
- * record the start position and only blur on `pointerup` when the pointer
- * barely moved (a genuine tap). A scroll/drag moves past the tolerance and
- * leaves the keyboard open — the keyboard then only closes on a real tap or the
- * native swipe-down-through-keyboard gesture.
- */
-const KEYBOARD_TAP_MOVE_TOLERANCE_PX = 10
-
-let keyboardTapStartX = 0
-let keyboardTapStartY = 0
-let keyboardTapCandidate = false
-
-const isEditableEl = (el: HTMLElement | null): boolean =>
-  !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)
-
-const onKeyboardDismissPointerDown = (event: PointerEvent) => {
-  keyboardTapCandidate = false
-  if (!isEditableEl(document.activeElement as HTMLElement | null)) return
-  const target = event.target as HTMLElement | null
-  // A press that starts inside an editable control is never a dismiss.
-  if (target && target.closest(EDITABLE_SELECTOR)) return
-  keyboardTapStartX = event.clientX
-  keyboardTapStartY = event.clientY
-  keyboardTapCandidate = true
-}
-
-const onKeyboardDismissPointerUp = (event: PointerEvent) => {
-  if (!keyboardTapCandidate) return
-  keyboardTapCandidate = false
-  // Moved too far → this was a scroll/drag, not a tap: keep the keyboard open.
-  if (
-    Math.abs(event.clientX - keyboardTapStartX) > KEYBOARD_TAP_MOVE_TOLERANCE_PX ||
-    Math.abs(event.clientY - keyboardTapStartY) > KEYBOARD_TAP_MOVE_TOLERANCE_PX
-  ) {
-    return
-  }
-  const active = document.activeElement as HTMLElement | null
-  if (!isEditableEl(active)) return
-  const target = event.target as HTMLElement | null
-  // Tapped into another editable control — let it keep focus.
-  if (target && target.closest(EDITABLE_SELECTOR)) return
-  active!.blur()
-}
-
-// A touch that turns into a scroll fires pointercancel (not pointerup) once the
-// browser claims the gesture — reset so no stray blur happens afterwards.
-const onKeyboardDismissPointerCancel = () => {
-  keyboardTapCandidate = false
-}
+// Tap-outside-to-dismiss for the keyboard is global (services/keyboardDismiss.ts,
+// wired in App.vue), so pages outside this layout behave the same.
 
 onMounted(() => {
   playPageEnter()
   measureTopTapBand()
   document.addEventListener('keydown', handleEscape)
-  document.addEventListener('pointerdown', onKeyboardDismissPointerDown)
-  document.addEventListener('pointerup', onKeyboardDismissPointerUp)
-  document.addEventListener('pointercancel', onKeyboardDismissPointerCancel)
   document.addEventListener('pointerdown', scrollToTopOnBandTap)
   window.addEventListener('resize', measureTopTapBand)
   window.addEventListener('resize', closeDrawerOnDesktopChrome)
 })
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEscape)
-  document.removeEventListener('pointerdown', onKeyboardDismissPointerDown)
-  document.removeEventListener('pointerup', onKeyboardDismissPointerUp)
-  document.removeEventListener('pointercancel', onKeyboardDismissPointerCancel)
   document.removeEventListener('pointerdown', scrollToTopOnBandTap)
   window.removeEventListener('resize', measureTopTapBand)
   window.removeEventListener('resize', closeDrawerOnDesktopChrome)
@@ -435,6 +377,13 @@ onBeforeUnmount(() => {
 .v2-content-layer {
   /* Containing block for the status-bar band, at both breakpoints. */
   position: relative;
+  /* Native soft keyboard (see the shrink model in style.css): the column
+     gives up exactly the keyboard's overlap, so the composer and any bottom
+     controls rise with the keyboard while the rail, the drawer and the fixed
+     header buttons, all siblings or outside this column, stay where they are.
+     0 on the web, where the browser shrinks the viewport itself. */
+  height: calc(100% - var(--keyboard-inset-height, 0px));
+  min-height: 0;
 }
 
 .v2-status-bar-band {

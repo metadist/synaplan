@@ -443,92 +443,49 @@
     background: var(--bg-chat);
   }
 
-  /* On-screen keyboard inset (px). The native shell sets this from the
-     Capacitor Keyboard `keyboardWillShow`/`keyboardWillHide` events (see
-     app/synaplan-native.js) so the chat composer can float above the keyboard
-     WITHOUT the WebView resizing (Keyboard.resize = 'none'). Stays 0 on the web
-     build, where the composer keeps its normal sticky-bottom behavior. */
+  /* Native soft keyboard: the shrink model.
+
+     The shell (synaplan-apps/app/synaplan-native.js) keeps the WebView at full
+     height (Keyboard.resize = 'none') and writes the part of the keyboard that
+     covers the page into --keyboard-inset-height on <html>, on every frame of
+     the keyboard animation, together with the class `synaplan-keyboard-open`.
+     A WebView that already shrank above the keyboard reports 0 here, so the
+     inset is never applied twice.
+
+     The page does not translate. The content column (.v2-content-layer in
+     MainLayout.vue, .app-screen below) takes the inset off its height, so
+     everything anchored to its bottom (the chat composer, form buttons) rises
+     exactly as far as the keyboard, the header stays, and the scroll areas
+     inside shrink and scroll. The desktop rail, the phone drawer, the fixed
+     header buttons and the ambient background are outside that column and do
+     not move. No transition: the frames come from the keyboard itself, an
+     easing of our own would lag behind it. Stays 0 on the web build. */
+
+  /* Pages outside MainLayout (sign-in, sign-up, setup, onboarding). Full
+     height minus the keyboard, and the page itself is the scroller, because
+     <html> and <body> never scroll. The native shell has no address bar, so
+     100dvh is the WebView height there. */
+  .app-screen {
+    height: calc(100dvh - var(--keyboard-inset-height, 0px));
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
   .chat-composer-sticky {
     position: sticky;
     bottom: 0;
-    /* keyboardWillShow fires at the START of the iOS animation with the final
-       height, so this transition glides the composer up in sync — no lag. */
-    transform: translateY(calc(var(--keyboard-inset-height, 0px) * -1));
-    transition:
-      transform 0.22s ease-out,
-      padding-bottom 0.22s ease-out;
-    will-change: transform;
-    /* The composer owns the iOS home-indicator safe area — but ONLY while the
-       keyboard is hidden. When the native keyboard is up (--keyboard-inset-height
-       > 0) this collapses to 0 so the input sits right above the keyboard instead
-       of floating ~34px above it. resize:'none' keeps visualViewport unchanged in
-       the native app, so this inset var is the reliable "keyboard open" signal. */
-    padding-bottom: max(
-      0px,
-      calc(env(safe-area-inset-bottom, 0px) - var(--keyboard-inset-height, 0px))
-    );
+    /* The composer is the bottom-most element on every breakpoint, so it owns
+       the iOS home-indicator safe area while the keyboard is hidden. */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  /* Native chat dock. The shell writes the keyboard's live overlap into
-     --keyboard-inset-height on every frame (iOS display link, Android inset
-     animation). A CSS transition would ease on its own clock, so the keyboard
-     arrives first and covers the composer. No transition: the chat is where
-     the keyboard is. */
-  html.synaplan-keyboard-dock [data-testid='page-chat'] {
-    transform: translateY(calc(var(--keyboard-inset-height, 0px) * -1));
-    transition: none;
-  }
-
-  html.synaplan-keyboard-dock .chat-composer-sticky {
-    transform: none;
-    transition: none;
-  }
-
-  html.synaplan-keyboard-dock .chat-composer-sticky::after {
-    transition: none;
-  }
-
-  html.synaplan-keyboard-dock .chat-scroll-keyboard-pad {
-    padding-bottom: 0;
-  }
-
-  html.synaplan-keyboard-dock .chat-top-edge {
-    transform: translateY(var(--keyboard-inset-height, 0px));
-  }
-
-  /* Web fallback: mobile browsers DO shrink visualViewport, so useKeyboardOpen
-     flips this class — collapse the inset there too (the native inset var stays
-     0 on the web build). */
+  /* Keyboard up: the keyboard covers the home indicator, the input sits right
+     above the keys. Native shell (class from the bootstrap) and web fallback
+     (useKeyboardOpen flips the modifier when visualViewport shrinks). */
+  html.synaplan-keyboard-open .chat-composer-sticky,
   .chat-composer-sticky--kb-open {
     padding-bottom: 0;
-  }
-
-  /* With Keyboard.resize:'none' the WebView keeps its full height, so the chat
-     message list still lives behind the (semi-translucent) iOS keyboard and its
-     messages shimmer through while scrolling. This fills that region with the
-     solid chat background: the composer is lifted by --keyboard-inset-height, so
-     an ::after starting at its bottom edge and exactly that tall covers the whole
-     keyboard area with var(--bg-chat) — the keyboard now blurs a flat colour, not
-     the messages. Collapses to 0 height when the keyboard hides. */
-  .chat-composer-sticky::after {
-    content: '';
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    height: var(--keyboard-inset-height, 0px);
-    background: var(--bg-chat);
-    pointer-events: none;
-    transition: height 0.22s ease-out;
-  }
-
-  /* Reserve scroll space equal to the keyboard inset so the newest message can
-     be scrolled clear of the floating composer. Applied instantly (no
-     transition): ChatView pins the container to the bottom on the keyboard
-     event, so the padding must reach its final size in the same frame — an
-     animating padding would leave the pin chasing a growing scrollHeight. */
-  .chat-scroll-keyboard-pad {
-    padding-bottom: var(--keyboard-inset-height, 0px);
   }
 
   /* Shadow along the top of the chat. A fade in the chat colour itself
@@ -1271,15 +1228,20 @@
    * dialogs never grow under the iOS notch / Dynamic Island and always leave
    * the device safe areas clear. `100dvh` (not `vh`) tracks the visible viewport
    * on mobile browsers where the URL bar / keyboard change the usable height.
+   * In the native shell the viewport does not shrink; the keyboard's overlap
+   * arrives as --keyboard-inset-height instead and is kept clear the same way,
+   * so a dialog with a text field is centered above the keyboard, not under it.
    */
   .modal-overlay {
     padding-top: max(env(safe-area-inset-top, 0px), 1rem);
-    padding-bottom: max(env(safe-area-inset-bottom, 0px), 1rem);
+    padding-bottom: calc(
+      max(env(safe-area-inset-bottom, 0px), 1rem) + var(--keyboard-inset-height, 0px)
+    );
   }
   .modal-panel {
     max-height: calc(
       100dvh - max(env(safe-area-inset-top, 0px), 1rem) -
-        max(env(safe-area-inset-bottom, 0px), 1rem)
+        max(env(safe-area-inset-bottom, 0px), 1rem) - var(--keyboard-inset-height, 0px)
     );
   }
 

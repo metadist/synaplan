@@ -1,6 +1,6 @@
 <template>
   <div
-    class="min-h-screen bg-light-bg dark:bg-dark-bg flex items-center justify-center px-4 py-12 relative overflow-hidden"
+    class="app-screen bg-light-bg dark:bg-dark-bg flex items-start justify-center px-4 py-12 relative"
     data-testid="page-code-signup"
   >
     <div class="absolute top-6 right-6 flex items-center gap-4">
@@ -22,7 +22,7 @@
       </button>
     </div>
 
-    <div class="w-full max-w-md">
+    <div class="w-full max-w-md my-auto">
       <div class="text-center mb-8">
         <router-link to="/login" class="inline-block">
           <img :src="logoSrc" :alt="config.branding.name" class="h-12 mx-auto mb-6" />
