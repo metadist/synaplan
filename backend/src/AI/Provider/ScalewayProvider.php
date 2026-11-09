@@ -164,6 +164,23 @@ class ScalewayProvider extends AbstractChatCompletionsCloudProvider implements E
         return self::BASE_URI;
     }
 
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $options
+     *
+     * @return array<string, mixed>
+     */
+    protected function buildChatOptions(array $messages, array $options, bool $stream): array
+    {
+        $request = parent::buildChatOptions($messages, $options, $stream);
+        $effort = $this->resolveReasoningEffort((string) ($options['model'] ?? ''), $options);
+        if (null !== $effort) {
+            $request['reasoning_effort'] = $effort;
+        }
+
+        return $request;
+    }
+
     protected function envVarName(): string
     {
         return 'SCALEWAY_API_KEY';
@@ -201,8 +218,9 @@ class ScalewayProvider extends AbstractChatCompletionsCloudProvider implements E
             'json' => $payload,
         ]);
         $body = $response->toArray(false);
-        if ($response->getStatusCode() >= 400) {
-            throw new ProviderException('Scaleway embedding error: '.($body['error']['message'] ?? $response->getStatusCode()), self::PROVIDER_NAME);
+        $statusCode = $response->getStatusCode();
+        if ($statusCode >= 400) {
+            throw new ProviderException('Scaleway embedding error: '.($body['error']['message'] ?? $statusCode), self::PROVIDER_NAME, null, $statusCode);
         }
 
         return [
@@ -252,8 +270,9 @@ class ScalewayProvider extends AbstractChatCompletionsCloudProvider implements E
             'body' => $form->bodyToIterable(),
         ]);
         $body = $response->toArray(false);
-        if ($response->getStatusCode() >= 400) {
-            throw new ProviderException('Scaleway transcription error: '.($body['error']['message'] ?? $response->getStatusCode()), self::PROVIDER_NAME);
+        $statusCode = $response->getStatusCode();
+        if ($statusCode >= 400) {
+            throw new ProviderException('Scaleway transcription error: '.($body['error']['message'] ?? $statusCode), self::PROVIDER_NAME, null, $statusCode);
         }
 
         return [
@@ -267,5 +286,73 @@ class ScalewayProvider extends AbstractChatCompletionsCloudProvider implements E
     public function translateAudio(string $audioPath, string $targetLang): string
     {
         throw new ProviderException('Scaleway Whisper transcribes speech. It does not translate it.', self::PROVIDER_NAME);
+    }
+
+    /**
+     * An explicit level wins when the model accepts it. The Thinking toggle
+     * maps off to the cheapest accepted level and on to the catalog default,
+     * or to `high` when that level exists. No signal leaves Scaleway's default.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function resolveReasoningEffort(string $model, array $options): ?string
+    {
+        $allowed = $this->allowedReasoningEfforts($model);
+        if (null === $allowed) {
+            return null;
+        }
+
+        $explicit = $options['reasoning_effort'] ?? null;
+        if (is_string($explicit) && in_array(strtolower($explicit), $allowed, true)) {
+            return strtolower($explicit);
+        }
+
+        if (!array_key_exists('reasoning', $options)) {
+            return null;
+        }
+
+        $features = $options['modelFeatures'] ?? null;
+        if (is_array($features) && !in_array('reasoning', $features, true)) {
+            return null;
+        }
+
+        if (!$this->isReasoningEnabled($options['reasoning'])) {
+            return $allowed[0];
+        }
+
+        $config = $options['modelConfig'] ?? null;
+        $default = is_array($config) ? ($config['reasoning_effort_default'] ?? null) : null;
+        if (is_string($default) && in_array($default, $allowed, true)) {
+            return $default;
+        }
+
+        if (in_array('high', $allowed, true)) {
+            return 'high';
+        }
+
+        return $allowed[array_key_last($allowed)];
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private function allowedReasoningEfforts(string $model): ?array
+    {
+        foreach (self::REASONING_EFFORTS as $prefix => $levels) {
+            if (str_starts_with(strtolower($model), $prefix)) {
+                return $levels;
+            }
+        }
+
+        return null;
+    }
+
+    private function isReasoningEnabled(mixed $reasoning): bool
+    {
+        if (is_array($reasoning)) {
+            return [] !== $reasoning;
+        }
+
+        return (bool) $reasoning;
     }
 }

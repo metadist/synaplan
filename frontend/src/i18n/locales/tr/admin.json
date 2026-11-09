@@ -998,6 +998,10 @@
       "title": "Cerebras API anahtarı",
       "message": "Cerebras Cloud panelinde (API Keys) bir API anahtarı oluşturun ve buraya yapıştırın. Bu, çok hızlı yanıtlarla GPT OSS 120B ve Qwen 3.8 27B'yi açar. İstemleri ABD'de Cerebras işler."
     },
+    "scaleway": {
+      "title": "Scaleway API anahtarı",
+      "message": "Scaleway konsolunda (IAM → API anahtarları) bir gizli anahtar oluşturun ve buraya yapıştırın. Bu, Paris'te barındırılan üretken API'leri açar. İstemleri Fransa'da Scaleway işler."
+    },
     "huggingface": {
       "title": "HuggingFace API jetonu",
       "message": "HuggingFace ayarlarında bir erişim jetonu oluşturun ve HuggingFace Inference modellerini kullanmak için buraya yapıştırın."

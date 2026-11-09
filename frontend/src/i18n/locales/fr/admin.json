@@ -1002,6 +1002,10 @@
       "title": "Clé API Cerebras",
       "message": "Créez une clé API dans le tableau de bord Cerebras Cloud (API Keys), puis collez-la ici. Cela active GPT OSS 120B et Qwen 3.8 27B avec des réponses très rapides. Les invites sont traitées par Cerebras aux États-Unis."
     },
+    "scaleway": {
+      "title": "Clé API Scaleway",
+      "message": "Créez une clé secrète dans la console Scaleway (IAM → clés API), puis collez-la ici. Cela active les API génératives hébergées à Paris. Les invites sont traitées par Scaleway en France."
+    },
     "huggingface": {
       "title": "Jeton API HuggingFace",
       "message": "Créez un jeton d’accès dans vos réglages HuggingFace, puis collez-le ici pour utiliser les modèles HuggingFace Inference."

@@ -6441,12 +6441,12 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'DeepSeek V4.1 Flash on Scaleway (Paris). Preview. Chat, code and images. Cached input is €0.12 per million.',
-                'max_tokens' => 131072,
+                'description' => 'DeepSeek V4.1 Flash on Scaleway (Paris). Preview. Chat, code and images. Cached input is €0.12 per million. Scaleway caps completion at 32768 tokens.',
+                'max_tokens' => 32768,
                 'params' => ['model' => 'deepseek-v4.1-flash-1017'],
                 'features' => ['vision', 'reasoning', 'tool_use', 'code', 'multilingual'],
                 'cache_read_price_per_1M' => 0.1340,
-                'meta' => ['context_window' => '262144', 'max_output' => '131072', 'host' => 'api.scaleway.ai', 'jurisdiction' => 'FR', 'preview' => true],
+                'meta' => ['context_window' => '262144', 'max_output' => '32768', 'host' => 'api.scaleway.ai', 'jurisdiction' => 'FR', 'preview' => true],
             ],
         ],
         [
@@ -6477,7 +6477,8 @@ class ModelCatalog
             'service' => 'Scaleway',
             'name' => 'LightOnOCR 3 0.8B',
             'tag' => 'chat',
-            'selectable' => 1,
+            // PDF-only OCR. The chat path cannot send a PDF, so it stays out of the picker.
+            'selectable' => 0,
             'active' => 1,
             'providerId' => 'lightonocr-3-0.8b',
             'priceIn' => 2.4563,
