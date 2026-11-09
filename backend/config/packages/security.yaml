@@ -92,6 +92,10 @@ security:
         - { path: ^/\.well-known/synaplan-federation, roles: PUBLIC_ACCESS }
         - { path: ^/\.well-known/jwks\.json$, roles: PUBLIC_ACCESS }
         - { path: ^/\.well-known/synaplan-configuration$, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/oauth-authorization-server$, roles: PUBLIC_ACCESS }
+        # OAuth2 server for clouds: clients authenticate with private_key_jwt
+        # in the controller, people consent through /api/v1/oauth/consent.
+        - { path: ^/oauth/, roles: PUBLIC_ACCESS }
         - { path: ^/mcp$, roles: PUBLIC_ACCESS }
         - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 

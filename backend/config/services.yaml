@@ -140,6 +140,8 @@ parameters:
     env(PLATFORM_LINKS_OIDC_CLOUD_URL): ''
     env(PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID): ''
     env(PLATFORM_LINKS_OIDC_CLOUD_INTERNAL_URL): ''
+    env(PLATFORM_LINKS_REGISTRATION): 'pending'
+    env(PLATFORM_LINKS_REGISTRATION_TOKEN): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
     env(TURNSTILE_SECRET_KEY): ''
@@ -989,6 +991,31 @@ services:
     App\Service\Auth\OidcAuthorizeParams:
         arguments:
             $bearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
+
+    App\Service\OAuth\Server\Repository\AccessTokenRepository:
+        arguments:
+            $issuer: '%env(APP_URL)%'
+
+    App\Service\OAuth\Server\AccessTokenValidator:
+        arguments:
+            $issuer: '%env(APP_URL)%'
+
+    App\Service\OAuth\Server\ClientAssertionVerifier:
+        arguments:
+            $issuer: '%env(APP_URL)%'
+
+    App\Service\OAuth\Server\ClientRegistrationService:
+        arguments:
+            $issuer: '%env(APP_URL)%'
+
+    App\Service\OAuth\Server\OAuthServerFactory:
+        arguments:
+            $secret: '%env(APP_SECRET)%'
+
+    App\Service\OAuth\Server\RegistrationPolicy:
+        arguments:
+            $mode: '%env(PLATFORM_LINKS_REGISTRATION)%'
+            $initialAccessToken: '%env(PLATFORM_LINKS_REGISTRATION_TOKEN)%'
 
     App\Service\PlatformLink\OidcCloud:
         arguments:
