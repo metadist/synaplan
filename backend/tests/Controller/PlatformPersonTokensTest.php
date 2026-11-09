@@ -60,6 +60,29 @@ final class PlatformPersonTokensTest extends WebTestCase
         self::assertSame(ExternalIdentity::STATUS_ACTIVE, $row->getStatus());
     }
 
+    public function testATokenThroughTheCloudReachesOnlyWhatACloudMay(): void
+    {
+        $person = $this->person();
+        $user = $this->em->find(User::class, $person['id']);
+        self::assertInstanceOf(User::class, $user);
+        $user->setUserLevel('ADMIN');
+        $this->em->flush();
+        $this->installTokens([
+            'ada.token.value' => $person,
+            'ada.app.value' => $person + ['azp' => 'synaplan-app'],
+        ]);
+        $this->register();
+
+        $this->client->request('GET', '/api/v1/files', server: $this->bearer('ada.token.value'));
+        self::assertResponseIsSuccessful((string) $this->client->getResponse()->getContent());
+        $this->client->request('GET', '/api/v1/admin/platform-links/instances', server: $this->bearer('ada.token.value'));
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN, 'an administrator acting through the cloud is still only the cloud');
+        self::assertSame('insufficient_scope', $this->json()['error']);
+
+        $this->client->request('GET', '/api/v1/admin/platform-links/instances', server: $this->bearer('ada.app.value'));
+        self::assertResponseIsSuccessful('the same person signed in to Synaplan itself is not limited');
+    }
+
     public function testACloudAccountLinkedToSomeoneElseIsNotTakenOver(): void
     {
         $ada = $this->person();

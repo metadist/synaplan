@@ -94,6 +94,28 @@ final readonly class PlatformBearerAttribution
     }
 
     /**
+     * Whether the token came through a cloud's client: then it reaches only
+     * what a cloud may reach for a person, like an access token Synaplan
+     * issued to a cloud.
+     *
+     * @param array<string, mixed> $claims
+     */
+    public function isCloudClient(array $claims): bool
+    {
+        $azp = $claims['azp'] ?? null;
+        if (!is_string($azp) || '' === $azp) {
+            return false;
+        }
+        foreach ($this->instances->findByOidcClientId($azp) as $instance) {
+            if ($instance->isActive()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * The first call of this person through this cloud: link them as the
      * token's subject. Nothing happens when that cloud account is already
      * someone else's link.
