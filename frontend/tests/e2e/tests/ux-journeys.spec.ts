@@ -78,7 +78,7 @@ test.describe('@ci UX journeys', () => {
 
       if (await isAgentsEnabled(request, credentials)) {
         await page.goto('/ai/agents')
-        await replayTour(page, 'Create an assistant')
+        await replayTour(page, 'Create an agent')
       }
     })
 
