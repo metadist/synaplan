@@ -162,7 +162,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
      */
     private function requestPage(string $method, string $url, array $headers, string $provider): array|ProbeResult
     {
-        $transportError = null;
+        $lastError = 'the provider did not answer';
         for ($attempt = 0; $attempt < 2; ++$attempt) {
             try {
                 $response = $this->httpClient->request($method, $url, [
@@ -171,6 +171,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
                 ]);
                 $status = $response->getStatusCode();
                 if ((429 === $status || $status >= 500) && 0 === $attempt) {
+                    $lastError = sprintf('HTTP %d', $status);
                     $this->logger->info('Model catalog probe retrying after an upstream error', [
                         'provider' => $provider,
                         'status' => $status,
@@ -183,26 +184,23 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
                     'body' => $status >= 200 && $status < 300 ? $response->toArray(false) : [],
                 ];
             } catch (\Throwable $e) {
-                $transportError = $e;
+                $lastError = $e->getMessage();
                 if (0 === $attempt) {
                     $this->logger->info('Model catalog probe retrying after a transport error', [
                         'provider' => $provider,
-                        'error' => $e->getMessage(),
+                        'error' => $lastError,
                     ]);
                     continue;
                 }
             }
         }
 
-        $detail = $transportError instanceof \Throwable
-            ? $transportError->getMessage()
-            : 'the provider did not answer';
         $this->logger->info('Model catalog probe could not reach provider', [
             'provider' => $provider,
-            'error' => $detail,
+            'error' => $lastError,
         ]);
 
-        return ProbeResult::failed(FailureKind::Transient, 'Could not reach the provider API: '.$detail);
+        return ProbeResult::failed(FailureKind::Transient, 'Could not reach the provider API: '.$lastError);
     }
 
     /**

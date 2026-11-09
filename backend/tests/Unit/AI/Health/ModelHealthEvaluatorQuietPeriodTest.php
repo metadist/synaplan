@@ -214,6 +214,16 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
             [ModelHealthAlert::KIND_DEGRADED, false],
             [ModelHealthAlert::KIND_CREDENTIAL, false],
         ], $sent);
+
+        $probe->next = ProbeResult::ok(['grok-voice-3.0']);
+        $recovered = $evaluator->run();
+        self::assertCount(1, $recovered->alertsResolved, 'Recovery after escalation sends one all-clear for the credential incident, not a duplicate for the superseded degraded one');
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $recovered->alertsResolved[0]->kind);
+        self::assertSame([
+            [ModelHealthAlert::KIND_DEGRADED, false],
+            [ModelHealthAlert::KIND_CREDENTIAL, false],
+            [ModelHealthAlert::KIND_CREDENTIAL, true],
+        ], $sent);
     }
 
     /**

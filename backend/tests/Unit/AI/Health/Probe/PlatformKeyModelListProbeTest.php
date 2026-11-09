@@ -146,6 +146,23 @@ final class PlatformKeyModelListProbeTest extends TestCase
         self::assertSame(2, $attempts);
     }
 
+    public function testAPersistentUpstreamServerErrorReturnsHttpStatusAfterOneRetry(): void
+    {
+        $attempts = 0;
+        $client = new MockHttpClient(function () use (&$attempts): MockResponse {
+            ++$attempts;
+
+            return new MockResponse('{}', ['http_code' => 503]);
+        });
+
+        $result = $this->probe($client);
+
+        self::assertTrue($result->isFailed());
+        self::assertSame(FailureKind::Transient, $result->kind);
+        self::assertSame('Provider catalog returned HTTP 503.', $result->message);
+        self::assertSame(2, $attempts);
+    }
+
     public function testARejectedKeyIsNotRetried(): void
     {
         $attempts = 0;

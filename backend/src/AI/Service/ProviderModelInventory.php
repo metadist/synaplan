@@ -219,51 +219,14 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
      */
     private function probeXaiVoice(string $provider, string $providerModelId, string $listingUrl, array $headers): ModelProbeResult
     {
-        $rosterUrl = preg_replace('#/models$#', '/tts/voices', rtrim($listingUrl, '/'));
-        if (!is_string($rosterUrl) || $rosterUrl === rtrim($listingUrl, '/')) {
+        $roster = $this->fetchXaiRoster($provider, $providerModelId, $listingUrl, '/tts/voices', $headers);
+        if (null === $roster) {
             return ModelProbeResult::Inconclusive;
         }
 
-        $call = new AiCall(
-            capability: AiCapability::Probe,
-            provider: $provider,
-            model: $providerModelId,
-            context: AiCallContext::probe(),
-            payload: new AiCallPayload(),
-            options: AiCallOptions::fromArray(['skip_circuit_breaker' => true, 'skip_model_health' => true]),
-        );
-
-        try {
-            /** @var array{status: int, body: array<mixed>} $result */
-            $result = $this->pipeline->run(
-                $call,
-                function () use ($rosterUrl, $headers): array {
-                    $response = $this->httpClient->request('GET', $rosterUrl, [
-                        'headers' => $headers,
-                        'timeout' => self::PROBE_TIMEOUT_SECONDS,
-                    ]);
-                    $status = $response->getStatusCode();
-
-                    return [
-                        'status' => $status,
-                        'body' => $status >= 200 && $status < 300 ? $response->toArray(false) : [],
-                    ];
-                },
-            )->value;
-            $status = $result['status'];
-            $body = $result['body'];
-        } catch (\Throwable $e) {
-            $this->logger->warning('Model availability probe failed', [
-                'provider' => $provider,
-                'model' => $providerModelId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return ModelProbeResult::Inconclusive;
-        }
-
+        $status = $roster['status'];
         if ($status >= 200 && $status < 300) {
-            $voices = $body['voices'] ?? null;
+            $voices = $roster['body']['voices'] ?? null;
 
             return is_array($voices) && [] !== $voices
                 ? ModelProbeResult::Alive
@@ -288,9 +251,36 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
      */
     private function probeXaiImage(string $provider, string $providerModelId, string $listingUrl, array $headers): ModelProbeResult
     {
-        $rosterUrl = preg_replace('#/models$#', '/image-generation-models', rtrim($listingUrl, '/'));
-        if (!is_string($rosterUrl) || $rosterUrl === rtrim($listingUrl, '/')) {
+        $roster = $this->fetchXaiRoster($provider, $providerModelId, $listingUrl, '/image-generation-models', $headers);
+        if (null === $roster) {
             return ModelProbeResult::Inconclusive;
+        }
+
+        $status = $roster['status'];
+        if ($status >= 200 && $status < 300) {
+            return $this->xaiImageRosterConfirms($roster['body'], $providerModelId)
+                ? ModelProbeResult::Alive
+                : ModelProbeResult::Inconclusive;
+        }
+
+        // A missing roster means the image product itself is gone. Auth and
+        // rate-limit answers still say nothing about the alias.
+        return 404 === $status ? ModelProbeResult::Gone : ModelProbeResult::Inconclusive;
+    }
+
+    /**
+     * Fetch a sibling xAI roster endpoint (`/tts/voices`, `/image-generation-models`)
+     * derived from the `/models` listing URL through the probe pipeline.
+     *
+     * @param array<string, string> $headers
+     *
+     * @return array{status: int, body: array<mixed>}|null
+     */
+    private function fetchXaiRoster(string $provider, string $providerModelId, string $listingUrl, string $rosterPath, array $headers): ?array
+    {
+        $rosterUrl = preg_replace('#/models$#', $rosterPath, rtrim($listingUrl, '/'));
+        if (!is_string($rosterUrl) || $rosterUrl === rtrim($listingUrl, '/')) {
+            return null;
         }
 
         $call = new AiCall(
@@ -319,8 +309,8 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
                     ];
                 },
             )->value;
-            $status = $result['status'];
-            $body = $result['body'];
+
+            return $result;
         } catch (\Throwable $e) {
             $this->logger->warning('Model availability probe failed', [
                 'provider' => $provider,
@@ -328,18 +318,8 @@ final readonly class ProviderModelInventory implements ProviderModelInventoryInt
                 'error' => $e->getMessage(),
             ]);
 
-            return ModelProbeResult::Inconclusive;
+            return null;
         }
-
-        if ($status >= 200 && $status < 300) {
-            return $this->xaiImageRosterConfirms($body, $providerModelId)
-                ? ModelProbeResult::Alive
-                : ModelProbeResult::Inconclusive;
-        }
-
-        // A missing roster means the image product itself is gone. Auth and
-        // rate-limit answers still say nothing about the alias.
-        return 404 === $status ? ModelProbeResult::Gone : ModelProbeResult::Inconclusive;
     }
 
     /**

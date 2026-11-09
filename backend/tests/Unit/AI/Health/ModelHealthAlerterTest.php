@@ -234,6 +234,9 @@ final class ModelHealthAlerterTest extends TestCase
         self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_OFFLINE, [1], ['Grok Voice 3'])));
         self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Grok Voice 3'])));
         self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $this->healthRows[1]->getLastAlertedKind());
+        self::assertNull($this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_DEGRADED));
+        self::assertNull($this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_OFFLINE));
+        self::assertSame([1 => 'Grok Voice 3'], $this->alerter->openIncident('OpenAI', ModelHealthAlert::KIND_CREDENTIAL));
     }
 
     /**
