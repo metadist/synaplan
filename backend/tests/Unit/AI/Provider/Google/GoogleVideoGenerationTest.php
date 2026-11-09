@@ -48,7 +48,7 @@ final class GoogleVideoGenerationTest extends TestCase
         $video = $this->video($this->api([self::json(['name' => 'operations/op-2']), self::json([])]));
 
         try {
-            $video->generateVideo('A lake', ['cancel_check' => static fn (): bool => true]);
+            $video->generateVideo('A lake', ['model' => 'veo-3.1-generate-preview', 'cancel_check' => static fn (): bool => true]);
             self::fail('A stopped render must end in a cancellation.');
         } catch (ProviderCancelledException) {
         }

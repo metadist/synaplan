@@ -176,7 +176,7 @@ class GoogleProviderAsyncVideoTest extends TestCase
         $this->expectException(ProviderException::class);
         $this->expectExceptionMessage('Google Veo API error (HTTP 400)');
 
-        $provider->startVideoOperation('test prompt');
+        $provider->startVideoOperation('test prompt', ['model' => 'veo-3.1-generate-preview']);
     }
 
     public function testPollVideoOperationOnceNotDone(): void

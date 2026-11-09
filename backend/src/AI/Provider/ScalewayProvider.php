@@ -109,7 +109,9 @@ class ScalewayProvider extends AbstractChatCompletionsCloudProvider implements E
             ),
             dialects: new ProviderDialects(
                 structuredOutput: StructuredOutputDialect::OPENAI_JSON_SCHEMA,
-                catalogToolUse: true,
+                // Not every chat row can call tools (GPT OSS 120B and the PDF
+                // OCR model cannot). Tool use is the row's `tool_use` feature.
+                catalogToolUse: false,
                 reasoning: ReasoningLadder::prefixes(self::REASONING_EFFORTS),
             ),
             defaults: new ProviderDefaults(bindings: [

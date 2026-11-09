@@ -324,7 +324,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             self::assertSame($descriptor->dialects->catalogToolUse, CatalogToolUse::isCapableChatService($descriptor->name), $descriptor->name);
         }
         $flagged = self::names(array_filter($this->catalog->all(), static fn (ProviderDescriptor $d): bool => $d->dialects->catalogToolUse));
-        self::assertSameSet(['openai', 'groq', 'anthropic', 'google', 'xai', 'mistral', 'huggingface', 'trustedtokens', 'a2agent', 'meta', 'cerebras', 'scaleway'], $flagged);
+        self::assertSameSet(['openai', 'groq', 'anthropic', 'google', 'xai', 'mistral', 'huggingface', 'trustedtokens', 'a2agent', 'meta', 'cerebras'], $flagged);
         self::assertTrue(CatalogToolUse::isCapableChatService('Hugging Face'), 'service aliases normalise');
         self::assertFalse(CatalogToolUse::isCapableChatService('ollama'), 'opt-in per pulled model');
     }
