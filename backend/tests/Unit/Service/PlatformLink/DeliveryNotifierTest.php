@@ -11,6 +11,7 @@ use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\DeliveryOriginPolicy;
 use App\Service\PlatformLink\NotificationToken;
 use App\Service\PlatformLink\NotifyKeyStore;
+use App\Service\PlatformLink\OidcCloud;
 use App\Service\PlatformLink\RedirectUriPolicy;
 use App\Service\PlatformLink\SignedNotificationClient;
 use App\Service\Security\EncryptionService;
@@ -106,7 +107,7 @@ final class DeliveryNotifierTest extends TestCase
             $http,
             new NotifyKeyStore($configs, new EncryptionService('test-secret', new NullLogger()), new FederationSigner(), $redis),
             new FederationSigner(),
-            new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard()),
+            new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard(), new OidcCloud('', '', '', '')),
             new NullLogger(),
             'https://synaplan.example/',
         );
