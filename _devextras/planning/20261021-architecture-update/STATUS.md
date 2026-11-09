@@ -1,5 +1,11 @@
 # Architecture update — status
 
+> **2026-11-09 — AU28 spike, not a decision.** The relay copy rules,
+> the attach token, and an incremental OpenAI chat-completions decoder
+> are tested on `spike/au28-relay-pump`. G1–G7 are not measured: this
+> branch has no pump, no eight PHP workers, and no 500-stream run.
+> The branch is not merged. A go or no-go waits for those measurements.
+
 > **2026-11-04 — AU25.** The gate runs on every tool call. A write that
 > runs leaves `tool.executed` (no arguments, no result). The OpenAI loop
 > and custom HTTP gain a `TOOLS` row. A document edit of the person's own
@@ -69,6 +75,7 @@ measurement and a rollout are entries here, not chat messages.
 
 | Date | Step | Pull request | State | Notes |
 | ---- | ---- | ------------ | ----- | ----- |
+| 2026-11-09 | AU28 | spike branch, not merged | open | copy rules, shared attach-token vector, split-feed decoder. G1–G7 not measured |
 | 2026-10-21 | AU0 | [#2623](https://github.com/metadist/synaplan/pull/2623) | merged (`ce89e32a4`) | research, spike, plan; three Copilot rounds, all findings accepted |
 | 2026-10-21 | AU0b | [#2627](https://github.com/metadist/synaplan/pull/2627) | merged (`5af450f6e`) | Pre-flight: §0 ticked, scope and autonomy decided, hook budget corrected, hardening scheduled before AU10 / AU19 / AU28 |
 | 2026-10-21 | AU1 | [#2628](https://github.com/metadist/synaplan/pull/2628) | merged (`ad9a8ed79`) | `make perf-runtime` |
