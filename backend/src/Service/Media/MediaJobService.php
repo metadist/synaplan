@@ -401,6 +401,20 @@ final class MediaJobService
         if (null !== $stored->getResult()) {
             $job->setResult($stored->getResult());
         }
+
+        // The user sentence above is the winner's. The red notice reads the
+        // reason and provider dump from options, so those must be the winner's
+        // too — including when the winner stored neither.
+        $options = $job->getOptions();
+        $storedOptions = $stored->getOptions();
+        foreach ([MediaJob::OPT_ERROR_REASON, MediaJob::OPT_ERROR_DEBUG] as $key) {
+            if (array_key_exists($key, $storedOptions)) {
+                $options[$key] = $storedOptions[$key];
+            } else {
+                unset($options[$key]);
+            }
+        }
+        $job->setOptions($options);
     }
 
     public function heartbeat(MediaJob $job): void
