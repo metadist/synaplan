@@ -30,6 +30,9 @@ class PlatformInstance
     public const STATUS_PENDING = 'pending';
     public const STATUS_REVOKED = 'revoked';
 
+    /** The one cloud configured by environment variables (OidcCloud). */
+    public const OIDC_CLOUD_ID = 'oidc-cloud';
+
     public const OUTLOOK_BUILTIN_ID = 'outlook-builtin';
 
     /**
@@ -162,6 +165,16 @@ class PlatformInstance
     public function getInstanceId(): string
     {
         return $this->instanceId;
+    }
+
+    public function setClient(string $client): void
+    {
+        $this->client = $client;
+    }
+
+    public function setHost(string $host): void
+    {
+        $this->host = $host;
     }
 
     public function getHost(): string

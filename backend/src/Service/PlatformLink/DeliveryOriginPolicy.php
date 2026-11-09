@@ -11,13 +11,15 @@ use App\Service\Security\SsrfGuard;
  * Synaplan calls only a delivery address that belongs to the registered
  * cloud (03 §2): the registered host over https; a hostname an
  * administrator approved, private addresses included but loopback and
- * link-local never; or, while developing, a host from the shared dev list.
+ * link-local never; for the cloud configured by environment (OidcCloud)
+ * exactly its configured address, with the same exception; or, while developing, a host from the shared dev list.
  */
 final readonly class DeliveryOriginPolicy
 {
     public function __construct(
         private RedirectUriPolicy $redirects,
         private SsrfGuard $ssrfGuard,
+        private OidcCloud $oidcCloud,
     ) {
     }
 
@@ -31,6 +33,9 @@ final readonly class DeliveryOriginPolicy
         $scheme = strtolower($parts['scheme']);
         if ($this->redirects->isDev() && $this->redirects->isLocalDevHost($host) && in_array($scheme, ['http', 'https'], true)) {
             return true;
+        }
+        if ($this->oidcCloud->isThisCloud($instance)) {
+            return $this->oidcCloud->allowsDelivery($instance, $url) && !$this->isLoopbackOrLinkLocal($host);
         }
         if (in_array($scheme, ['http', 'https'], true) && in_array($host, $instance->getApprovedHosts(), true)) {
             return !$this->isLoopbackOrLinkLocal($host);
