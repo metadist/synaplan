@@ -52,3 +52,57 @@ These are not blockers. Answer them before CB2.
 - The gateway ships off. An administrator turns it on.
 - An empty pin changes nothing for anyone.
 - The chat router stays out of the coding path.
+
+## 5. Copilot on the first draft (2026-11-09)
+
+The first draft was reviewed on pull request 3038. Each note was
+checked against the code and written into the plan. Two lines in §2
+are replaced by this section. W5's `DELETE /api/v1/coding/model` is not
+the API: the page PUTs a mode, because a delete cannot both opt out of
+a group model and restore it. W8's `displayModel` does not change
+`/v1/messages`.
+
+| Note | What the code does | Where the plan says it now |
+| ---- | ------------------ | -------------------------- |
+| Group defaults are not `BCONFIG` rows with a group id as owner. | `GroupConfig` is `BGROUPCONFIG`, keyed by `BGROUPID`. `putGroupConfig()` is the write. `usesGroupLayer()` ignores a key that is not on `PolicyAllowList`. | Master plan §3.4. CB1 adds `CODING` to the allow-list. CB5 writes only through `putGroupConfig()`. |
+| A group lock cannot be the installation lock. | `isLocked()` reads owner 0. `setLocks()` throws `MissingInstanceDefaultException` without a non-empty installation value. An installation value would pin every account. | The lock is dropped. §3.6. CB5 shows no lock and does not call `setLocks()`. |
+| Unpinned resolution was described in the wrong order. | Messages: catalog key, then alias, then provider id / name, then a dated suffix. Chat Completions: configured CHAT, configured SORT, chat identity, any active row, then `getDefaultModel()` even for an unknown name. Aliases are Messages-only. | Findings §1. §5.1. CB2's editor-chooses path calls those functions unchanged, with a regression test for the unknown-name fall-through. |
+| The pin payload had no long-context price. | `ModelCatalog::contextPricing()` has it. `/api/v1/config/models` does not. | D15. `CodingModelFacts` copies the array. It is on the pin, on `GET /v1/coding`, and on `GET /v1/models`. |
+| An inactive pin was treated as unset. | `getConfiguredDefaultModel()` skips an inactive row and continues, so a dead user pin becomes the group pin or editor-chooses. | `forUser()` does not call that getter. An inactive winning id is `invalid`, and the gateway returns 404. CB1 test. |
+| Clearing the user row always returned `pinned: false`. | A group value is still in the chain. The old confirm text promised that editors would choose again. | There is no Clear that means both things. Editor-chooses while a group model exists writes the user token `editor`. **Use your group's model** deletes the row and the GET is resolved again. The opt-out sentence names the group model. |
+| `displayModel` does not echo on `/v1/messages`. | Translators copy the upstream request model. Passthrough emits the upstream `message_start` unchanged. `OpenAiMessagesTranslator.php` is on the size ratchet. | `CodingResponseModel` rewrites non-stream JSON, a synthesized `message_start`, and a raw passthrough chunk. Tests for all three. Chat Completions already prints `displayModel`. |
+| `requested` stayed the pin id. | `resolveSelected()` sets `requested` from the row. | The selection class overwrites `requested` and `displayModel` with the editor's string after that call. The Haiku / GPT-6 test asserts `requested_model` is the Haiku id. |
+| The usage query summed the wrong OpenAI row. | `AiChatUsageMeter` writes action `AI_CALL` with the tokens. `FacadeMeteredChat::logMetadata()` then clears the controller's `OPENAI_API` allowance row. The controller never sets `usage_source`, so the billed row is source `ai_facade`. | CB2 stamps `usage_source = OPENAI_API` plus client, requested model, and `key_source` via `claim()`. CB4 sums `AI_CALL` / `OPENAI_API` and `MESSAGES` / `MESSAGES_API`, and drops `facade_metered`. A fixture asserts the tokens are counted once. |
+| Own-key and a free model both cost 0. | `zero_cost` is set for a user key. A local model is `operator` and can also cost 0 (`isLocalHost`). The first query grouped only by model and client. | Group by `key_source`. The own-key sentence is `user` only. `key_source` comes from `UserProviderKeyResolver`, not from the cost. |
+
+## 6. Flexibility (owner, 2026-11-09)
+
+The first draft's title was the product: one coding model per account,
+and an empty pin as the only way to keep today's editors. That is the
+wrong default to put on a page. Developers who use Synaplan as a
+backend already rely on the editor sending the model, including
+Claude Code's five slots and a list in Pi or OpenCode.
+
+The revised plan:
+
+- Two modes, one fieldset, on a new page **Apps → Developer backend**.
+  Editor chooses is the default and does not change resolution. One
+  model is the opt-in.
+- The Claude Code app stays the connection page (gateway status,
+  Anthropic key, API key) and links to the new page. Admin → Coding
+  clients stays the install switch. Three jobs, three screens.
+- A group may set a one-model default. A member may pick another model
+  or opt out. The opt-out is a user row, because deleting the row
+  would reveal the group model again.
+- Slots, per-key pins, and a coding-only allow-list are not controls.
+  Slots are the editor's config in editor-chooses mode. The copy block
+  shows the five variables and says they may differ.
+
+Open questions from §3:
+
+- Q1 and Q2 stay open. Q1 is re-checked in the week CB3 is written. Q2
+  is the CB2 capture todo.
+- Q3 is decided with D4: a one-model turn forwards images, and the page
+  says they may be refused. Editor chooses keeps today's vision rewrite.
+- Q4 is decided with D6: the Claude Code app is not renamed. The new
+  page is Developer backend.
