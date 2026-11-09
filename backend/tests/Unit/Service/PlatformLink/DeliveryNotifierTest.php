@@ -107,7 +107,7 @@ final class DeliveryNotifierTest extends TestCase
             $http,
             new NotifyKeyStore($configs, new EncryptionService('test-secret', new NullLogger()), new FederationSigner(), $redis),
             new FederationSigner(),
-            new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard(), new OidcCloud('', '', '', '')),
+            new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard(), new OidcCloud('', '', '')),
             new NullLogger(),
             'https://synaplan.example/',
         );

@@ -46,14 +46,14 @@ final class OidcCloudTest extends WebTestCase
 
     public function testTheSeederKeepsOneRowInLineWithTheConfiguration(): void
     {
-        $this->seed('cloud.example.com', 'http://synaplan-opencloud:9106/api/synaplan/inbound');
+        $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
         $first = $this->row();
         self::assertSame(PlatformInstance::STATUS_ACTIVE, $first->getStatus());
         self::assertSame('cloud.example.com', $first->getHost());
         self::assertSame('zero-setup-people', $first->getOidcClientId());
         $id = $first->getId();
 
-        $this->seed('files.example.com', 'http://opencloud-synaplan.cloud.svc:9106/api/synaplan/inbound');
+        $this->seed('https://files.example.com', 'http://opencloud-synaplan.cloud.svc:9106');
         $second = $this->row();
         self::assertSame($id, $second->getId());
         self::assertSame('files.example.com', $second->getHost());
@@ -62,7 +62,7 @@ final class OidcCloudTest extends WebTestCase
 
     public function testWithoutTheConfigurationNothingIsWritten(): void
     {
-        $seeder = new OidcCloudSeeder(new OidcCloud('', '', '', ''), $this->instances(), static::getContainer()->get(RedirectUriPolicy::class), static::getContainer()->get(AuditLogWriter::class));
+        $seeder = new OidcCloudSeeder(new OidcCloud('', '', ''), $this->instances(), static::getContainer()->get(RedirectUriPolicy::class), static::getContainer()->get(AuditLogWriter::class));
         $seeder->seed();
 
         self::assertNull($this->instances()->findByInstanceId(PlatformInstance::OIDC_CLOUD_ID));
@@ -70,7 +70,7 @@ final class OidcCloudTest extends WebTestCase
 
     public function testTheCloudHasNoCredentialForTheInstanceRoutes(): void
     {
-        $this->seed('cloud.example.com', 'http://synaplan-opencloud:9106/api/synaplan/inbound');
+        $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
 
         $this->client->request('GET', '/api/v1/platform-links/instances/self', server: [
             'HTTP_X_INSTANCE_ID' => PlatformInstance::OIDC_CLOUD_ID,
@@ -81,13 +81,13 @@ final class OidcCloudTest extends WebTestCase
 
     public function testTheConfiguredCloudGetsAllCapabilitiesUnlessNamed(): void
     {
-        $this->seed('cloud.example.com', 'http://synaplan-opencloud:9106/api/synaplan/inbound');
+        $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
         self::assertSame(OidcCloud::ALL_CAPABILITIES, $this->row()->getAppCapabilities());
     }
 
-    private function seed(string $host, string $deliveryUrl): OidcCloud
+    private function seed(string $url, string $internalUrl): OidcCloud
     {
-        $cloud = new OidcCloud('opencloud', $host, 'zero-setup-people', $deliveryUrl);
+        $cloud = new OidcCloud('opencloud', $url, 'zero-setup-people', $internalUrl);
         $seeder = new OidcCloudSeeder(
             $cloud,
             $this->instances(),

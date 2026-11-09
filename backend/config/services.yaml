@@ -136,11 +136,10 @@ parameters:
     env(GITHUB_CLIENT_ID): ''
     env(OIDC_CLIENT_ID): ''
     env(OIDC_BEARER_AUDIENCE): ''
-    env(PLATFORM_LINKS_OIDC_CLOUD): ''
-    env(PLATFORM_LINKS_OIDC_CLOUD_HOST): ''
-    env(PLATFORM_LINKS_OIDC_CLOUD_PEOPLE_CLIENT): ''
-    env(PLATFORM_LINKS_OIDC_CLOUD_DELIVERY_URL): ''
-    env(PLATFORM_LINKS_OIDC_CLOUD_CAPABILITIES): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_TYPE): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_URL): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_INTERNAL_URL): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
     env(TURNSTILE_SECRET_KEY): ''
@@ -993,11 +992,10 @@ services:
 
     App\Service\PlatformLink\OidcCloud:
         arguments:
-            $client: '%env(PLATFORM_LINKS_OIDC_CLOUD)%'
-            $host: '%env(PLATFORM_LINKS_OIDC_CLOUD_HOST)%'
-            $peopleClient: '%env(PLATFORM_LINKS_OIDC_CLOUD_PEOPLE_CLIENT)%'
-            $deliveryUrl: '%env(PLATFORM_LINKS_OIDC_CLOUD_DELIVERY_URL)%'
-            $capabilities: '%env(PLATFORM_LINKS_OIDC_CLOUD_CAPABILITIES)%'
+            $type: '%env(PLATFORM_LINKS_OIDC_CLOUD_TYPE)%'
+            $url: '%env(PLATFORM_LINKS_OIDC_CLOUD_URL)%'
+            $clientId: '%env(PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID)%'
+            $internalUrl: '%env(PLATFORM_LINKS_OIDC_CLOUD_INTERNAL_URL)%'
 
     App\Service\PlatformLink\SignedNotificationClient:
         arguments:
