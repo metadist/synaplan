@@ -154,11 +154,11 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
     if ('done' === payload.state) {
       push({ type: 'success', message: t('jobs.toast.ready', { kind }), duration: 8000, action })
     } else {
+      reconcileFailedMediaJob(payload)
       push({ type: 'error', message: t('jobs.toast.failed', { kind }), duration: 8000, action })
     }
   }
 
-  /** Deep-link to a chat (toast "View" + tray "Open"). Best-effort, never throws. */
   function openChat(chatId: number): void {
     try {
       useChatsStore().setActiveChat(chatId)
@@ -222,3 +222,12 @@ export const useMediaJobsStore = defineStore('mediaJobs', () => {
     subscribedUserId,
   }
 })
+
+/** Reload the saved message so an admin can open the provider dump. */
+function reconcileFailedMediaJob(payload: MediaJobUpdate): void {
+  if ('failed' !== payload.state || payload.message_id == null) return
+  const history = useHistoryStore()
+  const loaded = history.messages.find((message) => message.backendMessageId === payload.message_id)
+  if (!loaded) return
+  void history.reconcileMessage(loaded.id, payload.message_id)
+}

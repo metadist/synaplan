@@ -203,6 +203,7 @@ final readonly class NonStreamingTurn
         // Email and webhook callers get the right "Audio Model" badge and
         // "Again" capability after a reload too.
         $this->meta->persistOriginalMediaMeta($outgoing, $classification, $metadata);
+        $this->meta->persistMediaFailure($outgoing, $metadata);
 
         if (!empty($metadata['multitask'])) {
             $outgoing->setMeta('multitask', '1');
@@ -280,6 +281,10 @@ final readonly class NonStreamingTurn
                 array_map(fn ($feedback) => $feedback['id'] ?? null, $metadata['feedbacks']),
                 fn ($id) => null !== $id
             );
+        }
+
+        foreach ($this->meta->chatErrorSseFields($outgoing, $turn->caller->seesProviderDiagnostics()) as $key => $value) {
+            $completeData[$key] = $value;
         }
 
         return $completeData;

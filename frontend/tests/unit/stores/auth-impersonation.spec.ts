@@ -144,6 +144,7 @@ describe('useAuthStore — impersonation', () => {
 
     expect(store.impersonator).toBeNull()
     expect(store.isImpersonating).toBe(false)
+    expect(store.canSeeAdminDiagnostics).toBe(false)
   })
 
   it('startImpersonation calls the API, refreshes auth, and reflects the new state', async () => {
@@ -167,6 +168,8 @@ describe('useAuthStore — impersonation', () => {
     expect(store.user?.email).toBe('target@example.com')
     expect(store.impersonator?.email).toBe('admin@example.com')
     expect(store.isImpersonating).toBe(true)
+    expect(store.isAdmin).toBe(false)
+    expect(store.canSeeAdminDiagnostics).toBe(true)
     // /auth/me must have been called as part of the post-swap refresh.
     expect(refreshUserMock).toHaveBeenCalled()
   })

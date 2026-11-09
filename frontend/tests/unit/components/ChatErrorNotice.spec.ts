@@ -6,11 +6,18 @@ import { ref } from 'vue'
 import ChatErrorNotice from '@/components/ChatErrorNotice.vue'
 
 const isAdmin = ref(false)
+const isImpersonating = ref(false)
 
 vi.mock('@/stores/auth', () => ({
   useAuthStore: () => ({
     get isAdmin() {
       return isAdmin.value
+    },
+    get isImpersonating() {
+      return isImpersonating.value
+    },
+    get canSeeAdminDiagnostics() {
+      return isAdmin.value || isImpersonating.value
     },
   }),
 }))
@@ -62,6 +69,7 @@ const mountNotice = (props: {
 describe('ChatErrorNotice', () => {
   beforeEach(() => {
     isAdmin.value = false
+    isImpersonating.value = false
   })
 
   it('shows the classified reason instead of a title-only banner', () => {
@@ -199,5 +207,28 @@ describe('ChatErrorNotice', () => {
     expect(wrapper.find('[data-testid="btn-chat-error-details"]').exists()).toBe(true)
     await wrapper.get('[data-testid="btn-chat-error-details"]').trigger('click')
     expect(wrapper.get('[data-testid="chat-error-debug"]').text()).toContain('json_validate_failed')
+  })
+
+  it('shows the same diagnostics when an admin is impersonating a non-admin', async () => {
+    isAdmin.value = false
+    isImpersonating.value = true
+    const wrapper = mountNotice({
+      canRetryModel: true,
+      errorDebug: 'Groq chat error: json_validate_failed',
+    })
+
+    expect(wrapper.find('[data-testid="btn-chat-error-details"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="btn-chat-error-details"]').trigger('click')
+    expect(wrapper.get('[data-testid="chat-error-debug"]').text()).toContain('json_validate_failed')
+  })
+
+  it('keeps the dump shut for the account itself even if the field is present', () => {
+    const wrapper = mountNotice({
+      canRetryModel: true,
+      errorDebug: 'Groq chat error: json_validate_failed',
+    })
+
+    expect(wrapper.find('[data-testid="btn-chat-error-details"]').exists()).toBe(false)
+    expect(wrapper.html()).not.toContain('json_validate_failed')
   })
 })

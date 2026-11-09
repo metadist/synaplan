@@ -234,18 +234,16 @@ class MediaErrorMessageBuilderTest extends TestCase
     {
         $exception = new ProviderException('Higgsfield API error (400): invalid_image_url', 'higgsfield', ['status_code' => 400]);
 
-        // Regular user: clean, non-leaky message — never the raw provider text.
-        $userMessage = $this->builder->buildErrorMessage($exception, 'video', 'en', false);
+        $userMessage = $this->builder->buildErrorMessage($exception, 'video', 'en');
         $this->assertStringNotContainsString('invalid_image_url', $userMessage);
         $this->assertStringNotContainsString('Admin diagnostics', $userMessage);
+        $this->assertStringContainsString('We couldn\'t open the image you linked.', $userMessage);
 
-        // Admin: same clean message PLUS the appended raw diagnostics block.
-        $adminMessage = $this->builder->buildErrorMessage($exception, 'video', 'en', true);
-        $this->assertStringContainsString('We couldn\'t open the image you linked.', $adminMessage);
-        $this->assertStringContainsString('Admin diagnostics', $adminMessage);
-        $this->assertStringContainsString('Provider: higgsfield', $adminMessage);
-        $this->assertStringContainsString('invalid_image_url', $adminMessage);
-        $this->assertStringContainsString('status_code', $adminMessage);
+        $debug = $this->builder->diagnostics($exception);
+        $this->assertStringContainsString('Provider: higgsfield', $debug);
+        $this->assertStringContainsString('invalid_image_url', $debug);
+        $this->assertStringContainsString('status_code', $debug);
+        $this->assertStringNotContainsString('Admin diagnostics', $debug);
     }
 
     public function testContentFilteredVideoSurfacesGoogleReasonToUser(): void

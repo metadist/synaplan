@@ -325,8 +325,7 @@ class WebhookController extends AbstractController
 
             $response = $result['response'];
             $responseContent = $response['content'] ?? '';
-            $responseMeta = $response['metadata'] ?? [];
-            $this->recordWebhookChat($user, $message, $responseContent, $responseMeta);
+            $responseMeta = $this->recordWebhookChat($user, $message, $responseContent, $response['metadata'] ?? []);
 
             $webhookMediaType = $responseMeta['media_type'] ?? null;
             if ($webhookMediaType) {
@@ -375,13 +374,18 @@ class WebhookController extends AbstractController
 
     /**
      * @param array<string, mixed> $metadata
+     *
+     * @return array<string, mixed>
      */
-    private function recordWebhookChat(User $user, Message $message, string $answer, array $metadata): void
+    private function recordWebhookChat(User $user, Message $message, string $answer, array $metadata): array
     {
+        unset($metadata['chat_error_debug'], $metadata['errorDebug'], $metadata['error_debug']);
         \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService,
             $user,
             'MESSAGES',
             FacadeMeteredChat::messages($metadata, 'WEBHOOK', $message->getText(), $answer),
         );
+
+        return $metadata;
     }
 }

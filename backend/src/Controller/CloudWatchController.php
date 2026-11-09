@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Security\PlatformInstancePrincipal;
 use App\Service\CloudWatch\CloudWatchException;
 use App\Service\CloudWatch\CloudWatchIndex;
 use App\Service\CloudWatch\CloudWatchService;
 use App\Service\CloudWatch\WatchDialogOptions;
 use App\Service\CloudWatch\WatchUpload;
 use App\Service\File\CloudFilesConfig;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
-use App\Service\PlatformLink\InstanceCredential;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -36,7 +33,6 @@ final class CloudWatchController extends AbstractController
         private readonly WatchDialogOptions $dialogOptions,
         private readonly WatchUpload $uploads,
         private readonly CloudWatchIndex $index,
-        private readonly InstanceCredential $instances,
     ) {
     }
 
@@ -223,9 +219,8 @@ final class CloudWatchController extends AbstractController
         operationId: 'cloudWatchIndex',
         summary: 'Watches on this cloud, one page at a time',
         tags: ['Cloud watches'],
+        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
         parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', maximum: 500)),
             new OA\Parameter(name: 'cursor', in: 'query', schema: new OA\Schema(type: 'string')),
             new OA\Parameter(name: 'since', in: 'query', schema: new OA\Schema(type: 'string')),
@@ -233,27 +228,23 @@ final class CloudWatchController extends AbstractController
         responses: [
             new OA\Response(response: 200, description: 'A page, or the changes since a cursor'),
             new OA\Response(response: 304, description: 'Nothing changed'),
+            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
+            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
+            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
             new OA\Response(response: 410, description: 'The cursor is older than 7 days'),
+            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ],
     )]
-    public function index(Request $request): JsonResponse|Response
+    public function index(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse|Response
     {
         $absent = $this->absent();
         if ($absent instanceof JsonResponse) {
             return $absent;
         }
         try {
-            $instance = $this->instances->require(
-                (string) $request->headers->get('X-Instance-Id', ''),
-                (string) $request->headers->get('X-Instance-Secret', ''),
-            );
-            $feed = $this->index->feed($instance, $request, time());
+            $feed = $this->index->feed($caller->instance, $request, time());
         } catch (CloudWatchException $e) {
             return $this->json(['error' => $e->error, 'message' => $e->getMessage()], $e->status);
-        } catch (PlatformInstanceNotFoundException) {
-            return $this->json(['error' => 'Instance not found.'], Response::HTTP_NOT_FOUND);
-        } catch (PlatformInstanceSecretException|PlatformInstanceNotActiveException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_UNAUTHORIZED);
         }
         if (304 === $feed['status']) {
             return new Response('', Response::HTTP_NOT_MODIFIED, ['ETag' => $feed['etag']]);

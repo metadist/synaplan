@@ -47,6 +47,8 @@ export interface TaskCard {
   mediaType?: string
   // Failure details from the `task_update` SSE event (failed/skipped states).
   error?: string
+  /** Raw provider dump. The API sends this only to an admin. */
+  errorDebug?: string
   // Resolved generation prompt of a failed media node — payload for the
   // "retry this step with the next model" action.
   prompt?: string

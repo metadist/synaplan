@@ -19,8 +19,8 @@ use Psr\Log\LoggerInterface;
  * an image URL from the text, an inline file or a public copy), the render
  * goes to a background job where allowed or to the provider right away, and
  * the result is kept and billed. A Stop is a neutral outcome that is still
- * billed (#1146); any other failure is told in one sentence, with the
- * provider's cause for an admin.
+ * billed (#1146); any other failure is one sentence. The provider cause
+ * is stored for the admin error notice and is not part of that sentence.
  */
 final readonly class MediaGenerationRun
 {
@@ -88,7 +88,7 @@ final readonly class MediaGenerationRun
         } catch (ProviderCancelledException $e) {
             return $this->cancelled($request, $user, $result);
         } catch (\Exception $e) {
-            return $this->failed($request, $user, $e, $streamCallback);
+            return $this->failed($request, $e, $streamCallback);
         }
     }
 
@@ -430,12 +430,12 @@ final readonly class MediaGenerationRun
     }
 
     /**
-     * Admins get the raw provider error appended for diagnosis; everyone
-     * else reads the clean sentence.
+     * The sentence is safe for every viewer. Reason and diagnostics travel
+     * in metadata so the stream can store them for the admin notice.
      *
      * @return array<string, mixed>
      */
-    private function failed(MediaTurnRequest $request, ?User $user, \Exception $e, callable $streamCallback): array
+    private function failed(MediaTurnRequest $request, \Exception $e, callable $streamCallback): array
     {
         $provider = (string) $request->model->provider;
         $modelName = $request->model->name;
@@ -447,14 +447,16 @@ final readonly class MediaGenerationRun
             'exception' => $e,
         ] + ($e instanceof ProviderException ? $e->logContext() : []));
 
-        $userMessage = $this->errorMessageBuilder->buildErrorMessage($e, $request->mediaType, $request->language(), $user?->isAdmin() ?? false);
+        $userMessage = $this->errorMessageBuilder->buildErrorMessage($e, $request->mediaType, $request->language());
         $streamCallback($userMessage);
 
         return [
             'metadata' => [
                 'provider' => $provider,
                 'model' => $modelName,
-                'error' => $e->getMessage(),
+                'error' => $userMessage,
+                'chat_error_reason' => $this->errorMessageBuilder->failureReason($e)->value,
+                'chat_error_debug' => $this->errorMessageBuilder->diagnostics($e),
             ],
         ];
     }

@@ -9,7 +9,6 @@ use App\Repository\PlatformInstanceRepository;
 use App\Service\PlatformLink\DeliveryAddressService;
 use App\Service\PlatformLink\DeliveryOriginPolicy;
 use App\Service\PlatformLink\DeliveryProbe;
-use App\Service\PlatformLink\PlatformInstanceService;
 use App\Service\PlatformLink\PlatformInstanceSupersession;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -24,21 +23,19 @@ final class DeliveryAddressServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org', null, PlatformInstance::STATUS_ACTIVE);
-        $instances = $this->createStub(PlatformInstanceService::class);
-        $instances->method('requireInstance')->willReturn($this->instance);
         $platforms = $this->createStub(PlatformInstanceRepository::class);
         $origins = $this->createStub(DeliveryOriginPolicy::class);
         $origins->method('accepts')->willReturn(true);
         $this->probe = $this->createMock(DeliveryProbe::class);
         $this->supersession = $this->createMock(PlatformInstanceSupersession::class);
-        $this->service = new DeliveryAddressService($instances, $platforms, $origins, $this->probe, $this->supersession);
+        $this->service = new DeliveryAddressService($platforms, $origins, $this->probe, $this->supersession);
     }
 
     public function testAnnouncingTheClientLetsTheInstanceTakeOverOlderTwins(): void
     {
         $this->supersession->expects($this->once())->method('takeOverOlderTwins')->with($this->instance);
 
-        $this->service->update('pi_abc', 'secret', null, null, 'synaplan-nextcloud');
+        $this->service->update($this->instance, null, null, 'synaplan-nextcloud');
     }
 
     public function testSavingOnlyTheAddressTakesNothingOver(): void
@@ -46,7 +43,7 @@ final class DeliveryAddressServiceTest extends TestCase
         $this->probe->method('reachable')->willReturn(true);
         $this->supersession->expects($this->never())->method('takeOverOlderTwins');
 
-        $this->service->update('pi_abc', 'secret', 'https://files.example.org/inbound', null);
+        $this->service->update($this->instance, 'https://files.example.org/inbound', null);
     }
 
     public function testSavingTheAddressProbesItAndStoresWhatTheAppReports(): void
@@ -54,8 +51,7 @@ final class DeliveryAddressServiceTest extends TestCase
         $this->probe->expects($this->once())->method('reachable')->with('https://files.example.org/inbound')->willReturn(true);
 
         $saved = $this->service->update(
-            'pi_abc',
-            'secret',
+            $this->instance,
             'https://files.example.org/inbound',
             ['deliveries', 'name-the-core-does-not-know', 'watches'],
             'synaplan-nextcloud',
@@ -75,7 +71,7 @@ final class DeliveryAddressServiceTest extends TestCase
     {
         $this->probe->expects($this->once())->method('reachable')->willReturn(false);
 
-        $saved = $this->service->update('pi_abc', 'secret', 'https://files.example.org/inbound', null);
+        $saved = $this->service->update($this->instance, 'https://files.example.org/inbound', null);
 
         self::assertFalse($saved['reachable']);
     }
@@ -85,7 +81,7 @@ final class DeliveryAddressServiceTest extends TestCase
         $this->instance->setAppVersion('1.7.0');
         $this->probe->expects($this->never())->method('reachable');
 
-        $saved = $this->service->update('pi_abc', 'secret', null, ['pickups']);
+        $saved = $this->service->update($this->instance, null, ['pickups']);
 
         self::assertSame('1.7.0', $saved['app_version']);
         self::assertSame(['pickups'], $saved['app_capabilities']);

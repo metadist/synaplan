@@ -50,6 +50,7 @@ final readonly class EmailReply
 
         $answer = (string) ($result['response']['content'] ?? '');
         $metadata = $result['response']['metadata'] ?? [];
+        unset($metadata['chat_error_debug'], $metadata['errorDebug'], $metadata['error_debug']);
         $attachmentPath = $this->files->primary($metadata);
         $usage = $this->answers->recordUsage($email, $stored, $answer, $metadata, $processingTime);
         if (null === $attachmentPath && '1' === $stored->message->getMeta('voice_reply')) {

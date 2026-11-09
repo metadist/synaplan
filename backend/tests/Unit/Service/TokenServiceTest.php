@@ -13,6 +13,7 @@ use App\Service\Auth\TokenService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Unit tests for {@see TokenService}.
@@ -101,6 +102,36 @@ final class TokenServiceTest extends TestCase
 
         self::assertNull($service->refreshTokens('refresh-suspended'));
         self::assertSame($originalExpiry, $refresh->getExpires());
+    }
+
+    public function testNoteAccessTokenRecordsTheImpersonatorAndDropsItForANormalToken(): void
+    {
+        $service = new TokenService(
+            $this->createStub(TokenRepository::class),
+            $this->createStub(UserRepository::class),
+            new NullLogger(),
+            new AuthCookieFactory('test', 'https://synaplan.example.com'),
+            self::SECRET_A,
+        );
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $user->method('getMail')->willReturn('ada@example.com');
+        $user->method('getRoles')->willReturn(['ROLE_USER']);
+        $user->method('getUserLevel')->willReturn('PRO');
+        $request = Request::create('/');
+
+        $impersonated = $service->validateAccessToken(
+            $service->generateAccessToken($user, impersonatorId: 3),
+        );
+        self::assertNotNull($impersonated);
+        $service->noteAccessToken($request, $impersonated);
+        self::assertSame(7, $request->attributes->get('access_token_user_id'));
+        self::assertSame(3, $request->attributes->get(TokenService::IMPERSONATOR_ATTRIBUTE));
+
+        $plain = $service->validateAccessToken($service->generateAccessToken($user));
+        self::assertNotNull($plain);
+        $service->noteAccessToken($request, $plain);
+        self::assertFalse($request->attributes->has(TokenService::IMPERSONATOR_ATTRIBUTE));
     }
 
     public function testRefreshCookieLifetimeMatchesRefreshTtl(): void

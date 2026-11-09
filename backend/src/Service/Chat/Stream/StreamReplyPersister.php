@@ -407,6 +407,7 @@ final readonly class StreamReplyPersister
         $this->mediaJobs->rebindTaskCards($outgoing, $metadata);
 
         $this->meta->persistOriginalMediaMeta($outgoing, $classification, $metadata);
+        $this->meta->persistMediaFailure($outgoing, $metadata);
         $this->meta->persistClassificationSortingMeta($outgoing, $classification);
     }
 

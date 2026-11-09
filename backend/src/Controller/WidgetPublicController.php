@@ -14,6 +14,7 @@ use App\Service\Chat\Run\ChatRunService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
+use App\Service\Message\StoredAdminDiagnostics;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
 use App\Service\Widget\Turn\WidgetConversation;
@@ -885,7 +886,7 @@ class WidgetPublicController extends AbstractController
             return [
                 'id' => $message->getId(),
                 'direction' => $message->getDirection(),
-                'text' => $message->getText(),
+                'text' => StoredAdminDiagnostics::userText((string) $message->getText()),
                 'timestamp' => $message->getUnixTimestamp(),
                 'messageType' => $message->getMessageType(),
                 'sender' => $sender,

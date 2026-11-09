@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Media;
 
+use App\AI\Exception\ChatFailureReason;
+use App\Service\Message\StoredAdminDiagnostics;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -267,6 +269,7 @@ final class MediaJobService
         if ($this->adoptFreshMessageBinding($job)) {
             return false;
         }
+        $this->ensureFailureReason($job, ChatFailureReason::Unknown->value);
         $job->setError($this->truncateError($error))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_FAILED);
@@ -302,6 +305,7 @@ final class MediaJobService
         if ($this->adoptFreshMessageBinding($job)) {
             return false;
         }
+        $this->ensureFailureReason($job, ChatFailureReason::Timeout->value);
         $job->setError($this->truncateError($reason))
             ->setFinishedAt(time())
             ->setStatus(MediaJob::STATUS_TIMED_OUT);
@@ -397,6 +401,20 @@ final class MediaJobService
         if (null !== $stored->getResult()) {
             $job->setResult($stored->getResult());
         }
+
+        // The user sentence above is the winner's. The red notice reads the
+        // reason and provider dump from options, so those must be the winner's
+        // too — including when the winner stored neither.
+        $options = $job->getOptions();
+        $storedOptions = $stored->getOptions();
+        foreach ([MediaJob::OPT_ERROR_REASON, MediaJob::OPT_ERROR_DEBUG] as $key) {
+            if (array_key_exists($key, $storedOptions)) {
+                $options[$key] = $storedOptions[$key];
+            } else {
+                unset($options[$key]);
+            }
+        }
+        $job->setOptions($options);
     }
 
     public function heartbeat(MediaJob $job): void
@@ -436,7 +454,7 @@ final class MediaJobService
      * @return array{
      *     job_id:string, status:string, state:string, type:string,
      *     percent:?int, provider_status:?string, elapsed_seconds:int,
-     *     error:?string, file:?array<string,mixed>, finished:bool,
+     *     error:?string, error_reason:?string, file:?array<string,mixed>, finished:bool,
      *     created_at:int, updated_at:int, deadline_at:?int,
      *     max_wait_seconds:int, remaining_seconds:?int,
      *     stalled:bool, stall_reason:?string
@@ -460,7 +478,8 @@ final class MediaJobService
             'percent' => $job->getPercent(),
             'provider_status' => $job->getProviderStatus(),
             'elapsed_seconds' => $job->getElapsedSeconds(),
-            'error' => $job->getError(),
+            'error' => $this->publicError($job),
+            'error_reason' => $this->failureReason($job),
             'file' => $file,
             'finished' => $job->isTerminal(),
             'created_at' => $job->getCreated(),
@@ -623,6 +642,46 @@ final class MediaJobService
 
         // Closure, resource, or any object — not JSON-serializable, drop it.
         return null;
+    }
+
+    /**
+     * A caller may already have stored a precise reason. Otherwise the
+     * terminal transition still names one, so the red notice can render.
+     */
+    private function ensureFailureReason(MediaJob $job, string $fallback): void
+    {
+        $options = $job->getOptions();
+        $current = $options[MediaJob::OPT_ERROR_REASON] ?? null;
+        if (is_string($current) && null !== ChatFailureReason::tryFrom($current)) {
+            return;
+        }
+
+        $options[MediaJob::OPT_ERROR_REASON] = $fallback;
+        $job->setOptions($options);
+    }
+
+    private function failureReason(MediaJob $job): ?string
+    {
+        $raw = $job->getOptions()[MediaJob::OPT_ERROR_REASON] ?? null;
+        if (!is_string($raw)) {
+            return null;
+        }
+
+        return ChatFailureReason::tryFrom($raw)?->value;
+    }
+
+    /**
+     * Older failures appended the provider dump to the stored sentence.
+     * Poll and realtime only ever carry the sentence.
+     */
+    private function publicError(MediaJob $job): ?string
+    {
+        $error = $job->getError();
+        if (null === $error || '' === $error) {
+            return $error;
+        }
+
+        return StoredAdminDiagnostics::userText($error);
     }
 
     private function truncateError(string $error): string
