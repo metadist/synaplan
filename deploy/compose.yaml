@@ -91,7 +91,7 @@ x-app-environment: &app-environment
   REGISTRATION_MODE: "${REGISTRATION_MODE:-}"
   GUEST_CHAT_ENABLED: "${GUEST_CHAT_ENABLED:-}"
   # Feature-flag pins (docs/FEATURE_FLAGS.md). Every flag is ON by default and
-  # managed under Operate > System configuration > Features; an empty value here
+  # managed under Admin → System configuration → Features; an empty value here
   # keeps it that way. "false" pins the feature off for this deployment and
   # locks the admin toggle. Module gates (FEATURE_MODULES_GATE_<ID>) are per
   # module and go into a compose override when a deployment needs one.

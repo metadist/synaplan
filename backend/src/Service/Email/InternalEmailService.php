@@ -577,7 +577,7 @@ final readonly class InternalEmailService
                     <tr><td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Time</td>
                         <td style="padding: 8px; border: 1px solid #ddd;">{$timestamp}</td></tr>
                 </table>
-                <p style="color: #666; font-size: 13px;">Full status per model: Operate → AI infrastructure → Model health.</p>
+                <p style="color: #666; font-size: 13px;">Full status per model: Admin → AI infrastructure → Model health.</p>
             </div>
             HTML;
 

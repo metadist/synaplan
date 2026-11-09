@@ -10,7 +10,7 @@
 - [Monitoring & Background Scheduler](#monitoring) — [Health Endpoints](#health-check-endpoint) · [Recent Errors](#recent-errors) · [Background Jobs (Scheduler)](#background-jobs-scheduler)
 - [Backups, Restore & Updates](#backups) — [Restore](#restore) · [Updates](#updates) · [Elestio Cleanup](#elestio-trial-cleanup)
 - [Security, Sessions & Signup Protection](#security) — [Token Rotation](#token-rotation) · [Sessions Survive Restarts](#sessions-survive-restarts) · [Signup Limits & Human Check](#account-creation-limits-human-check-kill-switch) · [Open vs. Admission Mode](#who-may-create-an-account-open-or-admission)
-- [User Management & The Operate Area](#user-management) — [Operate Navigation](#the-operate-area) · [Users and Groups](#users-and-groups) · [Sharing](#sharing) · [Group Policies & Locked Defaults](#group-policies-and-locked-defaults)
+- [User Management & The Admin Area](#user-management) — [Admin Navigation](#the-admin-area) · [Users and Groups](#users-and-groups) · [Sharing](#sharing) · [Group Policies & Locked Defaults](#group-policies-and-locked-defaults)
 - [Self-Awareness (`SELF_AWARE`)](#self-awareness-self_aware) · [Integrations, Linked Platforms & AI Plugs](#integrations) · [Troubleshooting](#troubleshooting)
 
 ---
@@ -560,9 +560,9 @@ Always use `BID` (primary key) in UPDATE statements to avoid affecting the wrong
 
 ---
 
-## The Operate area
+## The Admin area
 
-Operate is grouped by topic. Each entry answers one question; the tabs
+Admin is grouped by topic. Each entry answers one question; the tabs
 inside it are the sub-topics.
 
 | Entry | Path | What it holds |
@@ -594,10 +594,10 @@ and `/admin/config?tab=ai|processing|vectordb|routing` land on the new home.
 
 ## Users and groups
 
-Groups, the Users page under Operate, and the group API are gated by
+Groups, the Users page under Admin, and the group API are gated by
 `IAM.GROUPS_ENABLED` (BCONFIG group `IAM`, owner `0`). The flag is **on by
 default** (seeded `1`; a migration turns it on for existing installs). Operators
-switch it in **Operate → System configuration → Features → Users & sharing**
+switch it in **Admin → System configuration → Features → Users & sharing**
 (`/admin/config?tab=features`, field `FEATURE_IAM_GROUPS_ENABLED`) or pin it
 for automated deployments with the environment variable
 `FEATURE_IAM_GROUPS_ENABLED=false`. See [Feature flags](FEATURE_FLAGS.md) for
@@ -605,7 +605,7 @@ the full list.
 
 When the flag is off:
 
-- Operate **Users** (`/admin/people`) is still the user list. The tab bar
+- Admin **Users** (`/admin/people`) is still the user list. The tab bar
   is hidden only when Users is the sole enabled section (Groups, Policies,
   Platform instances and Audit stay flag-gated). `/admin?tab=users` redirects
   there.
@@ -614,7 +614,7 @@ When the flag is off:
 
 When the flag is on:
 
-- Operate **Users** (`/admin/people`) shows **Users**, **Groups**, and
+- Admin **Users** (`/admin/people`) shows **Users**, **Groups**, and
   **Audit**. **Policies** appears only when group policies are also on.
 - An admin can create a manual group, add users by email, and set the role
   to member or manager.
@@ -673,10 +673,10 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
 
 ### Directory groups
 
-**Directory groups** is on by default; switch it under **Operate → System
+**Directory groups** is on by default; switch it under **Admin → System
 configuration → Features → Users & sharing**
 (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`). The claim settings live under
-**Operate → System configuration → Access → Sharing & audit**. Optional settings:
+**Admin → System configuration → Access → Sharing & audit**. Optional settings:
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
@@ -697,13 +697,13 @@ never include content. `app:iam:reap-audit` deletes rows older than
 
 Administrators can share, unshare and delete (manage) but they cannot read
 another user's chats, files or assistants unless those items are shared with
-them. **Operate → Users** has **View as user** for audited
+them. **Admin → Users** has **View as user** for audited
 impersonation (`IAM.ADMIN_IMPERSONATION` = `audited`). Set it to `disabled`
 to hide that action.
 
 ### Group policies and locked defaults
 
-**Group policies** is switched under **Operate → System configuration →
+**Group policies** is switched under **Admin → System configuration →
 Features → Users & sharing** (`FEATURE_IAM_GROUP_POLICIES_ENABLED`). Users &
 groups must also be on. The seeder inserts the flag as `1`. Off means every
 resolver reads only `[user, global]` and never touches `BGROUPCONFIG`.
@@ -739,7 +739,7 @@ row.
 Acceptance script: `_devextras/testing/iam/policy-demo.sh`.
 
 The Users, sharing, and policy switches live under
-**Operate → System configuration → Features → Users & sharing**. The page
+**Admin → System configuration → Features → Users & sharing**. The page
 reloads the runtime config so Users, Share, and Policies appear without a
 restart. For automated deployments pin a flag with its `FEATURE_*` environment
 variable (the toggle then shows as locked); SQL remains available too:
@@ -902,7 +902,7 @@ Rollback is the same statement with `'0'`. Rows in `BPLATFORMINSTANCES` and
 **Approving instances.** A partner instance registered by a signed-in
 administrator is `active` immediately. One registered anonymously or by a
 regular user is `pending` and cannot issue link codes until an administrator
-approves it under **Operate → Users → Platform instances** (host, client,
+approves it under **Admin → Users → Platform instances** (host, client,
 status, last seen; *Approve* / *Revoke*). Anonymous registration is limited to
 10 per hour per address. Revoking an instance also revokes every key it
 issued.
@@ -936,7 +936,7 @@ through if they fail, so a down sidecar never blocks an upload.
 
 Web search defaults to Brave (`WEB_SEARCH.PROVIDER=brave`). An admin
 picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
-**Operate → System configuration → Web search**, plus an optional
+**Admin → System configuration → Web search**, plus an optional
 fallback. The Brave API key and result count sit on the same tab. The next chat search uses the new provider with no restart.
 **Test query** shows up to five titles. Per-user override is
 **Settings → Use my own search**, only when
@@ -944,7 +944,7 @@ fallback. The Brave API key and result count sit on the same tab. The next chat 
 
 Rerank stays **off** by default (`RERANK.ENABLED=0`) until a live eval
 shows recall@5 up and p95 latency inside the budget. An admin turns it
-on under **Operate → AI infrastructure → Knowledge search → Reranking**: pick a catalog
+on under **Admin → AI infrastructure → Knowledge search → Reranking**: pick a catalog
 rerank model (TEI / Jina / Cohere / Voyage), set how many extra
 snippets to fetch and the millisecond budget, optionally allow the
 summary model as a costly fallback, and run **Test order** on sample
@@ -974,7 +974,7 @@ and set that model as the image default under Settings. `/pic` then
 draws with that model. The endpoint does not edit an attached picture;
 remove the attachment or pick another image model for edits.
 
-The Operate page is **AI infrastructure** (`/admin/setup`). The
+Under Admin, **AI infrastructure** (`/admin/setup`) is the page. The
 **Document reading** tab shows adapter health, lets an admin reorder a
 family chain, and offers **Test with a file**; below it, **Reading
 services** holds the URL, timeout and a connection test for Tika and

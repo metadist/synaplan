@@ -130,7 +130,7 @@
       "directSaved": "Kaydedildi. Sonraki OpenAI sohbeti bu ayarı kullanır.",
       "directFailed": "Doğrudan bağlantı ayarı kaydedilemedi."
     },
-    "title": "İşlet",
+    "title": "Yönetim",
     "description": "Sunucunuza genel bakış: kullanıcılar, kayıtlar ve kullanım.",
     "tabs": {
       "overview": "Genel Bakış",
@@ -1041,7 +1041,7 @@
       "signupCodes": "Davet kodları"
     },
     "openPeople": "Kullanıcılar’ı aç",
-    "backToOperate": "İşlet’e dön",
+    "backToOperate": "Yönetim’e dön",
     "myGroups": {
       "subtitle": "Bu kuruluşta üye olduğunuz gruplar.",
       "emptyMember": "Henüz bir grupta değilsiniz. Bir yönetici sizi Kullanıcılar sayfasından ekleyebilir.",
@@ -1588,7 +1588,7 @@
     "inviteReady": "Davet hazır. Adresi diğer yöneticiye gönderin.",
     "loadFailed": "İş ortakları yüklenemedi. Yeniden deneyin.",
     "joinTitle": "Davetlisiniz",
-    "joinBody": "{name} ({domain}) şirketinizi davet etti. Kendi Synaplan'ınızda Operate, sonra İş ortakları'nı açın ve bu adresi yapıştırın.",
+    "joinBody": "{name} ({domain}) şirketinizi davet etti. Kendi Synaplan'ınızda Yönetim, sonra İş ortakları'nı açın ve bu adresi yapıştırın.",
     "joinInvalid": "Bu davet geçersiz veya süresi dolmuş.",
     "errors": {
       "not_reachable": "Sunucunuz özel bir adreste, bu yüzden diğer şirketler ona ulaşamaz. İş ortakları genel bir https adresi ister.",

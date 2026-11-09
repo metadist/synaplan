@@ -9,7 +9,7 @@ namespace App\Service\Feature;
  *
  * Every wave feature flag (IAM, assistants, tools, workflows, platform links,
  * document tools, desktop, bundle, URL watch, module gates) is stored in
- * BCONFIG and editable under Operate → System configuration → Features. An
+ * BCONFIG and editable under Admin → System configuration → Features. An
  * automated deployment (Helm chart, compose stack, CI image) cannot click that
  * toggle, so it may pin a flag with an environment variable instead:
  *

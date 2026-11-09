@@ -7,7 +7,7 @@ namespace App\Service\Usage;
 use App\Repository\UseLogRepository;
 
 /**
- * The admin cost board (Operate → Usage): who produces what cost, ranked,
+ * The admin cost board (Admin → Usage): who produces what cost, ranked,
  * and the individual model requests behind a row.
  *
  * Costs are the provider costs as recorded in BUSELOG.BCOST — what the

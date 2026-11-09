@@ -77,7 +77,7 @@ final readonly class BrandingService
     public const DEFAULT_POWERED_BY_URL = 'https://www.synaplan.com';
 
     /**
-     * Style settings the Operate "reset to default style" action restores: the
+     * Style settings the Admin "reset to default style" action restores: the
      * light + dark brand colors and the font settings. Name, logos, legal
      * links, navigation and attribution are brand identity, not style, and are
      * deliberately kept.

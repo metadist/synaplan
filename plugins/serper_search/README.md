@@ -9,7 +9,7 @@ third party can add a search provider without touching `backend/src`.
 The plugin is discovered automatically from the plugins directory. To enable it:
 
 1. Get an API key from [serper.dev](https://serper.dev/).
-2. In **Operate → AI infrastructure → Web search**, enter the key for **Serper
+2. In **Admin → AI infrastructure → Web search**, enter the key for **Serper
    (Google)** and save it.
 3. Select Serper as the active provider (or fallback). The next chat search uses
    it.

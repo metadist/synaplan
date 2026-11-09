@@ -22,7 +22,7 @@ flowchart LR
 ```
 
 1. **Upload** — Files are uploaded into **Library** (optionally organized into knowledge folders/groups).
-2. **Extract** — Synaplan runs the family extraction chain (`PLUGS`, configured under **Operate → AI infrastructure → Document reading**).
+2. **Extract** — Synaplan runs the family extraction chain (`PLUGS`, configured under **Admin → AI infrastructure → Document reading**).
 3. **Chunk & Vectorize** — Text is split into chunks (heading-aware for Docling markdown so tables stay intact) and embedded into 1024-dimensional vectors (default: `bge-m3`).
 4. **Store** — Vectors are stored in **MariaDB 11.8+ native `VECTOR`** (default) or **Qdrant** (which adds a full-text BM25 index).
 5. **Retrieve & Rerank** — Queries search across the caller's authorized owner scopes, optionally reorder candidates with a dedicated reranker, and inject the top passages into the prompt.
@@ -58,7 +58,7 @@ When uploading documents via the UI or API (`process_level`), you choose how far
 
 ## Vector Storage: MariaDB VECTOR vs. Qdrant Hybrid Search
 
-Synaplan supports two vector backends (`VECTOR_STORAGE_PROVIDER`, managed under **Operate → AI infrastructure → Knowledge search**):
+Synaplan supports two vector backends (`VECTOR_STORAGE_PROVIDER`, managed under **Admin → AI infrastructure → Knowledge search**):
 
 | Capability | MariaDB 11.8+ `VECTOR` (Default) | Qdrant (`http://qdrant:6333`) |
 | ---------- | -------------------------------- | ----------------------------- |
@@ -77,7 +77,7 @@ After vector (or hybrid) retrieval, an optional rerank model can re-score a wide
 3. On success, the top `k` chunks are returned with `rerank_score`.
 4. On timeout, HTTP error, or empty output, the pipeline degrades gracefully and keeps the first `k` chunks in embedding order so chat still answers.
 
-`RERANK.LLM_FALLBACK = 1` uses the summary model for listwise ranking only when **no** dedicated rerank model is bound—never as a retry when an HTTP reranker times out. Configure and test under **Operate → AI infrastructure → Knowledge search → Reranking**.
+`RERANK.LLM_FALLBACK = 1` uses the summary model for listwise ranking only when **no** dedicated rerank model is bound—never as a retry when an HTTP reranker times out. Configure and test under **Admin → AI infrastructure → Knowledge search → Reranking**.
 
 ### Evaluating Rerank & Hybrid Recall
 

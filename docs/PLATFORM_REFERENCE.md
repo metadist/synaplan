@@ -163,7 +163,7 @@ Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API
 - **Synaplan Desktop** — Pair a computer and run skills on it. Open **Channels → Synaplan Desktop**. No installer yet ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
 - **AI assistants** — Saved recipes (instructions, knowledge folders, tools, triggers) that you publish in versions ([assistants](https://docs.synaplan.com/assistants))
 - **Tools & approvals** — One tool registry; write-class actions pause under **Approvals** ([tools](https://docs.synaplan.com/tools-and-approvals))
-- **Users & groups** — Share folders, chats, assistants and tasks; **Operate → Users** ([people](https://docs.synaplan.com/people-and-groups))
+- **Users & groups** — Share folders, chats, assistants and tasks; **Admin → Users** ([people](https://docs.synaplan.com/people-and-groups))
 - **File work** — Short Python or Node runs on *copies* of files you picked, in an isolated sidecar ([guide](COMPUTE.md))
 - **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](REALTIME.md))
 - **WhatsApp** — Meta Business API integration
@@ -184,7 +184,7 @@ Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API
 
 ## AI providers & models
 
-Synaplan is provider-neutral: connect the providers you want in **Operate → AI infrastructure → Providers & keys** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — those are read at container start and imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
+Synaplan is provider-neutral: connect the providers you want in **Admin → AI infrastructure → Providers & keys** (keys are validated live and stored encrypted in the database, active without a restart), or set the env variables below in `backend/.env` — those are read at container start and imported into the encrypted store on first use. Each user picks a different model **per task** (chat, vision, image, video, audio, embeddings) — nothing is hardcoded.
 
 A new OpenAI-compatible provider is one class. Names, icons, the key check and the outbound allowlist all read that class. The command is in [docs/PROVIDERS.md](PROVIDERS.md).
 
@@ -214,7 +214,7 @@ A new OpenAI-compatible provider is one class. Names, icons, the key check and t
 
 ## Lean by design: core vs optional building blocks
 
-`make up` starts a complete platform, but the **core is deliberately small**: the app, its database and Redis. Everything else is a building block that adds one capability and costs RAM. Switch a block on when you need it and off when you don't — Synaplan keeps running either way and simply hides the matching feature. The boot status screen at <http://localhost:5173> lists the live on/off state of every block, and **Operate → System status** (`/admin/features`) does the same after login.
+`make up` starts a complete platform, but the **core is deliberately small**: the app, its database and Redis. Everything else is a building block that adds one capability and costs RAM. Switch a block on when you need it and off when you don't — Synaplan keeps running either way and simply hides the matching feature. The boot status screen at <http://localhost:5173> lists the live on/off state of every block, and **Admin → System status** (`/admin/features`) does the same after login.
 
 | Block | Gives you | Default | Switch |
 |-------|-----------|---------|--------|

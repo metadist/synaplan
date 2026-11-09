@@ -75,7 +75,7 @@ final readonly class FeaturesTab implements SystemConfigTab
         return new ConfigSection('Users & sharing', [
             'FEATURE_IAM_GROUPS_ENABLED' => new FieldDefinition(
                 type: 'boolean',
-                description: 'Users & groups: show Users under Operate and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
+                description: 'Users & groups: show Users under Admin and let administrators create groups. Members see their groups under Account. Sharing and group policies need this to be on.',
                 default: 'true',
                 row: new DatabaseRow(IamConfig::CONFIG_GROUP, IamConfig::KEY_GROUPS_ENABLED),
             ),
@@ -195,7 +195,7 @@ final readonly class FeaturesTab implements SystemConfigTab
             ),
             'FEATURE_PLATFORM_LINKS_ENABLED' => new FieldDefinition(
                 type: 'boolean',
-                description: 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Operate → Users → Platform instances, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
+                description: 'Linked platforms: let Nextcloud, ownCloud and similar partner platforms connect their users to this instance (Admin → Users → Platform instances, Account → Linked platforms). The Outlook add-in connect path stays available either way.',
                 default: 'true',
                 row: new DatabaseRow(PlatformLinksConfig::CONFIG_GROUP, PlatformLinksConfig::KEY_ENABLED),
             ),
@@ -229,7 +229,7 @@ final readonly class FeaturesTab implements SystemConfigTab
             $fields[FeatureFlagEnv::envVarFor(ModuleGateConfig::GROUP, $setting)] = new FieldDefinition(
                 type: 'boolean',
                 description: sprintf(
-                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Operate → System status.',
+                    'Hide the "%s" module while it is not configured: its API routes answer 404 and the interface shows no card for it. %s Configure the module first — see Admin → System status.',
                     $id,
                     $onByDefault
                         ? 'On is the shipped default for new installs.'
