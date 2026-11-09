@@ -28,6 +28,7 @@ import { setNativeTokens } from '@/services/api/nativeAuth'
 export interface NativeOAuthResult {
   success: boolean
   error?: string
+  errorCode?: string
   /** True when the user dismissed the browser without completing OAuth. */
   cancelled?: boolean
 }
@@ -57,6 +58,34 @@ export function nativeProviderLoginUrl(
 // closure as a cancellation. This reconciles the unspecified ordering of the
 // two independent native events — it is not a logic-race workaround.
 const BROWSER_DISMISS_GRACE_MS = 800
+
+function parseCallbackUrl(url: string): {
+  handoff?: string
+  errorResult?: NativeOAuthResult
+} {
+  let params: URLSearchParams
+  try {
+    params = new URL(url).searchParams
+  } catch {
+    return { errorResult: { success: false, error: 'Invalid callback URL' } }
+  }
+  const providerError = params.get('error')
+  const errorCode = params.get('error_code')
+  if (providerError || errorCode) {
+    return {
+      errorResult: {
+        success: false,
+        error: providerError || undefined,
+        errorCode: errorCode || undefined,
+      },
+    }
+  }
+  const handoff = params.get('handoff')
+  if (!handoff) {
+    return { errorResult: { success: false, error: 'No handoff token received' } }
+  }
+  return { handoff }
+}
 
 export async function startNativeOAuth(
   provider: string,
@@ -96,31 +125,15 @@ export async function startNativeOAuth(
 
     CapacitorApp.addListener('appUrlOpen', (event: { url: string }) => {
       const url = event.url || ''
-      // Ignore unrelated deep links (e.g. universal links handled elsewhere).
       if (!url.includes(CALLBACK_MARKER)) {
         return
       }
-
-      let handoff: string | null
-      let providerError: string | null
-      try {
-        const params = new URL(url).searchParams
-        providerError = params.get('error')
-        handoff = params.get('handoff')
-      } catch {
-        void finish({ success: false, error: 'Invalid callback URL' })
+      const parsed = parseCallbackUrl(url)
+      if (parsed.errorResult) {
+        void finish(parsed.errorResult)
         return
       }
-
-      if (providerError) {
-        void finish({ success: false, error: providerError })
-        return
-      }
-      if (!handoff) {
-        void finish({ success: false, error: 'No handoff token received' })
-        return
-      }
-      void exchangeHandoff(handoff).then(finish)
+      void exchangeHandoff(parsed.handoff!).then(finish)
     }).then((handle) => {
       urlListener = handle
       // If finish() already ran (extremely fast callback), clean up immediately.

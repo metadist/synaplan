@@ -8,6 +8,7 @@ use App\Entity\SignupCode;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Http\ClientAddress;
+use App\Service\Iam\UserLifecycleService;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -23,7 +24,9 @@ use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
  * result in the signed OAuth state. On the callback, a *new* account is
  * refused unless that proof is present, its nonce has not been used yet, and
  * the signup limits allow it. An existing account — matched by email or by
- * the provider's stable id — always signs in.
+ * the provider's stable id — always signs in, including when self-sign-up
+ * is turned off or paused. A new account is refused with SIGNUP_CLOSED
+ * when self-sign-up is off.
  *
  * `?native=true` on the browser start URL only chooses the deep-link return
  * path. It does not skip the human check: anyone can add that query flag.
@@ -48,6 +51,8 @@ final readonly class OAuthSignupGate
         private LoggerInterface $logger,
         private SignupAdmission $admission,
         private EntityManagerInterface $em,
+        private RegistrationConfig $registration,
+        private UserLifecycleService $lifecycle,
     ) {
     }
 
@@ -144,11 +149,18 @@ final readonly class OAuthSignupGate
      */
     private function assertNewAccountAllowed(?User $existing, array $statePayload, ?string $clientIp, bool $verifiedNative): void
     {
-        if (!$verifiedNative) {
-            $this->consumeNonce($statePayload, null === $existing);
-        }
         if (null !== $existing) {
+            if (!$verifiedNative) {
+                $this->consumeNonce($statePayload, false);
+            }
+
             return;
+        }
+        if (!$this->registration->isEnabled()) {
+            throw SignupBlockedException::closed();
+        }
+        if (!$verifiedNative) {
+            $this->consumeNonce($statePayload, true);
         }
         if (!$verifiedNative && $this->protection->challengeRequired() && true !== ($statePayload[self::STATE_HUMAN] ?? false)) {
             throw SignupBlockedException::challengeRequired();
@@ -188,6 +200,17 @@ final readonly class OAuthSignupGate
 
             throw SignupBlockedException::challengeRequired();
         }
+    }
+
+    /**
+     * The unsaved row for a new social account. Self-sign-up must be on.
+     * The caller fills the provider details and then {@see finishSignIn()}.
+     *
+     * @throws SignupBlockedException
+     */
+    public function createAccount(SignupDoor $door, string $email, bool $emailVerified): User
+    {
+        return $this->lifecycle->buildExternalAccount($door, $email, $emailVerified);
     }
 
     /**

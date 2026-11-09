@@ -6,11 +6,12 @@ namespace App\Service\Iam;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
+use App\Service\Auth\SignupDoor;
 use App\Service\Auth\TokenService;
 use App\Service\Chat\GuestSessionService;
-use App\Service\Email\EmailChatService;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -25,10 +26,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * Deletion lives in {@see UserDeletionService};
  * together they form the user lifecycle.
  *
- * Current callers: AuthController::register(), AdminUserProvisioningService.
- * Not yet migrated (kept intentionally out of the first cut): OAuth/OIDC
- * find-or-create paths, anonymous channel users (EmailChatService), and the
- * WordPress wizard.
+ * Self-sign-up (email and the social doors) is created here. Directory
+ * provisioning, channel identities and fixtures are not.
  */
 final readonly class UserLifecycleService
 {
@@ -40,6 +39,7 @@ final readonly class UserLifecycleService
         private SignupAdmission $signupAdmission,
         private UserRepository $users,
         private TokenService $tokenService,
+        private RegistrationConfig $registration,
     ) {
     }
 
@@ -64,7 +64,7 @@ final readonly class UserLifecycleService
             return null;
         }
 
-        $existing = $this->users->findOneBy(['mail' => $email]);
+        $existing = $this->users->findOtherByNormalizedEmail($email, 0);
         if ($existing instanceof User) {
             // Same work as a real sign-up, so the two answers take the same time.
             $this->logger->warning('Registration attempt with existing email', ['email' => $email, 'ip' => $clientIp]);
@@ -78,7 +78,7 @@ final readonly class UserLifecycleService
             $level = $admission['code']->getLevel();
         }
 
-        $user = $this->createUser($email, $plainPassword, 'local', 'WEB', $level, false, $userDetails);
+        $user = $this->createUser($email, $plainPassword, SignupDoor::Email->value, 'WEB', $level, false, $userDetails);
         if (null === $admission) {
             return $user;
         }
@@ -93,6 +93,29 @@ final readonly class UserLifecycleService
         }
 
         return $user;
+    }
+
+    /**
+     * A new social account, not yet stored. The OAuth callback fills the
+     * provider details and {@see \App\Service\Auth\OAuthSignupGate::finishSignIn()}
+     * stores the row in the same transaction as the admission, so a refused
+     * plan does not leave an account behind.
+     *
+     * Refused when self-sign-up is off. A pause is decided earlier, because an
+     * invitation code may pass the pause and must not be refused here.
+     *
+     * @throws SignupBlockedException
+     */
+    public function buildExternalAccount(SignupDoor $door, string $email, bool $emailVerified): User
+    {
+        if (SignupDoor::Email === $door) {
+            throw new \InvalidArgumentException('Email sign-up uses createSignup().');
+        }
+        if (!$this->registration->isEnabled()) {
+            throw SignupBlockedException::closed();
+        }
+
+        return $this->newAccount($email, null, $door->value, 'WEB', 'NEW', $emailVerified, []);
     }
 
     /**
@@ -113,23 +136,7 @@ final readonly class UserLifecycleService
         bool $emailVerified = false,
         array $userDetails = [],
     ): User {
-        if (GuestSessionService::isReservedProcessorEmail($email)) {
-            throw new \InvalidArgumentException('This email is reserved for guest chat processing');
-        }
-
-        $user = new User();
-        $user->setMail($email);
-        $user->setCreated(date('Y-m-d H:i:s'));
-        $user->setType($type);
-        $user->setProviderId($providerId);
-        $user->setUserLevel($userLevel);
-        $user->setEmailVerified($emailVerified);
-        $user->setUserDetails($userDetails);
-        $user->setPaymentDetails([]);
-
-        if (null !== $plainPassword && '' !== $plainPassword) {
-            $user->setPw($this->passwordHasher->hashPassword($user, $plainPassword));
-        }
+        $user = $this->newAccount($email, $plainPassword, $providerId, $type, $userLevel, $emailVerified, $userDetails);
 
         $this->em->persist($user);
         $this->em->flush();
@@ -146,11 +153,38 @@ final readonly class UserLifecycleService
     }
 
     /**
-     * Record that this person proved the mailbox. A local account created
-     * already verified never passes through the false-to-true change that
-     * queues its default plugins, so new accounts are created unverified
-     * and verified here.
+     * @param array<string, mixed> $userDetails
      */
+    private function newAccount(
+        string $email,
+        ?string $plainPassword,
+        string $providerId,
+        string $type,
+        string $userLevel,
+        bool $emailVerified,
+        array $userDetails,
+    ): User {
+        if (GuestSessionService::isReservedProcessorEmail($email)) {
+            throw new \InvalidArgumentException('This email is reserved for guest chat processing');
+        }
+
+        $user = new User();
+        $user->setMail(mb_strtolower(trim($email)));
+        $user->setCreated(date('Y-m-d H:i:s'));
+        $user->setType($type);
+        $user->setProviderId($providerId);
+        $user->setUserLevel($userLevel);
+        $user->setEmailVerified($emailVerified);
+        $user->setUserDetails($userDetails);
+        $user->setPaymentDetails([]);
+
+        if (null !== $plainPassword && '' !== $plainPassword) {
+            $user->setPw($this->passwordHasher->hashPassword($user, $plainPassword));
+        }
+
+        return $user;
+    }
+
     /**
      * The mailbox was just proven. Refresh the cutoff, drop every refresh
      * token, and leave the access token that was already issued to be refused

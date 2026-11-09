@@ -18,6 +18,7 @@ import { isNativeApp, getNativeApiBaseUrl } from '@/services/api/nativeRuntime'
 import { checkMemoryServiceAvailability } from '@/services/api/configApi'
 import { i18n } from '@/i18n'
 import { ref } from 'vue'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 
 // Async state for Qdrant availability
 const memoryServiceAvailable = ref<boolean | null>(null)
@@ -87,6 +88,14 @@ const config = {
     /** open = anyone may sign up. admission = a paid plan or an invitation code. */
     get registrationMode(): 'open' | 'admission' {
       return getConfigSync().auth?.registrationMode === 'admission' ? 'admission' : 'open'
+    },
+    /** Temporary pause. Existing accounts still sign in. */
+    get signupPaused(): boolean {
+      return getConfigSync().auth?.signupPaused ?? false
+    },
+    /** A stranger can create an account. False when sign-up is off or paused. */
+    get selfSignupOpen(): boolean {
+      return isSelfSignupOpen(getConfigSync().auth)
     },
     /**
      * False when the operator disabled the anonymous guest trial

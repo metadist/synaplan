@@ -10,4 +10,12 @@ describe('RegistrationClosedHint', () => {
       'Registration is turned off. Please contact the administrator if you need an account.'
     )
   })
+
+  it('shows the temporary pause message when paused is true', () => {
+    const wrapper = mount(RegistrationClosedHint, { props: { paused: true } })
+
+    expect(wrapper.get('[data-testid="login-registration-closed"]').text()).toBe(
+      'Sign-up is paused for a short while. Please try again later.'
+    )
+  })
 })

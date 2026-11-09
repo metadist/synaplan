@@ -14,11 +14,11 @@
       {{ $t('tours.common.start') }}
     </button>
     <router-link
-      :to="configStore.auth.registrationEnabled ? '/register' : '/login'"
+      :to="isSelfSignupOpen(configStore.auth) ? '/register' : '/login'"
       class="btn-primary w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium min-h-11"
       data-testid="btn-sidebar-v2-guest-signup"
     >
-      {{ configStore.auth.registrationEnabled ? $t('guest.banner.signUp') : $t('auth.signIn') }}
+      {{ isSelfSignupOpen(configStore.auth) ? $t('guest.banner.signUp') : $t('auth.signIn') }}
     </router-link>
   </div>
   <div v-else data-testid="section-sidebar-chats" :data-chats-loading="chatsLoading">
@@ -194,6 +194,7 @@ import { useChatHistory, type HistoryChat } from '@/composables/useChatHistory'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 import { useTour } from '@/composables/useTour'
 import { GUEST_CHATS_TOUR_ID } from '@/tours'
 

@@ -30,7 +30,11 @@ vi.mock('@/services/api/httpClient', async () => {
 })
 
 vi.mock('@/stores/config', () => ({
-  useConfigStore: () => ({ branding: { name: 'Synaplan' }, reload: vi.fn() }),
+  useConfigStore: () => ({
+    branding: { name: 'Synaplan' },
+    auth: configAuth,
+    reload: vi.fn(),
+  }),
 }))
 
 vi.mock('@/stores/auth', () => ({
@@ -59,6 +63,8 @@ vi.mock('@/composables/useTheme', () => ({
 
 import CodeSignupView from '@/views/CodeSignupView.vue'
 
+const configAuth = { registrationEnabled: true, signupPaused: false }
+
 async function mountView(path = '/start/code') {
   const router = createRouter({
     history: createMemoryHistory(),
@@ -76,6 +82,8 @@ async function mountView(path = '/start/code') {
 describe('CodeSignupView', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    configAuth.registrationEnabled = true
+    configAuth.signupPaused = false
     requestCodeSignup.mockReset()
     consumeCodeSignup.mockReset()
     resetPrincipalClientState.mockReset()
@@ -132,5 +140,17 @@ describe('CodeSignupView', () => {
 
     expect(wrapper.get('[data-testid="text-error"]').text()).toContain('could not tell')
     expect(wrapper.get('[data-testid="link-sign-in"]').attributes('href')).toBe('/login')
+  })
+
+  it('points to sign-in instead of register when code signup is off and registration is closed', async () => {
+    configAuth.registrationEnabled = false
+    requestCodeSignup.mockRejectedValue(new ApiError(404, 'Not found.', 'CODE_SIGNUP_OFF'))
+    const wrapper = await mountView()
+    await wrapper.get('[data-testid="input-email"]').setValue('ada@example.com')
+    await wrapper.get('[data-testid="input-code"]').setValue('ABCD2345EFGH')
+    await wrapper.get('[data-testid="form-code-signup"]').trigger('submit')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="link-register"]').attributes('href')).toBe('/login')
   })
 })

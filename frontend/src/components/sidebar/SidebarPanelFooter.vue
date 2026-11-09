@@ -83,7 +83,7 @@
               {{ $t('guest.banner.title') }}
             </p>
             <router-link
-              v-if="configStore.auth.registrationEnabled"
+              v-if="isSelfSignupOpen(configStore.auth)"
               to="/register"
               class="dropdown-item font-medium"
               style="color: var(--brand)"
@@ -221,6 +221,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
+import { isSelfSignupOpen } from '@/utils/selfSignup'
 import { useSmartSearchStore } from '@/stores/smartSearch'
 import { useAuth } from '@/composables/useAuth'
 import { paletteShortcutLabel } from '@/composables/search/shortcut'

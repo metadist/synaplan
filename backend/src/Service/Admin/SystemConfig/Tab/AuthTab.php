@@ -56,7 +56,7 @@ final readonly class AuthTab implements SystemConfigTab
         return new ConfigSection('Who can use this instance', [
             'REGISTRATION_ENABLED' => new FieldDefinition(
                 type: 'boolean',
-                description: 'Allow visitors to create their own account with email and password. Turn this off for an invite-only instance (an administrator then creates every account) or for SSO-only deployments. The sign-up page and the API both refuse when off.',
+                description: 'Allow visitors to create their own account (email, Google, GitHub, Apple). Turn this off for an invite-only instance or for SSO-only deployments. Existing accounts still sign in. An invitation code does not bypass this. The register page and every self-sign-up door refuse when off.',
                 default: 'true',
                 row: new DatabaseRow(RegistrationConfig::CONFIG_GROUP, RegistrationConfig::KEY_ENABLED),
             ),
