@@ -42,6 +42,19 @@ async function shellReportsKeyboard(page: Page, insetPx: number): Promise<void> 
   }, insetPx)
 }
 
+/** The shell's frame path: the inset grows a step per animation frame. */
+async function shellAnimatesKeyboard(page: Page, insetPx: number): Promise<void> {
+  await page.evaluate(async (inset) => {
+    const root = document.documentElement
+    root.classList.add('synaplan-keyboard-open')
+    for (let px = 0; px <= inset; px += 32) {
+      root.style.setProperty('--keyboard-inset-height', `${Math.min(px, inset)}px`)
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+    }
+    root.style.setProperty('--keyboard-inset-height', `${inset}px`)
+  }, insetPx)
+}
+
 async function installBridge(page: Page): Promise<void> {
   await page.addInitScript(() => {
     const requests: boolean[] = []
@@ -93,6 +106,47 @@ test.describe('Native keyboard shrink — chat', () => {
     // Keyboard gone: the composer owns the bottom edge again.
     await shellReportsKeyboard(page, 0)
     await expect.poll(() => bottomOf(page, selectors.chat.composer)).toBe(FULL_HEIGHT)
+  })
+
+  test('@ci a message sent while the keyboard is up lands above the composer', async ({ page }) => {
+    const input = page.locator(selectors.chat.textInput)
+    await input.click()
+    await shellAnimatesKeyboard(page, KEYBOARD)
+    await expect.poll(() => bottomOf(page, selectors.chat.composer)).toBe(KEYBOARD_TOP)
+
+    const text = `keyboard pin ${Date.now()}`
+    await input.fill(text)
+    await input.press('Enter')
+    const sent = page.getByTestId('message-container').filter({ hasText: text }).first()
+    await expect(sent).toBeVisible()
+
+    // The list follows the newest message; nothing hides under the composer.
+    const area = page.locator(selectors.chat.messageArea)
+    await expect
+      .poll(() =>
+        area.evaluate((el) => el.scrollHeight - el.clientHeight - Math.round(el.scrollTop))
+      )
+      .toBeLessThanOrEqual(1)
+    const composerTop = await topOf(page, selectors.chat.composer)
+    const box = await sent.boundingBox()
+    expect(box && Math.round(box.y + box.height)).toBeLessThanOrEqual(composerTop)
+
+    // Cold start into the same chat with the keyboard opening before the
+    // messages have arrived: the list must still end up pinned to the bottom.
+    await page.route('**/api/v1/chats/*/messages*', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1200))
+      await route.continue()
+    })
+    await page.reload()
+    await dismissLiteracyCard(page)
+    await input.click()
+    await shellAnimatesKeyboard(page, KEYBOARD)
+    await expect(sent).toBeAttached({ timeout: 20_000 })
+    await expect
+      .poll(() =>
+        area.evaluate((el) => el.scrollHeight - el.clientHeight - Math.round(el.scrollTop))
+      )
+      .toBeLessThanOrEqual(1)
   })
 
   test('@ci a WebView that shrank above the keyboard leaves no empty band', async ({ page }) => {

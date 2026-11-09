@@ -119,6 +119,25 @@ describe('ChatView keyboard pin', () => {
     expect(container.scrollTop).toBe(500)
   })
 
+  it('keeps following the bottom when the scroll event of a pin arrives a frame late', async () => {
+    const container = await mountChat()
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 600 })
+    // Keyboard frame 1: the pin lands at 2400 - 600.
+    Object.defineProperty(container, 'scrollHeight', { configurable: true, value: 2400 })
+    fireResize()
+    // Keyboard frame 2 shrinks the container again before frame 1's scroll
+    // event is delivered; the position it reports is 60px short of the new
+    // bottom and differs from the value last set.
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 540 })
+    container.scrollTop = 1800
+    container.dispatchEvent(new Event('scroll'))
+    await flushPromises()
+
+    container.scrollTop = 0
+    fireResize()
+    expect(container.scrollTop).toBe(2400)
+  })
+
   it('disconnects the observer when the view unmounts', async () => {
     await mountChat()
     wrapper?.unmount()

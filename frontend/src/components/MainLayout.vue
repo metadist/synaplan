@@ -426,6 +426,14 @@ onBeforeUnmount(() => {
     background: var(--bg-sidebar);
   }
 
+  /* The content layer gives up the keyboard's height (shrink model) and no
+     longer covers the drawer's lower part. iOS keyboards are translucent and
+     the band flashes during the slide; a closed drawer stays out of sight.
+     An open drawer has already closed the keyboard (openDrawer blurs). */
+  :global(html.synaplan-keyboard-open .v2-mobile-drawer[inert]) {
+    visibility: hidden;
+  }
+
   .v2-content-layer {
     z-index: 10;
     /* Opaque so the drawer underneath is fully hidden while closed. */

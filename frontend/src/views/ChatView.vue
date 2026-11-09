@@ -1850,8 +1850,17 @@ const handleVisibilityChangeForToken = () => {
 // frame (shrink model, style.css), a rotation. Observing the container itself
 // covers all of them with one signal, in the frame the height changed. While
 // streaming the pin behaviour stays intact instead of jumping to the bottom.
+//
+// The scroll events those pins produce arrive a frame late. By then the next
+// keyboard frame has shrunk the container again, so the event's scrollTop no
+// longer equals the value last set and handleScroll would read a user scroll
+// that "left the bottom" and drop auto-follow for good. Scroll events inside
+// this window after a resize pin are therefore taken as programmatic.
+const RESIZE_PIN_GRACE_MS = 200
+let lastResizePinAt = 0
 const handleMessageAreaResize = () => {
   if (!autoScroll.value || !chatContainer.value) return
+  lastResizePinAt = Date.now()
   if (historyStore.messages.some((m) => m.isStreaming)) {
     followStreamingScroll()
     return
@@ -2415,7 +2424,9 @@ const handleScroll = async () => {
   // Distinguish our own programmatic scrolls (including the pinned position
   // that is NOT at the bottom) from real user scrolling. Only the latter may
   // toggle auto-follow off/on.
-  const isProgrammatic = Math.abs(scrollTop - expectedScrollTop) <= 1
+  const isProgrammatic =
+    Math.abs(scrollTop - expectedScrollTop) <= 1 ||
+    Date.now() - lastResizePinAt < RESIZE_PIN_GRACE_MS
   if (!isProgrammatic) {
     const isAtBottom = Math.abs(scrollHeight - clientHeight - scrollTop) < 50
     autoScroll.value = isAtBottom
