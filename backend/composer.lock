@@ -15141,16 +15141,16 @@
         },
         {
             "name": "phpstan/phpstan-doctrine",
-            "version": "2.1.0",
+            "version": "2.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpstan/phpstan-doctrine.git",
-                "reference": "1c3be34c9f80f79931eb76f21dc98b2e8015f77c"
+                "reference": "a05453aeaa073187f637d823ce74de06b6621c3e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpstan/phpstan-doctrine/zipball/1c3be34c9f80f79931eb76f21dc98b2e8015f77c",
-                "reference": "1c3be34c9f80f79931eb76f21dc98b2e8015f77c",
+                "url": "https://api.github.com/repos/phpstan/phpstan-doctrine/zipball/a05453aeaa073187f637d823ce74de06b6621c3e",
+                "reference": "a05453aeaa073187f637d823ce74de06b6621c3e",
                 "shasum": ""
             },
             "require": {
@@ -15212,9 +15212,10 @@
             ],
             "support": {
                 "issues": "https://github.com/phpstan/phpstan-doctrine/issues",
-                "source": "https://github.com/phpstan/phpstan-doctrine/tree/2.1.0"
+                "source": "https://github.com/phpstan/phpstan-doctrine/tree/2.1.1"
             },
-            "time": "2026-10-30T17:56:27+00:00"
+            "time": "2026-11-05T21:28:06+00:00",
+            "published-time": "2026-11-05T21:28:49+00:00"
         },
         {
             "name": "phpunit/php-code-coverage",
