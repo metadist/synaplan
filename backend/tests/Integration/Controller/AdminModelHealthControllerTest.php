@@ -205,7 +205,7 @@ class AdminModelHealthControllerTest extends WebTestCase
      * The evaluator stops checking a model once BRETIREDON is set, so the
      * verdict stored before the retirement is frozen. Reading it as live state
      * is how fifteen long-retired models kept "19 model(s) need attention" on
-     * the page and the Operate badge.
+     * the page and the Admin badge.
      */
     public function testARetiredModelIsListedApartAndNeverNeedsAttention(): void
     {

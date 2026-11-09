@@ -117,7 +117,7 @@ DELETE FROM BUSER WHERE BPROVIDERID = 'health-monitor';
 
 ### Note on Research Runs
 
-Research does not add a check to `/api/health/probe`. The **Operate → System status** page shows how many research runs are currently in progress when research is enabled, and stalled runs are recovered automatically by `app:research:reap` on the scheduler tick. See [Deep & Automatic Research](RESEARCH.md).
+Research does not add a check to `/api/health/probe`. The **Admin → System status** page shows how many research runs are currently in progress when research is enabled, and stalled runs are recovered automatically by `app:research:reap` on the scheduler tick. See [Deep & Automatic Research](RESEARCH.md).
 
 ---
 

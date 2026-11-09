@@ -17,7 +17,7 @@ where to switch them, and how an automated deployment pins one off.
 > feature you switched off before this release comes back on. If it must stay
 > off, pin it with `FEATURE_<GROUP>_<SETTING>=false` **before** deploying (the
 > environment wins over the database, so the flipped row has no effect) or
-> switch it off again afterwards under **Operate → System configuration →
+> switch it off again afterwards under **Admin → System configuration →
 > Features**. Per-user and group rows, module gates and the
 > `TOOLS.REGISTRY_ENABLED` kill switch are not touched.
 
@@ -25,7 +25,7 @@ where to switch them, and how an automated deployment pins one off.
 
 | Where | Who | Notes |
 | ----- | --- | ----- |
-| **Operate → System configuration → Features** (`/admin/config?tab=features`) | administrator, in the browser | Takes effect immediately; the page reloads the runtime config so menus and pages appear or disappear without a restart. |
+| **Admin → System configuration → Features** (`/admin/config?tab=features`) | administrator, in the browser | Takes effect immediately; the page reloads the runtime config so menus and pages appear or disappear without a restart. |
 | Environment variable `FEATURE_<GROUP>_<SETTING>` | Helm chart, compose stack, CI image | `false` pins the feature **off**, `true` pins it **on**, unset or empty lets the database decide. The admin toggle then shows as locked and names the variable. |
 | SQL on `BCONFIG` | automation that already talks to the database | `INSERT … ON DUPLICATE KEY UPDATE BVALUE = '0'` on the `BOWNERID = 0` row. |
 
@@ -65,7 +65,7 @@ deliberately off by default ([#2060](https://github.com/metadist/synaplan/issues
 
 | Wave | Feature | What users see | `BCONFIG` key | Environment variable | Default | Shipped in |
 | ---- | ------- | -------------- | ------------- | -------------------- | ------- | ---------- |
-| 1 | Users & groups | **Operate → Users** (users, groups, audit); **Account → My groups**; group API | `IAM.GROUPS_ENABLED` | `FEATURE_IAM_GROUPS_ENABLED` | on | [#1708](https://github.com/metadist/synaplan/pull/1708), [#1742](https://github.com/metadist/synaplan/pull/1742) |
+| 1 | Users & groups | **Admin → Users** (users, groups, audit); **Account → My groups**; group API | `IAM.GROUPS_ENABLED` | `FEATURE_IAM_GROUPS_ENABLED` | on | [#1708](https://github.com/metadist/synaplan/pull/1708), [#1742](https://github.com/metadist/synaplan/pull/1742) |
 | 1–2 | Sharing | **Share** on folders, chats, AI assistants, saved tasks and widgets; "Shared with me" filters and pills | `IAM.SHARING_ENABLED` | `FEATURE_IAM_SHARING_ENABLED` | on | [#1713](https://github.com/metadist/synaplan/pull/1713), [#1714](https://github.com/metadist/synaplan/pull/1714), [#1717](https://github.com/metadist/synaplan/pull/1717) |
 | – | User search in share picker | Finding user accounts by name or email in the share dialog; when off, only groups (and Everyone, per policy) can be picked | `IAM.USER_SEARCH_ENABLED` | `FEATURE_IAM_USER_SEARCH_ENABLED` | **off** ([#2060](https://github.com/metadist/synaplan/issues/2060)) |
 | 2 | Directory groups | Groups filled from the company login (OIDC groups claim); Users → Audit | `IAM.DIRECTORY_SYNC_ENABLED` | `FEATURE_IAM_DIRECTORY_SYNC_ENABLED` | on | [#1718](https://github.com/metadist/synaplan/pull/1718) |
@@ -73,9 +73,9 @@ deliberately off by default ([#2060](https://github.com/metadist/synaplan/issues
 | 2–3 | AI assistants (agent builder) | The assistant builder (instructions, knowledge folders, tools, publish as widget), `/api/v1/agents`, shared knowledge folders | `AGENTS.ENABLED` | `FEATURE_AGENTS_ENABLED` | on | [#1738](https://github.com/metadist/synaplan/pull/1738), [#1763](https://github.com/metadist/synaplan/pull/1763), [#1769](https://github.com/metadist/synaplan/pull/1769) |
 | 3 | Assistants in routing | The message sorter may answer with an assistant marked "reachable from chat" | `AGENTS.ROUTABLE_ENABLED` | `FEATURE_AGENTS_ROUTABLE_ENABLED` | on | [#1769](https://github.com/metadist/synaplan/pull/1769) |
 | 3 | Export / import bundles | Move assistants, instructions and saved tasks between installs (`/api/v1/bundles`) | `BUNDLE.ENABLED` | `FEATURE_BUNDLE_ENABLED` | on | [#1769](https://github.com/metadist/synaplan/pull/1769) |
-| 3 | AI plugs: extraction, web search, rerank, model import, plugin adapters | **Operate → AI infrastructure** (Document reading, Knowledge search → Reranking) and **Operate → System configuration → Web search**; Docling and SearXNG providers | – (provider configuration; optional module gates below) | – | on | [#1750](https://github.com/metadist/synaplan/pull/1750), [#1756](https://github.com/metadist/synaplan/pull/1756), [#1758](https://github.com/metadist/synaplan/pull/1758), [#1760](https://github.com/metadist/synaplan/pull/1760), [#1761](https://github.com/metadist/synaplan/pull/1761), [#1762](https://github.com/metadist/synaplan/pull/1762) |
+| 3 | AI plugs: extraction, web search, rerank, model import, plugin adapters | **Admin → AI infrastructure** (Document reading, Knowledge search → Reranking) and **Admin → System configuration → Web search**; Docling and SearXNG providers | – (provider configuration; optional module gates below) | – | on | [#1750](https://github.com/metadist/synaplan/pull/1750), [#1756](https://github.com/metadist/synaplan/pull/1756), [#1758](https://github.com/metadist/synaplan/pull/1758), [#1760](https://github.com/metadist/synaplan/pull/1760), [#1761](https://github.com/metadist/synaplan/pull/1761), [#1762](https://github.com/metadist/synaplan/pull/1762) |
 | 3 | Watched pages (URL watch) | **Saved Tasks → Watched pages**: one saved copy per address, scheduled compare and diff mail; "get this URL" in chat | `MULTITASK.URL_FETCH_ENABLED` | `FEATURE_MULTITASK_URL_FETCH_ENABLED` | on | [#1754](https://github.com/metadist/synaplan/pull/1754), [#1813](https://github.com/metadist/synaplan/pull/1813) |
-| 3 | Linked platforms | Nextcloud / ownCloud / OpenCloud users link their existing Synaplan account; **Operate → Users → Platform instances**, **Account → Linked platforms** | `PLATFORM_LINKS.ENABLED` | `FEATURE_PLATFORM_LINKS_ENABLED` | on | [#1745](https://github.com/metadist/synaplan/pull/1745) |
+| 3 | Linked platforms | Nextcloud / ownCloud / OpenCloud users link their existing Synaplan account; **Admin → Users → Platform instances**, **Account → Linked platforms** | `PLATFORM_LINKS.ENABLED` | `FEATURE_PLATFORM_LINKS_ENABLED` | on | [#1745](https://github.com/metadist/synaplan/pull/1745) |
 | 4 | Tool registry | One registry of callables (MCP, custom HTTP, built-in) for the assistant and Saved Tasks | `TOOLS.REGISTRY_ENABLED` | `FEATURE_TOOLS_REGISTRY_ENABLED` | on (kill switch) | [#1774](https://github.com/metadist/synaplan/pull/1774) |
 | 4 | Approvals | Ask before a tool that changes or deletes something runs; unattended Saved Tasks pause under **Approvals** | `TOOLS.APPROVALS_ENABLED` | `FEATURE_TOOLS_APPROVALS_ENABLED` | on | [#1774](https://github.com/metadist/synaplan/pull/1774) |
 | 4 | Custom tools | Users declare their own HTTP / OpenAPI tools under **Connections** | `TOOLS.CUSTOM_HTTP_ENABLED` | `FEATURE_TOOLS_CUSTOM_HTTP_ENABLED` | on | [#1774](https://github.com/metadist/synaplan/pull/1774) |

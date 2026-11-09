@@ -371,7 +371,7 @@ silent until every image is pulled.)
 That's it! The first start takes 5–15 minutes on a cold cache (backend image
 build + `npm ci` + migrations; ~2 minutes warm, seconds on restart). Log in as
 `admin@synaplan.com` / `admin123`, and connect a provider under
-**Operate → AI infrastructure → Providers & keys** (see [Connect an AI Provider](#connect-an-ai-provider)).
+**Admin → AI infrastructure → Providers & keys** (see [Connect an AI Provider](#connect-an-ai-provider)).
 
 ---
 
@@ -443,7 +443,7 @@ Until then — or while the download runs — chat needs a cloud provider key
 ## Connect an AI Provider
 
 After `make up`, log in as `admin@synaplan.com` / `admin123` and open
-**Operate → AI infrastructure → Providers & keys** (`http://localhost:5173/admin/setup`).
+**Admin → AI infrastructure → Providers & keys** (`http://localhost:5173/admin/setup`).
 
 - Paste a cloud key (free tier: [console.groq.com](https://console.groq.com)) — it is
   tested live, stored encrypted in the database, and works immediately (no restart).

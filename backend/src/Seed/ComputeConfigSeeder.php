@@ -56,7 +56,7 @@ final readonly class ComputeConfigSeeder implements SeederInterface
     /**
      * New installs start enabled only when a sidecar is wired at seed time.
      * Existing rows are never touched (insertIfMissing) — enabling there is
-     * an admin decision in Operate → System config.
+     * an admin decision in Admin → System config.
      */
     public static function enabledSeedValue(): string
     {

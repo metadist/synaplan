@@ -16,7 +16,7 @@ use Symfony\Contracts\Service\ResetInterface;
  * uniform 404 on the module's routes while the module is absent. New installs
  * seed gates from {@see \App\Seed\ModuleGateSeeder} (see
  * {@see \App\Seed\ModuleGateSeeder::defaultValue()}). An unknown or malformed value also reads as OFF.
- * Existing rows are never overwritten. Operators flip a gate under Operate → System configuration →
+ * Existing rows are never overwritten. Operators flip a gate under Admin → System configuration →
  * Features, or pin it with `FEATURE_MODULES_GATE_<ID>` ({@see FeatureFlagEnv}).
  *
  * Not `readonly`: the whole group is loaded with one query on first use and

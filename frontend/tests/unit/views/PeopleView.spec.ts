@@ -127,7 +127,7 @@ describe('PeopleView', () => {
     ])
   })
 
-  it('offers a back link to Operate', async () => {
+  it('offers a back link to Admin', async () => {
     setActivePinia(createPinia())
     const router = createRouter({
       history: createMemoryHistory(),
@@ -151,7 +151,7 @@ describe('PeopleView', () => {
     await flushPromises()
 
     const back = wrapper.get('[data-testid="link-people-back-operate"]')
-    expect(back.text()).toContain('Back to Operate')
+    expect(back.text()).toContain('Back to Admin')
     await back.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.name).toBe('admin')
