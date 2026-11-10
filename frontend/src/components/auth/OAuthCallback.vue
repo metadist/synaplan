@@ -56,11 +56,12 @@
           </svg>
         </div>
 
-        <!-- Error Message -->
-        <h2 class="text-2xl font-bold txt-primary mb-2">
-          {{ $t('auth.socialLoginError') }}
+        <!-- A known account refusal is the whole message. "Try again" would
+             send a suspended person back to the same door. -->
+        <h2 class="text-2xl font-bold txt-primary" :class="knownBlock ? 'mb-6' : 'mb-2'">
+          {{ knownBlock ? $t(knownBlock) : $t('auth.socialLoginError') }}
         </h2>
-        <p class="txt-secondary text-sm mb-6">
+        <p v-if="error && !knownBlock" class="txt-secondary text-sm mb-6">
           {{ error }}
         </p>
 
@@ -89,6 +90,9 @@ const { t } = useI18n()
 
 const provider = ref<string | null>(null)
 const error = ref<string | null>(null)
+const failureCode = ref<string | null>(null)
+
+const knownBlock = computed(() => signupBlockedI18nKey(failureCode.value))
 
 const providerName = computed(() => {
   if (provider.value === 'google') return 'Google'
@@ -141,6 +145,7 @@ onMounted(async () => {
       // Cancelled / failed OAuth must not leave a pending deep-link in
       // sessionStorage, or the next plain login could be hijacked.
       clearPendingRedirect()
+      failureCode.value = errorCode
       error.value = oauthErrorMessage(errorCode, scopeParam, errorParam)
       return
     }

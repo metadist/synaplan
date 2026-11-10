@@ -1270,6 +1270,7 @@ class WhatsAppServiceTest extends TestCase
         // Create a mock user
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
+        $user->method('isActive')->willReturn(true);
 
         // Create incoming message DTO
         $incomingMsg = [
@@ -1590,6 +1591,7 @@ class WhatsAppServiceTest extends TestCase
         // Create a mock user
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
+        $user->method('isActive')->willReturn(true);
 
         // Create incoming message DTO
         $incomingMsg = [
@@ -1660,6 +1662,7 @@ class WhatsAppServiceTest extends TestCase
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
+        $user->method('isActive')->willReturn(true);
 
         $incomingMsg = array_merge(
             [
@@ -1768,6 +1771,7 @@ class WhatsAppServiceTest extends TestCase
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
+        $user->method('isActive')->willReturn(true);
 
         $incomingMsg = [
             'from' => '+1234567890',
@@ -1984,6 +1988,7 @@ class WhatsAppServiceTest extends TestCase
 
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(1);
+        $user->method('isActive')->willReturn(true);
 
         $incomingMsg = [
             'from' => '+1234567890',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Auth;
 
 use App\Entity\User;
+use App\Security\AccountAccess;
 use App\Service\Http\ClientAddress;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -38,6 +39,13 @@ final readonly class OAuthLoginResponder
      */
     public function success(User $user, Request $request, string $provider, bool $native): Response
     {
+        $closed = AccountAccess::signIn($user);
+        if (null !== $closed) {
+            return $this->error($provider, AccountAccess::message($closed), $native, [
+                'error_code' => 'account_suspended',
+            ]);
+        }
+
         if ($native) {
             return new RedirectResponse($this->deepLink([
                 'success' => 'true',

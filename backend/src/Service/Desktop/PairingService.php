@@ -10,6 +10,7 @@ use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\DesktopDeviceRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Security\ApiKeyScope;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Desktop\Exception\PairingException;
@@ -50,6 +51,9 @@ final readonly class PairingService
         $owner = $this->userRepository->find($userId);
         if (!$owner instanceof User) {
             throw new PairingException(\sprintf('Cannot pair: user %d no longer exists.', $userId));
+        }
+        if (null !== AccountAccess::credential($owner)) {
+            throw new PairingException('This account cannot pair a computer.');
         }
 
         $this->premiumFeatureGate->assertApiKeysAllowed($owner);

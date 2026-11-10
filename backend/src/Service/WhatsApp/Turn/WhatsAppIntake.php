@@ -4,6 +4,7 @@ namespace App\Service\WhatsApp\Turn;
 
 use App\DTO\WhatsApp\IncomingMessageDto;
 use App\Entity\User;
+use App\Security\AccountAccess;
 use App\Service\Agent\AgentConfig;
 use App\Service\RateLimitService;
 use App\Service\WhatsApp\WhatsAppAgentBinding;
@@ -75,6 +76,14 @@ final readonly class WhatsAppIntake
         $early = $this->checkAndMarkAsDuplicate($dto) ?? $this->handleUnsupportedTypeIfNeeded($dto);
         if (null !== $early) {
             throw WhatsAppMessageAnswered::with($early);
+        }
+
+        if (!$isAnonymous && null !== ($closed = AccountAccess::credential($user))) {
+            $this->logger->warning('WhatsApp message refused for a closed account', [
+                'user_id' => $user->getId(),
+                'code' => $closed,
+            ]);
+            throw WhatsAppMessageAnswered::with(['success' => false, 'message_id' => $dto->messageId, 'error' => AccountAccess::PENDING === $closed ? AccountAccess::PENDING_MESSAGE : 'This account cannot receive replies.']);
         }
 
         $effectiveUserId = $isAnonymous ? $this->whatsappUserId : $user->getId();

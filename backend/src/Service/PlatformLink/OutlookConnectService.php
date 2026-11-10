@@ -9,6 +9,7 @@ use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\PlatformInstanceRepository;
+use App\Security\AccountAccess;
 use App\Security\ApiKeyScope;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
@@ -62,6 +63,10 @@ final readonly class OutlookConnectService
 
         $redirectUri = trim($redirectUri);
         $relay = '' === $redirectUri ? null : $this->acceptedRelay($user, $redirectUri, $ip);
+
+        if (null !== AccountAccess::credential($user)) {
+            throw new PlatformLinkValidationException('This account cannot connect an add-in.');
+        }
 
         $this->premiumFeatureGate->assertApiKeysAllowed($user);
 

@@ -6,6 +6,8 @@ use App\Entity\Token;
 use App\Entity\User;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
+use App\Security\AccountSignInRefused;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Cookie;
@@ -65,6 +67,8 @@ final readonly class TokenService
      */
     public function generateAccessToken(User $user, ?int $impersonatorId = null, ?int $mailboxGeneration = null): string
     {
+        $this->refuseClosedSignIn($user);
+
         $payload = [
             'user_id' => $user->getId(),
             'email' => $user->getMail(),
@@ -130,6 +134,8 @@ final readonly class TokenService
      */
     public function generateRefreshToken(User $user, ?string $ipAddress = null): string
     {
+        $this->refuseClosedSignIn($user);
+
         // Revoke any existing refresh tokens for this user (single session)
         // Or keep multiple for multi-device support - for now, keep multiple
 
@@ -449,5 +455,24 @@ final readonly class TokenService
     private function sign(string $data): string
     {
         return hash_hmac('sha256', $data, $this->appSecret);
+    }
+
+    /**
+     * Suspended and banned accounts must not receive a session, including
+     * from a door that forgot its own check. Pending payment may still sign
+     * in, so it can reach checkout.
+     */
+    private function refuseClosedSignIn(User $user): void
+    {
+        if (null === AccountAccess::signIn($user)) {
+            return;
+        }
+
+        $this->logger->warning('Refusing a token for an account that cannot sign in', [
+            'user_id' => $user->getId(),
+            'status' => $user->getAccountStatus(),
+        ]);
+
+        throw new AccountSignInRefused();
     }
 }

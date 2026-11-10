@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Model\VerificationResendStatus;
 use App\Repository\UserRepository;
 use App\Repository\VerificationTokenRepository;
+use App\Security\AccountAccess;
 use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\NativeAuthHandoffService;
 use App\Service\Auth\OidcAccessDeniedException;
@@ -153,8 +154,8 @@ class AuthController extends AbstractController
         }
 
         $user = $this->userRepository->find($userId);
-        if (!$user) {
-            return new JsonResponse(['success' => false, 'error' => 'User not found'], Response::HTTP_UNAUTHORIZED);
+        if (!$user instanceof User || null !== AccountAccess::signIn($user)) {
+            return new JsonResponse(['success' => false, 'error' => 'Invalid or expired handoff token'], Response::HTTP_UNAUTHORIZED);
         }
 
         $accessToken = $this->tokenService->generateAccessToken($user);

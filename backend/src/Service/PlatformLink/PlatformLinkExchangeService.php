@@ -12,6 +12,7 @@ use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Security\ApiKeyScope;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
@@ -406,7 +407,7 @@ final readonly class PlatformLinkExchangeService
     private function linkingUser(int $userId): User
     {
         $user = $this->userRepository->find($userId);
-        if (!$user instanceof User) {
+        if (!$user instanceof User || null !== AccountAccess::credential($user)) {
             throw PlatformLinkCodeException::unknown();
         }
         $this->premiumFeatureGate->assertApiKeysAllowed($user);

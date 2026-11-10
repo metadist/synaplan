@@ -949,6 +949,7 @@ final class TelegramInboundServiceTest extends TestCase
 
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
+        $user->method('isActive')->willReturn(true);
         $user->method('getLocale')->willReturn($locale);
         $user->method('getPreferredLanguage')->willReturn($languageStored ? $locale : null);
         $users = $this->createMock(UserRepository::class);
