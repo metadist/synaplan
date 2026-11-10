@@ -24,7 +24,7 @@
           </p>
         </div>
 
-        <div v-if="viewState === 'loading' || viewState === 'connecting'" class="text-center py-6">
+        <div v-if="busyLabel" class="text-center py-6" role="status">
           <div class="relative mx-auto w-10 h-10 mb-4">
             <div class="absolute inset-0 rounded-full border-2 border-brand/20"></div>
             <div
@@ -32,11 +32,7 @@
             ></div>
           </div>
           <p class="txt-secondary text-sm">
-            {{
-              viewState === 'loading'
-                ? $t('platformConnect.loading')
-                : $t('platformConnect.connecting')
-            }}
+            {{ busyLabel }}
           </p>
         </div>
 
@@ -46,23 +42,43 @@
               $t('platformConnect.confirmPrompt', {
                 client: clientLabel,
                 host: consent.host,
-                uid: consent.externalId,
+                uid: consent.external_id,
               })
             }}
           </p>
           <div
             class="surface-chip rounded-xl p-3 text-center ring-1 ring-black/[0.03] dark:ring-white/[0.04] mb-3"
           >
-            <p class="txt-primary text-sm font-medium">{{ consent.externalId }}</p>
-            <p class="txt-secondary text-xs mt-1">{{ consent.host }}</p>
+            <p class="txt-primary text-sm font-medium break-all">{{ consent.external_id }}</p>
+            <p class="txt-secondary text-xs mt-1 break-all">{{ consent.host }}</p>
           </div>
-          <p class="txt-secondary text-xs text-center mb-6" data-testid="signed-in-as">
+          <p class="txt-secondary text-xs text-center mb-5" data-testid="signed-in-as">
             {{ $t('platformConnect.signedInAs', { email: userEmail }) }}
           </p>
 
+          <div v-if="permissions.length > 0" class="mb-6" data-testid="section-permissions">
+            <p class="txt-primary text-sm font-medium mb-2">
+              {{ $t('platformConnect.permissionsTitle', { client: clientLabel }) }}
+            </p>
+            <ul class="space-y-1.5">
+              <li
+                v-for="permission in permissions"
+                :key="permission"
+                class="flex items-start gap-2 text-sm txt-secondary"
+              >
+                <Icon
+                  icon="heroicons:check"
+                  class="w-4 h-4 mt-0.5 shrink-0 text-brand"
+                  aria-hidden="true"
+                />
+                <span>{{ $t(permission) }}</span>
+              </li>
+            </ul>
+          </div>
+
           <button
             type="button"
-            class="w-full btn-primary px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 active:scale-[0.98]"
+            class="btn-primary w-full px-4 py-2.5 text-sm font-medium"
             data-testid="btn-connect"
             @click="decide(true)"
           >
@@ -70,7 +86,7 @@
           </button>
           <button
             type="button"
-            class="w-full mt-2 px-4 py-3 rounded-xl text-sm font-medium icon-ghost"
+            class="btn-secondary w-full mt-2 px-4 py-2.5 text-sm font-medium"
             data-testid="btn-deny"
             @click="decide(false)"
           >
@@ -78,7 +94,7 @@
           </button>
 
           <p class="text-xs txt-secondary text-center mt-4">
-            {{ $t('platformConnect.scopesNote') }}
+            {{ $t('platformConnect.revocableNote') }}
           </p>
           <button
             type="button"
@@ -91,14 +107,11 @@
         </div>
 
         <div v-else-if="viewState === 'error'" data-testid="section-error">
-          <div
-            class="rounded-xl p-4 bg-red-500/10 ring-1 ring-red-500/20"
-            data-testid="error-message"
-          >
-            <p class="txt-primary text-sm font-medium mb-1">
+          <div class="alert-error" role="alert" data-testid="error-message">
+            <p class="alert-error-text text-sm mb-1">
               {{ $t('platformConnect.errorTitle') }}
             </p>
-            <p class="txt-secondary text-xs">{{ errorMessage }}</p>
+            <p class="alert-error-text text-xs font-normal">{{ errorMessage }}</p>
           </div>
         </div>
 
@@ -116,20 +129,38 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { Icon } from '@iconify/vue'
 import { useAuthStore, authReady } from '@/stores/auth'
+import { ApiError } from '@/services/api/httpClient'
 import { platformLinksApi, type CloudConsent } from '@/services/api/platformLinksApi'
 import { setPendingRedirect } from '@/utils/pendingAuthRedirect'
 import { resolvePlatformClient } from '@/platform-connect/clients'
 
 /**
  * /connect/cloud — consent for a cloud (Nextcloud, ownCloud) that asks to
- * act for the signed-in person through Synaplan's OAuth2 server. The backend
- * parked the checked authorization request under `?request=`; this page
- * shows which cloud account asks, and the person allows or denies. The
- * browser then follows the redirect the backend returns, back to the cloud.
+ * act for the signed-in person through Synaplan's OAuth2 server. The cloud's
+ * server pushed the authorization request and the browser arrives with its
+ * id under `?request=`; this page shows which cloud account asks and what
+ * it may do, and the person allows or denies. The browser then follows the
+ * redirect the backend returns, back to the cloud.
  */
 
-type ViewState = 'loading' | 'ready' | 'connecting' | 'error'
+type ViewState = 'loading' | 'ready' | 'connecting' | 'denying' | 'error'
+
+const BUSY_KEYS: Partial<Record<ViewState, string>> = {
+  loading: 'platformConnect.loading',
+  connecting: 'platformConnect.connecting',
+  denying: 'platformConnect.returning',
+}
+
+/** What each scope a cloud can ask for lets it do, in the person's words. */
+const PERMISSION_KEYS: Record<string, string> = {
+  chat: 'platformConnect.permissions.chat',
+  files: 'platformConnect.permissions.files',
+  rag: 'platformConnect.permissions.rag',
+  'cloud:watch': 'platformConnect.permissions.watch',
+  memories: 'platformConnect.permissions.memories',
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -146,19 +177,36 @@ const clientLabel = computed(() => {
   const policy = resolvePlatformClient(consent.value?.client)
   return policy ? t(policy.labelKey) : t('platformConnect.clients.unknown')
 })
+const busyLabel = computed(() => {
+  const key = BUSY_KEYS[viewState.value]
+  return key ? t(key) : ''
+})
+const permissions = computed(() =>
+  (consent.value?.scopes ?? []).flatMap((scope) =>
+    scope in PERMISSION_KEYS ? [PERMISSION_KEYS[scope]] : []
+  )
+)
 
-function fail(message: string): void {
-  errorMessage.value = message
+/**
+ * A request Synaplan no longer knows ran out, was decided before, or never
+ * existed; the way forward is the same. Anything else is said without the
+ * server's wording.
+ */
+function fail(err?: unknown): void {
+  const gone = err === undefined || (err instanceof ApiError && err.status === 404)
+  errorMessage.value = t(
+    gone ? 'platformConnect.errorExpired' : 'platformConnect.errorIssuanceFailed'
+  )
   viewState.value = 'error'
 }
 
 async function decide(approve: boolean): Promise<void> {
-  viewState.value = 'connecting'
+  viewState.value = approve ? 'connecting' : 'denying'
   try {
     const { redirect } = await platformLinksApi.decideCloudConsent(requestId.value, approve)
     window.location.assign(redirect)
   } catch (err) {
-    fail(err instanceof Error ? err.message : String(err))
+    fail(err)
   }
 }
 
@@ -171,7 +219,7 @@ async function handleNotYou(): Promise<void> {
 
 async function bootstrap(): Promise<void> {
   if (!/^[a-f0-9]{48}$/.test(requestId.value)) {
-    fail(t('platformConnect.errorMissingState'))
+    fail()
     return
   }
   await authReady
@@ -185,7 +233,7 @@ async function bootstrap(): Promise<void> {
     consent.value = await platformLinksApi.getCloudConsent(requestId.value)
     viewState.value = 'ready'
   } catch (err) {
-    fail(err instanceof Error ? err.message : String(err))
+    fail(err)
   }
 }
 

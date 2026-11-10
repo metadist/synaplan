@@ -188,8 +188,9 @@ const router = createRouter({
       },
     },
     {
-      // Consent for a cloud asking to act for the person (OAuth2, parked
-      // by the backend's /oauth/authorize under ?request=).
+      // Consent for a cloud asking to act for the person (OAuth2). The
+      // cloud's server pushed the request; /oauth/authorize sends the
+      // browser here with its id under ?request=.
       path: '/connect/cloud',
       name: 'cloud-consent',
       component: () => import('@/views/CloudConsentView.vue'),
