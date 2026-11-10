@@ -104,6 +104,11 @@ class OAuthToken
         return $this->expires;
     }
 
+    public function expireAt(int $expires): void
+    {
+        $this->expires = $expires;
+    }
+
     public function isRevoked(): bool
     {
         return $this->revoked;

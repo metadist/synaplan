@@ -12,6 +12,8 @@ use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 
 final readonly class RefreshTokenRepository implements RefreshTokenRepositoryInterface
 {
+    public const ROTATION_GRACE = 60;
+
     public function __construct(private OAuthTokenRepository $tokens)
     {
     }
@@ -36,9 +38,15 @@ final readonly class RefreshTokenRepository implements RefreshTokenRepositoryInt
         ));
     }
 
+    /**
+     * League calls this when it rotates a refresh token. The old one keeps
+     * working for ROTATION_GRACE seconds, so a client whose answer got lost
+     * can repeat the refresh instead of losing the person's grant. Revoking
+     * the token or the grant still ends it at once.
+     */
     public function revokeRefreshToken(string $tokenId): void
     {
-        $this->tokens->revoke($tokenId);
+        $this->tokens->retire($tokenId, time() + self::ROTATION_GRACE);
     }
 
     public function isRefreshTokenRevoked(string $tokenId): bool

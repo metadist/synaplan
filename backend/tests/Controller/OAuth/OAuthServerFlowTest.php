@@ -112,11 +112,12 @@ final class OAuthServerFlowTest extends WebTestCase
 
         $rotated = $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
         self::assertResponseIsSuccessful();
-        $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
-        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST, 'the old refresh token is spent');
+        self::assertNotSame($tokens['refresh_token'], $rotated['refresh_token']);
 
         $this->form('/oauth/revoke', ['token' => (string) $rotated['refresh_token']], $this->assertion($clientId, '/oauth/revoke'));
         self::assertResponseIsSuccessful();
+        $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST, 'revoking the grant also ends the refresh token it replaced');
         $this->em->clear();
         $ended = static::getContainer()->get(ExternalIdentityRepository::class)->findOneByTriple('nextcloud', $clientId, 'ada');
         self::assertSame(ExternalIdentity::STATUS_REVOKED, $ended?->getStatus());

@@ -45,6 +45,20 @@ class OAuthTokenRepository extends ServiceEntityRepository
     }
 
     /**
+     * Lets a live token end at $until instead of when it was going to; it
+     * never lives longer. Unlike revoke(), the token still counts as live
+     * until then, so revoking it or its grant ends it at once.
+     */
+    public function retire(string $id, int $until): void
+    {
+        $token = $this->find($id);
+        if ($token instanceof OAuthToken && !$token->isRevoked() && $token->getExpires() > $until) {
+            $token->expireAt($until);
+            $this->getEntityManager()->flush();
+        }
+    }
+
+    /**
      * Revokes every token a client holds for a person, or for nobody in
      * particular when $userId is null. Returns how many were live.
      */

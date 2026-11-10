@@ -122,9 +122,12 @@ trait CloudClientTrait
         return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
     }
 
-    private function assertion(string $clientId, string $endpoint, ?string $privateKey = null, string $algorithm = 'RS256', ?string $kid = 'cloud-key'): string
+    /**
+     * @param array<string, int> $times replaces iat, exp or adds nbf
+     */
+    private function assertion(string $clientId, string $endpoint, ?string $privateKey = null, string $algorithm = 'RS256', ?string $kid = 'cloud-key', array $times = []): string
     {
-        return JWT::encode([
+        return JWT::encode($times + [
             'iss' => $clientId,
             'sub' => $clientId,
             'aud' => $this->issuer().$endpoint,
