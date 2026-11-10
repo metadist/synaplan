@@ -24,7 +24,7 @@ run are entries here, not chat messages.
 | PC2 | | waits for D4 |
 | IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | merged |
 | IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | merged |
-| IC5+IC5b | | in review — the level is the highest grant, and People shows where it comes from |
+| IC5+IC5b | [#3079](https://github.com/metadist/synaplan/pull/3079) | in review — the level is the highest grant, and People shows where it comes from |
 | IC6 | | waits for IC5 — the identity guide |
 | IC8 | [#3077](https://github.com/metadist/synaplan/pull/3077) | merged — password reset and the SSO-only login page |
 | CH1 | | waits for IC6 (`synaplan-charts`) |
