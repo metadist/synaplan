@@ -876,6 +876,38 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * Claude Fable 5.2 — released 2026-11-09. Input/output are $8/$40 per 1M,
+     * down from Fable 5.1's $10/$50. Cache reads are 0.025x base input
+     * ($0.20), not the Anthropic-wide 0.1x ($0.80). 5-minute cache writes
+     * stay on the provider default of 1.25x ($10) and 1-hour writes on 2x
+     * ($16), so the row authors no write multiplier. Default effort is high.
+     */
+    public function testClaudeFable52ModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $fable52 = ModelCatalog::find('anthropic:claude-fable-5-2');
+
+        $this->assertCount(2, $fable52, 'Expected claude-fable-5-2 chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($fable52, 'tag'));
+        $this->assertSame(431, ModelCatalog::findBidByKey('anthropic:claude-fable-5-2:chat'));
+        $this->assertSame(432, ModelCatalog::findBidByKey('anthropic:claude-fable-5-2:pic2text'));
+
+        foreach ($fable52 as $variant) {
+            $this->assertSame('Anthropic', $variant['service']);
+            $this->assertSame('claude-fable-5-2', $variant['providerId']);
+            $this->assertSame('claude-fable-5-2', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(8.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(40.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.20, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertArrayNotHasKey('cache_write_multiplier', $variant['json']);
+        }
+
+        $chat = ModelCatalog::find('anthropic:claude-fable-5-2:chat')[0];
+        $this->assertSame('high', $chat['json']['meta']['reasoning_effort_default'] ?? null);
+        $this->assertSame(128000, $chat['json']['max_tokens'] ?? null);
+        $this->assertStringContainsString('30 days', (string) ($chat['json']['description'] ?? ''));
+    }
+
+    /**
      * Claude Opus 5.5 — released 2026-09-22. Cache reads are 0.05x base input
      * ($0.20/1M), not the Anthropic-wide 0.1x, so the catalog carries an
      * explicit `cache_read_price_per_1M` override.

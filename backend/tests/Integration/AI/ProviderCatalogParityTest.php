@@ -296,7 +296,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
                 self::assertTrue($capability->supportsStrict($descriptor->name, strtoupper($model)), "{$descriptor->name} {$model} strict, any case");
             }
         }
-        self::assertSameSet(['claude-fable-5-1', 'claude-mythos-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5'], $unavailable);
+        self::assertSameSet(['claude-fable-5-2', 'claude-mythos-5-2', 'claude-fable-5-1', 'claude-mythos-5-1', 'claude-opus-5-5', 'claude-sonnet-5-5'], $unavailable);
         self::assertSameSet(['groq:openai/gpt-oss-120b', 'groq:openai/gpt-oss-20b'], $strict);
         self::assertTrue($capability->supports('anthropic', 'claude-sonnet-5', false), 'other Claude generations keep the forced tool call');
         self::assertFalse($capability->supportsStrict('groq', 'qwen/qwen3.6-27b'));
@@ -423,6 +423,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['anthropic', 'claude-opus-5-5', ['low', 'medium', 'high']],
         ['anthropic', 'claude-opus-5', ['low', 'medium', 'high']],
         ['anthropic', 'claude-sonnet-5', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-fable-5-2', ['low', 'medium', 'high', 'xhigh', 'max']],
         ['anthropic', 'claude-fable-5-1', ['low', 'medium', 'high']],
         ['anthropic', 'claude-fable-5', ['low', 'medium', 'high']],
         ['anthropic', 'claude-haiku-4-5-20251001', null],
