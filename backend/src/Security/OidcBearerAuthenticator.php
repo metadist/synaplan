@@ -13,6 +13,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Exception\AuthenticationException;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAccountStatusException;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 use Symfony\Component\Security\Http\Authenticator\AbstractAuthenticator;
 use Symfony\Component\Security\Http\Authenticator\Passport\Badge\UserBadge;
@@ -110,6 +111,11 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
             $user = $this->oidcUserService->findOrCreateFromClaims($claims);
         } catch (OidcAccessDeniedException) {
             throw new CustomUserMessageAuthenticationException('Invalid or expired OIDC bearer token');
+        }
+
+        $closed = AccountAccess::signIn($user);
+        if (null !== $closed) {
+            throw new CustomUserMessageAccountStatusException(AccountAccess::message($closed));
         }
 
         $path = $request->getPathInfo();

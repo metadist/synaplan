@@ -266,6 +266,9 @@ final readonly class WhatsAppIntake
         $users = $qb->getQuery()->getResult();
 
         foreach ($users as $user) {
+            if (null !== AccountAccess::credential($user)) {
+                continue;
+            }
             $userDetails = $user->getUserDetails();
             $verification = $userDetails['phone_verification'] ?? null;
 

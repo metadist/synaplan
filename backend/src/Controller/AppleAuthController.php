@@ -249,6 +249,7 @@ class AppleAuthController extends AbstractController
                 'emailVerified' => $user->isEmailVerified(),
                 'isAdmin' => $user->isAdmin(),
                 'memoriesEnabled' => $user->isMemoriesEnabled(),
+                'accountStatus' => $user->getAccountStatus(),
                 'firstName' => $this->extractFirstName($user),
                 'language' => $user->getPreferredLanguage(),
             ],

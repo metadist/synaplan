@@ -7,6 +7,7 @@ namespace App\Service\Auth;
 use App\Entity\SignupCode;
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Service\Http\ClientAddress;
 use App\Service\Iam\UserLifecycleService;
 use App\Service\ModelConfigService;
@@ -224,6 +225,12 @@ final readonly class OAuthSignupGate
      */
     public function finishSignIn(User $user, bool $isNewUser, array $state = []): void
     {
+        if (!$isNewUser && null !== AccountAccess::signIn($user)) {
+            $this->em->detach($user);
+
+            return;
+        }
+
         $this->em->persist($user);
         if (!$isNewUser) {
             $this->em->flush();

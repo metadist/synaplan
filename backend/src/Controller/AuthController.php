@@ -113,8 +113,8 @@ class AuthController extends AbstractController
 
         return $this->json([
             'error' => 'Account suspended',
-            'code' => 'ACCOUNT_SUSPENDED',
-            'message' => 'This account has been suspended. Please contact support.',
+            'code' => AccountAccess::SUSPENDED,
+            'message' => AccountAccess::SUSPENDED_MESSAGE,
         ], Response::HTTP_FORBIDDEN);
     }
 
@@ -395,7 +395,7 @@ class AuthController extends AbstractController
 
         // Suspended/banned accounts cannot sign in (Apple Guideline 1.2). A
         // pending-payment account may: it has to reach the checkout.
-        if (!$user->canSignIn()) {
+        if (null !== AccountAccess::signIn($user)) {
             return $this->accountSuspendedResponse($user, 'Login');
         }
 
@@ -507,7 +507,7 @@ class AuthController extends AbstractController
 
         $existingRefresh = $this->tokenService->validateRefreshToken($refreshTokenString);
         $refreshOwner = $existingRefresh?->getUser();
-        if ($refreshOwner instanceof User && !$refreshOwner->canSignIn()) {
+        if ($refreshOwner instanceof User && null !== AccountAccess::signIn($refreshOwner)) {
             return $this->tokenService->clearAuthCookies(
                 $this->accountSuspendedResponse($refreshOwner, 'Refresh')
             );
@@ -535,7 +535,7 @@ class AuthController extends AbstractController
                 'level' => $result['user']->getUserLevel(),
                 'emailVerified' => $result['user']->isEmailVerified(),
                 'isAdmin' => $result['user']->isAdmin(),
-                'memoriesEnabled' => $result['user']->isMemoriesEnabled(),
+                'memoriesEnabled' => $result['user']->isMemoriesEnabled(), 'accountStatus' => $result['user']->getAccountStatus(),
                 'firstName' => $this->extractFirstName($result['user']),
             ],
         ];
@@ -597,7 +597,7 @@ class AuthController extends AbstractController
                         'level' => $admin->getUserLevel(),
                         'emailVerified' => $admin->isEmailVerified(),
                         'isAdmin' => $admin->isAdmin(),
-                        'memoriesEnabled' => $admin->isMemoriesEnabled(),
+                        'memoriesEnabled' => $admin->isMemoriesEnabled(), 'accountStatus' => $admin->getAccountStatus(),
                         'firstName' => $this->extractFirstName($admin),
                     ],
                 ]);
@@ -635,7 +635,7 @@ class AuthController extends AbstractController
                 'level' => $target->getUserLevel(),
                 'emailVerified' => $target->isEmailVerified(),
                 'isAdmin' => $target->isAdmin(),
-                'memoriesEnabled' => $target->isMemoriesEnabled(),
+                'memoriesEnabled' => $target->isMemoriesEnabled(), 'accountStatus' => $target->getAccountStatus(),
                 'firstName' => $this->extractFirstName($target),
             ],
         ]);
@@ -680,7 +680,7 @@ class AuthController extends AbstractController
             } catch (OidcAccessDeniedException) {
                 return $this->oidcSessionEnded('OIDC refresh refused by instance policy');
             }
-            if ($knownUser instanceof User && !$knownUser->canSignIn()) {
+            if ($knownUser instanceof User && null !== AccountAccess::signIn($knownUser)) {
                 $response = $this->accountSuspendedResponse($knownUser, 'OIDC refresh');
                 $this->tokenService->clearAuthCookies($response);
                 $this->oidcTokenService->clearOidcCookies($response);
@@ -728,7 +728,7 @@ class AuthController extends AbstractController
             return $response;
         }
 
-        if (!$user->canSignIn()) {
+        if (null !== AccountAccess::signIn($user)) {
             $response = $this->accountSuspendedResponse($user, 'OIDC refresh');
             $this->tokenService->clearAuthCookies($response);
             $this->oidcTokenService->clearOidcCookies($response);
@@ -918,7 +918,7 @@ class AuthController extends AbstractController
 
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
-        if (!$user || $user->isManagedExternally()) {
+        if (!$user || $user->isManagedExternally() || null !== AccountAccess::signIn($user)) {
             return $this->json([
                 'success' => true,
                 'message' => 'If email exists, reset instructions sent',
@@ -974,6 +974,9 @@ class AuthController extends AbstractController
             return $this->json([
                 'error' => 'This account is managed by your organization. Password reset is not allowed.',
             ], Response::HTTP_FORBIDDEN);
+        }
+        if (null !== AccountAccess::signIn($user)) {
+            return $this->accountSuspendedResponse($user, 'Password reset');
         }
 
         $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));

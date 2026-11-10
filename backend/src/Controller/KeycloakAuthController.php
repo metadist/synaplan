@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Model\AccountLanguage;
+use App\Security\AccountAccess;
 use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OidcAccessDeniedException;
@@ -259,16 +260,15 @@ class KeycloakAuthController extends AbstractController
             );
 
             // Native (mobile) cannot use cross-origin OIDC cookies — hand the app
-            // its own Bearer tokens via the deep-link handoff. The Keycloak
-            // refresh-cookie flow stays web-only; native refreshes through our
-            // app refresh token instead.
-            if ($native) {
+            // its own Bearer tokens via the deep-link handoff. A closed account
+            // also exits through OAuthLoginResponder before cookies are set.
+            if ($native || null !== AccountAccess::signIn($user)) {
                 $this->logger->info('Keycloak OAuth successful (native handoff)', [
                     'user_id' => $user->getId(),
                     'email' => $user->getMail(),
                 ]);
 
-                return $this->oauthLoginResponder->success($user, $request, 'keycloak', true);
+                return $this->oauthLoginResponder->success($user, $request, 'keycloak', $native);
             }
 
             // Create redirect response
@@ -291,9 +291,7 @@ class KeycloakAuthController extends AbstractController
 
             // Also generate our app tokens for internal use, and defensively
             // wipe any orphan impersonation stash that survived from a prior
-            // session on this browser (same rationale as the regular login
-            // path — never let a fresh sign-in inherit somebody else's
-            // suspended admin session).
+            // session on this browser.
             $appAccessToken = $this->tokenService->generateAccessToken($user);
             $appRefreshToken = $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request));
             $this->tokenService->addAuthCookies($response, $appAccessToken, $appRefreshToken);

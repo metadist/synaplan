@@ -10,6 +10,7 @@ use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -73,7 +74,7 @@ final readonly class WordPressIntegrationService
         $hash = $existingUser instanceof User ? $existingUser->getPassword() : '';
         $passwordMatched = password_verify($password, '' !== $hash ? $hash : $dummyHash) && '' !== $hash;
 
-        if (!$existingUser instanceof User || !$passwordMatched) {
+        if (!$existingUser instanceof User || !$passwordMatched || null !== AccountAccess::credential($existingUser)) {
             $this->logger->info(
                 $existingUser instanceof User
                     ? 'WordPress wizard: rejected an existing account without a matching password'
@@ -401,7 +402,7 @@ final readonly class WordPressIntegrationService
     private function requireUser(int $userId): User
     {
         $user = $this->userRepository->find($userId);
-        if (!$user instanceof User) {
+        if (!$user instanceof User || null !== AccountAccess::credential($user)) {
             throw new \RuntimeException('User not found');
         }
 

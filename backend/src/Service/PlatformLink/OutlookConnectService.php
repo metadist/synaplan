@@ -61,12 +61,12 @@ final readonly class OutlookConnectService
             throw new PlatformLinkValidationException(sprintf('state must be at most %d characters.', self::STATE_MAX_LENGTH));
         }
 
-        $redirectUri = trim($redirectUri);
-        $relay = '' === $redirectUri ? null : $this->acceptedRelay($user, $redirectUri, $ip);
-
         if (null !== AccountAccess::credential($user)) {
             throw new PlatformLinkValidationException('This account cannot connect an add-in.');
         }
+
+        $redirectUri = trim($redirectUri);
+        $relay = '' === $redirectUri ? null : $this->acceptedRelay($user, $redirectUri, $ip);
 
         $this->premiumFeatureGate->assertApiKeysAllowed($user);
 

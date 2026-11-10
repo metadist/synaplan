@@ -31,8 +31,9 @@ final class AccountStatusChecker implements UserCheckerInterface
         // checkout. PendingPaymentSubscriber answers ACCOUNT_PENDING_PAYMENT
         // on every other request. API keys never get this far: their
         // authenticator requires an active owner.
-        if (!$user->canSignIn()) {
-            throw new CustomUserMessageAccountStatusException('This account has been suspended. Please contact support.');
+        $closed = AccountAccess::signIn($user);
+        if (null !== $closed) {
+            throw new CustomUserMessageAccountStatusException(AccountAccess::message($closed));
         }
     }
 

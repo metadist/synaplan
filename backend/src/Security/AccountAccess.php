@@ -42,6 +42,11 @@ final class AccountAccess
         return self::SUSPENDED;
     }
 
+    public static function forUser(User $user, AccountEntry $entry): ?string
+    {
+        return $entry->allowsPendingPayment() ? self::signIn($user) : self::credential($user);
+    }
+
     public static function signIn(User $user): ?string
     {
         return $user->canSignIn() ? null : self::SUSPENDED;

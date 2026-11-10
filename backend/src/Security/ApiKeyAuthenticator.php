@@ -128,7 +128,8 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         // The key's own flag is not the account. A suspended or deleted owner
         // cannot use the platform at all.
         $owner = $this->userRepository->find($apiKeyEntity->getOwnerId());
-        if (!$owner instanceof User || !$owner->canSignIn()) {
+        $closed = $owner instanceof User ? AccountAccess::credential($owner) : AccountAccess::SUSPENDED;
+        if (AccountAccess::SUSPENDED === $closed) {
             $this->logger->warning('API key owner cannot use the platform', [
                 'key_id' => $apiKeyEntity->getId(),
                 'owner_id' => $apiKeyEntity->getOwnerId(),
@@ -140,7 +141,7 @@ class ApiKeyAuthenticator extends AbstractAuthenticator
         // their key spend the platform. A free account keeps the in-app chat.
         // Both get the plan answer: the key itself is the API, and that stays
         // on a paid plan while this install sells one.
-        if (!$owner->isActive() || !$this->premiumFeatureGate->isUnlockedFor($owner)) {
+        if (null !== $closed || !$this->premiumFeatureGate->isUnlockedFor($owner)) {
             $this->logger->warning('API key owner is not on a paid plan', [
                 'key_id' => $apiKeyEntity->getId(),
                 'owner_id' => $apiKeyEntity->getOwnerId(),
