@@ -20,14 +20,15 @@ run are entries here, not chat messages.
 | PC1 | | not started (`synaplan-platform`) |
 | PC2 | | waits for D4 |
 | IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | merged |
-| IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | in review |
+| IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | merged |
 | IC5+IC5b | | waits for D6 and D10 — one pull request, schema then the People row |
-| IC6+IC8 | | waits for IC2 and IC5 — one pull request, the guide and the journeys |
+| IC6 | | waits for IC5 — the identity guide |
+| IC8 | | in progress — password reset and the SSO-only login page |
 | CH1 | | waits for IC6 (`synaplan-charts`) |
 | IC7 | | waits for D7 — own pull request |
 | PC3 | | waits for D5 |
 
-Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. IC5 still waits for D6 and D10 before a `BUSER_LEVEL_GRANTS` table is added.
+Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. IC5 still waits for D6 and D10 before a `BUSER_LEVEL_GRANTS` table is added. IC8 walks the journeys that IC2 already made possible; the identity guide (IC6) still waits for IC5.
 
 ## Audit 2026-10-25
 
