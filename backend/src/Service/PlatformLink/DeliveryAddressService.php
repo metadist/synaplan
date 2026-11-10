@@ -43,7 +43,8 @@ final readonly class DeliveryAddressService
                 throw new PlatformLinkValidationException('That address is not on this cloud.');
             } else {
                 $instance->setDeliveryUrl($url);
-                $instance->setReachable($this->probe->reachable($url));
+                // A client nobody has approved does not get a connection yet.
+                $instance->setReachable($instance->isActive() ? $this->probe->reachable($instance, $url) : null);
             }
         }
         if (null !== $capabilities) {
@@ -69,5 +70,19 @@ final readonly class DeliveryAddressService
             'app_version' => $instance->getAppVersion() ?? '',
             'server_id' => $instance->getServerId() ?? '',
         ];
+    }
+
+    /**
+     * Probe the address already stored, once the client is approved. Nothing
+     * happens while it is still waiting, or when it has no address.
+     */
+    public function probeStored(PlatformInstance $instance): void
+    {
+        $url = $instance->getDeliveryUrl();
+        if (!$instance->isActive() || null === $url || '' === $url) {
+            return;
+        }
+        $instance->setReachable($this->origins->accepts($instance, $url) && $this->probe->reachable($instance, $url));
+        $this->platforms->save($instance);
     }
 }

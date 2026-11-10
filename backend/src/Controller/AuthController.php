@@ -1218,6 +1218,7 @@ class AuthController extends AbstractController
         $sessionOwner = $this->impersonationService->resolveStashedAdmin($request) ?? $user;
 
         $count = $this->tokenService->revokeAllUserTokens($sessionOwner);
+        $this->userLifecycleService->endCloudGrants($sessionOwner);
 
         $this->logger->info('All sessions revoked', [
             'user_id' => $sessionOwner->getId(),

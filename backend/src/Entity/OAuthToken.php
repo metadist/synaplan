@@ -46,6 +46,10 @@ class OAuthToken
     #[ORM\Column(name: 'BPARENTID', length: 128, nullable: true)]
     private ?string $parentId;
 
+    /** The cloud account the grant was issued for. Null for a client assertion. */
+    #[ORM\Column(name: 'BEXTERNALID', length: 191, nullable: true)]
+    private ?string $externalId;
+
     #[ORM\Column(name: 'BEXPIRES', type: 'bigint')]
     private int $expires;
 
@@ -55,7 +59,7 @@ class OAuthToken
     /**
      * @param list<string> $scopes
      */
-    public function __construct(string $id, string $kind, string $clientId, ?int $userId, array $scopes, int $expires, ?string $parentId = null)
+    public function __construct(string $id, string $kind, string $clientId, ?int $userId, array $scopes, int $expires, ?string $parentId = null, ?string $externalId = null)
     {
         $this->id = $id;
         $this->kind = $kind;
@@ -64,6 +68,7 @@ class OAuthToken
         $this->scopes = $scopes;
         $this->expires = $expires;
         $this->parentId = $parentId;
+        $this->externalId = $externalId;
     }
 
     public function getId(): string
@@ -97,6 +102,11 @@ class OAuthToken
     public function getParentId(): ?string
     {
         return $this->parentId;
+    }
+
+    public function getExternalId(): ?string
+    {
+        return $this->externalId;
     }
 
     public function getExpires(): int

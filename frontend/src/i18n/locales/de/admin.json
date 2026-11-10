@@ -96,6 +96,7 @@
       "memories": "Deine Synaplan-Erinnerungen lesen und speichern"
     },
     "revocableNote": "Du kannst die Verbindung jederzeit in Synaplan unter Apps trennen.",
+    "unreviewed": "Diese Cloud hat sich selbst angemeldet. Keine Administration hat sie freigegeben. Mach nur weiter, wenn du diesen Server kennst.",
     "errorExpired": "Diese Verbindungsanfrage ist abgelaufen oder wurde bereits verwendet. Starte erneut in der anderen App.",
     "scopesNote": "Gewährt Zugriff auf Chats, Dateien und Suche. Der Schlüssel bleibt auf der Plattform — du tippst ihn nicht ein.",
     "connecting": "Verbinden…",

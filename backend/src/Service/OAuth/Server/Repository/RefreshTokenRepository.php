@@ -6,7 +6,9 @@ namespace App\Service\OAuth\Server\Repository;
 
 use App\Entity\OAuthToken;
 use App\Repository\OAuthTokenRepository;
+use App\Service\OAuth\Server\Entity\AccessToken;
 use App\Service\OAuth\Server\Entity\RefreshToken;
+use App\Service\OAuth\Server\GrantContext;
 use League\OAuth2\Server\Entities\RefreshTokenEntityInterface;
 use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
 
@@ -14,8 +16,10 @@ final readonly class RefreshTokenRepository implements RefreshTokenRepositoryInt
 {
     public const ROTATION_GRACE = 60;
 
-    public function __construct(private OAuthTokenRepository $tokens)
-    {
+    public function __construct(
+        private OAuthTokenRepository $tokens,
+        private GrantContext $context,
+    ) {
     }
 
     public function getNewRefreshToken(): RefreshTokenEntityInterface
@@ -35,6 +39,7 @@ final readonly class RefreshTokenRepository implements RefreshTokenRepositoryInt
             array_map(static fn ($scope): string => $scope->getIdentifier(), $access->getScopes()),
             $refreshTokenEntity->getExpiryDateTime()->getTimestamp(),
             $access->getIdentifier(),
+            $access instanceof AccessToken ? ($access->externalId() ?? $this->context->requireExternalId()) : $this->context->requireExternalId(),
         ));
     }
 
@@ -51,6 +56,11 @@ final readonly class RefreshTokenRepository implements RefreshTokenRepositoryInt
 
     public function isRefreshTokenRevoked(string $tokenId): bool
     {
+        $row = $this->tokens->find($tokenId);
+        if ($row instanceof OAuthToken && OAuthToken::KIND_REFRESH === $row->getKind()) {
+            $this->context->setExternalId($row->getExternalId());
+        }
+
         return $this->tokens->isRevoked($tokenId);
     }
 }

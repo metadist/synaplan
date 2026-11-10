@@ -40,10 +40,11 @@ final readonly class ClientAssertionVerifier
     /**
      * The client the assertion proves, or null.
      *
-     * @param list<string> $audiences the endpoint URLs accepted besides the issuer
-     * @param bool         $pendingOk whether a client still waiting for approval may authenticate
+     * @param list<string> $audiences   the endpoint URLs accepted as audience
+     * @param bool         $pendingOk   whether a client still waiting for approval may authenticate
+     * @param bool         $allowIssuer whether the bare issuer is also an audience. Token, revocation and pushed requests accept it. Reading or changing a registration does not: an assertion made for one of those must not replace the client's keys.
      */
-    public function verify(string $assertion, array $audiences, bool $pendingOk = false): ?PlatformInstance
+    public function verify(string $assertion, array $audiences, bool $pendingOk = false, bool $allowIssuer = true): ?PlatformInstance
     {
         $clientId = $this->unverifiedIssuer($assertion);
         if (null === $clientId) {
@@ -76,7 +77,10 @@ final readonly class ClientAssertionVerifier
         }
         $aud = $claims['aud'] ?? null;
         $auds = is_array($aud) ? $aud : [$aud];
-        $accepted = array_merge([rtrim($this->issuer, '/')], array_map(static fn (string $a): string => rtrim($a, '/'), $audiences));
+        $accepted = array_map(static fn (string $a): string => rtrim($a, '/'), $audiences);
+        if ($allowIssuer) {
+            $accepted[] = rtrim($this->issuer, '/');
+        }
         $exp = $claims['exp'] ?? null;
         $jti = $claims['jti'] ?? null;
         if (($claims['iss'] ?? null) !== $clientId || ($claims['sub'] ?? null) !== $clientId

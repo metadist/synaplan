@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\OAuth\Server;
 
+use App\Entity\OAuthToken;
 use App\Entity\PlatformInstance;
-use Defuse\Crypto\Crypto;
+use App\Repository\OAuthTokenRepository;
 
 /**
  * Token revocation (RFC 7009). An access token ends alone. A refresh token
@@ -19,6 +20,8 @@ final readonly class TokenRevocationService
         private OAuthServerFactory $servers,
         private AccessTokenValidator $accessTokens,
         private CloudLinkService $links,
+        private TokenCipher $cipher,
+        private OAuthTokenRepository $tokens,
     ) {
     }
 
@@ -35,32 +38,37 @@ final readonly class TokenRevocationService
 
             return;
         }
-        $userId = $this->refreshTokenOwner($client, $token);
-        if (null !== $userId) {
-            $this->links->endByCloud($client, $userId, $ip);
+        $refresh = $this->liveRefreshToken($client, $token);
+        if ($refresh instanceof OAuthToken && null !== $refresh->getUserId() && null !== $refresh->getExternalId()) {
+            $this->links->endByCloud($client, $refresh->getUserId(), $refresh->getExternalId(), $ip);
         }
     }
 
     /**
-     * The person a refresh token of this client was issued for. League
-     * encrypts refresh tokens with the server's key, so reading one proves
-     * Synaplan issued it.
+     * A refresh token of this client that is still live. An authorization
+     * code decrypts with the same key but is not one, and a token that
+     * already expired or was rotated does not end the link again.
      */
-    private function refreshTokenOwner(PlatformInstance $client, string $token): ?int
+    private function liveRefreshToken(PlatformInstance $client, string $token): ?OAuthToken
     {
-        try {
-            $data = json_decode(Crypto::decryptWithPassword($token, $this->servers->encryptionKey()), true);
-        } catch (\Throwable) {
+        $data = $this->cipher->open($token);
+        $id = is_array($data) ? ($data['refresh_token_id'] ?? null) : null;
+        if (!is_string($id) || ($data['client_id'] ?? null) !== $client->getInstanceId()) {
             return null;
         }
-        if (!is_array($data) || ($data['client_id'] ?? null) !== $client->getInstanceId()) {
+        $row = $this->tokens->find($id);
+        if (!$row instanceof OAuthToken
+            || OAuthToken::KIND_REFRESH !== $row->getKind()
+            || $row->getClientId() !== $client->getInstanceId()
+            || $row->isRevoked()
+            || $row->getExpires() < time()
+            || null === $row->getUserId()
+            || null === $row->getExternalId()
+            || '' === $row->getExternalId()
+        ) {
             return null;
-        }
-        $user = $data['user_id'] ?? null;
-        if (is_int($user)) {
-            return $user;
         }
 
-        return is_string($user) && ctype_digit($user) ? (int) $user : null;
+        return $row;
     }
 }

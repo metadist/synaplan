@@ -66,7 +66,7 @@ final class OAuth
         $state = $store->state();
 
         return Synaplan::from($state)->json('GET', '/oauth/register/'.$state['instance']['id'], null, [
-            'Authorization' => 'Bearer '.self::assertion($state),
+            'Authorization' => 'Bearer '.self::assertion($state, rtrim((string) $state['issuer'], '/').'/oauth/register/'.$state['instance']['id']),
         ]);
     }
 
@@ -230,14 +230,14 @@ final class OAuth
     /**
      * @param array<string, mixed> $state
      */
-    private static function assertion(array $state): string
+    private static function assertion(array $state, ?string $audience = null): string
     {
         $clientId = (string) $state['instance']['id'];
         $header = self::b64((string) json_encode(['alg' => 'RS256', 'typ' => 'JWT', 'kid' => $state['oauth_key']['kid']]));
         $payload = self::b64((string) json_encode([
             'iss' => $clientId,
             'sub' => $clientId,
-            'aud' => rtrim((string) $state['issuer'], '/'),
+            'aud' => $audience ?? rtrim((string) $state['issuer'], '/'),
             'jti' => bin2hex(random_bytes(16)),
             'iat' => time(),
             'exp' => time() + 60,

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Service\Http\ClientAddress;
+use App\Service\Auth\TokenService;
 use App\Service\OAuth\Server\AuthorizationRequestStore;
 use App\Service\OAuth\Server\ConsentService;
 use OpenApi\Attributes as OA;
@@ -44,12 +44,13 @@ final class OAuthConsentController extends AbstractController
         parameters: [new OA\Parameter(name: 'request', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
         responses: [
             new OA\Response(response: 200, description: 'The request', content: new OA\JsonContent(
-                required: ['client', 'host', 'external_id', 'scopes'],
+                required: ['client', 'host', 'external_id', 'scopes', 'unreviewed'],
                 properties: [
                     new OA\Property(property: 'client', type: 'string', example: 'nextcloud'),
                     new OA\Property(property: 'host', type: 'string', example: 'cloud.example.com'),
                     new OA\Property(property: 'external_id', type: 'string', example: 'alice', description: 'The cloud account that gets linked.'),
                     new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'files'], description: 'What the cloud may do for the person once allowed.'),
+                    new OA\Property(property: 'unreviewed', type: 'boolean', example: false, description: 'True when no administrator has approved this cloud.'),
                 ],
             )),
             new OA\Response(response: 401, description: 'Not signed in'),
@@ -61,7 +62,7 @@ final class OAuthConsentController extends AbstractController
         if (!$user instanceof User) {
             return $this->json(['error' => 'unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
-        $described = $this->consent->describe($request);
+        $described = $this->consent->describe($request, (int) $user->getId());
 
         return null === $described
             ? $this->json(['error' => 'unknown_request'], Response::HTTP_NOT_FOUND)
@@ -86,7 +87,9 @@ final class OAuthConsentController extends AbstractController
                 properties: [new OA\Property(property: 'redirect', type: 'string', example: 'https://cloud.example.com/apps/synaplan/link/callback?code=…&state=…')],
             )),
             new OA\Response(response: 401, description: 'Not signed in'),
+            new OA\Response(response: 403, description: 'An administrator is acting as this person'),
             new OA\Response(response: 404, description: 'Unknown or expired request, or one that was decided before'),
+            new OA\Response(response: 415, description: 'The body is not JSON'),
         ],
     )]
     public function decide(string $request, Request $http, #[CurrentUser] ?User $user): JsonResponse
@@ -94,12 +97,18 @@ final class OAuthConsentController extends AbstractController
         if (!$user instanceof User) {
             return $this->json(['error' => 'unauthorized'], Response::HTTP_UNAUTHORIZED);
         }
+        if (null !== $http->attributes->get(TokenService::IMPERSONATOR_ATTRIBUTE)) {
+            return $this->json(['error' => 'impersonation', 'message' => 'End the administrator session before connecting a cloud.'], Response::HTTP_FORBIDDEN);
+        }
+        $media = strtolower(trim(explode(';', (string) $http->headers->get('Content-Type', ''), 2)[0]));
+        if ('application/json' !== $media) {
+            return $this->json(['error' => 'invalid_content_type'], Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
+        }
         $body = json_decode($http->getContent(), true);
         $redirect = $this->consent->decide(
             $request,
             (int) $user->getId(),
             is_array($body) && true === ($body['approve'] ?? null),
-            ClientAddress::resolve($http) ?? '',
         );
 
         return null === $redirect

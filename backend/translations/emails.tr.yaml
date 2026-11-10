@@ -34,6 +34,14 @@ email:
     subject_named: '%name% — Synaplan sonuçlarınız'
     sent_confirmation: 'Sonuçlar %email% adresine e-postayla gönderildi.'
 
+  cloud_grant:
+    connected:
+      subject: 'Bir bulut artık Synaplan hesabınızda işlem yapabilir'
+      body: '%host% adresindeki %client%, %external_id% hesabı için Synaplan’da işlem yapabilir. Siz değilseniz bağlantıyı Uygulamalar altından kesin.'
+    lost:
+      subject: 'Bir bulutun Synaplan hesabınızla bağlantısı kesildi'
+      body: '%host% adresindeki %client% artık hesabınıza bağlı değil (%external_id%).'
+
   footer:
     support: 'Sorun yaşıyorsanız lütfen destek ekibimizle iletişime geçin.'
     help: 'Yardıma mı ihtiyacınız var? Belgelerimize göz atın veya destekle iletişime geçin.'

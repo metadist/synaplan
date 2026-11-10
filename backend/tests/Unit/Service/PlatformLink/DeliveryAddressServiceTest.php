@@ -48,7 +48,7 @@ final class DeliveryAddressServiceTest extends TestCase
 
     public function testSavingTheAddressProbesItAndStoresWhatTheAppReports(): void
     {
-        $this->probe->expects($this->once())->method('reachable')->with('https://files.example.org/inbound')->willReturn(true);
+        $this->probe->expects($this->once())->method('reachable')->with($this->instance, 'https://files.example.org/inbound')->willReturn(true);
 
         $saved = $this->service->update(
             $this->instance,
@@ -86,5 +86,16 @@ final class DeliveryAddressServiceTest extends TestCase
         self::assertSame('1.7.0', $saved['app_version']);
         self::assertSame(['pickups'], $saved['app_capabilities']);
         self::assertNull($saved['reachable']);
+    }
+
+    public function testAClientWaitingForApprovalIsNotProbed(): void
+    {
+        $this->instance->setStatus(PlatformInstance::STATUS_PENDING);
+        $this->probe->expects($this->never())->method('reachable');
+
+        $saved = $this->service->update($this->instance, 'https://files.example.org/inbound', null);
+
+        self::assertNull($saved['reachable']);
+        self::assertSame('https://files.example.org/inbound', $this->instance->getDeliveryUrl());
     }
 }

@@ -950,10 +950,8 @@ the old account's grant and moves the link to the new account
 (`platform_link.linked` with the previous user id) — one external user is never
 two Synaplan accounts at once.
 
-A grant belongs to a person and a cloud, not to one cloud account. For someone
-who linked two accounts of the same cloud to one Synaplan account, revoking
-either account's refresh token ends both links; the other account connects
-again.
+A grant belongs to one person, one cloud and one cloud account. Disabling or
+revoking one account leaves the person's other accounts on that cloud working.
 
 Endpoint reference: [Swagger UI](http://localhost:8000/api/doc) → tag
 *Platform Links*, and the server metadata.

@@ -10,6 +10,7 @@ use App\Service\OAuth\Server\ClientAssertionVerifier;
 use App\Service\OAuth\Server\ClientAuthentication;
 use App\Service\OAuth\Server\ClientAuthenticationException;
 use App\Service\OAuth\Server\ClientRegistrationService;
+use App\Service\OAuth\Server\GrantContext;
 use App\Service\OAuth\Server\OAuthServerFactory;
 use App\Service\OAuth\Server\Psr7;
 use App\Service\OAuth\Server\PushedAuthorizationService;
@@ -54,6 +55,7 @@ final class OAuthServerController extends AbstractController
         private readonly TokenRevocationService $revocation,
         private readonly ClientRegistrationService $registrations,
         private readonly PlatformLinksConfig $platformLinks,
+        private readonly GrantContext $context,
         #[Autowire('%env(APP_URL)%')]
         private readonly string $appUrl,
         #[Autowire('%env(FRONTEND_URL)%')]
@@ -248,6 +250,7 @@ final class OAuthServerController extends AbstractController
             return $this->notFound();
         }
         try {
+            $this->context->setIp(ClientAddress::resolve($request) ?? '');
             $this->clients->assertNotThrottled($request);
             $response = $this->servers->create()->respondToAccessTokenRequest(Psr7::request($request, $request->request->all()), Psr7::response());
         } catch (ClientAuthenticationException $e) {
