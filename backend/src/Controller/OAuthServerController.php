@@ -4,19 +4,20 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Entity\PlatformInstance;
-use App\Service\OAuth\Server\AccessTokenValidator;
+use App\Service\Http\ClientAddress;
+use App\Service\OAuth\Server\AuthorizationRequestStore;
 use App\Service\OAuth\Server\ClientAssertionVerifier;
+use App\Service\OAuth\Server\ClientAuthentication;
+use App\Service\OAuth\Server\ClientAuthenticationException;
 use App\Service\OAuth\Server\ClientRegistrationService;
-use App\Service\OAuth\Server\CloudLinkService;
 use App\Service\OAuth\Server\OAuthServerFactory;
 use App\Service\OAuth\Server\Psr7;
-use App\Service\OAuth\Server\RegistrationException;
+use App\Service\OAuth\Server\PushedAuthorizationService;
 use App\Service\OAuth\Server\Repository\ScopeRepository;
+use App\Service\OAuth\Server\TokenRevocationService;
 use App\Service\PlatformLink\PlatformLinksConfig;
-use Defuse\Crypto\Crypto;
 use League\OAuth2\Server\Exception\OAuthServerException;
-use Psr\Cache\CacheItemPoolInterface;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -27,29 +28,32 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Synaplan as OAuth2 authorization server for clouds (Nextcloud,
- * ownCloud): dynamic client registration (RFC 7591) and client
- * configuration (RFC 7592), the authorization endpoint with PKCE, the token
- * endpoint, revocation (RFC 7009) and the server metadata (RFC 8414).
+ * ownCloud): the server metadata (RFC 8414), pushed authorization requests
+ * (RFC 9126), the authorization endpoint, the token endpoint and revocation
+ * (RFC 7009). Clients register in {@see OAuthClientRegistrationController}.
  *
- * Clients authenticate with private_key_jwt only. RFC 7592 asks for a
- * registration access token on the configuration endpoint; Synaplan takes
- * the same client assertion there instead, so a cloud never holds a bearer
- * secret from Synaplan.
+ * Clients authenticate with private_key_jwt only, so a cloud never holds a
+ * secret from Synaplan. An authorization starts with a pushed request and
+ * no other way: it names the cloud account being linked, and only the
+ * cloud's server may say which one that is.
  */
+#[OA\Tag(name: 'Platform Links')]
 final class OAuthServerController extends AbstractController
 {
-    public const AUTHORIZE_CACHE_PREFIX = 'oauth_authorize_';
-    public const AUTHORIZE_TTL = 600;
+    use OAuthEndpointResponses;
+
+    private const ASSERTION_PROPERTIES = [
+        'client_assertion_type' => ClientAssertionVerifier::TYPE,
+        'client_assertion' => 'A JWT signed with a key from the client\'s jwks: iss and sub the client_id, aud this endpoint or the issuer, a fresh jti, exp at most five minutes ahead.',
+    ];
 
     public function __construct(
         private readonly OAuthServerFactory $servers,
-        private readonly ClientAssertionVerifier $assertions,
+        private readonly ClientAuthentication $clients,
+        private readonly PushedAuthorizationService $pushed,
+        private readonly TokenRevocationService $revocation,
         private readonly ClientRegistrationService $registrations,
-        private readonly AccessTokenValidator $accessTokens,
-        private readonly CloudLinkService $links,
         private readonly PlatformLinksConfig $platformLinks,
-        #[Autowire(service: 'cache.app')]
-        private readonly CacheItemPoolInterface $cache,
         #[Autowire('%env(APP_URL)%')]
         private readonly string $appUrl,
         #[Autowire('%env(FRONTEND_URL)%')]
@@ -58,16 +62,48 @@ final class OAuthServerController extends AbstractController
     }
 
     #[Route('/.well-known/oauth-authorization-server', name: 'oauth_metadata', methods: ['GET'])]
+    #[OA\Get(
+        path: '/.well-known/oauth-authorization-server',
+        operationId: 'oauthServerMetadata',
+        summary: 'OAuth2 authorization server metadata (RFC 8414)',
+        tags: ['Platform Links'],
+        responses: [
+            new OA\Response(response: 200, description: 'Metadata', content: new OA\JsonContent(
+                required: ['issuer', 'authorization_endpoint', 'token_endpoint', 'pushed_authorization_request_endpoint', 'require_pushed_authorization_requests', 'registration_endpoint', 'revocation_endpoint', 'jwks_uri', 'scopes_supported', 'registration_policy'],
+                properties: [
+                    new OA\Property(property: 'issuer', type: 'string', example: 'https://synaplan.example'),
+                    new OA\Property(property: 'authorization_endpoint', type: 'string', example: 'https://synaplan.example/oauth/authorize'),
+                    new OA\Property(property: 'token_endpoint', type: 'string', example: 'https://synaplan.example/oauth/token'),
+                    new OA\Property(property: 'pushed_authorization_request_endpoint', type: 'string', example: 'https://synaplan.example/oauth/par'),
+                    new OA\Property(property: 'require_pushed_authorization_requests', type: 'boolean', example: true),
+                    new OA\Property(property: 'registration_endpoint', type: 'string', example: 'https://synaplan.example/oauth/register'),
+                    new OA\Property(property: 'revocation_endpoint', type: 'string', example: 'https://synaplan.example/oauth/revoke'),
+                    new OA\Property(property: 'jwks_uri', type: 'string', example: 'https://synaplan.example/.well-known/jwks.json'),
+                    new OA\Property(property: 'scopes_supported', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'files']),
+                    new OA\Property(property: 'response_types_supported', type: 'array', items: new OA\Items(type: 'string'), example: ['code']),
+                    new OA\Property(property: 'grant_types_supported', type: 'array', items: new OA\Items(type: 'string'), example: ['authorization_code', 'refresh_token']),
+                    new OA\Property(property: 'code_challenge_methods_supported', type: 'array', items: new OA\Items(type: 'string'), example: ['S256']),
+                    new OA\Property(property: 'token_endpoint_auth_methods_supported', type: 'array', items: new OA\Items(type: 'string'), example: ['private_key_jwt']),
+                    new OA\Property(property: 'token_endpoint_auth_signing_alg_values_supported', type: 'array', items: new OA\Items(type: 'string'), example: ['RS256', 'ES256']),
+                    new OA\Property(property: 'revocation_endpoint_auth_methods_supported', type: 'array', items: new OA\Items(type: 'string'), example: ['private_key_jwt']),
+                    new OA\Property(property: 'registration_policy', type: 'string', enum: ['pending', 'open', 'token'], description: 'Whether a new client waits for an admin, is active at once, or needs the initial access token.'),
+                ],
+            )),
+            new OA\Response(response: 404, description: 'Platform links are off'),
+        ],
+    )]
     public function metadata(): JsonResponse
     {
         if (!$this->platformLinks->isEnabled(null)) {
-            return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound();
         }
-        $issuer = $this->issuer();
+        $issuer = rtrim($this->appUrl, '/');
         $response = $this->json([
             'issuer' => $issuer,
             'authorization_endpoint' => $issuer.'/oauth/authorize',
             'token_endpoint' => $issuer.'/oauth/token',
+            'pushed_authorization_request_endpoint' => $issuer.'/oauth/par',
+            'require_pushed_authorization_requests' => true,
             'registration_endpoint' => $issuer.'/oauth/register',
             'revocation_endpoint' => $issuer.'/oauth/revoke',
             'jwks_uri' => $issuer.'/.well-known/jwks.json',
@@ -86,214 +122,179 @@ final class OAuthServerController extends AbstractController
         return $response;
     }
 
-    #[Route('/oauth/register', name: 'oauth_register', methods: ['POST'])]
-    public function register(Request $request): JsonResponse
+    #[Route('/oauth/par', name: 'oauth_par', methods: ['POST'])]
+    #[OA\Post(
+        path: '/oauth/par',
+        operationId: 'oauthPushAuthorizationRequest',
+        summary: 'Push an authorization request (RFC 9126); the only way to start one',
+        tags: ['Platform Links'],
+        requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/x-www-form-urlencoded', schema: new OA\Schema(
+            required: ['client_assertion_type', 'client_assertion', 'response_type', 'redirect_uri', 'code_challenge', 'code_challenge_method', 'external_id'],
+            properties: [
+                new OA\Property(property: 'client_assertion_type', type: 'string', example: self::ASSERTION_PROPERTIES['client_assertion_type']),
+                new OA\Property(property: 'client_assertion', type: 'string', description: self::ASSERTION_PROPERTIES['client_assertion']),
+                new OA\Property(property: 'response_type', type: 'string', example: 'code'),
+                new OA\Property(property: 'redirect_uri', type: 'string', example: 'https://cloud.example.com/apps/synaplan/link/callback'),
+                new OA\Property(property: 'state', type: 'string'),
+                new OA\Property(property: 'scope', type: 'string', example: 'chat files', description: 'Space-separated; the default set when left out.'),
+                new OA\Property(property: 'code_challenge', type: 'string'),
+                new OA\Property(property: 'code_challenge_method', type: 'string', example: 'S256'),
+                new OA\Property(property: 'external_id', type: 'string', example: 'alice', description: 'The cloud account being linked: the person signed in to the cloud right now.'),
+            ],
+        ))),
+        responses: [
+            new OA\Response(response: 201, description: 'The request is kept', content: new OA\JsonContent(
+                required: ['request_uri', 'expires_in'],
+                properties: [
+                    new OA\Property(property: 'request_uri', type: 'string', example: 'urn:ietf:params:oauth:request_uri:6f1c…', description: 'Send the browser to the authorization endpoint with this and client_id.'),
+                    new OA\Property(property: 'expires_in', type: 'integer', example: 600),
+                ],
+            )),
+            new OA\Response(response: 400, description: 'The request is not one Synaplan would ask consent for', content: new OA\JsonContent(ref: '#/components/schemas/OAuthError')),
+            new OA\Response(response: 401, description: 'Client authentication failed', content: new OA\JsonContent(ref: '#/components/schemas/OAuthError')),
+            new OA\Response(response: 404, description: 'Platform links are off'),
+            new OA\Response(response: 429, description: 'Too many failed client authentications from this address'),
+        ],
+    )]
+    public function pushAuthorizationRequest(Request $request): JsonResponse
     {
         if (!$this->platformLinks->isEnabled(null)) {
-            return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound();
         }
         try {
-            $body = $this->jsonBody($request);
-            $result = $this->registrations->register($body, $this->bearer($request), $request->getClientIp() ?? '');
-        } catch (RegistrationException $e) {
-            return $this->registrationError($e);
+            $client = $this->clients->fromForm($request, '/oauth/par');
+            $requestUri = $this->pushed->push($client, $request->request->all());
+        } catch (ClientAuthenticationException $e) {
+            return $this->clientAuthenticationFailed($e);
+        } catch (OAuthServerException $e) {
+            // Never a redirect: this is the cloud's server, not a browser.
+            return $this->noStore($this->json($e->getPayload(), $e->getHttpStatusCode()));
         }
 
-        return $this->noStore($this->json($result, Response::HTTP_CREATED));
-    }
-
-    #[Route('/oauth/register/{clientId}', name: 'oauth_client_configuration', methods: ['GET', 'PUT', 'DELETE'])]
-    public function configuration(Request $request, string $clientId): Response
-    {
-        if (!$this->platformLinks->isEnabled(null)) {
-            return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
-        }
-        $instance = $this->assertions->verify(
-            (string) $this->bearer($request),
-            [$this->issuer().'/oauth/register/'.$clientId, $this->issuer().'/oauth/register'],
-            true,
-        );
-        if (!$instance instanceof PlatformInstance || $instance->getInstanceId() !== $clientId) {
-            return $this->json(['error' => 'invalid_token', 'error_description' => 'A client assertion of this client is required.'], Response::HTTP_UNAUTHORIZED, ['WWW-Authenticate' => 'Bearer error="invalid_token"']);
-        }
-        try {
-            return match ($request->getMethod()) {
-                'PUT' => $this->noStore($this->json($this->registrations->update($instance, $this->jsonBody($request), $request->getClientIp() ?? ''))),
-                'DELETE' => $this->deleted($instance, $request),
-                default => $this->noStore($this->json($this->registrations->read($instance))),
-            };
-        } catch (RegistrationException $e) {
-            return $this->registrationError($e);
-        }
+        return $this->noStore($this->json(
+            ['request_uri' => $requestUri, 'expires_in' => AuthorizationRequestStore::TTL],
+            Response::HTTP_CREATED,
+        ));
     }
 
     #[Route('/oauth/authorize', name: 'oauth_authorize', methods: ['GET'])]
+    #[OA\Get(
+        path: '/oauth/authorize',
+        operationId: 'oauthAuthorize',
+        summary: 'Send the person to the consent page for a pushed authorization request',
+        tags: ['Platform Links'],
+        parameters: [
+            new OA\Parameter(name: 'client_id', in: 'query', required: true, schema: new OA\Schema(type: 'string')),
+            new OA\Parameter(name: 'request_uri', in: 'query', required: true, description: 'From the pushed authorization request endpoint.', schema: new OA\Schema(type: 'string')),
+        ],
+        responses: [
+            new OA\Response(response: 302, description: 'To the consent page; it says so when the request is unknown or ran out'),
+            new OA\Response(response: 404, description: 'Platform links are off'),
+        ],
+    )]
     public function authorize(Request $request): Response
     {
         if (!$this->platformLinks->isEnabled(null)) {
-            return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound();
         }
-        $externalId = trim((string) $request->query->get('external_id', ''));
-        if ('S256' !== $request->query->get('code_challenge_method') || '' === (string) $request->query->get('code_challenge', '')) {
-            return $this->json(['error' => 'invalid_request', 'error_description' => 'PKCE with S256 is required.'], Response::HTTP_BAD_REQUEST);
-        }
-        if ('' === $externalId || mb_strlen($externalId) > 191) {
-            return $this->json(['error' => 'invalid_request', 'error_description' => 'external_id names the person in the cloud and is required.'], Response::HTTP_BAD_REQUEST);
-        }
-        try {
-            $this->servers->create()->validateAuthorizationRequest(Psr7::request($request));
-        } catch (OAuthServerException $e) {
-            return Psr7::toSymfony($e->generateHttpResponse(Psr7::response()));
-        }
-        $nonce = bin2hex(random_bytes(24));
-        $item = $this->cache->getItem(self::AUTHORIZE_CACHE_PREFIX.$nonce);
-        $item->set($request->query->all());
-        $item->expiresAfter(self::AUTHORIZE_TTL);
-        $this->cache->save($item);
+        $id = $this->pushed->resolve(
+            (string) $request->query->get('client_id', ''),
+            (string) $request->query->get('request_uri', ''),
+        );
 
-        return new RedirectResponse(rtrim($this->frontendUrl, '/').'/connect/cloud?request='.$nonce);
+        // An unknown request goes to the page as well: the person reads what
+        // happened there, in their language, and not a JSON error.
+        return new RedirectResponse(rtrim($this->frontendUrl, '/').'/connect/cloud'.(null !== $id ? '?request='.$id : ''));
     }
 
     #[Route('/oauth/token', name: 'oauth_token', methods: ['POST'])]
+    #[OA\Post(
+        path: '/oauth/token',
+        operationId: 'oauthToken',
+        summary: 'Exchange an authorization code or a refresh token for tokens',
+        tags: ['Platform Links'],
+        requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/x-www-form-urlencoded', schema: new OA\Schema(
+            required: ['grant_type', 'client_assertion_type', 'client_assertion'],
+            properties: [
+                new OA\Property(property: 'grant_type', type: 'string', enum: ['authorization_code', 'refresh_token']),
+                new OA\Property(property: 'client_assertion_type', type: 'string', example: self::ASSERTION_PROPERTIES['client_assertion_type']),
+                new OA\Property(property: 'client_assertion', type: 'string', description: self::ASSERTION_PROPERTIES['client_assertion']),
+                new OA\Property(property: 'code', type: 'string', description: 'With authorization_code.'),
+                new OA\Property(property: 'redirect_uri', type: 'string', description: 'With authorization_code; the one the request named.'),
+                new OA\Property(property: 'code_verifier', type: 'string', description: 'With authorization_code (PKCE).'),
+                new OA\Property(property: 'refresh_token', type: 'string', description: 'With refresh_token. Each one works once; the answer carries the next.'),
+                new OA\Property(property: 'scope', type: 'string', description: 'With refresh_token, to narrow the scopes.'),
+            ],
+        ))),
+        responses: [
+            new OA\Response(response: 200, description: 'Tokens', content: new OA\JsonContent(
+                required: ['token_type', 'expires_in', 'access_token', 'refresh_token'],
+                properties: [
+                    new OA\Property(property: 'token_type', type: 'string', example: 'Bearer'),
+                    new OA\Property(property: 'expires_in', type: 'integer', example: 900),
+                    new OA\Property(property: 'access_token', type: 'string', description: 'A JWT (RFC 9068), signed with a key from jwks_uri.'),
+                    new OA\Property(property: 'refresh_token', type: 'string'),
+                ],
+            )),
+            new OA\Response(response: 400, description: 'The grant was refused', content: new OA\JsonContent(ref: '#/components/schemas/OAuthError')),
+            new OA\Response(response: 401, description: 'Client authentication failed', content: new OA\JsonContent(ref: '#/components/schemas/OAuthError')),
+            new OA\Response(response: 404, description: 'Platform links are off'),
+            new OA\Response(response: 429, description: 'Too many failed client authentications from this address'),
+        ],
+    )]
     public function token(Request $request): Response
     {
         if (!$this->platformLinks->isEnabled(null)) {
-            return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
+            return $this->notFound();
         }
         try {
+            $this->clients->assertNotThrottled($request);
             $response = $this->servers->create()->respondToAccessTokenRequest(Psr7::request($request, $request->request->all()), Psr7::response());
+        } catch (ClientAuthenticationException $e) {
+            return $this->clientAuthenticationFailed($e);
         } catch (OAuthServerException $e) {
+            if ('invalid_client' === $e->getErrorType()) {
+                $this->clients->failed($request);
+            }
             $response = $e->generateHttpResponse(Psr7::response());
         }
 
         return Psr7::toSymfony($response);
     }
 
-    /**
-     * RFC 7009. A refresh token ends the person's grant and their link with
-     * the cloud: a cloud revokes it when the person disconnects there or the
-     * cloud account is deleted or disabled. Unknown tokens answer 200 too.
-     */
     #[Route('/oauth/revoke', name: 'oauth_revoke', methods: ['POST'])]
+    #[OA\Post(
+        path: '/oauth/revoke',
+        operationId: 'oauthRevoke',
+        summary: 'Revoke a token (RFC 7009); a refresh token ends the person\'s link with the cloud',
+        tags: ['Platform Links'],
+        requestBody: new OA\RequestBody(required: true, content: new OA\MediaType(mediaType: 'application/x-www-form-urlencoded', schema: new OA\Schema(
+            required: ['token', 'client_assertion_type', 'client_assertion'],
+            properties: [
+                new OA\Property(property: 'token', type: 'string', description: 'An access or refresh token of this client.'),
+                new OA\Property(property: 'client_assertion_type', type: 'string', example: self::ASSERTION_PROPERTIES['client_assertion_type']),
+                new OA\Property(property: 'client_assertion', type: 'string', description: self::ASSERTION_PROPERTIES['client_assertion']),
+            ],
+        ))),
+        responses: [
+            new OA\Response(response: 200, description: 'Done; also for a token that is unknown or another client\'s'),
+            new OA\Response(response: 401, description: 'Client authentication failed', content: new OA\JsonContent(ref: '#/components/schemas/OAuthError')),
+            new OA\Response(response: 404, description: 'Platform links are off'),
+            new OA\Response(response: 429, description: 'Too many failed client authentications from this address'),
+        ],
+    )]
     public function revoke(Request $request): Response
     {
         if (!$this->platformLinks->isEnabled(null)) {
-            return $this->json(['error' => 'not_found'], Response::HTTP_NOT_FOUND);
-        }
-        $instance = $this->authenticateClient($request, '/oauth/revoke');
-        if (!$instance instanceof PlatformInstance) {
-            return $this->invalidClient();
-        }
-        $token = (string) $request->request->get('token', '');
-        $access = $this->accessTokens->validate($token, false);
-        if (null !== $access) {
-            if ($access['client_id'] === $instance->getInstanceId()) {
-                $this->revokeAccess($access['jti']);
-            }
-
-            return new Response('', Response::HTTP_OK);
-        }
-        $refresh = $this->refreshTokenData($token);
-        if (null !== $refresh && $refresh['client_id'] === $instance->getInstanceId() && null !== $refresh['user_id']) {
-            $this->links->endByCloud($instance, $refresh['user_id'], $request->getClientIp() ?? '');
-        }
-
-        return new Response('', Response::HTTP_OK);
-    }
-
-    private function revokeAccess(string $jti): void
-    {
-        $this->servers->accessTokens()->revokeAccessToken($jti);
-    }
-
-    /**
-     * @return array{client_id: string, user_id: int|null}|null
-     */
-    private function refreshTokenData(string $token): ?array
-    {
-        if ('' === $token) {
-            return null;
+            return $this->notFound();
         }
         try {
-            $data = json_decode(Crypto::decryptWithPassword($token, $this->servers->encryptionKey()), true);
-        } catch (\Throwable) {
-            return null;
+            $client = $this->clients->fromForm($request, '/oauth/revoke');
+        } catch (ClientAuthenticationException $e) {
+            return $this->clientAuthenticationFailed($e);
         }
-        if (!is_array($data) || !is_string($data['client_id'] ?? null)) {
-            return null;
-        }
-        $user = $data['user_id'] ?? null;
+        $this->revocation->revoke($client, (string) $request->request->get('token', ''), ClientAddress::resolve($request) ?? '');
 
-        return [
-            'client_id' => $data['client_id'],
-            'user_id' => is_string($user) && ctype_digit($user) ? (int) $user : (is_int($user) ? $user : null),
-        ];
-    }
-
-    private function authenticateClient(Request $request, string $endpoint): ?PlatformInstance
-    {
-        if (ClientAssertionVerifier::TYPE !== $request->request->get('client_assertion_type')) {
-            return null;
-        }
-        $instance = $this->assertions->verify((string) $request->request->get('client_assertion', ''), [$this->issuer().$endpoint]);
-        if (!$instance instanceof PlatformInstance) {
-            return null;
-        }
-        $claimed = (string) $request->request->get('client_id', '');
-        if ('' !== $claimed && $claimed !== $instance->getInstanceId()) {
-            return null;
-        }
-
-        return $instance;
-    }
-
-    private function deleted(PlatformInstance $instance, Request $request): Response
-    {
-        $this->registrations->delete($instance, $request->getClientIp() ?? '');
-
-        return new Response('', Response::HTTP_NO_CONTENT);
-    }
-
-    private function invalidClient(): JsonResponse
-    {
-        return $this->noStore($this->json(['error' => 'invalid_client', 'error_description' => 'Client authentication failed (private_key_jwt).'], Response::HTTP_UNAUTHORIZED));
-    }
-
-    private function registrationError(RegistrationException $e): JsonResponse
-    {
-        return $this->noStore($this->json(['error' => $e->error, 'error_description' => $e->getMessage()], $e->status));
-    }
-
-    private function noStore(JsonResponse $response): JsonResponse
-    {
-        $response->headers->set('Cache-Control', 'no-store');
-        $response->headers->set('Pragma', 'no-cache');
-
-        return $response;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function jsonBody(Request $request): array
-    {
-        $body = json_decode($request->getContent(), true);
-        if (!is_array($body)) {
-            throw new RegistrationException('invalid_client_metadata', 'The body must be a JSON object.');
-        }
-
-        return $body;
-    }
-
-    private function bearer(Request $request): ?string
-    {
-        $header = (string) $request->headers->get('Authorization', '');
-
-        return str_starts_with($header, 'Bearer ') ? trim(substr($header, 7)) : null;
-    }
-
-    private function issuer(): string
-    {
-        return rtrim($this->appUrl, '/');
+        return new Response('', Response::HTTP_OK);
     }
 }

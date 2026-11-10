@@ -178,6 +178,16 @@ framework:
             limit: '%env(int:PAID_SIGNUP_ALERT_LIMIT)%'
             interval: '1 hour'
             cache_pool: 'cache.rate_limiter'
+        # Failed client authentications on the OAuth server endpoints
+        # (ClientAuthentication), keyed per client IP. A cloud signs every
+        # call with its own key, so a real one fails only while misconfigured;
+        # 30 a minute leaves room for that and stops assertion guessing.
+        # Successful calls never count.
+        oauth_client_auth_failures:
+            policy: 'sliding_window'
+            limit: 30
+            interval: '1 minute'
+            cache_pool: 'cache.rate_limiter'
         # One OAuth state nonce may authorise one callback. The signed state
         # lives for ten minutes; spending the nonce here stops one solved
         # human check from creating a second account on another node.

@@ -8,6 +8,7 @@ use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
+use App\Repository\OAuthTokenRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
@@ -31,6 +32,7 @@ final readonly class PlatformInstanceService
         private AuditLogWriter $auditLogWriter,
         private EntityManagerInterface $entityManager,
         private DeliveryNotifier $notifier,
+        private OAuthTokenRepository $oauthTokens,
     ) {
     }
 
@@ -172,6 +174,7 @@ final readonly class PlatformInstanceService
         }
         $instance->setStatus(PlatformInstance::STATUS_REVOKED);
         $this->instanceRepository->save($instance);
+        $this->oauthTokens->revokeAll($instanceId, null);
 
         $revoked = [];
         foreach ($this->externalIdentityRepository->findByInstanceId($instanceId) as $identity) {

@@ -63,6 +63,16 @@ class PlatformInstance
     #[ORM\Column(name: 'BHOST', length: 255)]
     private string $host;
 
+    /**
+     * Unused since clouds authenticate by private_key_jwt. Still mapped so
+     * the column survives until a later release drops it (expand/contract,
+     * docs/MIGRATIONS.md).
+     *
+     * @deprecated phase-2 removal
+     */
+    #[ORM\Column(name: 'BSECRETHASH', length: 255, options: ['default' => ''])]
+    private string $secretHash = '';
+
     /** The cloud's public keys (a JWK Set as JSON): it authenticates by private_key_jwt. */
     #[ORM\Column(name: 'BJWKS', type: 'text', nullable: true)]
     private ?string $jwks = null;
@@ -184,9 +194,6 @@ class PlatformInstance
     }
 
     /**
-     * @return list<string>
-     */
-    /**
      * @return array<string, mixed>|null
      */
     public function getJwks(): ?array
@@ -212,6 +219,9 @@ class PlatformInstance
         $this->redirectUris = $redirectUris;
     }
 
+    /**
+     * @return list<string>
+     */
     public function getRedirectUris(): array
     {
         return $this->redirectUris ?? [];

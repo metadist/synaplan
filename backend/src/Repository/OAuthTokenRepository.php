@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\OAuthToken;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -14,6 +15,8 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class OAuthTokenRepository extends ServiceEntityRepository
 {
+    private const PURGE_BATCH = 1000;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, OAuthToken::class);
@@ -90,11 +93,17 @@ class OAuthTokenRepository extends ServiceEntityRepository
         return true;
     }
 
+    /**
+     * Deletes rows that expired before $before, at most PURGE_BATCH per call
+     * so one call never holds the table for long.
+     */
     public function purgeExpired(int $before): int
     {
-        return (int) $this->getEntityManager()->getConnection()->executeStatement(
-            'DELETE FROM BOAUTHTOKENS WHERE BEXPIRES < ? LIMIT 1000',
-            [$before],
+        $statement = $this->getEntityManager()->getConnection()->prepare(
+            'DELETE FROM BOAUTHTOKENS WHERE BEXPIRES < :before LIMIT '.self::PURGE_BATCH,
         );
+        $statement->bindValue('before', $before, ParameterType::INTEGER);
+
+        return (int) $statement->executeStatement();
     }
 }

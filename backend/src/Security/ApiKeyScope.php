@@ -154,6 +154,13 @@ final class ApiKeyScope
     private const SELF_SERVICE_PATHS = ['/api/v1/auth/me', '/api/health'];
 
     /**
+     * Paths no API key reaches ({@see isSessionOnly()}).
+     *
+     * @var list<string>
+     */
+    private const SESSION_ONLY_PREFIXES = ['/api/v1/cloud/watches/from-message', '/api/v1/oauth/consent'];
+
+    /**
      * Legacy webhook scopes. A key whose list contains ONLY these keeps full
      * access until the later CORE-3 migration narrows them explicitly.
      *
@@ -253,13 +260,23 @@ final class ApiKeyScope
     }
 
     /**
-     * Pinning a chat turn into a watch is a signed-in action in Synaplan.
-     * Every API key is refused, including a legacy or `*` key. Every method
-     * is refused: `$method` is part of the call shape and is not a filter.
+     * Actions of the signed-in person in Synaplan itself: pinning a chat
+     * turn into a watch, and allowing a cloud to act for them (OAuth
+     * consent; a key that could consent would turn itself into a grant that
+     * outlives it). Every API key is refused, including a legacy or `*`
+     * key. Every method is refused: `$method` is part of the call shape and
+     * is not a filter.
      */
     public static function isSessionOnly(string $method, string $path): bool
     {
-        return self::matchesPrefix(self::decodedPath($path), '/api/v1/cloud/watches/from-message');
+        $path = self::decodedPath($path);
+        foreach (self::SESSION_ONLY_PREFIXES as $prefix) {
+            if (self::matchesPrefix($path, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
