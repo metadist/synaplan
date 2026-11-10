@@ -221,7 +221,7 @@ final class PlatformInstanceController extends AbstractController
         return $this->json(['success' => true, ...$saved]);
     }
 
-    #[Route('/{instanceId}/public', name: 'public', methods: ['GET'], requirements: ['instanceId' => 'pi_[a-f0-9]+|outlook-builtin'])]
+    #[Route('/{instanceId}/public', name: 'public', methods: ['GET'], requirements: ['instanceId' => 'pi_[a-f0-9]+|outlook-builtin|oidc-cloud'])]
     #[OA\Get(
         path: '/api/v1/platform-links/instances/{instanceId}/public',
         operationId: 'getPlatformInstancePublic',

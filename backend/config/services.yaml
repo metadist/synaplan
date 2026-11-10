@@ -136,6 +136,10 @@ parameters:
     env(GITHUB_CLIENT_ID): ''
     env(OIDC_CLIENT_ID): ''
     env(OIDC_BEARER_AUDIENCE): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_TYPE): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_URL): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID): ''
+    env(PLATFORM_LINKS_OIDC_CLOUD_INTERNAL_URL): ''
     env(OIDC_DISCOVERY_URL): ''
     env(RECAPTCHA_SECRET_KEY): ''
     env(TURNSTILE_SECRET_KEY): ''
@@ -985,6 +989,13 @@ services:
     App\Service\Auth\OidcAuthorizeParams:
         arguments:
             $bearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
+
+    App\Service\PlatformLink\OidcCloud:
+        arguments:
+            $type: '%env(PLATFORM_LINKS_OIDC_CLOUD_TYPE)%'
+            $url: '%env(PLATFORM_LINKS_OIDC_CLOUD_URL)%'
+            $clientId: '%env(PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID)%'
+            $internalUrl: '%env(PLATFORM_LINKS_OIDC_CLOUD_INTERNAL_URL)%'
 
     App\Service\PlatformLink\SignedNotificationClient:
         arguments:
