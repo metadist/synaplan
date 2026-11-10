@@ -6,10 +6,12 @@ namespace App\Tests\Controller\OAuth;
 
 use App\Entity\ApiKey;
 use App\Entity\ExternalIdentity;
+use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Service\Iam\UserLifecycleService;
 use App\Service\OAuth\Server\RegistrationPolicy;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -230,6 +232,28 @@ final class OAuthServerFlowTest extends WebTestCase
         self::assertSame(ExternalIdentity::STATUS_ACTIVE, $identities->findOneByTriple('nextcloud', $clientId, 'grace')?->getStatus());
         $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => (string) $grace['refresh_token']]);
         self::assertResponseIsSuccessful('revoking one account does not spend the other');
+    }
+
+    /** @return iterable<string, array{string, int}> */
+    public static function closedAccounts(): iterable
+    {
+        yield 'pending payment' => [User::ACCOUNT_STATUS_PENDING_PAYMENT, Response::HTTP_FORBIDDEN];
+        yield 'suspended' => [User::ACCOUNT_STATUS_SUSPENDED, Response::HTTP_UNAUTHORIZED];
+        yield 'banned' => [User::ACCOUNT_STATUS_BANNED, Response::HTTP_UNAUTHORIZED];
+    }
+
+    #[DataProvider('closedAccounts')]
+    public function testACloudTokenFollowsTheAccountStatusLikeAnApiKey(string $status, int $refused): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $user = $this->person();
+        $tokens = $this->grant($clientId, $user, 'ada');
+
+        $this->em->find(User::class, $user->getId())?->setAccountStatus($status);
+        $this->em->flush();
+
+        $this->client->request('GET', '/api/v1/files', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$tokens['access_token']]);
+        self::assertResponseStatusCodeSame($refused);
     }
 
     public function testAnAccessTokenDoesNotWidenAnApiKey(): void
