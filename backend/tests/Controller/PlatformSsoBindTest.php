@@ -82,15 +82,18 @@ final class PlatformSsoBindTest extends WebTestCase
 
         $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('bad.azp.token', $instance) + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'ada']));
         self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
-        self::assertSame('azp_mismatch', $this->json()['code']);
+        self::assertSame('platform_disconnected', $this->json()['code']);
 
+        // A person's binding follows their token; an instance credential sent
+        // along, right or wrong, plays no part.
         $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: [
             'HTTP_AUTHORIZATION' => 'Bearer good.token.value',
             'HTTP_X_INSTANCE_ID' => 'pi_doesnotexist',
             'HTTP_X_INSTANCE_SECRET' => 'nope',
             'CONTENT_TYPE' => 'application/json',
         ], content: (string) json_encode(['external_id' => 'ada']));
-        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        self::assertResponseStatusCodeSame(Response::HTTP_OK);
+        self::assertCount(1, $this->rows($instance['instance_id']));
 
         $this->markStatus($row, ExternalIdentity::STATUS_PAUSED);
         $this->client->request('POST', '/api/v1/platform-links/sso/bind', server: $this->bearer('good.token.value', $instance) + ['CONTENT_TYPE' => 'application/json'], content: (string) json_encode(['external_id' => 'ada']));

@@ -10,8 +10,9 @@ use App\Message\NotifyIdentityRevoked;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Tells a cloud app that a copy or a revoked link is waiting. The body is
- * only the id; the app fetches the rest with its own credential.
+ * Tells a cloud app that a copy or a revoked link is waiting. The body names
+ * the id and the person (external_id), so the app claims with that person's
+ * credential; it fetches the rest itself.
  */
 final readonly class DeliveryNotifier
 {
@@ -27,17 +28,17 @@ final readonly class DeliveryNotifier
      *
      * @return array<string, mixed>|null
      */
-    public function delivery(PlatformInstance $instance, int $deliveryId): ?array
+    public function delivery(PlatformInstance $instance, int $deliveryId, string $externalId): ?array
     {
-        return $this->client->post($instance, 'delivery', (string) $deliveryId);
+        return $this->client->post($instance, 'delivery', (string) $deliveryId, $externalId);
     }
 
     /**
      * @return array<string, mixed>|null
      */
-    public function pickup(PlatformInstance $instance, int $pickupId): ?array
+    public function pickup(PlatformInstance $instance, int $pickupId, string $externalId): ?array
     {
-        return $this->client->post($instance, 'pickup', (string) $pickupId);
+        return $this->client->post($instance, 'pickup', (string) $pickupId, $externalId);
     }
 
     /**

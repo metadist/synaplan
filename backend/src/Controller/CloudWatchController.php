@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
-use App\Security\PlatformInstancePrincipal;
 use App\Service\CloudWatch\CloudWatchException;
-use App\Service\CloudWatch\CloudWatchIndex;
 use App\Service\CloudWatch\CloudWatchService;
 use App\Service\CloudWatch\WatchDialogOptions;
 use App\Service\CloudWatch\WatchUpload;
@@ -32,7 +30,6 @@ final class CloudWatchController extends AbstractController
         private readonly CloudWatchService $watches,
         private readonly WatchDialogOptions $dialogOptions,
         private readonly WatchUpload $uploads,
-        private readonly CloudWatchIndex $index,
     ) {
     }
 
@@ -211,46 +208,6 @@ final class CloudWatchController extends AbstractController
 
             return $this->uploads->reconcile($this->watches->open($user, $request, $id), $rows);
         });
-    }
-
-    #[Route('/api/v1/platform-links/watches', name: 'api_cloud_watch_index', methods: ['GET'])]
-    #[OA\Get(
-        path: '/api/v1/platform-links/watches',
-        operationId: 'cloudWatchIndex',
-        summary: 'Watches on this cloud, one page at a time',
-        tags: ['Cloud watches'],
-        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
-        parameters: [
-            new OA\Parameter(name: 'limit', in: 'query', schema: new OA\Schema(type: 'integer', maximum: 500)),
-            new OA\Parameter(name: 'cursor', in: 'query', schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'since', in: 'query', schema: new OA\Schema(type: 'string')),
-        ],
-        responses: [
-            new OA\Response(response: 200, description: 'A page, or the changes since a cursor'),
-            new OA\Response(response: 304, description: 'Nothing changed'),
-            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
-            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
-            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
-            new OA\Response(response: 410, description: 'The cursor is older than 7 days'),
-            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
-        ],
-    )]
-    public function index(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse|Response
-    {
-        $absent = $this->absent();
-        if ($absent instanceof JsonResponse) {
-            return $absent;
-        }
-        try {
-            $feed = $this->index->feed($caller->instance, $request, time());
-        } catch (CloudWatchException $e) {
-            return $this->json(['error' => $e->error, 'message' => $e->getMessage()], $e->status);
-        }
-        if (304 === $feed['status']) {
-            return new Response('', Response::HTTP_NOT_MODIFIED, ['ETag' => $feed['etag']]);
-        }
-
-        return $this->json($feed['body'], $feed['status'], ['ETag' => $feed['etag']]);
     }
 
     /**

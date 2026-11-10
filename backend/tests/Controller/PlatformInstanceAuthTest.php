@@ -50,16 +50,6 @@ final class PlatformInstanceAuthTest extends WebTestCase
     {
         yield 'self check' => ['GET', '/api/v1/platform-links/instances/self'];
         yield 'self update' => ['PATCH', '/api/v1/platform-links/instances/self'];
-        yield 'delivery claim' => ['POST', '/api/v1/platform-links/deliveries/1/claim'];
-        yield 'delivery file' => ['GET', '/api/v1/platform-links/deliveries/1/file'];
-        yield 'delivery result' => ['POST', '/api/v1/platform-links/deliveries/1/result'];
-        yield 'pickup claim' => ['POST', '/api/v1/platform-links/pickups/1/claim'];
-        yield 'pickup listing' => ['POST', '/api/v1/platform-links/pickups/1/listing'];
-        yield 'pickup files' => ['POST', '/api/v1/platform-links/pickups/1/files'];
-        yield 'pickup result' => ['POST', '/api/v1/platform-links/pickups/1/result'];
-        yield 'read scope' => ['PUT', '/api/v1/platform-links/read-scope'];
-        yield 'source events' => ['POST', '/api/v1/platform-links/sources/events'];
-        yield 'watch index' => ['GET', '/api/v1/platform-links/watches'];
         yield 'lifecycle' => ['POST', '/api/v1/platform-links/lifecycle'];
     }
 
@@ -110,7 +100,7 @@ final class PlatformInstanceAuthTest extends WebTestCase
         $this->call('PATCH', '/api/v1/platform-links/instances/self', $this->headers($instance));
         $this->assertPastAuthentication();
 
-        $this->call('POST', '/api/v1/platform-links/deliveries/1/claim', $this->headers($instance));
+        $this->call('POST', '/api/v1/platform-links/lifecycle', $this->headers($instance));
         $this->assertRefused(Response::HTTP_FORBIDDEN, 'instance_pending');
 
         $this->call('POST', '/api/v1/platform-links/lifecycle', $this->headers($instance));
@@ -124,10 +114,10 @@ final class PlatformInstanceAuthTest extends WebTestCase
         $this->em->flush();
         $this->authenticateClient($this->client, $admin);
 
-        $this->call('POST', '/api/v1/platform-links/deliveries/1/claim', []);
+        $this->call('POST', '/api/v1/platform-links/lifecycle', []);
         $this->assertRefused(Response::HTTP_UNAUTHORIZED, 'unauthorized');
 
-        $this->call('GET', '/api/v1/platform-links/watches', ['HTTP_AUTHORIZATION' => 'Bearer sk_'.bin2hex(random_bytes(16))]);
+        $this->call('GET', '/api/v1/platform-links/instances/self', ['HTTP_AUTHORIZATION' => 'Bearer sk_'.bin2hex(random_bytes(16))]);
         $this->assertRefused(Response::HTTP_UNAUTHORIZED, 'unauthorized');
 
         $instance = $this->instance(PlatformInstance::STATUS_ACTIVE);
@@ -159,7 +149,7 @@ final class PlatformInstanceAuthTest extends WebTestCase
         $this->setFlag(false);
 
         foreach ([[], $this->headers($instance, 'not-the-secret'), $this->headers($instance)] as $headers) {
-            $this->call('POST', '/api/v1/platform-links/deliveries/1/claim', $headers);
+            $this->call('POST', '/api/v1/platform-links/lifecycle', $headers);
             self::assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
         }
     }

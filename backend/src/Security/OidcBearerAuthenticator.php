@@ -44,8 +44,8 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
 
     public function supports(Request $request): ?bool
     {
-        $token = $this->bearerToken($request);
-        if (null === $token || str_starts_with($token, 'sk_')) {
+        $token = BearerToken::jwtFromRequest($request);
+        if (null === $token) {
             return false;
         }
 
@@ -76,16 +76,6 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
         return true;
     }
 
-    private function bearerToken(Request $request): ?string
-    {
-        $authHeader = (string) $request->headers->get('Authorization', '');
-        if (!str_starts_with($authHeader, 'Bearer ')) {
-            return null;
-        }
-
-        return substr($authHeader, 7);
-    }
-
     private function isChatPath(Request $request): bool
     {
         $path = $request->getPathInfo();
@@ -96,7 +86,7 @@ class OidcBearerAuthenticator extends AbstractAuthenticator
 
     public function authenticate(Request $request): Passport
     {
-        $token = $this->bearerToken($request) ?? '';
+        $token = BearerToken::jwtFromRequest($request) ?? '';
         $claims = $this->oidcTokenService->validateBearerToken($token);
 
         if (!$claims) {

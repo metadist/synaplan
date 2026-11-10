@@ -15,11 +15,14 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\DependencyInjection\Attribute\When;
 
 /**
  * Fills one person's cloud with watches so the index can be tried at the cap.
  * Development and test only.
  */
+#[When(env: 'dev')]
+#[When(env: 'test')]
 #[AsCommand(name: 'app:cloud-watches:seed-test', description: 'Create watches for the index test (dev and test only)')]
 final class SeedCloudWatchesCommand extends Command
 {

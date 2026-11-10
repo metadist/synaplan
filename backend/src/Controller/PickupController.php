@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\DTO\CloudCallerError;
+use App\Entity\User;
 use App\Exception\CloudDeliveryException;
-use App\Security\PlatformInstancePrincipal;
+use App\Service\PlatformLink\CloudCallerResolver;
 use App\Service\PlatformLink\PickupService;
 use App\Service\PlatformLink\PlatformLinksConfig;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -23,6 +26,7 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class PickupController extends AbstractController
 {
     public function __construct(
+        private CloudCallerResolver $callers,
         private PlatformLinksConfig $platformLinksConfig,
         private PickupService $pickups,
     ) {
@@ -34,7 +38,7 @@ final class PickupController extends AbstractController
         operationId: 'claimCloudPickup',
         summary: 'Claim a pickup and receive its selector',
         tags: ['Platform Links'],
-        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
+        security: [['Bearer' => []], ['ApiKey' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
@@ -52,20 +56,19 @@ final class PickupController extends AbstractController
                 ]),
                 new OA\Property(property: 'expires_at', type: 'integer'),
             ])),
-            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
-            new OA\Response(response: 403, description: 'Wrong instance, or instance waiting for approval (instance_pending)'),
-            new OA\Response(response: 404, description: 'Unknown pickup, or unknown instance (unknown_instance)'),
-            new OA\Response(response: 409, description: 'Already claimed'),
+            new OA\Response(response: 401, description: CloudCallerError::UNAUTHORIZED, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 403, description: CloudCallerError::FORBIDDEN, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 404, description: 'Unknown pickup, or one of another person (unknown_delivery)', content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 409, description: 'Already claimed, or '.CloudCallerError::AMBIGUOUS, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
             new OA\Response(response: 410, description: 'Expired'),
-            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
         ]
     )]
-    public function claim(int $id, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
+    public function claim(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $this->guard();
 
         try {
-            return $this->json($this->pickups->claim($caller->instance, $id));
+            return $this->json($this->pickups->claim($this->callers->resolve($request, $user), $id));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -77,7 +80,7 @@ final class PickupController extends AbstractController
         operationId: 'listCloudPickup',
         summary: 'Send a file listing and learn what to upload',
         tags: ['Platform Links'],
-        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
+        security: [['Bearer' => []], ['ApiKey' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
@@ -103,20 +106,19 @@ final class PickupController extends AbstractController
                     new OA\Property(property: 'reason', type: 'string', enum: ['too_large', 'type_not_read', 'over_limit']),
                 ])),
             ])),
-            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
-            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
-            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
-            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
+            new OA\Response(response: 401, description: CloudCallerError::UNAUTHORIZED, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 403, description: CloudCallerError::FORBIDDEN, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 409, description: CloudCallerError::AMBIGUOUS, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
         ]
     )]
-    public function listing(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
+    public function listing(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
         $items = is_array($body) && is_array($body['items'] ?? null) ? $body['items'] : [];
 
         try {
-            return $this->json($this->pickups->listing($caller->instance, $id, $items));
+            return $this->json($this->pickups->listing($this->callers->resolve($request, $user), $id, $items));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -128,7 +130,7 @@ final class PickupController extends AbstractController
         operationId: 'uploadCloudPickupFile',
         summary: 'Upload one file into a pickup',
         tags: ['Platform Links'],
-        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
+        security: [['Bearer' => []], ['ApiKey' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
@@ -141,14 +143,12 @@ final class PickupController extends AbstractController
             new OA\Response(response: 200, description: 'Stored', content: new OA\JsonContent(required: ['file_id'], properties: [
                 new OA\Property(property: 'file_id', type: 'integer'),
             ])),
-            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
-            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
-            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
-            new OA\Response(response: 409, description: 'Not requested, too large, or a names-only pickup'),
-            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
+            new OA\Response(response: 401, description: CloudCallerError::UNAUTHORIZED, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 403, description: CloudCallerError::FORBIDDEN, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 409, description: 'Not requested, too large, a names-only pickup, or '.CloudCallerError::AMBIGUOUS, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
         ]
     )]
-    public function files(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
+    public function files(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $this->guard();
         try {
@@ -161,7 +161,7 @@ final class PickupController extends AbstractController
                 return $this->json(['success' => false, 'error' => 'not_requested'], Response::HTTP_CONFLICT);
             }
             $fileId = $this->pickups->storeFile(
-                $caller->instance,
+                $this->callers->resolve($request, $user),
                 $id,
                 (string) $request->request->get('id', ''),
                 (string) $request->request->get('version', ''),
@@ -182,7 +182,7 @@ final class PickupController extends AbstractController
         operationId: 'recordCloudPickupResult',
         summary: 'Close a pickup',
         tags: ['Platform Links'],
-        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
+        security: [['Bearer' => []], ['ApiKey' => []]],
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
         ],
@@ -197,19 +197,18 @@ final class PickupController extends AbstractController
             new OA\Response(response: 200, description: 'Current state', content: new OA\JsonContent(required: ['state'], properties: [
                 new OA\Property(property: 'state', type: 'string', enum: ['queued', 'claimed', 'done', 'partial', 'failed']),
             ])),
-            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
-            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
-            new OA\Response(response: 404, description: 'Unknown instance (unknown_instance)'),
-            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
+            new OA\Response(response: 401, description: CloudCallerError::UNAUTHORIZED, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 403, description: CloudCallerError::FORBIDDEN, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 409, description: CloudCallerError::AMBIGUOUS, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
         ]
     )]
-    public function result(int $id, Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
+    public function result(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
 
         try {
-            return $this->json($this->pickups->result($caller->instance, $id, is_array($body) ? $body : []));
+            return $this->json($this->pickups->result($this->callers->resolve($request, $user), $id, is_array($body) ? $body : []));
         } catch (CloudDeliveryException $e) {
             return $this->json(['success' => false, 'error' => $e->errorCode], $e->status);
         }
@@ -221,7 +220,7 @@ final class PickupController extends AbstractController
         operationId: 'reportCloudReadScope',
         summary: 'Report what a person lets Synaplan read',
         tags: ['Platform Links'],
-        security: [['PlatformInstanceId' => [], 'PlatformInstanceSecret' => []]],
+        security: [['Bearer' => []], ['ApiKey' => []]],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['external_id', 'mode', 'folders'], properties: [
             new OA\Property(property: 'external_id', type: 'string'),
             new OA\Property(property: 'mode', type: 'string', enum: ['watched', 'allowed', 'all']),
@@ -234,13 +233,13 @@ final class PickupController extends AbstractController
             new OA\Response(response: 200, description: 'Saved', content: new OA\JsonContent(properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
             ])),
-            new OA\Response(response: 401, description: 'Missing or wrong instance credential'),
-            new OA\Response(response: 403, description: 'Instance waiting for approval (instance_pending)'),
-            new OA\Response(response: 404, description: 'Unknown person, or unknown instance (unknown_instance)'),
-            new OA\Response(response: 429, description: 'Too many failed instance credentials from this address (too_many_attempts)'),
+            new OA\Response(response: 401, description: CloudCallerError::UNAUTHORIZED, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 403, description: CloudCallerError::FORBIDDEN, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 404, description: 'Unknown person, or another person (unknown_identity)', content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
+            new OA\Response(response: 409, description: CloudCallerError::AMBIGUOUS, content: new OA\JsonContent(ref: new Model(type: CloudCallerError::class))),
         ]
     )]
-    public function readScope(Request $request, #[CurrentUser] PlatformInstancePrincipal $caller): JsonResponse
+    public function readScope(Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         $this->guard();
         $body = json_decode($request->getContent(), true);
@@ -248,7 +247,7 @@ final class PickupController extends AbstractController
 
         try {
             $this->pickups->reportScope(
-                $caller->instance,
+                $this->callers->resolve($request, $user),
                 is_string($body['external_id'] ?? null) ? $body['external_id'] : '',
                 is_string($body['mode'] ?? null) ? $body['mode'] : '',
                 is_array($body['folders'] ?? null) ? $body['folders'] : [],

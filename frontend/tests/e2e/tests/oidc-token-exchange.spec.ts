@@ -35,6 +35,15 @@ async function exchangeForSynaplan(subjectToken: string): Promise<string> {
   })
 }
 
+async function exchangeAsSynaplanApp(subjectToken: string, audience: string): Promise<string> {
+  return exchangeOidcToken({
+    subjectToken,
+    clientId: 'synaplan-app',
+    clientSecret: 'test-oidc-secret',
+    audience,
+  })
+}
+
 test.describe('@ci @oidc @token-exchange OIDC Token Exchange', () => {
   test('should get a user token from Keycloak via direct access grant', async () => {
     const token = await getUserToken()
@@ -67,6 +76,17 @@ test.describe('@ci @oidc @token-exchange OIDC Token Exchange', () => {
     // Response shape: { success: true, user: { id, email, ... } }
     expect(data.success).toBe(true)
     expect(data.user.email).toBeTruthy()
+  })
+
+  test('Synaplan cannot exchange a person token for the cloud clients', async () => {
+    const userToken = await getUserToken()
+    const synaplanToken = await exchangeForSynaplan(userToken)
+
+    for (const audience of ['opencloud', 'synaplan-opencloud']) {
+      await expect(exchangeAsSynaplanApp(synaplanToken, audience)).rejects.toThrow(
+        /Token exchange failed: 403/
+      )
+    }
   })
 
   test('should auto-provision user on first access via exchanged token', async () => {

@@ -24,8 +24,8 @@ final readonly class WatchChangeNotifier
 
     public function __invoke(): void
     {
-        foreach ($this->queue->pull() as $instanceId) {
-            $this->bus->dispatch(new NotifyWatchesChanged($instanceId));
+        foreach ($this->queue->pull() as $change) {
+            $this->bus->dispatch(new NotifyWatchesChanged($change['instanceId'], $change['externalId']));
         }
     }
 }

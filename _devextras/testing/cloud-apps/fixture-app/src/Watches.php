@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CloudFixture;
 
 /**
- * The app side of watched folders: the instance index, one file upload, and
+ * The app side of watched folders: a person's watches, one file upload, and
  * reconciliation. The person's key is passed in; the fixture does not keep it.
  */
 final class Watches
@@ -15,23 +15,14 @@ final class Watches
     }
 
     /**
+     * The person's own watches on this cloud. There is no index across
+     * people: the app asks for each person with that person's key.
+     *
      * @return array{status: int, body: array<mixed>}
      */
-    public function index(?string $cursor, ?string $since): array
+    public function list(string $apiKey): array
     {
-        $query = [];
-        if (null !== $cursor && '' !== $cursor) {
-            $query['cursor'] = $cursor;
-        }
-        if (null !== $since && '' !== $since) {
-            $query['since'] = $since;
-        }
-        $path = '/api/v1/platform-links/watches';
-        if ([] !== $query) {
-            $path .= '?'.http_build_query($query);
-        }
-
-        return $this->synaplan->json('GET', $path);
+        return $this->synaplan->json('GET', '/api/v1/cloud/watches', null, ['X-Api-Key' => $apiKey]);
     }
 
     /**

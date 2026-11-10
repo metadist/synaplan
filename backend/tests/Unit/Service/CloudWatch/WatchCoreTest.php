@@ -9,7 +9,6 @@ use App\Entity\CloudWatch;
 use App\Repository\CloudDeliveryRepository;
 use App\Service\CloudWatch\LoopGuard;
 use App\Service\CloudWatch\QuietPeriod;
-use App\Service\CloudWatch\WatchIndexCursor;
 use App\Service\CloudWatch\WatchLimits;
 use PHPUnit\Framework\TestCase;
 
@@ -39,17 +38,6 @@ final class WatchCoreTest extends TestCase
         self::assertSame(100, $limits->perHour(false));
         self::assertFalse($limits->readable('photo.png', false));
         self::assertTrue($limits->readable('notes.md', false));
-    }
-
-    public function testACursorOlderThanSevenDaysIsRefused(): void
-    {
-        $now = 1_700_000_000;
-        $fresh = WatchIndexCursor::since($now - 10, 5);
-        $stale = WatchIndexCursor::since($now - WatchIndexCursor::TTL_SECONDS - 1, 5);
-
-        self::assertSame(['iat' => $now - 10, 'kind' => 's', 'revision' => 5, 'id' => 0], WatchIndexCursor::read($fresh, $now));
-        self::assertNull(WatchIndexCursor::read($stale, $now));
-        self::assertNull(WatchIndexCursor::read('not-a-cursor', $now));
     }
 
     public function testTheLoopGuardDropsOwnWritesAndTranslatedNames(): void

@@ -32,7 +32,7 @@ final class Deliveries
     /**
      * @return array<string, mixed>
      */
-    public function handle(string $id): array
+    public function handle(string $id, string $expectedPerson): array
     {
         $base = '/api/v1/platform-links/deliveries/'.rawurlencode($id);
         $claim = $this->synaplan->json('POST', $base.'/claim');
@@ -42,6 +42,9 @@ final class Deliveries
         }
         $copy = $claim['body'];
         $person = (string) ($copy['external_id'] ?? '');
+        if ($person !== $expectedPerson) {
+            return $this->finish($base, ['status' => 'failed', 'error_code' => 'not_found']);
+        }
         $bytes = $this->synaplan->download((string) ($copy['download_path'] ?? ''));
         if (null === $bytes) {
             return $this->finish($base, ['status' => 'failed', 'error_code' => 'unreachable']);

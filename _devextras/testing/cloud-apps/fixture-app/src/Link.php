@@ -62,6 +62,9 @@ final class Link
                 'link_id' => (string) ($body['link_id'] ?? ''),
                 'email' => (string) ($user['email'] ?? ''),
                 'key_id' => $key['id'] ?? null,
+                // The app acts for the person with this key. A real app keeps
+                // it encrypted; the fixture is a development stand-in.
+                'key' => (string) ($key['key'] ?? ''),
                 'scopes' => $key['scopes'] ?? [],
                 'linked_at' => time(),
             ];

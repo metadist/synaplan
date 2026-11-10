@@ -25,13 +25,16 @@ final readonly class WatchTargetFollow
     ) {
     }
 
-    public function apply(PlatformInstance $instance, string $event, string $targetId, int $now): bool
+    public function apply(PlatformInstance $instance, string $event, string $targetId, int $now, int $userId): bool
     {
         if (!in_array($event, ['deleted', 'restored'], true)) {
             return false;
         }
         $changed = false;
         foreach ($this->watches->targets($instance->getInstanceId(), $targetId) as $watch) {
+            if ($watch->getOwnerId() !== $userId) {
+                continue;
+            }
             $did = $this->follow($watch, $event, $now);
             $identity = null !== $watch->getIdentityId() ? $this->identities->find($watch->getIdentityId()) : null;
             if ($did) {

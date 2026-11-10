@@ -79,7 +79,6 @@ final class CloudFilesModule implements FeatureModuleInterface
             'api_cloud_watches_delete',
             'api_cloud_watches_files',
             'api_cloud_watches_reconcile',
-            'api_cloud_watch_index',
         ];
     }
 

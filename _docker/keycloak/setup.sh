@@ -122,6 +122,9 @@ OC_CLIENT_ID="${KC_OC_CLIENT_ID:-opencloud}"
 OC_CALLBACK="${KC_OC_CALLBACK:-https://host.docker.internal:9200/oidc-callback.html}"
 OC_ORIGIN="${KC_OC_ORIGIN:-https://host.docker.internal:9200}"
 OC_DEV_ORIGIN="${KC_OC_DEV_ORIGIN:-https://host.docker.internal:9201}"
+# The synaplan-opencloud extension's own development server (fixed port), where
+# its consent callback page is served from during development.
+OC_EXTENSION_DEV_ORIGIN="${KC_OC_EXTENSION_DEV_ORIGIN:-https://host.docker.internal:9210}"
 EXCHANGE_CLIENT_ID="${KC_EXCHANGE_CLIENT_ID:-synaplan-opencloud}"
 EXCHANGE_CLIENT_SECRET="${KC_EXCHANGE_CLIENT_SECRET:-synaplan-opencloud-secret}"
 
@@ -164,9 +167,12 @@ $KCADM create clients -r synaplan \
   -s enabled=true \
   -s publicClient=false \
   -s secret="${EXCHANGE_CLIENT_SECRET}" \
-  -s standardFlowEnabled=false \
+  -s standardFlowEnabled=true \
   -s directAccessGrantsEnabled=false \
-  -s serviceAccountsEnabled=true
+  -s serviceAccountsEnabled=false \
+  -s "redirectUris=[\"${OC_ORIGIN}/*\",\"${OC_DEV_ORIGIN}/*\",\"${OC_EXTENSION_DEV_ORIGIN}/*\"]" \
+  -s "webOrigins=[\"${OC_ORIGIN}\",\"${OC_DEV_ORIGIN}\",\"${OC_EXTENSION_DEV_ORIGIN}\"]" \
+  -s 'attributes={"pkce.code.challenge.method":"S256"}'
 
 # Configure token exchange permissions using kcadm.sh.
 # (SYNAPLAN_CLIENT_UUID was resolved earlier when creating the audience mapper.)
@@ -204,6 +210,26 @@ $KCADM update "clients/${REALM_MGMT_UUID}/authz/resource-server/permission/scope
   -s "policies=[\"${POLICY_UUID}\"]"
 
 echo "Token exchange permission configured for ${EXCHANGE_CLIENT_ID} -> ${CLIENT_ID}"
+
+# The synaplan-opencloud service also exchanges a person's token for the
+# opencloud client, to call OpenCloud as that person while they are away.
+$KCADM update "clients/${OC_CLIENT_UUID}/management/permissions" -r synaplan \
+  -s enabled=true
+
+OC_PERM_NAME="token-exchange.permission.client.${OC_CLIENT_UUID}"
+OC_EXCHANGE_PERM=$($KCADM get "clients/${REALM_MGMT_UUID}/authz/resource-server/permission?name=${OC_PERM_NAME}" -r synaplan --fields id | json_field id)
+
+if [ -z "${OC_EXCHANGE_PERM}" ]; then
+  echo "ERROR: Could not resolve token-exchange permission for ${OC_CLIENT_ID}" >&2
+  exit 1
+fi
+
+$KCADM update "clients/${REALM_MGMT_UUID}/authz/resource-server/permission/scope/${OC_EXCHANGE_PERM}" -r synaplan \
+  -s "name=${OC_PERM_NAME}" \
+  -s decisionStrategy=AFFIRMATIVE \
+  -s "policies=[\"${POLICY_UUID}\"]"
+
+echo "Token exchange permission configured for ${EXCHANGE_CLIENT_ID} -> ${OC_CLIENT_ID}"
 
 echo "OpenCloud integration clients provisioned"
 echo "  OpenCloud client: ${OC_CLIENT_ID}"

@@ -13,6 +13,7 @@ use App\Repository\FileRepository;
 use App\Repository\UserRepository;
 use App\Service\CloudWatch\WatchTargetFollow;
 use App\Service\Iam\AuditLogWriter;
+use App\Service\PlatformLink\CloudCaller;
 use App\Service\RAG\VectorStorage\VectorStorageFacade;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -41,19 +42,21 @@ final readonly class CloudSourceEvents
      *
      * @return array{applied: int, ignored: int, reupload: list<array{external_id: string, id: string}>}
      */
-    public function apply(PlatformInstance $instance, array $body, string $ip): array
+    public function apply(CloudCaller $caller, array $body, string $ip): array
     {
+        $instance = $caller->instance;
+        $userId = $caller->userId;
         $events = $this->events($body);
         $applied = 0;
         $ignored = 0;
         $reupload = [];
-        $this->withoutDeletedFilter(function () use ($instance, $events, $ip, &$applied, &$ignored, &$reupload): void {
+        $this->withoutDeletedFilter(function () use ($instance, $userId, $events, $ip, &$applied, &$ignored, &$reupload): void {
             foreach ($events as $event) {
                 $copies = array_values(array_filter(
-                    $this->files->findCopiesOfRemotes($instance->getClient(), [$event['id']], $instance->getInstanceId()),
+                    $this->files->findCopiesOfRemotes($instance->getClient(), [$event['id']], $instance->getInstanceId(), $userId),
                     fn (File $file): bool => $this->belongsTo($file, $instance),
                 ));
-                $followed = $this->targets->apply($instance, $event['event'], $event['id'], time());
+                $followed = $this->targets->apply($instance, $event['event'], $event['id'], time(), $userId);
                 $copiesChanged = [] !== $copies && $this->applyOne($instance, $event, $copies, $reupload);
                 if (!$followed && !$copiesChanged) {
                     ++$ignored;

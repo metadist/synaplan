@@ -195,3 +195,6 @@ when@test:
                 # mail is sent inside the request that asked for it.
                 'App\Message\SendLoginLinkMessage': sync
                 'App\Message\SendCodeSignupMessage': sync
+                # The test stack has no messenger worker; a cloud learns that
+                # a person ended their link inside the request that ended it.
+                'App\Message\NotifyIdentityRevoked': sync
