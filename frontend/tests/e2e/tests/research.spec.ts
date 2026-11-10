@@ -346,10 +346,11 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(page.locator(selectors.research.answerNow)).toBeVisible()
 
     // The writer's words arrive while it writes: the draft grows under the
-    // phases and says the check comes next.
+    // phases and says the check comes next. Both have to be read together.
+    // The next poll replaces the draft with the report, so a second lookup
+    // finds nothing.
     const draft = bubble.locator(selectors.research.draft)
-    await expect(draft).toContainText(DRAFT_START + DRAFT_END)
-    await expect(bubble.locator(selectors.research.draftNote)).toContainText('Draft of the answer')
+    await expect(draft).toContainText([DRAFT_START + DRAFT_END, 'Draft of the answer'])
 
     // Once it is done, the report is the reply and one line stays below it.
     // Opening it lists the phases folded; each unfolds on a click.
