@@ -52,6 +52,15 @@ final readonly class ClientRegistrationService
     public function register(array $metadata, ?string $bearer, string $ip): array
     {
         $status = $this->policy->statusFor($bearer);
+        $guessing = !$this->policy->presentsToken($bearer)
+            && (null === $status || (null !== $bearer && '' !== trim($bearer)));
+        if ($guessing && !$this->rateLimiter->allow(
+            'oauth:register-token:'.sha1('' !== $ip ? $ip : 'unknown'),
+            self::IP_LIMIT,
+            self::IP_WINDOW,
+        )) {
+            throw new RegistrationException('invalid_token', 'Too many attempts to register with an initial access token. Please wait and try again.', 429);
+        }
         if (null === $status) {
             throw new RegistrationException('invalid_token', 'Registration needs an initial access token.', 401);
         }
@@ -110,6 +119,9 @@ final readonly class ClientRegistrationService
      */
     public function update(PlatformInstance $instance, array $metadata, string $ip): array
     {
+        if (!$this->rateLimiter->allow('oauth:client-update:'.$instance->getInstanceId(), 30, self::IP_WINDOW)) {
+            throw new RegistrationException('invalid_client_metadata', 'Too many updates for this client. Please wait and try again.', 429);
+        }
         if (isset($metadata['client_id']) && $metadata['client_id'] !== $instance->getInstanceId()) {
             throw new RegistrationException('invalid_client_metadata', 'client_id does not match.');
         }

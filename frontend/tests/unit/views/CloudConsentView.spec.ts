@@ -68,6 +68,7 @@ describe('CloudConsentView', () => {
       host: 'cloud.example.org',
       external_id: 'ada',
       scopes: ['chat', 'cloud:watch', 'not-a-scope'],
+      unreviewed: true,
     })
     decideCloudConsent.mockResolvedValue({
       redirect: 'https://cloud.example.org/cb?code=x&state=s',
@@ -76,6 +77,9 @@ describe('CloudConsentView', () => {
 
     expect(getCloudConsent).toHaveBeenCalledWith(REQUEST)
     expect(wrapper.text()).toContain('ada')
+    expect(wrapper.get('[data-testid="unreviewed-cloud"]').text()).toContain(
+      'platformConnect.unreviewed'
+    )
     expect(wrapper.text()).toContain('cloud.example.org')
     const permissions = wrapper.get('[data-testid="section-permissions"]')
     expect(permissions.findAll('li').map((item) => item.text())).toEqual([

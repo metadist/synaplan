@@ -25,8 +25,20 @@ final class AccessToken implements AccessTokenEntityInterface
 
     private CryptKeyInterface $privateKey;
 
+    private ?string $externalId = null;
+
     public function __construct(private readonly string $issuer, private readonly string $kid)
     {
+    }
+
+    public function setExternalId(string $externalId): void
+    {
+        $this->externalId = $externalId;
+    }
+
+    public function externalId(): ?string
+    {
+        return $this->externalId;
     }
 
     public function setPrivateKey(CryptKeyInterface $privateKey): void
@@ -55,6 +67,7 @@ final class AccessToken implements AccessTokenEntityInterface
             ->expiresAt($this->getExpiryDateTime())
             ->relatedTo((string) $this->getUserIdentifier())
             ->withClaim('client_id', $this->getClient()->getIdentifier())
+            ->withClaim('external_id', (string) $this->externalId)
             ->withClaim('scope', implode(' ', $scopes))
             ->getToken($config->signer(), $config->signingKey())
             ->toString();

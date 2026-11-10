@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Iam;
 
 use App\Entity\User;
+use App\Repository\OAuthTokenRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupAdmission;
@@ -40,6 +41,7 @@ final readonly class UserLifecycleService
         private UserRepository $users,
         private TokenService $tokenService,
         private RegistrationConfig $registration,
+        private OAuthTokenRepository $oauthTokens,
     ) {
     }
 
@@ -195,5 +197,30 @@ final readonly class UserLifecycleService
         $user->recordMailboxProof();
         $this->em->flush();
         $this->tokenService->revokeAllUserTokens($user);
+        $this->endCloudGrants($user);
+    }
+
+    /**
+     * Stores a password the person just proved they know, and ends every cloud
+     * grant that was issued under the old one.
+     */
+    public function replacePassword(User $user, string $plainPassword): void
+    {
+        $user->setPw($this->passwordHasher->hashPassword($user, $plainPassword));
+        $user->setMustChangePassword(false);
+        $this->users->save($user);
+        $this->endCloudGrants($user);
+    }
+
+    /**
+     * Ends the grants clouds hold for this person. Signing out everywhere and
+     * a new password both do this, so a cloud allowed earlier cannot keep acting.
+     */
+    public function endCloudGrants(User $user): void
+    {
+        $id = $user->getId();
+        if (null !== $id) {
+            $this->oauthTokens->revokeAllForUser($id);
+        }
     }
 }

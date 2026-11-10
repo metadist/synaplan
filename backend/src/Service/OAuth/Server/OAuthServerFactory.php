@@ -33,7 +33,8 @@ final readonly class OAuthServerFactory
         private RefreshTokenRepository $refreshTokens,
         private AccessTokenKeyStore $keys,
         private ClientAssertionVerifier $assertions,
-        private string $secret,
+        private TokenCipher $cipher,
+        private CodeRedemption $redemption,
         private string $issuer,
     ) {
     }
@@ -53,10 +54,10 @@ final readonly class OAuthServerFactory
             $this->encryptionKey(),
         );
         $tokenEndpoint = rtrim($this->issuer, '/').'/oauth/token';
-        $authCode = new AuthCodeGrant($this->authCodes, $this->refreshTokens, new \DateInterval(self::AUTH_CODE_TTL), $this->assertions, $tokenEndpoint);
+        $authCode = new AuthCodeGrant($this->authCodes, $this->refreshTokens, new \DateInterval(self::AUTH_CODE_TTL), $this->assertions, $tokenEndpoint, $this->redemption->context(), $this->redemption);
         $authCode->setRefreshTokenTTL(new \DateInterval(self::REFRESH_TOKEN_TTL));
         $server->enableGrantType($authCode, new \DateInterval(self::ACCESS_TOKEN_TTL));
-        $refresh = new RefreshTokenGrant($this->refreshTokens, $this->assertions, $tokenEndpoint);
+        $refresh = new RefreshTokenGrant($this->refreshTokens, $this->assertions, $tokenEndpoint, $this->redemption->context());
         $refresh->setRefreshTokenTTL(new \DateInterval(self::REFRESH_TOKEN_TTL));
         $server->enableGrantType($refresh, new \DateInterval(self::ACCESS_TOKEN_TTL));
 
@@ -69,6 +70,6 @@ final readonly class OAuthServerFactory
      */
     public function encryptionKey(): string
     {
-        return hash('sha256', 'synaplan-oauth-server:'.$this->secret);
+        return $this->cipher->key();
     }
 }

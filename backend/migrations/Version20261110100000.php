@@ -44,6 +44,7 @@ final class Version20261110100000 extends AbstractMigration
               BUSERID BIGINT NULL,
               BSCOPES JSON NOT NULL,
               BPARENTID VARCHAR(128) NULL,
+              BEXTERNALID VARCHAR(191) NULL,
               BEXPIRES BIGINT NOT NULL,
               BREVOKED TINYINT(1) NOT NULL DEFAULT 0,
               PRIMARY KEY (BID),
@@ -52,6 +53,7 @@ final class Version20261110100000 extends AbstractMigration
             ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci ENGINE = InnoDB
         SQL);
         $this->addSql('ALTER TABLE BPLATFORMINSTANCES ADD COLUMN IF NOT EXISTS BJWKS LONGTEXT NULL');
+        $this->addSql('ALTER TABLE BOAUTHTOKENS ADD COLUMN IF NOT EXISTS BEXTERNALID VARCHAR(191) NULL');
     }
 
     public function down(Schema $schema): void

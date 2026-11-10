@@ -96,6 +96,7 @@
       "memories": "Read and save your Synaplan memories"
     },
     "revocableNote": "You can disconnect at any time in Synaplan under Apps.",
+    "unreviewed": "This cloud registered itself. No administrator has approved it. Continue only if you know this server.",
     "errorExpired": "This connection request has expired or was already used. Start again from the other app.",
     "scopesNote": "Grants access to chats, files and search. The key stays on the platform — you do not type it.",
     "connecting": "Connecting…",

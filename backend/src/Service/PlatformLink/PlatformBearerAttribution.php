@@ -116,6 +116,20 @@ final readonly class PlatformBearerAttribution
     }
 
     /**
+     * Whether `azp` is a cloud's client, approved or not. A session cookie is
+     * refused for such a token: the bearer path is where a cloud acts, and
+     * there it is limited to what a cloud may do.
+     *
+     * @param array<string, mixed> $claims
+     */
+    public function namesCloud(array $claims): bool
+    {
+        $azp = $claims['azp'] ?? null;
+
+        return is_string($azp) && '' !== $azp && [] !== $this->instances->findByOidcClientId($azp);
+    }
+
+    /**
      * The first call of this person through this cloud: link them as the
      * token's subject. Nothing happens when that cloud account is already
      * someone else's link.

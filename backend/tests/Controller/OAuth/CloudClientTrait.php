@@ -26,7 +26,7 @@ trait CloudClientTrait
 {
     use AuthenticatedTestTrait;
 
-    private const IAT = 'test-initial-access-token';
+    private const IAT = 'test-initial-access-token-0123456789';
 
     private KernelBrowser $client;
     private EntityManagerInterface $em;
@@ -44,6 +44,7 @@ trait CloudClientTrait
         $this->em->flush();
         static::getContainer()->set(RegistrationPolicy::class, new RegistrationPolicy('pending', self::IAT));
         static::getContainer()->get(RedisService::class)->delete('oauth:register:'.sha1('127.0.0.1'));
+        static::getContainer()->get(RedisService::class)->delete('oauth:register-token:'.sha1('127.0.0.1'));
         $this->forgetFailedAuthentications();
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => \OPENSSL_KEYTYPE_RSA]);
         self::assertNotFalse($key);
@@ -123,7 +124,7 @@ trait CloudClientTrait
     }
 
     /**
-     * @param array<string, int> $times replaces iat, exp or adds nbf
+     * @param array<string, int|string> $times replaces iat, exp or aud, or adds nbf
      */
     private function assertion(string $clientId, string $endpoint, ?string $privateKey = null, string $algorithm = 'RS256', ?string $kid = 'cloud-key', array $times = []): string
     {
@@ -199,7 +200,7 @@ trait CloudClientTrait
         $this->client->request('GET', '/api/v1/oauth/consent/'.$request);
         self::assertResponseIsSuccessful((string) $this->client->getResponse()->getContent());
         self::assertSame(
-            ['client' => 'nextcloud', 'host' => $this->host, 'external_id' => $externalId, 'scopes' => ApiKeyScope::platformLinkScopes()],
+            ['client' => 'nextcloud', 'host' => $this->host, 'external_id' => $externalId, 'scopes' => ApiKeyScope::platformLinkScopes(), 'unreviewed' => true],
             $this->json(),
         );
 
@@ -284,7 +285,7 @@ trait CloudClientTrait
             ->setMail('oauth-'.bin2hex(random_bytes(4)).'@synaplan.internal')
             ->setType('WEB')
             ->setProviderId('local')
-            ->setUserLevel('NEW');
+            ->setUserLevel('PRO');
         $user->setCreated(date('YmdHis'));
         $user->setEmailVerified(true);
         $this->em->persist($user);

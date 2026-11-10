@@ -9,6 +9,7 @@ use App\Repository\PlatformInstanceRepository;
 use App\Security\ApiKeyScope;
 use App\Service\OAuth\Server\Entity\User as OAuthUser;
 use App\Service\OAuth\Server\Repository\ScopeRepository;
+use App\Service\PlatformLink\PlatformLinksConfig;
 use League\OAuth2\Server\Exception\OAuthServerException;
 
 /**
@@ -21,7 +22,8 @@ final readonly class ConsentService
         private AuthorizationRequestStore $requests,
         private OAuthServerFactory $servers,
         private PlatformInstanceRepository $instances,
-        private CloudLinkService $links,
+        private PlatformLinksConfig $platformLinks,
+        private GrantContext $context,
     ) {
     }
 
@@ -30,10 +32,13 @@ final readonly class ConsentService
      * The scopes are the ones the tokens will carry: a request that names
      * none gets the default set.
      *
-     * @return array{client: string, host: string, external_id: string, scopes: list<string>}|null
+     * @return array{client: string, host: string, external_id: string, scopes: list<string>, unreviewed: bool}|null
      */
-    public function describe(string $id): ?array
+    public function describe(string $id, int $userId): ?array
     {
+        if (!$this->platformLinks->isEnabled($userId)) {
+            return null;
+        }
         $params = $this->requests->find($id);
         $instance = null === $params ? null : $this->activeClient($params['client_id'] ?? '');
         if (null === $params || null === $instance) {
@@ -49,6 +54,7 @@ final readonly class ConsentService
             'host' => $instance->getHost(),
             'external_id' => $params['external_id'] ?? '',
             'scopes' => [] !== $requested ? $requested : ApiKeyScope::platformLinkScopes(),
+            'unreviewed' => 0 === $instance->getRegisteredBy(),
         ];
     }
 
@@ -57,35 +63,34 @@ final readonly class ConsentService
      * refusal), or null when the request is unknown, ran out, was decided
      * before, or its cloud is no longer a client.
      */
-    public function decide(string $id, int $userId, bool $approve, string $ip): ?string
+    public function decide(string $id, int $userId, bool $approve): ?string
     {
+        if (!$this->platformLinks->isEnabled($userId)) {
+            return null;
+        }
         $params = $this->requests->find($id);
         if (null === $params) {
             return null;
         }
         $this->requests->forget($id);
 
+        // The code remembers the cloud account. The link itself waits until
+        // the cloud redeems the code.
+        $this->context->setExternalId($params['external_id'] ?? null);
         $server = $this->servers->create();
-        $codeIssued = false;
         try {
             $authorization = $server->validateAuthorizationRequest(Psr7::query($params));
             $authorization->setUser(new OAuthUser($userId));
             $authorization->setAuthorizationApproved($approve);
             $response = $server->completeAuthorizationRequest($authorization, Psr7::response());
-            $codeIssued = true;
         } catch (OAuthServerException $e) {
             $response = $e->generateHttpResponse(Psr7::response());
+        } finally {
+            $this->context->setExternalId(null);
         }
         $location = $response->getHeaderLine('Location');
-        if ('' === $location) {
-            return null;
-        }
-        $instance = $codeIssued ? $this->activeClient($params['client_id'] ?? '') : null;
-        if (null !== $instance) {
-            $this->links->link($userId, $instance, $params['external_id'] ?? '', $ip);
-        }
 
-        return $location;
+        return '' === $location ? null : $location;
     }
 
     private function activeClient(string $clientId): ?PlatformInstance

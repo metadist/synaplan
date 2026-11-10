@@ -60,9 +60,10 @@ class OAuthTokenRepository extends ServiceEntityRepository
 
     /**
      * Revokes every token a client holds for a person, or for nobody in
-     * particular when $userId is null. Returns how many were live.
+     * particular when $userId is null. With $externalId, only the grant for
+     * that one cloud account. Returns how many were live.
      */
-    public function revokeAll(string $clientId, ?int $userId): int
+    public function revokeAll(string $clientId, ?int $userId, ?string $externalId = null): int
     {
         $qb = $this->createQueryBuilder('t')
             ->update()
@@ -77,8 +78,37 @@ class OAuthTokenRepository extends ServiceEntityRepository
         if (null !== $userId) {
             $qb->andWhere('t.userId = :user')->setParameter('user', $userId);
         }
+        if (null !== $externalId) {
+            $qb->andWhere('t.externalId = :external')->setParameter('external', $externalId);
+        }
 
         return (int) $qb->getQuery()->execute();
+    }
+
+    /**
+     * Ends every grant a person holds with any cloud. Signing out everywhere
+     * and changing the password both come through here, so a cloud that was
+     * allowed before cannot keep acting afterwards.
+     */
+    public function revokeAllForUser(int $userId): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->update()
+            ->set('t.revoked', ':yes')
+            ->where('t.userId = :user')
+            ->andWhere('t.revoked = :no')
+            ->andWhere('t.kind IN (:kinds)')
+            ->setParameter('yes', true)
+            ->setParameter('no', false)
+            ->setParameter('user', $userId)
+            ->setParameter('kinds', [OAuthToken::KIND_ACCESS, OAuthToken::KIND_REFRESH, OAuthToken::KIND_CODE])
+            ->getQuery()
+            ->execute();
+    }
+
+    public function revokeForAccount(string $clientId, int $userId, string $externalId): int
+    {
+        return $this->revokeAll($clientId, $userId, $externalId);
     }
 
     /**

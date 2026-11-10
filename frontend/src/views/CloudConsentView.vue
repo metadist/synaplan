@@ -55,6 +55,13 @@
           <p class="txt-secondary text-xs text-center mb-5" data-testid="signed-in-as">
             {{ $t('platformConnect.signedInAs', { email: userEmail }) }}
           </p>
+          <p
+            v-if="consent.unreviewed"
+            class="text-sm text-red-600 dark:text-red-400 text-center mb-5"
+            data-testid="unreviewed-cloud"
+          >
+            {{ $t('platformConnect.unreviewed') }}
+          </p>
 
           <div v-if="permissions.length > 0" class="mb-6" data-testid="section-permissions">
             <p class="txt-primary text-sm font-medium mb-2">

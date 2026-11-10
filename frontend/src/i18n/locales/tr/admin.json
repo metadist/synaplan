@@ -96,6 +96,7 @@
       "memories": "Synaplan anılarınızı okumak ve kaydetmek"
     },
     "revocableNote": "Bağlantıyı istediğiniz zaman Synaplan’da Uygulamalar altından kesebilirsiniz.",
+    "unreviewed": "Bu bulut kendi kendine kaydoldu. Bir yönetici onu onaylamadı. Yalnızca bu sunucuyu tanıyorsanız devam edin.",
     "errorExpired": "Bu bağlantı isteğinin süresi doldu veya istek zaten kullanıldı. Diğer uygulamadan yeniden başlayın.",
     "scopesNote": "Sohbetlere, dosyalara ve aramaya erişim verir. Anahtar platformda kalır — buraya yazmazsınız.",
     "connecting": "Bağlanıyor…",

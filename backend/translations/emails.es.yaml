@@ -34,6 +34,14 @@ email:
     subject_named: '%name% — Sus resultados de Synaplan'
     sent_confirmation: 'Los resultados se han enviado por correo a %email%.'
 
+  cloud_grant:
+    connected:
+      subject: 'Una nube ya puede actuar en tu cuenta de Synaplan'
+      body: '%client% en %host% puede actuar en Synaplan para la cuenta %external_id%. Si no has sido tú, desconéctala en Apps.'
+    lost:
+      subject: 'Una nube se ha desconectado de tu cuenta de Synaplan'
+      body: '%client% en %host% ya no está conectada a tu cuenta (%external_id%).'
+
   footer:
     support: 'Si tiene problemas, póngase en contacto con nuestro equipo de soporte.'
     help: '¿Necesita ayuda? Consulte nuestra documentación o contacte con el soporte.'

@@ -232,6 +232,11 @@ class PlatformInstance
         return $this->registeredBy;
     }
 
+    public function setRegisteredBy(int $registeredBy): void
+    {
+        $this->registeredBy = $registeredBy;
+    }
+
     public function getStatus(): string
     {
         return $this->status;

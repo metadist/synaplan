@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller\OAuth;
 
+use App\Entity\ApiKey;
 use App\Entity\ExternalIdentity;
 use App\Repository\ExternalIdentityRepository;
+use App\Service\Iam\UserLifecycleService;
+use App\Service\OAuth\Server\RegistrationPolicy;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -69,9 +72,10 @@ final class OAuthServerFlowTest extends WebTestCase
         $verifier = bin2hex(random_bytes(32));
 
         $code = $this->consent($clientId, $user, $verifier, 'ada');
-        $identity = static::getContainer()->get(ExternalIdentityRepository::class)->findOneByTriple('nextcloud', $clientId, 'ada');
-        self::assertInstanceOf(ExternalIdentity::class, $identity);
-        self::assertSame((int) $user->getId(), $identity->getUserId());
+        self::assertNull(
+            static::getContainer()->get(ExternalIdentityRepository::class)->findOneByTriple('nextcloud', $clientId, 'ada'),
+            'allowing does not connect anything until the cloud redeems the code',
+        );
 
         $this->client->getCookieJar()->clear();
         $assertion = $this->assertion($clientId, '/oauth/token');
@@ -89,7 +93,10 @@ final class OAuthServerFlowTest extends WebTestCase
             array_slice(explode('.', (string) $tokens['access_token']), 0, 2),
         );
         self::assertSame('at+jwt', $header['typ']);
-        self::assertSame([$this->issuer(), $clientId, (string) $user->getId()], [$payload['iss'], $payload['client_id'], $payload['sub']]);
+        self::assertSame([$this->issuer(), $clientId, (string) $user->getId(), 'ada'], [$payload['iss'], $payload['client_id'], $payload['sub'], $payload['external_id']]);
+        $identity = static::getContainer()->get(ExternalIdentityRepository::class)->findOneByTriple('nextcloud', $clientId, 'ada');
+        self::assertInstanceOf(ExternalIdentity::class, $identity);
+        self::assertSame((int) $user->getId(), $identity->getUserId());
 
         $bearer = ['HTTP_AUTHORIZATION' => 'Bearer '.$tokens['access_token']];
         $this->client->request('GET', '/api/v1/files', server: $bearer);
@@ -184,5 +191,91 @@ final class OAuthServerFlowTest extends WebTestCase
 
         $this->client->request('GET', '/oauth/register/'.$clientId, server: ['HTTP_AUTHORIZATION' => 'Bearer not-an-assertion']);
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testOneCloudAccountDoesNotUnlockAnother(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $user = $this->person();
+        $ada = $this->grant($clientId, $user, 'ada');
+        $grace = $this->grant($clientId, $user, 'grace');
+
+        $this->lifecycle($clientId, 'ada', 'disabled');
+        $this->client->request('GET', '/api/v1/files', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$ada['access_token']]);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN, 'the disabled account stays disabled');
+        $this->client->request('GET', '/api/v1/files', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$grace['access_token']]);
+        self::assertResponseIsSuccessful('the other account of the same person keeps working');
+
+        $this->form('/oauth/revoke', ['token' => (string) $ada['refresh_token']], $this->assertion($clientId, '/oauth/revoke'));
+        self::assertResponseIsSuccessful();
+        $this->em->clear();
+        $identities = static::getContainer()->get(ExternalIdentityRepository::class);
+        self::assertSame(ExternalIdentity::STATUS_REVOKED, $identities->findOneByTriple('nextcloud', $clientId, 'ada')?->getStatus());
+        self::assertSame(ExternalIdentity::STATUS_ACTIVE, $identities->findOneByTriple('nextcloud', $clientId, 'grace')?->getStatus());
+        $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => (string) $grace['refresh_token']]);
+        self::assertResponseIsSuccessful('revoking one account does not spend the other');
+    }
+
+    public function testAnAccessTokenDoesNotWidenAnApiKey(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $tokens = $this->grant($clientId, $this->person(), 'mallory');
+        $owner = $this->person();
+        $plain = 'sk_'.bin2hex(random_bytes(20));
+        $this->em->persist((new ApiKey())
+            ->setOwner($owner)
+            ->setKey($plain)
+            ->setStatus('active')
+            ->setName('Meeting notes')
+            ->setScopes(['audio:transcribe']));
+        $this->em->flush();
+
+        $this->client->request('GET', '/api/v1/chats', server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$tokens['access_token'],
+            'HTTP_X_API_KEY' => $plain,
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        $this->client->request('GET', '/api/v1/chats?api_key='.$plain, server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$tokens['access_token'],
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+    }
+
+    public function testConsentIgnoresABodyThatIsNotJson(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $request = $this->pushedRequest($clientId, bin2hex(random_bytes(32)), 'ada');
+        $this->authenticateClient($this->client, $this->person());
+
+        $this->client->request('POST', '/api/v1/oauth/consent/'.$request, server: ['CONTENT_TYPE' => 'text/plain'], content: '{"approve":true}');
+        self::assertResponseStatusCodeSame(Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
+        $redirect = $this->decide($request, true);
+        self::assertStringStartsWith($this->redirectUri(), $redirect);
+    }
+
+    public function testChangingARegistrationNeedsAnAssertionForThatEndpoint(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $this->client->request('GET', '/oauth/register/'.$clientId, server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->assertion($clientId, '/oauth/token', times: ['aud' => $this->issuer()]),
+        ]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'an assertion made for the token endpoint cannot read the registration');
+    }
+
+    public function testEndingThePersonsSessionsEndsTheCloudGrant(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $user = $this->person();
+        $tokens = $this->grant($clientId, $user, 'ada');
+
+        static::getContainer()->get(UserLifecycleService::class)->endCloudGrants($user);
+        $this->client->request('GET', '/api/v1/files', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$tokens['access_token']]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+    }
+
+    public function testAShortRegistrationTokenIsRefusedAtStartup(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new RegistrationPolicy('token', 'short-token');
     }
 }

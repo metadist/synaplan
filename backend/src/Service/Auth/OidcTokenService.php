@@ -4,6 +4,7 @@ namespace App\Service\Auth;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\PlatformLink\PlatformBearerAttribution;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -43,6 +44,17 @@ final class OidcTokenService
         private string $oidcDiscoveryUrl,
         private string $oidcBearerAudience = '',
     ) {
+    }
+
+    private ?PlatformBearerAttribution $clouds = null;
+
+    /**
+     * Wired from the container. A constructor argument would grow a
+     * constructor that is already over the size limit.
+     */
+    public function setClouds(PlatformBearerAttribution $clouds): void
+    {
+        $this->clouds = $clouds;
     }
 
     /**
@@ -214,6 +226,15 @@ final class OidcTokenService
             // fall back to the internal app token on null, which would keep a
             // person signed in after their organization or role was revoked.
             $this->accessPolicy->assertAllowed($claims, 'session');
+
+            // A cloud's token is limited on the bearer path. Presented as the
+            // session cookie it would be a full session, so it is refused here.
+            $azp = $claims['azp'] ?? null;
+            if (is_string($azp) && $azp !== $this->oidcClientId && true === $this->clouds?->namesCloud($claims)) {
+                $this->logger->warning('A cloud client token was presented as a session cookie', ['azp' => $azp]);
+
+                return null;
+            }
 
             // Return claims in same format as before (for compatibility)
             return [

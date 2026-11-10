@@ -96,6 +96,7 @@
       "memories": "Lire et enregistrer vos mémoires Synaplan"
     },
     "revocableNote": "Vous pouvez déconnecter à tout moment dans Synaplan, sous Apps.",
+    "unreviewed": "Ce cloud s'est inscrit lui-même. Aucun administrateur ne l'a approuvé. Continuez seulement si vous connaissez ce serveur.",
     "errorExpired": "Cette demande de connexion a expiré ou a déjà été utilisée. Recommencez depuis l’autre application.",
     "scopesNote": "Accorde l’accès aux discussions, fichiers et recherche. La clé reste sur la plateforme — vous ne la saisissez pas.",
     "connecting": "Connexion…",

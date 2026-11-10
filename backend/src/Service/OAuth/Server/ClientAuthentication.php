@@ -55,7 +55,7 @@ final readonly class ClientAuthentication
      * The client of a request about one client (its configuration, its
      * people): the assertion is the bearer token and must be $clientId's.
      *
-     * @param list<string> $paths     endpoint paths accepted as audience besides the issuer
+     * @param list<string> $paths     endpoint paths accepted as audience. The bare issuer is not one: an assertion made for the token endpoint must not change this registration.
      * @param bool         $pendingOk whether a client still waiting for approval may authenticate
      *
      * @throws ClientAuthenticationException
@@ -65,7 +65,7 @@ final readonly class ClientAuthentication
         $this->assertNotThrottled($request);
         $header = (string) $request->headers->get('Authorization', '');
         $instance = str_starts_with($header, 'Bearer ')
-            ? $this->assertions->verify(trim(substr($header, 7)), array_map($this->url(...), $paths), $pendingOk)
+            ? $this->assertions->verify(trim(substr($header, 7)), array_map($this->url(...), $paths), $pendingOk, false)
             : null;
         if (!$instance instanceof PlatformInstance || $instance->getInstanceId() !== $clientId) {
             throw $this->failed($request);

@@ -144,7 +144,7 @@ final readonly class PlatformLinkExchangeService
             }
         }
         if ('' !== $identity->getInstanceId()) {
-            $this->oauthTokens->revokeAll($identity->getInstanceId(), $userId);
+            $this->oauthTokens->revokeAll($identity->getInstanceId(), $userId, $identity->getExternalId());
         }
         $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
         $identity->setRevokedAt(time());

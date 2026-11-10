@@ -96,6 +96,7 @@
       "memories": "Leer y guardar tus recuerdos de Synaplan"
     },
     "revocableNote": "Puedes desconectar en cualquier momento en Synaplan, en Apps.",
+    "unreviewed": "Esta nube se registró sola. Ningún administrador la ha aprobado. Continúa solo si conoces este servidor.",
     "errorExpired": "Esta solicitud de conexión ha caducado o ya se ha usado. Empieza de nuevo en la otra aplicación.",
     "scopesNote": "Concede acceso a chats, archivos y búsqueda. La clave permanece en la plataforma: no la escribes aquí.",
     "connecting": "Conectando…",
