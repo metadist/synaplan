@@ -2,6 +2,8 @@
 
 namespace App\Controller;
 
+use App\DTO\LevelChangeNotice;
+use App\DTO\LevelGrantView;
 use App\Entity\Prompt;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
@@ -9,12 +11,12 @@ use App\Repository\PromptRepository;
 use App\Repository\UseLogRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminPeopleAccountService;
-use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\GroupService;
 use App\Service\Iam\IamConfig;
 use App\Service\Iam\UserDeletionService;
 use App\Service\Usage\UsageStatsService;
 use Doctrine\ORM\EntityManagerInterface;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -38,7 +40,6 @@ class AdminController extends AbstractController
         private IamConfig $iamConfig,
         private GroupService $groupService,
         private ExternalIdentityRepository $externalIdentityRepository,
-        private AuditLogWriter $auditLogWriter,
         private LoggerInterface $logger,
         private AdminPeopleAccountService $peopleAccounts,
     ) {
@@ -98,6 +99,12 @@ class AdminController extends AbstractController
                             new OA\Property(property: 'created', type: 'string', format: 'date-time', example: '2024-01-15T10:30:00+00:00'),
                             new OA\Property(property: 'isAdmin', type: 'boolean', example: false),
                             new OA\Property(property: 'locale', type: 'string', example: 'en'),
+                            new OA\Property(
+                                property: 'grants',
+                                type: 'array',
+                                description: 'Why the account has its level. The level is the highest of these.',
+                                items: new OA\Items(ref: new Model(type: LevelGrantView::class)),
+                            ),
                             new OA\Property(
                                 property: 'groups',
                                 type: 'array',
@@ -174,49 +181,7 @@ class AdminController extends AbstractController
             }
         }
 
-        $usersData = array_map(function (User $u) use ($iamEnabled, $groupsByUser, $identitiesByUser) {
-            // Get email from BMAIL field
-            $email = $u->getMail();
-
-            // If email is empty or invalid, check BUSERDETAILS for phone number
-            if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $userDetails = $u->getUserDetails();
-                // Check for phone_number (verified phone) or anonymous_phone
-                $phone = $userDetails['phone_number'] ?? $userDetails['anonymous_phone'] ?? null;
-                if (!empty($phone)) {
-                    // Use phone number as email identifier
-                    $email = $phone;
-                } else {
-                    // No email and no phone - set to null
-                    $email = null;
-                }
-            }
-
-            // Ensure level is valid, default to 'NEW' if invalid
-            $level = $u->getUserLevel();
-            $validLevels = ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
-            if (!in_array($level, $validLevels, true)) {
-                $level = 'NEW';
-            }
-
-            $row = [
-                'id' => $u->getId(),
-                'email' => $email,
-                'level' => $level,
-                'type' => $u->getType(),
-                'providerId' => $u->getProviderId(),
-                'emailVerified' => $u->isEmailVerified(),
-                'created' => $u->getCreated(),
-                'isAdmin' => $u->isAdmin(),
-                'locale' => $u->getLocale(),
-            ];
-            if ($iamEnabled) {
-                $row['groups'] = $groupsByUser[(int) $u->getId()] ?? [];
-                $row['identities'] = array_values(array_unique($identitiesByUser[(int) $u->getId()] ?? []));
-            }
-
-            return $row;
-        }, $users);
+        $usersData = $this->peopleAccounts->listRows($users, $iamEnabled, $groupsByUser, $identitiesByUser);
 
         return $this->json([
             'users' => $usersData,
@@ -302,11 +267,37 @@ class AdminController extends AbstractController
         content: new OA\JsonContent(
             required: ['level'],
             properties: [
-                new OA\Property(property: 'level', type: 'string', enum: ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
+                new OA\Property(property: 'level', type: 'string', enum: ['NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'PRO'),
             ]
         )
     )]
-    #[OA\Response(response: 200, description: 'User level updated')]
+    #[OA\Response(
+        response: 200,
+        description: 'User level updated. level is the highest grant, which can be higher than the requested one.',
+        content: new OA\JsonContent(
+            required: ['success', 'user', 'notice'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'user',
+                    type: 'object',
+                    required: ['id', 'email', 'level', 'grants'],
+                    properties: [
+                        new OA\Property(property: 'id', type: 'integer', example: 2),
+                        new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
+                        new OA\Property(property: 'level', type: 'string', enum: ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'], example: 'BUSINESS'),
+                        new OA\Property(property: 'grants', type: 'array', items: new OA\Items(ref: new Model(type: LevelGrantView::class))),
+                    ]
+                ),
+                new OA\Property(
+                    property: 'notice',
+                    nullable: true,
+                    allOf: [new OA\Schema(ref: new Model(type: LevelChangeNotice::class))],
+                ),
+            ]
+        )
+    )]
+    #[OA\Response(response: 400, description: 'Invalid level')]
     #[OA\Response(response: 403, description: 'Not authorized or cannot change own level')]
     #[OA\Response(response: 404, description: 'User not found')]
     #[OA\Response(response: 409, description: 'Cannot demote the last administrator')]
@@ -325,58 +316,25 @@ class AdminController extends AbstractController
         }
 
         $data = json_decode($request->getContent(), true);
-        $newLevel = $data['level'] ?? '';
+        $newLevel = is_array($data) ? (string) ($data['level'] ?? '') : '';
 
-        $allowedLevels = ['ANONYMOUS', 'NEW', 'PRO', 'TEAM', 'BUSINESS', 'ADMIN'];
-        if (!in_array($newLevel, $allowedLevels)) {
+        try {
+            $result = $this->peopleAccounts->changeLevel($user, $targetUser, $newLevel, (string) $request->getClientIp());
+        } catch (\InvalidArgumentException) {
             return $this->json(['error' => 'Invalid level'], Response::HTTP_BAD_REQUEST);
         }
 
-        // The last-admin check and the level update run in one transaction with
-        // the admin rows locked: two concurrent demotions must not both
-        // observe a count of 2 and together remove the last administrator.
-        // Guard order inside: demoting the only administrator — necessarily
-        // yourself — reports the operational reason (409), any other
-        // self-change reports the generic one (403).
-        $oldLevel = $targetUser->getUserLevel();
-        $selfChange = $user->getId() === $id;
-        $outcome = $this->em->wrapInTransaction(function () use ($targetUser, $newLevel, $oldLevel, $selfChange, $user, $id, $request): string {
-            if ('ADMIN' === $oldLevel && 'ADMIN' !== $newLevel && 1 >= $this->userRepository->countAdminsForUpdate()) {
-                return 'conflict';
-            }
-            if ($selfChange) {
-                return 'forbidden';
-            }
-
-            $targetUser->setUserLevel($newLevel);
-            $this->auditLogWriter->record(
-                (int) $user->getId(),
-                'admin.user_level_change',
-                'user',
-                (string) $id,
-                [
-                    'target_email' => $targetUser->getMail(),
-                    'old_level' => $oldLevel,
-                    'new_level' => $newLevel,
-                ],
-                (string) $request->getClientIp(),
-            );
-            $this->em->flush();
-
-            return 'ok';
-        });
-
-        if ('conflict' === $outcome) {
+        if ('conflict' === $result['outcome']) {
             return $this->json(['error' => 'Cannot demote the last administrator'], Response::HTTP_CONFLICT);
         }
-        if ('forbidden' === $outcome) {
+        if ('forbidden' === $result['outcome']) {
             return $this->json(['error' => 'Cannot change your own level'], Response::HTTP_FORBIDDEN);
         }
 
         $this->logger->info('Admin updated user level', [
             'admin_id' => $user->getId(),
             'target_user_id' => $id,
-            'old_level' => $oldLevel,
+            'old_level' => $targetUser->getUserLevel(),
             'new_level' => $newLevel,
         ]);
 
@@ -386,7 +344,9 @@ class AdminController extends AbstractController
                 'id' => $targetUser->getId(),
                 'email' => $targetUser->getMail(),
                 'level' => $targetUser->getUserLevel(),
+                'grants' => $result['grants'],
             ],
+            'notice' => $result['notice'],
         ]);
     }
 

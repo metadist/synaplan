@@ -24,6 +24,7 @@ use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationExc
 
 class OidcUserServiceTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private UserRepository&MockObject $userRepository;
     private EntityManagerInterface&MockObject $em;
     private ModelConfigService&MockObject $modelConfigService;
@@ -59,7 +60,7 @@ class OidcUserServiceTest extends TestCase
         $sync = $this->createMock(DirectoryGroupSync::class);
         $sync->method('shouldRun')->willReturn(false);
 
-        return new OidcUserService(
+        $service = new OidcUserService(
             $this->userRepository,
             $this->em,
             $this->modelConfigService,
@@ -73,6 +74,9 @@ class OidcUserServiceTest extends TestCase
             $oidcClientId,
             'https://idp.example/realms/synaplan/.well-known/openid-configuration',
         );
+        $service->setLevelGrants($this->levelGrants());
+
+        return $service;
     }
 
     private function getPrivateProperty(object $object, string $property): mixed
@@ -244,7 +248,34 @@ class OidcUserServiceTest extends TestCase
             'realm_access' => ['roles' => ['default-roles-synaplan']],
         ]);
 
-        $this->assertSame('NEW', $result->getUserLevel());
+        // A local administrator has no directory grant. Losing a role that
+        // was never what made them an administrator leaves them one.
+        $this->assertSame('ADMIN', $result->getUserLevel());
+    }
+
+    public function testADirectoryAdminDropsWhenTheRoleLeaves(): void
+    {
+        $service = $this->createService('administrator');
+        $user = $this->makeKeycloakUser('directory-admin@example.com', 'NEW');
+
+        $this->userRepository->method('findOneBy')->willReturn($user);
+        $this->em->expects($this->exactly(2))->method('persist');
+        $this->em->expects($this->exactly(2))->method('flush');
+
+        $service->findOrCreateFromClaims([
+            'sub' => 'sub-dir',
+            'email' => 'directory-admin@example.com',
+            'realm_access' => ['roles' => ['administrator']],
+        ]);
+        $this->assertSame('ADMIN', $user->getUserLevel());
+
+        $service->findOrCreateFromClaims([
+            'sub' => 'sub-dir',
+            'email' => 'directory-admin@example.com',
+            'realm_access' => ['roles' => ['member']],
+        ]);
+
+        $this->assertSame('NEW', $user->getUserLevel());
     }
 
     public function testKeepsAdminWhenOidcRoleStillPresent(): void

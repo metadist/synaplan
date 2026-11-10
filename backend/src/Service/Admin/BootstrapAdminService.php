@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Admin;
 
 use App\Repository\UserRepository;
+use App\Service\Iam\LevelGrantService;
+use App\Service\Iam\LevelGrantSource;
 use App\Service\Iam\UserLifecycleService;
 use App\Service\Setup\SetupStateService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,6 +47,7 @@ final readonly class BootstrapAdminService
         private LockFactory $lockFactory,
         private SetupStateService $setupState,
         private LoggerInterface $logger,
+        private LevelGrantService $levelGrants,
     ) {
     }
 
@@ -79,7 +82,7 @@ final readonly class BootstrapAdminService
 
             $user = $this->userRepository->findByEmail($email);
             if (null !== $user) {
-                $user->setUserLevel('ADMIN');
+                $this->levelGrants->replace($user, LevelGrantSource::BOOTSTRAP, 'ADMIN', null, null);
                 $user->setEmailVerified(true);
                 $user->setPw($this->passwordHasher->hashPassword($user, $password));
                 $user->setMustChangePassword($forcePasswordChange);

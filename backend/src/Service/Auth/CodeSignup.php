@@ -141,7 +141,7 @@ final readonly class CodeSignup
         try {
             // Unverified first, then the false-to-true change, so the local
             // account receives the same default plugins as any other signup.
-            $user = $this->lifecycle->createUser($data['email'], null, 'local', 'WEB', $code->getLevel(), false);
+            $user = $this->lifecycle->createUser($data['email'], null, 'local', 'WEB', 'NEW', false);
             $this->lifecycle->markEmailVerified($user);
             $this->admission->commitCode($user, $code);
         } catch (SignupBlockedException|\InvalidArgumentException|UniqueConstraintViolationException) {

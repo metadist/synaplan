@@ -1043,6 +1043,10 @@ services:
             - [setClouds, ['@App\Service\PlatformLink\PlatformBearerAttribution']]
 
     # OIDC User Provisioning Service (shared by controller + bearer authenticator)
+    App\Service\Iam\LegacyLevelGrants:
+        arguments:
+            $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'
+
     App\Service\OidcUserService:
         arguments:
             $oidcAdminRoles: '%env(string:OIDC_ADMIN_ROLES)%'

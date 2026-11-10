@@ -6,6 +6,8 @@ namespace App\Service\Iap;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Iam\LevelGrantService;
+use App\Service\Iam\LevelGrantSource;
 use App\Service\Iap\Exception\IapConflictException;
 use App\Service\Iap\Exception\IapNotConfiguredException;
 use App\Service\Iap\Exception\IapVerificationException;
@@ -38,6 +40,7 @@ final readonly class MobilePurchaseService
         private AppleReceiptVerifierInterface $appleVerifier,
         private GooglePlayVerifierInterface $googleVerifier,
         private LoggerInterface $logger,
+        private LevelGrantService $levelGrants,
     ) {
     }
 
@@ -181,14 +184,19 @@ final readonly class MobilePurchaseService
     }
 
     /**
-     * Persist the entitlement onto the user: set the level when access is
-     * granted (active/grace), downgrade to NEW otherwise, and stamp the
-     * channel-aware `subscription` record. Mirrors the Stripe webhook's shape.
+     * Persist the entitlement onto the user. The grant is written while the
+     * previous subscription record is still in place, so a lapse takes back
+     * only the app-store grant and a first purchase is not protected as an
+     * administrator's decision.
      */
     private function applyEntitlement(User $user, IapEntitlement $entitlement, string $tier): void
     {
         $grants = $entitlement->grantsAccess();
-        $user->setUserLevel($grants ? $tier : 'NEW');
+        if ($grants) {
+            $this->levelGrants->replace($user, LevelGrantSource::IAP, $tier, null, null);
+        } else {
+            $this->levelGrants->remove($user, LevelGrantSource::IAP);
+        }
 
         $paymentDetails = $user->getPaymentDetails();
         $idKey = IapPlatform::APPLE === $entitlement->platform

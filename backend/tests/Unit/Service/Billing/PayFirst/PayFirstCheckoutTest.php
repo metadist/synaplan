@@ -23,6 +23,7 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
  */
 final class PayFirstCheckoutTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private RecordingGateway $gateway;
 
     protected function setUp(): void
@@ -129,7 +130,7 @@ final class PayFirstCheckoutTest extends TestCase
 
         return new PayFirstCheckout(
             $this->gateway,
-            new StripeEntitlement($this->createStub(SignupAnomalyAlert::class), new NullLogger(), 'price_pro', $team, 'price_business'),
+            new StripeEntitlement($this->createStub(SignupAnomalyAlert::class), new NullLogger(), 'price_pro', $team, 'price_business', $this->levelGrants()),
             new PlanAvailability($billing, $catalogue),
             new RateLimiterFactory(['id' => 'checkout_start_ip', 'policy' => 'sliding_window', 'limit' => $perIp, 'interval' => '1 hour'], new InMemoryStorage()),
             new RateLimiterFactory(['id' => 'checkout_start_email', 'policy' => 'sliding_window', 'limit' => $perEmail, 'interval' => '1 day'], new InMemoryStorage()),

@@ -1,12 +1,12 @@
 {
     "_comment": "Thin-controller ledger (tests/Architecture/ThinControllerTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_THIN_CONTROLLER=1 and review the diff.",
     "recorded": "2026-10-17",
-    "updated": "2026-11-04",
+    "updated": "2026-11-10",
     "limits": {
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 102,
+        "methodLines": 101,
         "entityManager": 14,
         "aiFacade": 5
     },
@@ -14,7 +14,6 @@
         "src/Controller/AI/HiggsfieldCredentialController.php::HiggsfieldCredentialController::test": 62,
         "src/Controller/AdminController.php::AdminController::getRegistrationAnalytics": 98,
         "src/Controller/AdminController.php::AdminController::getUsers": 98,
-        "src/Controller/AdminController.php::AdminController::updateUserLevel": 79,
         "src/Controller/AdminProviderKeysController.php::AdminProviderKeysController::save": 73,
         "src/Controller/ApiKeyController.php::ApiKeyController::update": 60,
         "src/Controller/AppleAuthController.php::AppleAuthController::callback": 58,

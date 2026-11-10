@@ -21,6 +21,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class UserLifecycleSignupTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
+
     public function testAdmissionIsCheckedBeforeTheAddressIsLookedUp(): void
     {
         $users = $this->createMock(UserRepository::class);
@@ -54,6 +56,7 @@ final class UserLifecycleSignupTest extends TestCase
             $this->createStub(TokenService::class),
             $this->registration(),
             $this->createStub(OAuthTokenRepository::class),
+            $this->levelGrants(),
         );
 
         self::assertNull($service->createSignup('known@example.com', 'secret', [], 'PRO', null, '203.0.113.9'));
@@ -73,6 +76,7 @@ final class UserLifecycleSignupTest extends TestCase
             $this->createStub(TokenService::class),
             $this->registration(true),
             $this->createStub(OAuthTokenRepository::class),
+            $this->levelGrants(),
         );
 
         $user = $open->buildExternalAccount(SignupDoor::Google, 'new@example.com', true);
@@ -89,6 +93,7 @@ final class UserLifecycleSignupTest extends TestCase
             $this->createStub(TokenService::class),
             $this->registration(false),
             $this->createStub(OAuthTokenRepository::class),
+            $this->levelGrants(),
         );
         $this->expectException(SignupBlockedException::class);
         $closed->buildExternalAccount(SignupDoor::Apple, 'new@example.com', true);
@@ -106,6 +111,7 @@ final class UserLifecycleSignupTest extends TestCase
             $this->createStub(TokenService::class),
             $this->registration(),
             $this->createStub(OAuthTokenRepository::class),
+            $this->levelGrants(),
         );
     }
 

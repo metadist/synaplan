@@ -91,4 +91,33 @@ class AuditLogEntryRepository extends ServiceEntityRepository
 
         return $deleted;
     }
+
+    /**
+     * The level an administrator set after a subscription started. The newest
+     * such change wins, including when it equals the Stripe tier.
+     */
+    public function levelSetAfter(int $userId, int $after): ?string
+    {
+        $level = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT JSON_UNQUOTE(JSON_EXTRACT(BSUBJECT, \'$.new_level\'))
+             FROM BAUDITLOG
+             WHERE BACTION = :action
+               AND BRESOURCEKIND = :kind
+               AND BRESOURCEID = :id
+               AND BCREATED > :after
+             ORDER BY BCREATED DESC
+             LIMIT 1',
+            [
+                'action' => 'admin.user_level_change',
+                'kind' => 'user',
+                'id' => (string) $userId,
+                'after' => $after,
+            ],
+        );
+        if (!is_string($level) || '' === $level) {
+            return null;
+        }
+
+        return strtoupper($level);
+    }
 }

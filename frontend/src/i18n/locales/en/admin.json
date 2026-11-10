@@ -232,9 +232,31 @@
       "levelUpdated": "User level updated to {level}",
       "levelUpdateFailed": "Failed to update user level",
       "levelConfirmTitle": "Change the level of {email}?",
-      "levelConfirmMessage": "{email} moves from {oldLevel} to {newLevel}. The new level applies immediately.",
+      "levelConfirmMessage": "{email} gets an administrator grant of {newLevel}. The account was {oldLevel}. A higher grant stays in place.",
       "levelConfirmAdmin": "{email} becomes an administrator with full access to every admin function. This applies immediately.",
       "levelConfirmAction": "Change level",
+      "grantNone": "No grant recorded.",
+      "grantRemove": "Remove admin grant",
+      "grantRemoveConfirm": "The admin grant of {removed} is removed. The account then keeps the highest grant that remains.",
+      "levelKept": "This account also has {level} through {source}; the level shown is the highest.",
+      "grantRemovedKeeps": "The admin grant of {removed} is removed. The account keeps {level} through {source}.",
+      "grantRemovedNow": "The admin grant of {removed} is removed. The account is now {level}.",
+      "levelName": {
+        "NEW": "New",
+        "PRO": "Pro",
+        "TEAM": "Team",
+        "BUSINESS": "Business",
+        "ADMIN": "Admin",
+        "ANONYMOUS": "Anonymous"
+      },
+      "grantSource": {
+        "stripe": "Stripe",
+        "iap": "the App Store",
+        "code": "a sign-up code",
+        "admin": "an administrator",
+        "directory": "the directory",
+        "bootstrap": "first-run setup"
+      },
       "loadFailed": "Failed to load users",
       "invalidResponse": "The server sent an unexpected response"
     },

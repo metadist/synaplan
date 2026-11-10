@@ -789,7 +789,7 @@ class SubscriptionController extends AbstractController
         if (!$customerId) {
             return $this->json([
                 'success' => true,
-                'level' => 'NEW',
+                'level' => $user->getUserLevel(),
                 'status' => 'no_customer',
                 'message' => 'No Stripe customer found',
             ]);
@@ -806,8 +806,8 @@ class SubscriptionController extends AbstractController
             ]);
 
             if (empty($subscriptions->data)) {
-                // No active subscriptions - downgrade to NEW
-                $user->setUserLevel('NEW');
+                // Take back the Stripe grant while the record still says active.
+                $this->entitlement->revokeStripe($user);
                 $paymentDetails = $user->getPaymentDetails();
                 if (isset($paymentDetails['subscription'])) {
                     $paymentDetails['subscription']['status'] = 'canceled';
@@ -817,7 +817,7 @@ class SubscriptionController extends AbstractController
 
                 return $this->json([
                     'success' => true,
-                    'level' => 'NEW',
+                    'level' => $user->getUserLevel(),
                     'status' => 'no_active_subscription',
                     'message' => 'No active subscription found in Stripe',
                 ]);

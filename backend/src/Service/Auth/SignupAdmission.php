@@ -8,6 +8,9 @@ use App\Entity\SignupCode;
 use App\Entity\User;
 use App\Repository\SignupCodeRepository;
 use App\Service\Billing\PlanAvailability;
+use App\Service\Iam\AccountLevel;
+use App\Service\Iam\LevelGrantService;
+use App\Service\Iam\LevelGrantSource;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -25,6 +28,7 @@ final readonly class SignupAdmission
         private SignupCodeRepository $codes,
         private EntityManagerInterface $em,
         private PlanAvailability $plans,
+        private LevelGrantService $levelGrants,
     ) {
     }
 
@@ -91,11 +95,9 @@ final readonly class SignupAdmission
             return;
         }
 
-        $code = $admission['code'];
-        if ($code instanceof SignupCode) {
-            $user->setUserLevel($code->getLevel());
+        if ($admission['code'] instanceof SignupCode) {
+            $user->setAccountStatus(User::ACCOUNT_STATUS_ACTIVE);
         }
-        $user->setAccountStatus(User::ACCOUNT_STATUS_ACTIVE);
     }
 
     /**
@@ -110,6 +112,11 @@ final readonly class SignupAdmission
             $this->em->flush();
 
             throw SignupBlockedException::codeInvalid();
+        }
+
+        $level = strtoupper($code->getLevel());
+        if (AccountLevel::known($level) && 'NEW' !== $level) {
+            $this->levelGrants->replace($user, LevelGrantSource::CODE, $level, (string) $code->getId(), null);
         }
 
         $this->em->flush();

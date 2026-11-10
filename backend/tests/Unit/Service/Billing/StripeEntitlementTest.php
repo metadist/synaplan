@@ -15,6 +15,7 @@ use Stripe\StripeObject;
 
 final class StripeEntitlementTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private const PRICE_PRO = 'price_pro';
     private const PRICE_TEAM = 'price_team';
     private const PRICE_BUSINESS = 'price_business';
@@ -31,6 +32,7 @@ final class StripeEntitlementTest extends TestCase
             self::PRICE_PRO,
             self::PRICE_TEAM,
             self::PRICE_BUSINESS,
+            $this->levelGrants(),
         );
     }
 
@@ -46,7 +48,7 @@ final class StripeEntitlementTest extends TestCase
 
     public function testAnEmptyConfiguredPriceNeverMatchesAnEmptyLookup(): void
     {
-        $entitlement = new StripeEntitlement($this->alert, new NullLogger(), '', '', '');
+        $entitlement = new StripeEntitlement($this->alert, new NullLogger(), '', '', '', $this->levelGrants());
 
         $this->assertSame('NEW', $entitlement->levelForPrice(''));
     }

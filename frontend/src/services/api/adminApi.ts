@@ -1,8 +1,11 @@
 // Admin API service
 import { httpClient } from './httpClient'
 import {
+  DeleteAdminRemoveAdminGrantResponseSchema,
   GetAdminGetUsersResponseSchema,
   GetAdminVoiceLiveSessionsResponseSchema,
+  LevelGrantView,
+  PatchAdminUpdateUserLevelResponseSchema,
   PostAdminCreateUserAccountResponseSchema,
   PostAdminVoiceLiveKillResponseSchema,
   PutAdminVoiceLiveWebrtcResponseSchema,
@@ -36,6 +39,10 @@ const FlexibleGetAdminUsersResponseSchema = GetAdminGetUsersResponseSchema.exten
 })
 
 export type GetAdminUsersResponse = z.infer<typeof FlexibleGetAdminUsersResponseSchema>
+export type LevelGrant = z.infer<typeof LevelGrantView>
+export type LevelChange =
+  | z.infer<typeof PatchAdminUpdateUserLevelResponseSchema>
+  | z.infer<typeof DeleteAdminRemoveAdminGrantResponseSchema>
 export type AdminUserSearchHit = NonNullable<
   z.infer<typeof SearchAdminUsersResponseSchema>['users']
 >[number]
@@ -117,17 +124,19 @@ export const adminApi = {
     return response
   },
 
-  async updateUserLevel(
-    userId: number,
-    level: string
-  ): Promise<{ success: boolean; user: AdminUser }> {
-    return httpClient<{ success: boolean; user: AdminUser }>(
-      `/api/v1/admin/users/${userId}/level`,
-      {
-        method: 'PATCH',
-        body: JSON.stringify({ level }),
-      }
-    )
+  async updateUserLevel(userId: number, level: string) {
+    return httpClient(`/api/v1/admin/users/${userId}/level`, {
+      method: 'PATCH',
+      body: JSON.stringify({ level }),
+      schema: PatchAdminUpdateUserLevelResponseSchema,
+    })
+  },
+
+  async removeAdminGrant(userId: number) {
+    return httpClient(`/api/v1/admin/users/${userId}/grants/admin`, {
+      method: 'DELETE',
+      schema: DeleteAdminRemoveAdminGrantResponseSchema,
+    })
   },
 
   async createUserAccount(input: {

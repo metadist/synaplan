@@ -10,9 +10,12 @@ use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcAccessPolicy;
 use App\Service\Auth\OidcClaimResolver;
 use App\Service\Iam\DirectoryGroupSync;
+use App\Service\Iam\LevelGrantService;
+use App\Service\Iam\LevelGrantSource;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Shared OIDC user provisioning service.
@@ -27,6 +30,8 @@ class OidcUserService
 
     /** @var array<array<string>> */
     private array $roleClaimPaths;
+
+    private ?LevelGrantService $levelGrantService = null;
 
     public function __construct(
         private UserRepository $userRepository,
@@ -44,6 +49,16 @@ class OidcUserService
     ) {
         $this->adminRoleNames = array_map('strtolower', array_map('trim', explode(',', $oidcAdminRoles)));
         $this->roleClaimPaths = $this->claimResolver->paths($oidcRoleClaims, $oidcClientId);
+    }
+
+    /**
+     * Setter so this class does not grow a constructor argument. The
+     * constructor is already at the size limit.
+     */
+    #[Required]
+    public function setLevelGrants(LevelGrantService $levelGrants): void
+    {
+        $this->levelGrantService = $levelGrants;
     }
 
     /**
@@ -95,7 +110,6 @@ class OidcUserService
             $user->setMail($email ?? $username.'@keycloak.local');
             $user->setType('WEB');
             $user->setProviderId('keycloak');
-            $user->setUserLevel('NEW');
             $user->setEmailVerified(true);
             $user->setCreated(date('Y-m-d H:i:s'));
             $user->setUserDetails([]);
@@ -110,11 +124,17 @@ class OidcUserService
         $this->updateUserDetails($user, $claims, $refreshToken);
         if ($isNewUser) {
             $user->applySignupLanguage($signupLanguage);
+        } else {
+            $this->syncRoles($user, $claims);
         }
-        $this->syncRoles($user, $claims);
 
         $this->em->persist($user);
         $this->em->flush();
+        if ($isNewUser) {
+            // The directory grant needs an id. Syncing before the first flush
+            // would keep it in memory and lose it.
+            $this->syncRoles($user, $claims);
+        }
         $lastSeen = $this->lastSeenForClaims($user, $claims);
         $this->upsertExternalIdentity($user, $claims);
         if ($this->directoryGroupSync->shouldRun($user, $refreshToken, $lastSeen)) {
@@ -149,15 +169,26 @@ class OidcUserService
         $userDetails['oidc_roles'] = $oidcRoles;
         $user->setUserDetails($userDetails);
 
+        $grants = $this->levelGrantService;
+        if (!$grants instanceof LevelGrantService) {
+            throw new \LogicException('Level grants are not wired.');
+        }
+
+        $wasAdmin = 'ADMIN' === $user->getUserLevel();
         $hasAdmin = !empty(array_intersect(array_map('strtolower', $oidcRoles), $this->adminRoleNames));
-        if ($hasAdmin && 'ADMIN' !== $user->getUserLevel()) {
-            $user->setUserLevel('ADMIN');
+        if ($hasAdmin) {
+            $grants->replace($user, LevelGrantSource::DIRECTORY, 'ADMIN', null, null);
+        } else {
+            // Remove only the directory grant. A local administrator has a
+            // bootstrap grant and stays an administrator.
+            $grants->remove($user, LevelGrantSource::DIRECTORY);
+        }
+        if (!$wasAdmin && 'ADMIN' === $user->getUserLevel()) {
             $this->logger->info('User promoted to ADMIN via OIDC role', [
                 'user_id' => $user->getId(),
                 'oidc_roles' => $oidcRoles,
             ]);
-        } elseif (!$hasAdmin && 'ADMIN' === $user->getUserLevel()) {
-            $user->setUserLevel('NEW');
+        } elseif ($wasAdmin && 'ADMIN' !== $user->getUserLevel()) {
             $this->logger->info('User demoted from ADMIN — OIDC roles no longer include admin', [
                 'user_id' => $user->getId(),
                 'oidc_roles' => $oidcRoles,

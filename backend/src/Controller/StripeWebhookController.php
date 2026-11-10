@@ -405,8 +405,8 @@ class StripeWebhookController extends AbstractController
         // Only downgrade if this is the CURRENT active subscription being deleted
         // This prevents race conditions where old subscription deletions reset the level
         if ($currentSubscriptionId === $subscription->id) {
-            // Downgrade to NEW
-            $user->setUserLevel('NEW');
+            // Take back only the Stripe grant. A higher grant stays.
+            $this->entitlement->revokeStripe($user);
 
             $paymentDetails['subscription']['status'] = 'canceled';
             $paymentDetails['subscription']['canceled_at'] = time();
