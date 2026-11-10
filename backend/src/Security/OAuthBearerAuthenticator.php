@@ -37,6 +37,7 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
 {
     public const CLIENT_ATTRIBUTE = 'oauth_client_id';
     public const SCOPES_ATTRIBUTE = 'oauth_scopes';
+    public const EXTERNAL_ID_ATTRIBUTE = 'oauth_external_id';
 
     public function __construct(
         private readonly AccessTokenValidator $tokens,
@@ -104,6 +105,7 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
 
         $request->attributes->set(self::CLIENT_ATTRIBUTE, $instance->getInstanceId());
         $request->attributes->set(self::SCOPES_ATTRIBUTE, $claims['scopes']);
+        $request->attributes->set(self::EXTERNAL_ID_ATTRIBUTE, $externalId);
 
         return new SelfValidatingPassport(new UserBadge((string) $claims['user_id']));
     }

@@ -189,8 +189,8 @@ const busyLabel = computed(() => {
   return key ? t(key) : ''
 })
 const permissions = computed(() =>
-  (consent.value?.scopes ?? []).flatMap((scope) =>
-    scope in PERMISSION_KEYS ? [PERMISSION_KEYS[scope]] : []
+  (consent.value?.scopes ?? []).map((scope) =>
+    scope in PERMISSION_KEYS ? PERMISSION_KEYS[scope] : scope
   )
 )
 

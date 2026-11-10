@@ -89,7 +89,7 @@
     "denyButton": "Deny",
     "permissionsTitle": "{client} will be able to:",
     "permissions": {
-      "chat": "Use Synaplan's AI for you: chat, summaries and generated media",
+      "chat": "Use Synaplan's AI for you, including your existing chats, and create summaries and media",
       "files": "Read your Synaplan files and add new ones",
       "rag": "Search your Synaplan knowledge",
       "watch": "Have Synaplan watch files in your cloud and react to changes",
