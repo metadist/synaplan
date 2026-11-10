@@ -78,7 +78,7 @@ final readonly class WhatsAppIntake
             throw WhatsAppMessageAnswered::with($early);
         }
 
-        if (!$isAnonymous && null !== ($closed = AccountAccess::credential($user))) {
+        if (null !== ($closed = AccountAccess::credential($user))) {
             $this->logger->warning('WhatsApp message refused for a closed account', [
                 'user_id' => $user->getId(),
                 'code' => $closed,

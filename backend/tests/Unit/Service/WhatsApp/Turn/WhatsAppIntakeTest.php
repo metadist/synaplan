@@ -84,6 +84,17 @@ final class WhatsAppIntakeTest extends TestCase
         self::assertSame(0, $this->limitChecks);
     }
 
+    public function testASuspendedAnonymousSenderIsRefusedBeforeTheLimit(): void
+    {
+        try {
+            $this->admit(self::text(), anonymous: true, status: User::ACCOUNT_STATUS_SUSPENDED);
+            self::fail('A suspended sender does not get a reply.');
+        } catch (WhatsAppMessageAnswered $answered) {
+            self::assertSame('This account cannot receive replies.', $answered->answer['error']);
+        }
+        self::assertSame(0, $this->limitChecks);
+    }
+
     private function admit(
         IncomingMessageDto $dto,
         bool $anonymous = false,
