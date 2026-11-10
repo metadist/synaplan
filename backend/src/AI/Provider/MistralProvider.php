@@ -11,6 +11,7 @@ use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
+use App\AI\Stream\OpenAiChatCompletionsDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
@@ -207,68 +208,28 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
             $response->getHeaders();
 
             $usage = $this->parseUsage([]);
-            $finishReason = null;
-            $buffer = '';
+            $decoder = new OpenAiChatCompletionsDecoder(false);
 
             foreach ($this->httpClient->stream($response) as $chunk) {
-                $buffer .= $chunk->getContent();
-
-                while (false !== ($pos = strpos($buffer, "\n"))) {
-                    $line = trim(substr($buffer, 0, $pos));
-                    $buffer = substr($buffer, $pos + 1);
-
-                    if ('' === $line || !str_starts_with($line, 'data:')) {
-                        continue;
+                foreach ($decoder->feed($chunk->getContent()) as $piece) {
+                    if ('error' === $piece->kind && is_array($piece->data)) {
+                        throw $this->streamFailure($piece->data);
                     }
-
-                    $payload = trim(substr($line, 5));
-                    if ('' === $payload || '[DONE]' === $payload) {
-                        continue;
+                    if ('reasoning' === $piece->kind && is_string($piece->data)) {
+                        $callback(['type' => 'reasoning', 'content' => $piece->data]);
                     }
-
-                    try {
-                        $decoded = json_decode($payload, true, 512, \JSON_THROW_ON_ERROR);
-                    } catch (\JsonException) {
-                        continue;
+                    if ('content' === $piece->kind) {
+                        $this->emitContentParts($piece->data, $callback);
                     }
-
-                    if (!is_array($decoded)) {
-                        continue;
+                    if ('tool_choice' === $piece->kind) {
+                        $this->emitChatCompletionsToolDeltas($piece->data, $callback);
                     }
-
-                    if ('error' === ($decoded['object'] ?? null) || is_array($decoded['error'] ?? null)) {
-                        throw $this->streamFailure($decoded);
-                    }
-
-                    if (is_array($decoded['usage'] ?? null)) {
-                        $usage = $this->parseUsage($decoded['usage']);
-                    }
-
-                    $choice = $decoded['choices'][0] ?? null;
-                    if (!is_array($choice)) {
-                        continue;
-                    }
-
-                    $chunkFinishReason = $choice['finish_reason'] ?? null;
-                    if (is_string($chunkFinishReason) && '' !== $chunkFinishReason) {
-                        $finishReason = $chunkFinishReason;
-                    }
-
-                    $delta = is_array($choice['delta'] ?? null) ? $choice['delta'] : [];
-                    if (is_string($delta['reasoning_content'] ?? null) && '' !== $delta['reasoning_content']) {
-                        $callback([
-                            'type' => 'reasoning',
-                            'content' => $delta['reasoning_content'],
-                        ]);
-                    }
-
-                    if (array_key_exists('content', $delta)) {
-                        $this->emitContentParts($delta['content'], $callback);
-                    }
-
-                    $this->emitChatCompletionsToolDeltas($choice, $callback);
                 }
             }
+            if ([] !== $decoder->usage()) {
+                $usage = $this->parseUsage($decoder->usage());
+            }
+            $finishReason = $decoder->finishReason();
 
             $callback(['type' => 'finish', 'finish_reason' => $finishReason ?? 'stop']);
 

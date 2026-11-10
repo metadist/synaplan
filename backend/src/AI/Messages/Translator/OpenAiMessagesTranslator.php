@@ -1058,29 +1058,14 @@ final readonly class OpenAiMessagesTranslator implements MessagesTranslatorInter
         $inputTokens = 0;
         $outputTokens = 0;
         $cacheRead = 0;
-        $buffer = '';
+        $decoder = new \App\AI\Stream\OpenAiChatCompletionsDecoder();
 
         foreach ($this->httpClient->stream($response) as $chunk) {
             set_time_limit(0);
             if ($chunk->isTimeout()) {
                 continue;
             }
-            $buffer .= $chunk->getContent();
-            while (false !== ($pos = strpos($buffer, "\n"))) {
-                $line = trim(substr($buffer, 0, $pos));
-                $buffer = substr($buffer, $pos + 1);
-                if ('' === $line || !str_starts_with($line, 'data:')) {
-                    continue;
-                }
-                $payload = trim(substr($line, 5));
-                if ('[DONE]' === $payload) {
-                    continue;
-                }
-                $decoded = json_decode($payload, true);
-                if (!\is_array($decoded)) {
-                    continue;
-                }
-
+            foreach ($decoder->events($chunk->getContent()) as $decoded) {
                 if (isset($decoded['usage']) && \is_array($decoded['usage'])) {
                     $inputTokens = (int) ($decoded['usage']['prompt_tokens'] ?? $inputTokens);
                     $outputTokens = (int) ($decoded['usage']['completion_tokens'] ?? $outputTokens);

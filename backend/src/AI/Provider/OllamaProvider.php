@@ -15,6 +15,7 @@ use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
+use App\AI\Stream\OllamaNdjsonDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputSchema;
@@ -291,7 +292,7 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
             $fullResponse = '';
             $promptTokens = 0;
             $completionTokens = 0;
-            $lineBuffer = '';
+            $ndjson = new OllamaNdjsonDecoder();
 
             foreach ($this->httpClient->stream($response) as $chunk) {
                 if ($chunk->isFirst()) {
@@ -319,23 +320,15 @@ class OllamaProvider implements ChatProviderInterface, EmbeddingProviderInterfac
                     continue;
                 }
 
-                $lineBuffer .= $content;
-
-                while (false !== ($newlinePos = strpos($lineBuffer, "\n"))) {
-                    $line = substr($lineBuffer, 0, $newlinePos);
-                    $lineBuffer = substr($lineBuffer, $newlinePos + 1);
-
-                    $line = trim($line);
-                    if ('' === $line) {
+                foreach ($ndjson->feed($content) as $piece) {
+                    if ('malformed' === $piece->kind) {
+                        $this->logger->warning('Ollama: Skipping malformed JSON line', [
+                            'line' => is_string($piece->data) ? $piece->data : '',
+                        ]);
                         continue;
                     }
-
-                    try {
-                        $data = json_decode($line, true, 512, JSON_THROW_ON_ERROR);
-                    } catch (\JsonException $e) {
-                        $this->logger->warning('Ollama: Skipping malformed JSON line', [
-                            'line' => substr($line, 0, 200),
-                        ]);
+                    $data = $piece->data;
+                    if (!is_array($data)) {
                         continue;
                     }
 

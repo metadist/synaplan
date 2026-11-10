@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Messages;
 
 use App\AI\Catalog\ProviderCatalog;
+use App\AI\Credential\TurnCredentialResolver;
 use App\AI\Credential\UserProviderKeyResolver;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
@@ -805,14 +806,12 @@ final class MessagesGateway
      */
     private function resolveCredential(string $provider, ?int $userId, bool $allowOperator): ?array
     {
-        if ($this->keyResolver->isLocalHost($provider)) {
-            // Ollama and admin-registered OpenAI-compatible endpoints do not
-            // use ProviderKeyStore. The translator attaches a real endpoint
-            // key when one exists; a placeholder is enough to pass this gate.
-            return ['key' => 'local', 'source' => 'operator'];
+        $decision = (new TurnCredentialResolver($this->keyResolver))->forGateway($provider, $userId, $allowOperator);
+        if (!$decision->present) {
+            return null;
         }
 
-        return $this->keyResolver->resolve($provider, $userId, $allowOperator);
+        return ['key' => $decision->key, 'source' => 'user' === $decision->keySource ? 'user' : 'operator'];
     }
 
     private function pickTranslator(string $provider): ?MessagesTranslatorInterface
