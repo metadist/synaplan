@@ -930,7 +930,9 @@ holds.
 **A cloud that shares Synaplan's identity provider (OpenCloud with the same
 Keycloak)** needs no registration: `PLATFORM_LINKS_OIDC_CLOUD*` configure it
 (see `backend/.env.example`). People's tokens are exchanged in Keycloak; a
-person's link is created on their first call through the cloud.
+person's link is created on their first call through the cloud. Synaplan
+sends the OpenCloud app lifecycle notices only; it offers it no copies or
+pickups until the app takes them.
 
 **What a user sees.** **Channels & integrations → Linked platforms** lists the
 user's own links (platform, host, external id) with *Disconnect*, which ends
