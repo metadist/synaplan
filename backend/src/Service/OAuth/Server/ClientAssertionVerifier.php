@@ -7,7 +7,6 @@ namespace App\Service\OAuth\Server;
 use App\Entity\PlatformInstance;
 use App\Repository\OAuthTokenRepository;
 use App\Repository\PlatformInstanceRepository;
-use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
 
 /**
@@ -25,6 +24,7 @@ final readonly class ClientAssertionVerifier
 
     private const MAX_LIFETIME = 300;
     private const ALGORITHMS = ['RS256', 'ES256'];
+    private const PURGE_ODDS = 50;
 
     public function __construct(
         private PlatformInstanceRepository $instances,
@@ -58,8 +58,7 @@ final readonly class ClientAssertionVerifier
             return null;
         }
         try {
-            $keys = JWK::parseKeySet($jwks, 'RS256');
-            $claims = (array) JWT::decode($assertion, $keys);
+            $claims = (array) JWT::decode($assertion, ClientKeys::parse($jwks));
         } catch (\Throwable) {
             return null;
         }
@@ -80,6 +79,11 @@ final readonly class ClientAssertionVerifier
         }
         if (!$this->tokens->claimAssertion($clientId, $jti, $exp)) {
             return null;
+        }
+        // Nothing schedules a sweep of the token table, so one in every
+        // PURGE_ODDS authenticated calls removes what has expired.
+        if (0 === random_int(0, self::PURGE_ODDS - 1)) {
+            $this->tokens->purgeExpired(time());
         }
 
         return $instance;

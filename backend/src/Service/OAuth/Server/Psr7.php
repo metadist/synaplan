@@ -29,6 +29,16 @@ final class Psr7
             ->withParsedBody($body ?? $request->request->all());
     }
 
+    /**
+     * An authorization request league can check, from its parameters alone.
+     *
+     * @param array<string, string> $params
+     */
+    public static function query(array $params): ServerRequestInterface
+    {
+        return (new ServerRequest('GET', '/oauth/authorize'))->withQueryParams($params);
+    }
+
     public static function response(): ResponseInterface
     {
         return new PsrResponse();

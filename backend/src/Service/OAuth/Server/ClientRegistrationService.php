@@ -30,6 +30,7 @@ final readonly class ClientRegistrationService
 
     private const IP_LIMIT = 10;
     private const IP_WINDOW = 3600;
+    private const MAX_REDIRECT_URIS = 10;
 
     public function __construct(
         private PlatformInstanceRepository $instances,
@@ -65,12 +66,13 @@ final readonly class ClientRegistrationService
         $client = $this->softwareId($metadata);
         $host = $this->host($metadata);
         $redirectUris = $this->redirectUris($host, $metadata);
-        $jwks = $this->jwks($metadata);
+        $jwks = ClientKeys::normalize($metadata['jwks'] ?? null);
         $this->assertProtocol($metadata);
 
+        // Stored by applyExtensions(), and only once every part was accepted:
+        // a refused registration leaves no client behind.
         $instance = new PlatformInstance($client, 'pi_'.bin2hex(random_bytes(12)), $host, $redirectUris, $status, 0);
         $instance->setJwks($jwks);
-        $this->instances->save($instance);
         $this->applyExtensions($instance, $metadata);
 
         $this->audit->record(0, 'platform_instance.registered', 'platform_instance', $instance->getInstanceId(), [
@@ -115,14 +117,19 @@ final readonly class ClientRegistrationService
             throw new RegistrationException('invalid_client_metadata', 'client_uri cannot change; register the new address as a new client.');
         }
         $this->assertProtocol($metadata);
-        if (isset($metadata['redirect_uris'])) {
-            $instance->setRedirectUris($this->redirectUris($instance->getHost(), $metadata));
+        $redirectUris = isset($metadata['redirect_uris']) ? $this->redirectUris($instance->getHost(), $metadata) : null;
+        $jwks = isset($metadata['jwks']) ? ClientKeys::normalize($metadata['jwks']) : null;
+
+        // Everything is checked before anything changes: applyExtensions()
+        // refuses a delivery address before it touches the client.
+        $this->applyExtensions($instance, $metadata);
+        if (null !== $redirectUris) {
+            $instance->setRedirectUris($redirectUris);
         }
-        if (isset($metadata['jwks'])) {
-            $instance->setJwks($this->jwks($metadata));
+        if (null !== $jwks) {
+            $instance->setJwks($jwks);
         }
         $this->instances->save($instance);
-        $this->applyExtensions($instance, $metadata);
         $this->audit->record(0, 'platform_instance.updated', 'platform_instance', $instance->getInstanceId(), null, $ip);
 
         return $this->describe($instance);
@@ -222,40 +229,14 @@ final readonly class ClientRegistrationService
         if (!is_array($uris)) {
             throw new RegistrationException('invalid_redirect_uri', 'redirect_uris is required.');
         }
+        if (count($uris) > self::MAX_REDIRECT_URIS) {
+            throw new RegistrationException('invalid_redirect_uri', sprintf('At most %d redirect_uris can be registered.', self::MAX_REDIRECT_URIS));
+        }
         try {
             return $this->redirects->normalizeRedirectUris($host, array_values(array_filter($uris, 'is_string')));
         } catch (PlatformLinkValidationException $e) {
             throw new RegistrationException('invalid_redirect_uri', $e->getMessage());
         }
-    }
-
-    /**
-     * Public signing keys only: RSA or EC, no private parts.
-     *
-     * @param array<string, mixed> $metadata
-     *
-     * @return array{keys: list<array<string, mixed>>}
-     */
-    private function jwks(array $metadata): array
-    {
-        $keys = is_array($metadata['jwks'] ?? null) && is_array($metadata['jwks']['keys'] ?? null) ? $metadata['jwks']['keys'] : [];
-        $clean = [];
-        foreach ($keys as $key) {
-            if (!is_array($key) || !in_array($key['kty'] ?? null, ['RSA', 'EC'], true)) {
-                throw new RegistrationException('invalid_client_metadata', 'jwks may hold RSA or EC public keys only.');
-            }
-            foreach (['d', 'p', 'q', 'dp', 'dq', 'qi', 'k'] as $private) {
-                if (array_key_exists($private, $key)) {
-                    throw new RegistrationException('invalid_client_metadata', 'jwks must not contain private key material.');
-                }
-            }
-            $clean[] = $key;
-        }
-        if ([] === $clean || count($clean) > 5) {
-            throw new RegistrationException('invalid_client_metadata', 'jwks needs one to five public keys.');
-        }
-
-        return ['keys' => $clean];
     }
 
     /**

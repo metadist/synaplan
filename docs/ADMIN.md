@@ -900,11 +900,19 @@ an OAuth2 authorization server for them (metadata at
 dynamic client registration (RFC 7591, `POST /oauth/register`) with its
 address, redirect URIs, the public keys it signs with, and where Synaplan may
 notify it. It authenticates with signed client assertions (`private_key_jwt`)
-only: Synaplan stores public keys, never a client secret. Each person connects
-once: the cloud sends them to Synaplan, they sign in and allow the cloud
-(`/connect/cloud`), and the cloud receives that person's access and refresh
-tokens (code flow with PKCE, refresh tokens rotate). Registering grants no
-access to anyone's data.
+only: Synaplan stores public keys (RSA of 2048 bits or more, or EC P-256),
+never a client secret. Each person connects once: the cloud's server pushes
+the authorization request to Synaplan (RFC 9126, `POST /oauth/par`) and sends
+the person's browser to Synaplan with the reference it got back; they sign in
+and allow the cloud (`/connect/cloud`, which lists what the cloud may do), and
+the cloud receives that person's access and refresh tokens (code flow with
+PKCE, refresh tokens rotate). Registering grants no access to anyone's data.
+
+Pushing the request is required, not optional: it names the cloud account
+being linked (`external_id`), and Synaplan takes that from the cloud's server
+only. A browser arriving at `/oauth/authorize` with parameters of its own is
+shown that the request is unknown. A pushed request lasts ten minutes and is
+decided once.
 
 Who may register is set by `PLATFORM_LINKS_REGISTRATION`:
 
@@ -930,15 +938,23 @@ the link and the cloud's tokens for that person. A cloud ends a link the same
 way when the person leaves there (RFC 7009 revocation).
 
 **Security model.** Redirect URIs are matched exactly against the URIs the
-client registered (HTTPS only outside dev, same host as the client). Every
+client registered (HTTPS only outside dev, same host as the client, at most
+ten). Only a signed-in person consents: no API key reaches the consent
+endpoints. An address that fails client authentication 30 times in a minute
+waits (HTTP 429) before it may try again on any OAuth endpoint. Every
 register, approve, revoke, link and disconnect writes a Users → Audit row.
 Linking a cloud account that already belonged to another Synaplan account ends
 the old account's grant and moves the link to the new account
 (`platform_link.linked` with the previous user id) — one external user is never
 two Synaplan accounts at once.
 
+A grant belongs to a person and a cloud, not to one cloud account. For someone
+who linked two accounts of the same cloud to one Synaplan account, revoking
+either account's refresh token ends both links; the other account connects
+again.
+
 Endpoint reference: [Swagger UI](http://localhost:8000/api/doc) → tag
-*Platform Links*; the OAuth2 endpoints are described by the server metadata.
+*Platform Links*, and the server metadata.
 
 ### AI plugs (S1–S5)
 
