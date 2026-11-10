@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Service\Auth\AppleClientSecretGenerator;
 use App\Service\Auth\AppleIdentityTokenVerifier;
 use App\Service\Auth\OAuthLoginResponder;
@@ -185,6 +186,7 @@ class AppleAuthController extends AbstractController
     #[OA\Response(response: 200, description: 'Bearer tokens issued')]
     #[OA\Response(response: 400, description: 'Missing identity token')]
     #[OA\Response(response: 401, description: 'Invalid identity token')]
+    #[OA\Response(response: 403, description: 'Account suspended or banned')]
     public function native(Request $request): JsonResponse
     {
         $decoded = json_decode($request->getContent(), true);
@@ -219,6 +221,20 @@ class AppleAuthController extends AbstractController
             return new JsonResponse(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus());
         }
 
+        $closed = AccountAccess::signIn($user);
+        if (null !== $closed) {
+            return new JsonResponse([
+                'success' => false,
+                'error' => AccountAccess::message($closed),
+                'code' => $closed,
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        return $this->nativeSession($user, $request);
+    }
+
+    private function nativeSession(User $user, Request $request): JsonResponse
+    {
         $accessToken = $this->tokenService->generateAccessToken($user);
         $refreshToken = $this->tokenService->generateRefreshToken($user, ClientAddress::resolve($request));
 
