@@ -7,6 +7,7 @@ namespace App\Tests\Controller\OAuth;
 use App\Entity\ApiKey;
 use App\Entity\ExternalIdentity;
 use App\Repository\ExternalIdentityRepository;
+use App\Repository\PlatformInstanceRepository;
 use App\Service\Iam\UserLifecycleService;
 use App\Service\OAuth\Server\RegistrationPolicy;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -51,6 +52,20 @@ final class OAuthServerFlowTest extends WebTestCase
         $active = $this->register(self::IAT);
         self::assertSame('active', $active['status']);
         self::assertSame('private_key_jwt', $active['token_endpoint_auth_method']);
+    }
+
+    public function testAnInitialAccessTokenApprovesOneClient(): void
+    {
+        self::assertSame('active', $this->register(self::IAT)['status']);
+
+        $this->host = 'cloud-'.bin2hex(random_bytes(4)).'.example.com';
+        $this->postRegistration($this->metadata(), self::IAT);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        self::assertSame('invalid_token', $this->json()['error']);
+        self::assertNull(
+            static::getContainer()->get(PlatformInstanceRepository::class)->findOneBy(['host' => $this->host]),
+            'a spent token does not leave a client behind',
+        );
     }
 
     public function testRegistrationRefusesSecretsAndPrivateKeyMaterial(): void
@@ -113,6 +128,7 @@ final class OAuthServerFlowTest extends WebTestCase
         self::assertSame('invalid_client', $this->json()['error']);
         $this->client->request('POST', '/oauth/token', ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token'], 'client_id' => $clientId, 'client_secret' => 'guess']);
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'a secret is no way in');
+        $this->reuseInitialAccessToken();
         $other = (string) $this->register(self::IAT)['client_id'];
         $this->tokenRequest($this->assertion($other, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $tokens['refresh_token']]);
         self::assertFalse($this->client->getResponse()->isSuccessful(), 'another client cannot redeem this grant');

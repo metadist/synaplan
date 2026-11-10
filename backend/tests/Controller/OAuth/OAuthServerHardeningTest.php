@@ -81,6 +81,7 @@ final class OAuthServerHardeningTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
 
         $this->host = 'cloud-'.bin2hex(random_bytes(4)).'.example.com';
+        $this->reuseInitialAccessToken();
         $other = (string) $this->register(self::IAT)['client_id'];
         $this->client->request('GET', '/oauth/authorize', ['client_id' => $other, 'request_uri' => $pushed['request_uri']]);
         self::assertStringEndsWith('/connect/cloud', (string) $this->client->getResponse()->headers->get('Location'), 'another client cannot use it');

@@ -138,6 +138,43 @@ class OAuthTokenRepository extends ServiceEntityRepository
     }
 
     /**
+     * Records that this initial access token has approved a client. A second
+     * call with the same token returns false. The row does not expire: the
+     * token stands in for an administrator only once.
+     */
+    public function claimRegistrationToken(string $token): bool
+    {
+        $connection = $this->getEntityManager()->getConnection();
+        try {
+            $connection->insert('BOAUTHTOKENS', [
+                'BID' => 'r:'.hash('sha256', $token),
+                'BKIND' => OAuthToken::KIND_REGISTRATION,
+                'BCLIENTID' => 'registration',
+                'BUSERID' => null,
+                'BSCOPES' => '[]',
+                'BPARENTID' => null,
+                'BEXPIRES' => 4_102_444_800,
+                'BREVOKED' => 0,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Forgets that this initial access token was used, so a test can register
+     * another client with the same value.
+     */
+    public function forgetRegistrationToken(string $token): void
+    {
+        $this->getEntityManager()->getConnection()->delete('BOAUTHTOKENS', [
+            'BID' => 'r:'.hash('sha256', $token),
+        ]);
+    }
+
+    /**
      * Deletes rows that expired before $before, at most PURGE_BATCH per call
      * so one call never holds the table for long.
      */

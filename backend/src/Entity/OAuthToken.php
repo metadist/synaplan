@@ -25,6 +25,9 @@ class OAuthToken
     public const KIND_CODE = 'code';
     public const KIND_ASSERTION = 'assertion';
 
+    /** A registration token that has already approved one client. It does not expire. */
+    public const KIND_REGISTRATION = 'regtoken';
+
     #[ORM\Id]
     #[ORM\Column(name: 'BID', length: 128)]
     private string $id;

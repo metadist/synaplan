@@ -83,6 +83,10 @@ final readonly class ClientRegistrationService
         $instance = new PlatformInstance($client, 'pi_'.bin2hex(random_bytes(12)), $host, $redirectUris, $status, 0);
         $instance->setJwks($jwks);
         $this->applyExtensions($instance, $metadata);
+        if ($this->policy->presentsToken($bearer) && !$this->tokens->claimRegistrationToken((string) $bearer)) {
+            $this->instances->remove($instance);
+            throw new RegistrationException('invalid_token', 'This initial access token was already used.', 401);
+        }
 
         $this->audit->record(0, 'platform_instance.registered', 'platform_instance', $instance->getInstanceId(), [
             'client' => $client,

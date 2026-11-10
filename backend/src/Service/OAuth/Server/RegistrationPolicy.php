@@ -16,7 +16,7 @@ namespace App\Service\OAuth\Server;
  *   PLATFORM_LINKS_REGISTRATION_TOKEN (RFC 7591 section 3).
  *
  * In every mode a registration that presents the initial access token is
- * active at once.
+ * active at once. That token approves one client and then is spent.
  */
 final readonly class RegistrationPolicy
 {
