@@ -32,6 +32,7 @@ vi.mock('@/stores/auth', () => ({
 }))
 
 import CloudConsentView from '@/views/CloudConsentView.vue'
+import { ApiError } from '@/services/api/httpClient'
 
 const REQUEST = 'a'.repeat(48)
 
@@ -65,8 +66,9 @@ describe('CloudConsentView', () => {
     getCloudConsent.mockResolvedValue({
       client: 'nextcloud',
       host: 'cloud.example.org',
-      externalId: 'ada',
-      scopes: [],
+      external_id: 'ada',
+      scopes: ['chat', 'cloud:watch', 'not-a-scope'],
+      unreviewed: true,
     })
     decideCloudConsent.mockResolvedValue({
       redirect: 'https://cloud.example.org/cb?code=x&state=s',
@@ -75,7 +77,16 @@ describe('CloudConsentView', () => {
 
     expect(getCloudConsent).toHaveBeenCalledWith(REQUEST)
     expect(wrapper.text()).toContain('ada')
+    expect(wrapper.get('[data-testid="unreviewed-cloud"]').text()).toContain(
+      'platformConnect.unreviewed'
+    )
     expect(wrapper.text()).toContain('cloud.example.org')
+    const permissions = wrapper.get('[data-testid="section-permissions"]')
+    expect(permissions.findAll('li').map((item) => item.text())).toEqual([
+      'platformConnect.permissions.chat',
+      'platformConnect.permissions.watch',
+      'not-a-scope',
+    ])
     await wrapper.get('[data-testid="btn-connect"]').trigger('click')
     await flushPromises()
     expect(decideCloudConsent).toHaveBeenCalledWith(REQUEST, true)
@@ -86,8 +97,8 @@ describe('CloudConsentView', () => {
     getCloudConsent.mockResolvedValue({
       client: 'nextcloud',
       host: 'cloud.example.org',
-      externalId: 'ada',
-      scopes: [],
+      external_id: 'ada',
+      scopes: ['chat'],
     })
     decideCloudConsent.mockResolvedValue({
       redirect: 'https://cloud.example.org/cb?error=access_denied',
@@ -106,9 +117,27 @@ describe('CloudConsentView', () => {
     expect(getCloudConsent).not.toHaveBeenCalled()
   })
 
-  it('refuses a malformed request without calling the server', async () => {
-    const { wrapper } = await mountAt('/connect/cloud?request=nope')
-    expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
+  it('refuses a malformed or missing request without calling the server', async () => {
+    for (const path of ['/connect/cloud?request=nope', '/connect/cloud']) {
+      const { wrapper } = await mountAt(path)
+      expect(wrapper.get('[data-testid="error-message"]').text()).toContain(
+        'platformConnect.errorExpired'
+      )
+    }
     expect(getCloudConsent).not.toHaveBeenCalled()
+  })
+
+  it('says a request ran out in its own words, and never shows the server message', async () => {
+    getCloudConsent.mockRejectedValue(new ApiError(404, 'unknown_request'))
+    const expired = await mountAt(`/connect/cloud?request=${REQUEST}`)
+    expect(expired.wrapper.get('[data-testid="error-message"]').text()).toContain(
+      'platformConnect.errorExpired'
+    )
+
+    getCloudConsent.mockRejectedValue(new ApiError(500, 'SQLSTATE[HY000] something internal'))
+    const broken = await mountAt(`/connect/cloud?request=${REQUEST}`)
+    const message = broken.wrapper.get('[data-testid="error-message"]').text()
+    expect(message).toContain('platformConnect.errorIssuanceFailed')
+    expect(message).not.toContain('SQLSTATE')
   })
 })

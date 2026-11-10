@@ -8,6 +8,7 @@ use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
+use App\Repository\OAuthTokenRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
@@ -31,6 +32,8 @@ final readonly class PlatformInstanceService
         private AuditLogWriter $auditLogWriter,
         private EntityManagerInterface $entityManager,
         private DeliveryNotifier $notifier,
+        private OAuthTokenRepository $oauthTokens,
+        private DeliveryAddressService $deliveryAddresses,
     ) {
     }
 
@@ -59,11 +62,8 @@ final readonly class PlatformInstanceService
         foreach ($this->instanceRepository->findAllOrdered() as $instance) {
             $deliveryUrl = $instance->getDeliveryUrl() ?? '';
             $deliveryHost = '' !== $deliveryUrl ? strtolower((string) parse_url($deliveryUrl, PHP_URL_HOST)) : '';
-            $deliveryIp = null;
-            if ('' !== $deliveryHost && false === filter_var($deliveryHost, \FILTER_VALIDATE_IP)) {
-                $resolved = gethostbyname($deliveryHost);
-                $deliveryIp = $resolved !== $deliveryHost ? $resolved : null;
-            }
+            // The address is not resolved here: a pending registration's name
+            // would stall this page on a slow answer.
             $out[] = [
                 'id' => $instance->getInstanceId(),
                 'client' => $instance->getClient(),
@@ -74,7 +74,7 @@ final readonly class PlatformInstanceService
                 'lastSeen' => $instance->getLastSeen(),
                 'deliveryUrl' => $deliveryUrl,
                 'deliveryHost' => $deliveryHost,
-                'deliveryIp' => $deliveryIp,
+                'deliveryIp' => null,
                 'reachable' => $instance->isReachable(),
                 'appVersion' => $instance->getAppVersion() ?? '',
                 'appCapabilities' => $instance->getAppCapabilities(),
@@ -153,7 +153,11 @@ final readonly class PlatformInstanceService
             throw new PlatformLinkValidationException('Only pending instances can be approved.');
         }
         $instance->setStatus(PlatformInstance::STATUS_ACTIVE);
+        if (0 === $instance->getRegisteredBy()) {
+            $instance->setRegisteredBy((int) $admin->getId());
+        }
         $this->instanceRepository->save($instance);
+        $this->deliveryAddresses->probeStored($instance);
         $this->auditLogWriter->record(
             (int) $admin->getId(),
             'platform_instance.approved',
@@ -172,6 +176,7 @@ final readonly class PlatformInstanceService
         }
         $instance->setStatus(PlatformInstance::STATUS_REVOKED);
         $this->instanceRepository->save($instance);
+        $this->oauthTokens->revokeAll($instanceId, null);
 
         $revoked = [];
         foreach ($this->externalIdentityRepository->findByInstanceId($instanceId) as $identity) {

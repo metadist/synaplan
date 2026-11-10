@@ -39,7 +39,7 @@ final readonly class AccessTokenValidator
     }
 
     /**
-     * @return array{jti: string, client_id: string, user_id: int|null, scopes: list<string>}|null
+     * @return array{jti: string, client_id: string, user_id: int|null, scopes: list<string>, external_id: string}|null
      */
     public function validate(string $token, bool $checkRevoked = true): ?array
     {
@@ -60,6 +60,10 @@ final readonly class AccessTokenValidator
             return null;
         }
         $sub = $claims['sub'] ?? null;
+        $externalId = $claims['external_id'] ?? null;
+        if (!is_string($externalId) || '' === $externalId) {
+            return null;
+        }
         $scope = is_string($claims['scope'] ?? null) ? $claims['scope'] : '';
 
         return [
@@ -67,6 +71,7 @@ final readonly class AccessTokenValidator
             'client_id' => $client,
             'user_id' => is_string($sub) && ctype_digit($sub) ? (int) $sub : null,
             'scopes' => array_values(array_filter(explode(' ', $scope), static fn (string $s): bool => '' !== $s)),
+            'external_id' => $externalId,
         ];
     }
 }

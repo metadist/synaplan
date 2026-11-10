@@ -6,6 +6,7 @@ namespace App\Service\OAuth\Server\Grant;
 
 use App\Entity\PlatformInstance;
 use App\Service\OAuth\Server\ClientAssertionVerifier;
+use App\Service\OAuth\Server\GrantContext;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\RequestEvent;
@@ -22,8 +23,12 @@ trait AuthenticatesWithClientAssertion
 
     private string $tokenEndpoint;
 
+    private GrantContext $context;
+
     protected function validateClient(ServerRequestInterface $request): ClientEntityInterface
     {
+        // A cloud account remembered for an earlier grant must not leak into this one.
+        $this->context->setExternalId(null);
         $body = (array) $request->getParsedBody();
         $assertion = $body['client_assertion'] ?? null;
         $instance = ClientAssertionVerifier::TYPE === ($body['client_assertion_type'] ?? null) && is_string($assertion)

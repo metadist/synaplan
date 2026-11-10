@@ -1003,9 +1003,12 @@ services:
         arguments:
             $issuer: '%env(APP_URL)%'
 
-    App\Service\OAuth\Server\OAuthServerFactory:
+    App\Service\OAuth\Server\TokenCipher:
         arguments:
             $secret: '%env(APP_SECRET)%'
+
+    App\Service\OAuth\Server\OAuthServerFactory:
+        arguments:
             $issuer: '%env(APP_URL)%'
 
     App\Service\OAuth\Server\RegistrationPolicy:
@@ -1031,6 +1034,8 @@ services:
             $oidcClientSecret: '%env(OIDC_CLIENT_SECRET)%'
             $oidcDiscoveryUrl: '%env(OIDC_DISCOVERY_URL)%'
             $oidcBearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
+        calls:
+            - [setClouds, ['@App\Service\PlatformLink\PlatformBearerAttribution']]
 
     # OIDC User Provisioning Service (shared by controller + bearer authenticator)
     App\Service\OidcUserService:

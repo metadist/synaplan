@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\PlatformLink;
 
-use App\Service\Security\SsrfGuard;
+use App\Entity\PlatformInstance;
 use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -14,11 +14,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * can reach the cloud, a connection or TLS error means it cannot.
  * Self-signed TLS is never accepted.
  *
- * The address it connects to is pinned from the answers the origin policy
- * just validated, so a hostname cannot hand back a different, forbidden
- * address for the probe (or resolve to nothing usable — that fails
- * closed). Development hosts from the shared dev list keep their loopback
- * answers; everywhere else loopback and link-local answers are dropped.
+ * The connection goes to the address {@see DeliveryOriginPolicy::pinnedAddress()}
+ * already accepted for this cloud. The probe does not resolve the name
+ * again, so a name that checked out as public cannot point the probe at a
+ * private address a moment later.
  */
 final readonly class DeliveryProbe
 {
@@ -26,17 +25,17 @@ final readonly class DeliveryProbe
 
     public function __construct(
         private HttpClientInterface $http,
-        private SsrfGuard $ssrfGuard,
-        private RedirectUriPolicy $redirects,
+        private DeliveryOriginPolicy $origins,
     ) {
     }
 
-    public function reachable(string $url): bool
+    public function reachable(PlatformInstance $instance, string $url): bool
     {
-        $host = strtolower(trim((string) parse_url($url, PHP_URL_HOST), '[]'));
-        if ('' === $host) {
+        $address = $this->origins->pinnedAddress($instance, $url);
+        if (null === $address) {
             return false;
         }
+        $host = strtolower(trim((string) parse_url($url, \PHP_URL_HOST), '[]'));
         $options = [
             'headers' => ['Content-Type' => 'application/json'],
             'body' => (string) json_encode(['type' => 'ping']),
@@ -44,12 +43,8 @@ final readonly class DeliveryProbe
             'max_duration' => self::TIMEOUT_SECONDS,
             'max_redirects' => 0,
         ];
-        if (false === filter_var($host, \FILTER_VALIDATE_IP)) {
-            $pinned = $this->pinnedAddress($host);
-            if (null === $pinned) {
-                return false;
-            }
-            $options['resolve'] = [$host => $pinned];
+        if ('' !== $host && $host !== $address) {
+            $options['resolve'] = [$host => $address];
         }
 
         try {
@@ -60,23 +55,5 @@ final readonly class DeliveryProbe
         } catch (ExceptionInterface) {
             return false;
         }
-    }
-
-    /**
-     * The one address the probe may connect to for this hostname, from the
-     * public and operator-network answers. Null when none survives.
-     */
-    private function pinnedAddress(string $host): ?string
-    {
-        $devLocal = $this->redirects->isDev() && $this->redirects->isLocalDevHost($host);
-        foreach ($this->ssrfGuard->pinnedIps($host, true) as $ip) {
-            if (!$devLocal && DeliveryOriginPolicy::ipIsLoopbackOrLinkLocal($ip)) {
-                continue;
-            }
-
-            return $ip;
-        }
-
-        return null;
     }
 }

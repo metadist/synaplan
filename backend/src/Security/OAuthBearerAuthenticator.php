@@ -6,8 +6,12 @@ namespace App\Security;
 
 use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
+use App\Entity\User;
+use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\PlatformInstanceRepository;
+use App\Repository\UserRepository;
+use App\Service\Billing\PremiumFeatureGate;
 use App\Service\OAuth\Server\AccessTokenValidator;
 use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -33,19 +37,38 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
 {
     public const CLIENT_ATTRIBUTE = 'oauth_client_id';
     public const SCOPES_ATTRIBUTE = 'oauth_scopes';
+    public const EXTERNAL_ID_ATTRIBUTE = 'oauth_external_id';
 
     public function __construct(
         private readonly AccessTokenValidator $tokens,
         private readonly PlatformInstanceRepository $instances,
         private readonly ExternalIdentityRepository $identities,
+        private readonly UserRepository $users,
+        private readonly PremiumFeatureGate $plans,
     ) {
     }
 
     public function supports(Request $request): bool
     {
+        // A request that also carries an API key is that key's request. Taking
+        // it here would let the token's scopes stand in for the key's.
+        if ($this->carriesApiKey($request)) {
+            return false;
+        }
         $token = BearerToken::jwtFromRequest($request);
 
         return null !== $token && $this->tokens->isOurs($token);
+    }
+
+    private function carriesApiKey(Request $request): bool
+    {
+        $header = $request->headers->get('X-API-Key');
+        if (is_string($header) && '' !== trim($header)) {
+            return true;
+        }
+        $query = $request->query->get('api_key');
+
+        return is_string($query) && '' !== trim($query);
     }
 
     public function authenticate(Request $request): Passport
@@ -58,9 +81,19 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
         if (!$instance instanceof PlatformInstance || !$instance->isActive()) {
             throw new CustomUserMessageAuthenticationException('This cloud is not connected to Synaplan.');
         }
+        $user = $this->users->find($claims['user_id']);
+        if (!$user instanceof User || !$user->canSignIn()) {
+            throw new CustomUserMessageAuthenticationException('Invalid or expired access token.');
+        }
+        if (!$this->plans->isUnlockedFor($user)) {
+            throw new ApiKeyPlanDeniedException();
+        }
+        $externalId = $claims['external_id'];
         $linked = array_filter(
             $this->identities->findForUserOnInstance($claims['user_id'], $instance->getClient(), $instance->getInstanceId()),
-            static fn (ExternalIdentity $identity): bool => ExternalIdentity::STATUS_REVOKED !== $identity->getStatus() && !$identity->isOff(),
+            static fn (ExternalIdentity $identity): bool => $identity->getExternalId() === $externalId
+                && ExternalIdentity::STATUS_REVOKED !== $identity->getStatus()
+                && !$identity->isOff(),
         );
         if ([] === $linked) {
             throw new PlatformDisconnectedException();
@@ -72,6 +105,7 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
 
         $request->attributes->set(self::CLIENT_ATTRIBUTE, $instance->getInstanceId());
         $request->attributes->set(self::SCOPES_ATTRIBUTE, $claims['scopes']);
+        $request->attributes->set(self::EXTERNAL_ID_ATTRIBUTE, $externalId);
 
         return new SelfValidatingPassport(new UserBadge((string) $claims['user_id']));
     }
@@ -83,6 +117,9 @@ final class OAuthBearerAuthenticator extends AbstractAuthenticator
 
     public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
+        if ($exception instanceof ApiKeyPlanDeniedException) {
+            return new JsonResponse(ApiKeyPlanRequiredException::responseBody(), Response::HTTP_FORBIDDEN);
+        }
         if ($exception instanceof PlatformDisconnectedException) {
             return new JsonResponse([
                 'error' => PlatformDisconnectedException::CODE,

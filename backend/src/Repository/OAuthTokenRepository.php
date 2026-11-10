@@ -7,6 +7,7 @@ namespace App\Repository;
 use App\Entity\OAuthToken;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\ParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -14,6 +15,8 @@ use Doctrine\Persistence\ManagerRegistry;
  */
 class OAuthTokenRepository extends ServiceEntityRepository
 {
+    private const PURGE_BATCH = 1000;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, OAuthToken::class);
@@ -42,10 +45,25 @@ class OAuthTokenRepository extends ServiceEntityRepository
     }
 
     /**
-     * Revokes every token a client holds for a person, or for nobody in
-     * particular when $userId is null. Returns how many were live.
+     * Lets a live token end at $until instead of when it was going to; it
+     * never lives longer. Unlike revoke(), the token still counts as live
+     * until then, so revoking it or its grant ends it at once.
      */
-    public function revokeAll(string $clientId, ?int $userId): int
+    public function retire(string $id, int $until): void
+    {
+        $token = $this->find($id);
+        if ($token instanceof OAuthToken && !$token->isRevoked() && $token->getExpires() > $until) {
+            $token->expireAt($until);
+            $this->getEntityManager()->flush();
+        }
+    }
+
+    /**
+     * Revokes every token a client holds for a person, or for nobody in
+     * particular when $userId is null. With $externalId, only the grant for
+     * that one cloud account. Returns how many were live.
+     */
+    public function revokeAll(string $clientId, ?int $userId, ?string $externalId = null): int
     {
         $qb = $this->createQueryBuilder('t')
             ->update()
@@ -60,8 +78,37 @@ class OAuthTokenRepository extends ServiceEntityRepository
         if (null !== $userId) {
             $qb->andWhere('t.userId = :user')->setParameter('user', $userId);
         }
+        if (null !== $externalId) {
+            $qb->andWhere('t.externalId = :external')->setParameter('external', $externalId);
+        }
 
         return (int) $qb->getQuery()->execute();
+    }
+
+    /**
+     * Ends every grant a person holds with any cloud. Signing out everywhere
+     * and changing the password both come through here, so a cloud that was
+     * allowed before cannot keep acting afterwards.
+     */
+    public function revokeAllForUser(int $userId): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->update()
+            ->set('t.revoked', ':yes')
+            ->where('t.userId = :user')
+            ->andWhere('t.revoked = :no')
+            ->andWhere('t.kind IN (:kinds)')
+            ->setParameter('yes', true)
+            ->setParameter('no', false)
+            ->setParameter('user', $userId)
+            ->setParameter('kinds', [OAuthToken::KIND_ACCESS, OAuthToken::KIND_REFRESH, OAuthToken::KIND_CODE])
+            ->getQuery()
+            ->execute();
+    }
+
+    public function revokeForAccount(string $clientId, int $userId, string $externalId): int
+    {
+        return $this->revokeAll($clientId, $userId, $externalId);
     }
 
     /**
@@ -90,11 +137,17 @@ class OAuthTokenRepository extends ServiceEntityRepository
         return true;
     }
 
+    /**
+     * Deletes rows that expired before $before, at most PURGE_BATCH per call
+     * so one call never holds the table for long.
+     */
     public function purgeExpired(int $before): int
     {
-        return (int) $this->getEntityManager()->getConnection()->executeStatement(
-            'DELETE FROM BOAUTHTOKENS WHERE BEXPIRES < ? LIMIT 1000',
-            [$before],
+        $statement = $this->getEntityManager()->getConnection()->prepare(
+            'DELETE FROM BOAUTHTOKENS WHERE BEXPIRES < :before LIMIT '.self::PURGE_BATCH,
         );
+        $statement->bindValue('before', $before, ParameterType::INTEGER);
+
+        return (int) $statement->executeStatement();
     }
 }

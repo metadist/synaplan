@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace CloudFixture;
 
 /**
- * Connects a person the way the Nextcloud app does: send the browser to
- * Synaplan's authorization endpoint (code flow with PKCE, naming the person
- * here as external_id), and exchange the returned code for the person's
- * tokens with this cloud's client assertion.
+ * Connects a person the way the Nextcloud app does: push the authorization
+ * request to Synaplan (code flow with PKCE, naming the person here as
+ * external_id), send the browser to Synaplan's authorization endpoint with
+ * the reference it got back, and exchange the returned code for the
+ * person's tokens with this cloud's client assertion.
  */
 final class Link
 {

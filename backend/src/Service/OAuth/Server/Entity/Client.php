@@ -12,10 +12,12 @@ use League\OAuth2\Server\Entities\ClientEntityInterface;
  * id, and it may only use the authorization code and refresh token grants.
  *
  * Every cloud is a confidential client that authenticates by
- * private_key_jwt, but league only knows client secrets. The token and
- * revocation endpoints verify the assertion before league sees the request
- * and refuse without one, so league is told the client is public: it then
- * skips its secret check and insists on PKCE, which Synaplan requires anyway.
+ * private_key_jwt. League only knows client secrets, so Synaplan's grants
+ * check the assertion in place of league's secret check
+ * ({@see \App\Service\OAuth\Server\Grant\AuthenticatesWithClientAssertion}).
+ * League asks a confidential client for PKCE only when the request carried
+ * a challenge; a pushed authorization request without S256 is refused
+ * ({@see \App\Service\OAuth\Server\PushedAuthorizationService}).
  */
 final readonly class Client implements ClientEntityInterface
 {

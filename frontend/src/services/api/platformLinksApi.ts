@@ -22,12 +22,7 @@ export type AdminPlatformInstance = NonNullable<
   z.infer<typeof ListAdminPlatformInstancesResponseSchema>['instances']
 >[number]
 
-export interface CloudConsent {
-  client: string
-  host: string
-  externalId: string
-  scopes: string[]
-}
+export type CloudConsent = z.infer<typeof OauthConsentShowResponseSchema>
 
 export type OutlookConnectResult = z.infer<typeof ConnectOutlookAddinResponseSchema>
 export type OutlookSignInPayload = OutlookConnectResult['payload']
@@ -62,18 +57,12 @@ export const platformLinksApi = {
     return { client: data.client ?? '', host: data.host ?? '' }
   },
 
-  /** What a cloud asks for, parked by /oauth/authorize under `request`. */
+  /** What a cloud asks for: the authorization request its server pushed, by id. */
   async getCloudConsent(request: string): Promise<CloudConsent> {
-    const data = await httpClient(`/api/v1/oauth/consent/${request}`, {
+    return httpClient(`/api/v1/oauth/consent/${request}`, {
       method: 'GET',
       schema: OauthConsentShowResponseSchema,
     })
-    return {
-      client: data.client,
-      host: data.host,
-      externalId: data.external_id,
-      scopes: data.scopes,
-    }
   },
 
   /** Allow or deny; the answer is where the browser goes next (back to the cloud). */

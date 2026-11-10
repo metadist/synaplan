@@ -118,11 +118,9 @@ final class AdminUserProvisioningController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/users/{id}/api-keys',
         summary: 'Mint an API key on behalf of a user',
-        description: 'Returns the plaintext key ONCE. Use it as that user\'s X-API-Key. With the instance credential the key is bound to that user\'s canonical identity row.',
+        description: 'Returns the plaintext key ONCE. Use it as that user\'s X-API-Key. With instance_id in the body the key is bound to that user\'s canonical identity row.',
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
         ],
         security: [['Bearer' => []]],
         tags: ['Admin User Provisioning']

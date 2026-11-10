@@ -24,17 +24,24 @@ final readonly class RegistrationPolicy
     public const OPEN = 'open';
     public const TOKEN = 'token';
 
+    public const MIN_TOKEN_LENGTH = 32;
+
     public string $mode;
 
     public function __construct(string $mode, private string $initialAccessToken)
     {
         $mode = strtolower(trim($mode));
         $this->mode = in_array($mode, [self::OPEN, self::TOKEN], true) ? $mode : self::PENDING;
+        if (self::TOKEN === $this->mode && strlen($this->initialAccessToken) < self::MIN_TOKEN_LENGTH) {
+            throw new \InvalidArgumentException('PLATFORM_LINKS_REGISTRATION_TOKEN must be at least 32 characters when registration requires it.');
+        }
     }
 
     public function presentsToken(?string $bearer): bool
     {
-        return '' !== $this->initialAccessToken && null !== $bearer && hash_equals($this->initialAccessToken, $bearer);
+        return strlen($this->initialAccessToken) >= self::MIN_TOKEN_LENGTH
+            && null !== $bearer
+            && hash_equals($this->initialAccessToken, $bearer);
     }
 
     /**

@@ -53,6 +53,18 @@ final class ApiKeyScopeSubscriber implements EventSubscriberInterface
         $request = $event->getRequest();
         $oauthScopes = $request->attributes->get(OAuthBearerAuthenticator::SCOPES_ATTRIBUTE);
         if (is_array($oauthScopes)) {
+            // The access token and an API key name different people. Neither
+            // set of scopes may cover the other one's account.
+            if ($request->attributes->get('api_key') instanceof ApiKey) {
+                $event->setResponse(new JsonResponse([
+                    'success' => false,
+                    'error' => 'invalid_request',
+                    'code' => 'invalid_request',
+                    'message' => 'Send either an access token or an API key.',
+                ], Response::HTTP_BAD_REQUEST));
+
+                return;
+            }
             $this->enforceOAuth($event, array_values(array_filter($oauthScopes, 'is_string')));
 
             return;

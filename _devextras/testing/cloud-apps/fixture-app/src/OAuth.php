@@ -8,8 +8,9 @@ namespace CloudFixture;
  * The fixture as an OAuth2 client of Synaplan, the way a cloud app does it:
  * it registers itself (RFC 7591) with a key pair it made, proves itself with
  * signed client assertions (private_key_jwt, never a secret), connects a
- * person with the authorization code flow and PKCE, keeps their rotating
- * refresh token, and revokes it when the person goes.
+ * person with a pushed authorization request (RFC 9126), the authorization
+ * code flow and PKCE, keeps their rotating refresh token, and revokes it
+ * when the person goes.
  *
  * Server-to-server calls go to Synaplan's internal address; assertions are
  * addressed to the issuer, which Synaplan accepts for every endpoint.
@@ -65,7 +66,7 @@ final class OAuth
         $state = $store->state();
 
         return Synaplan::from($state)->json('GET', '/oauth/register/'.$state['instance']['id'], null, [
-            'Authorization' => 'Bearer '.self::assertion($state),
+            'Authorization' => 'Bearer '.self::assertion($state, rtrim((string) $state['issuer'], '/').'/oauth/register/'.$state['instance']['id']),
         ]);
     }
 
@@ -73,22 +74,35 @@ final class OAuth
      * Where the person's browser goes to allow this cloud, and the PKCE
      * verifier to keep until the code comes back.
      *
+     * The request itself is pushed from here (RFC 9126), signed as the
+     * client: Synaplan takes the person's name in this cloud (external_id)
+     * from the cloud's server only, never from a browser. The browser
+     * carries just the one-time reference Synaplan answers with.
+     *
      * @return array{url: string, verifier: string}
      */
     public static function authorizeUrl(array $state, string $person, string $nonce): array
     {
         $verifier = self::b64(random_bytes(32));
+        $pushed = Synaplan::from($state)->form('/oauth/par', [
+            'response_type' => 'code',
+            'redirect_uri' => $state['fixture_url'].'/link/callback',
+            'scope' => self::SCOPE,
+            'state' => $nonce,
+            'code_challenge' => self::b64(hash('sha256', $verifier, true)),
+            'code_challenge_method' => 'S256',
+            'external_id' => $person,
+            'client_assertion_type' => self::ASSERTION_TYPE,
+            'client_assertion' => self::assertion($state),
+        ]);
+        if (201 !== $pushed['status'] || !is_string($pushed['body']['request_uri'] ?? null)) {
+            throw new FixtureException(502, 'par_refused', 'Synaplan refused the authorization request: '.($pushed['body']['error'] ?? 'HTTP '.$pushed['status']).'.');
+        }
 
         return [
             'url' => rtrim((string) $state['issuer'], '/').'/oauth/authorize?'.http_build_query([
-                'response_type' => 'code',
                 'client_id' => $state['instance']['id'],
-                'redirect_uri' => $state['fixture_url'].'/link/callback',
-                'scope' => self::SCOPE,
-                'state' => $nonce,
-                'code_challenge' => self::b64(hash('sha256', $verifier, true)),
-                'code_challenge_method' => 'S256',
-                'external_id' => $person,
+                'request_uri' => $pushed['body']['request_uri'],
             ]),
             'verifier' => $verifier,
         ];
@@ -216,14 +230,14 @@ final class OAuth
     /**
      * @param array<string, mixed> $state
      */
-    private static function assertion(array $state): string
+    private static function assertion(array $state, ?string $audience = null): string
     {
         $clientId = (string) $state['instance']['id'];
         $header = self::b64((string) json_encode(['alg' => 'RS256', 'typ' => 'JWT', 'kid' => $state['oauth_key']['kid']]));
         $payload = self::b64((string) json_encode([
             'iss' => $clientId,
             'sub' => $clientId,
-            'aud' => rtrim((string) $state['issuer'], '/'),
+            'aud' => $audience ?? rtrim((string) $state['issuer'], '/'),
             'jti' => bin2hex(random_bytes(16)),
             'iat' => time(),
             'exp' => time() + 60,
