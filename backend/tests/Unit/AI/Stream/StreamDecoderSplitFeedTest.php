@@ -22,6 +22,39 @@ final class StreamDecoderSplitFeedTest extends TestCase
 
     private const OLLAMA = "{\"message\":{\"content\":\"Hi\"},\"done\":false}\n{\"message\":{\"content\":\"\"},\"done\":true,\"done_reason\":\"stop\"}\n";
 
+    public function testAnErrorInTheSameChunkKeepsThePrecedingText(): void
+    {
+        $text = "event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hi\"}}\n\n";
+        $error = "event: error\ndata: {\"type\":\"error\",\"error\":{\"message\":\"overloaded\"}}\n\n";
+        $body = $text.$error;
+        $whole = $this->kinds(new AnthropicStreamDecoder(false), $body);
+
+        $atBoundary = new AnthropicStreamDecoder(false);
+        $boundary = array_merge(
+            $this->kindsOf($atBoundary->feed($text)),
+            $this->kindsOf($atBoundary->feed($error)),
+            $this->kindsOf($atBoundary->finish()),
+        );
+
+        $mid = strlen($text) + 12;
+        $split = new AnthropicStreamDecoder(false);
+        $halves = array_merge(
+            $this->kindsOf($split->feed(substr($body, 0, $mid))),
+            $this->kindsOf($split->feed(substr($body, $mid))),
+            $this->kindsOf($split->finish()),
+        );
+
+        self::assertSame($whole, $boundary);
+        self::assertSame($whole, $halves);
+        self::assertSame(
+            [
+                'callback:{"type":"content","content":"Hi"}',
+                'error:overloaded',
+            ],
+            $whole,
+        );
+    }
+
     public function testTwoHundredSeedsMatchTheWholeBody(): void
     {
         $cases = [

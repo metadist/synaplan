@@ -1334,6 +1334,10 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 break;
             }
             foreach ($decoder->feed($chunk->getContent()) as $piece) {
+                if ('error' === $piece->kind) {
+                    $message = is_string($piece->data) && '' !== $piece->data ? $piece->data : 'Unknown error';
+                    throw new \RuntimeException($message);
+                }
                 $event = $piece->data;
                 if (is_array($event) && 'tool_call_delta' === ($event['type'] ?? null)) {
                     $toolCalls?->addDelta($event);

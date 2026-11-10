@@ -463,19 +463,25 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
             // starts. Do not replay the stream after that.
             $delivered = true;
             $arr = $response->toArray();
-            foreach ($decoder->accept($arr) as $piece) {
+            $pieces = $decoder->accept($arr);
+            foreach ($pieces as $piece) {
                 if ('reasoning' === $piece->kind && is_string($piece->data)) {
                     $callback(['type' => 'reasoning', 'content' => $piece->data]);
                 }
-                if ('tool_choice' === $piece->kind) {
-                    $this->emitChatCompletionsToolDeltas($piece->data, $callback);
-                }
             }
 
+            // Text before tool deltas. A preamble and a tool call share one
+            // chunk, and the caller saw the text first before this decoder.
             if (isset($response->choices[0]->delta->content)) {
                 $content = self::toUtf8((string) $response->choices[0]->delta->content);
                 if ('' !== $content) {
                     $callback($content);
+                }
+            }
+
+            foreach ($pieces as $piece) {
+                if ('tool_choice' === $piece->kind) {
+                    $this->emitChatCompletionsToolDeltas($piece->data, $callback);
                 }
             }
         }
