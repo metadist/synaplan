@@ -6065,7 +6065,7 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Fable 5.1 - Anthropic\'s successor to Claude Fable 5 for the most demanding reasoning and long-horizon agentic coding, knowledge work and research. Adaptive thinking (always on). 1M context, 128K max output.',
+                'description' => 'Claude Fable 5.1 - Anthropic\'s successor to Claude Fable 5 for the most demanding reasoning and long-horizon agentic coding, knowledge work and research. Adaptive thinking (always on). 1M context, 128K max output. Anthropic keeps prompts for 30 days.',
                 'max_tokens' => 128000,
                 'params' => ['model' => 'claude-fable-5-1'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
@@ -6088,12 +6088,70 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Fable 5.1 for image analysis and vision tasks. Anthropic\'s most capable widely released vision model.',
+                'description' => 'Claude Fable 5.1 for image analysis and vision tasks. Anthropic keeps prompts for 30 days.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'claude-fable-5-1'],
                 'features' => ['vision'],
                 'meta' => ['supports_images' => true],
                 'cache_read_price_per_1M' => 0.25,
+            ],
+        ],
+        [
+            // Snapshot 2026-11-09 (https://platform.claude.com/docs/en/models/fable-5-2/overview
+            // and https://platform.claude.com/docs/en/about-claude/pricing).
+            // Claude Fable 5.2 — successor to Fable 5.1. Input $8 / output $40
+            // per 1M (down from $10 / $50). Cache reads are 0.025x base input
+            // ($0.20), not the Anthropic-wide 0.1x ($0.80), so the row authors
+            // `cache_read_price_per_1M`. 5-minute cache writes are 1.25x ($10)
+            // and 1-hour writes are 2x ($16); those match the Anthropic
+            // defaults, so no write multiplier is authored. Adaptive thinking
+            // is always on (thinking.type disabled is a 400). Default effort
+            // is high, and xhigh and max are accepted. Forced tool_choice is a
+            // 400. Temperature, top_p, and top_k are rejected. Anthropic
+            // requires 30-day retention; a zero-retention workspace is a 400.
+            'id' => 431,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5.2',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5-2',
+            'priceIn' => 8,
+            'inUnit' => 'per1M',
+            'priceOut' => 40,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5.2 - for demanding reasoning and long-horizon agentic work. Adaptive thinking stays on. 1M context, 128K max output. Anthropic keeps prompts for 30 days. A workspace that stores nothing cannot use this model.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-fable-5-2'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                'meta' => ['family' => 'anthropic', 'jurisdiction' => 'US', 'context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'high'],
+                'cache_read_price_per_1M' => 0.20,
+            ],
+        ],
+        [
+            'id' => 432,
+            'service' => 'Anthropic',
+            'name' => 'Claude Fable 5.2 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-fable-5-2',
+            'priceIn' => 8,
+            'inUnit' => 'per1M',
+            'priceOut' => 40,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Fable 5.2 for image analysis and vision tasks. Anthropic keeps prompts for 30 days. A workspace that stores nothing cannot use this model.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-fable-5-2'],
+                'features' => ['vision'],
+                'meta' => ['supports_images' => true],
+                'cache_read_price_per_1M' => 0.20,
             ],
         ],
         [

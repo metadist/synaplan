@@ -140,6 +140,29 @@ describe('resolveModelMix', () => {
     expect(resolved.defaults.CHAT).toBe(340)
   })
 
+  it('prefers Claude Fable 5.2 over Fable 5.1 when the installation serves both', () => {
+    const models: Partial<Record<Capability, AIModel[]>> = {
+      CHAT: [
+        model({
+          id: 338,
+          service: 'Anthropic',
+          providerId: 'claude-fable-5-1',
+          name: 'Claude Fable 5.1',
+        }),
+        model({
+          id: 431,
+          service: 'Anthropic',
+          providerId: 'claude-fable-5-2',
+          name: 'Claude Fable 5.2',
+        }),
+      ],
+    }
+
+    const resolved = resolveModelMix(mixDefinition('anthropic'), models)
+
+    expect(resolved.defaults.CHAT).toBe(431)
+  })
+
   it('prefers Claude Fable 5.1 over Fable 5 when the installation serves both', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
       CHAT: [

@@ -40,6 +40,8 @@ final class AnthropicDescriptor implements DescribesProviderInterface
      * @var list<string>
      */
     private const NO_FORCED_TOOL_CHOICE_MODELS = [
+        'claude-fable-5-2',
+        'claude-mythos-5-2',
         'claude-fable-5-1',
         'claude-mythos-5-1',
         'claude-opus-5-5',
@@ -47,18 +49,18 @@ final class AnthropicDescriptor implements DescribesProviderInterface
     ];
 
     /**
-     * Claude Sonnet 5.5 accepts xhigh and max in addition to low|medium|high.
-     * Checked before the adaptive models: `claude-sonnet-5` is a prefix of
-     * `claude-sonnet-5-5`.
+     * Sonnet 5.5 and Fable 5.2 accept xhigh and max as well as low|medium|high.
+     * Checked before the adaptive models: `claude-fable-5` is a prefix of
+     * `claude-fable-5-2`, and `claude-sonnet-5` is a prefix of `claude-sonnet-5-5`.
      *
      * @var list<string>
      */
-    private const EXTENDED_EFFORT_MODELS = ['claude-sonnet-5-5'];
+    private const EXTENDED_EFFORT_MODELS = ['claude-sonnet-5-5', 'claude-fable-5-2'];
 
     public static function descriptor(): ProviderDescriptor
     {
-        // Adaptive models take output_config.effort low|medium|high; Sonnet 5.5
-        // extends that to xhigh and max. Budget-token models keep the toggle.
+        // Adaptive models take output_config.effort low|medium|high. Sonnet 5.5
+        // and Fable 5.2 also take xhigh and max. Budget models keep the toggle.
         $reasoning = new ReasoningLadder([
             new ReasoningLevelRule(ReasoningMatch::Prefix, self::EXTENDED_EFFORT_MODELS, ['low', 'medium', 'high', 'xhigh', 'max']),
             new ReasoningLevelRule(ReasoningMatch::Prefix, AnthropicProvider::ADAPTIVE_THINKING_MODELS, ['low', 'medium', 'high']),

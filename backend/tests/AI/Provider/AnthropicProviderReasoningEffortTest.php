@@ -180,6 +180,50 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
         self::assertArrayNotHasKey('output_config', $captured['body']);
     }
 
+    public function testReasoningOffSendsLowEffortForFable52(): void
+    {
+        $captured = $this->captureChat('claude-fable-5-2', ['temperature' => 0.2]);
+
+        self::assertArrayNotHasKey('temperature', $captured['body']);
+        self::assertSame('low', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'updates'],
+            $captured['body']['thinking'] ?? null,
+        );
+        self::assertSame('thinking-display-updates-2026-08-18', $captured['headers']['anthropic-beta'] ?? null);
+    }
+
+    public function testReasoningOffSendsLowEffortForDatedFable52(): void
+    {
+        $captured = $this->captureChat('claude-fable-5-2-20261109', []);
+
+        self::assertSame('low', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame('updates', $captured['body']['thinking']['display'] ?? null);
+    }
+
+    public function testMaxEffortOnFable52StaysAdaptive(): void
+    {
+        $captured = $this->captureChat('claude-fable-5-2', [
+            'reasoning' => true,
+            'reasoning_effort' => 'max',
+        ]);
+
+        self::assertSame('max', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'summarized'],
+            $captured['body']['thinking'] ?? null,
+        );
+        self::assertArrayNotHasKey('temperature', $captured['body']);
+    }
+
+    public function testFable51ReasoningOffDoesNotInheritFable52Minimum(): void
+    {
+        $captured = $this->captureChat('claude-fable-5-1', []);
+
+        self::assertArrayNotHasKey('output_config', $captured['body']);
+        self::assertArrayNotHasKey('thinking', $captured['body']);
+    }
+
     public function testReasoningOffLeavesOtherModelsUntouched(): void
     {
         $captured = $this->captureChat('claude-sonnet-4-6', []);

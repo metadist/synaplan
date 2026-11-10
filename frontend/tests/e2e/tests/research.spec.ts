@@ -40,6 +40,12 @@ const SOFTENED = 'Processing takes a week.'
 const CHECK_NOTE = 'Only one office names a time.'
 const DRAFT_START = 'No visa for '
 const DRAFT_END = '90 days.'
+/**
+ * The draft leaves as soon as the next poll says the run is complete, and
+ * the sentence appears a frame at a time. Keep that poll waiting so the
+ * note and the full sentence are on screen together long enough to read.
+ */
+const DRAFT_READABLE_MS = 2500
 
 /** What the run's event pages say, in the order the poll reads them. */
 const frames = (lines: Array<[number, string, Record<string, unknown>]>): string =>
@@ -161,11 +167,12 @@ async function stubChatStream(page: Page, mode: 'research' | 'lookup') {
  */
 async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
   // The run gathers for three polls, writes on the fourth and ends on the
-  // fifth (about five seconds), so the working reply and the draft can be
-  // looked at before the report replaces them.
+  // fifth. The fifth waits so the draft can be read before the report
+  // replaces it. The history poll must not see the report during that wait.
   let framesSent = 0
   let ended = false
-  const finished = () => ended || (mode !== 'answer_now' && framesSent >= 5)
+  let reportSent = false
+  const finished = () => ended || reportSent
   await page.route('**/api/v1/chats/*/messages**', async (route) => {
     if (route.request().method() !== 'GET') {
       await route.fallback()
@@ -249,6 +256,10 @@ async function stubResearch(page: Page, mode: 'off' | 'run' | 'answer_now') {
         : framesSent === 4
           ? WRITE_FRAMES
           : CHECK_FRAMES
+    if (body === CHECK_FRAMES && mode === 'run') {
+      await new Promise((resolve) => setTimeout(resolve, DRAFT_READABLE_MS))
+    }
+    if (body === CHECK_FRAMES) reportSent = true
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body })
   })
   await page.route('**/api/v1/research/*/input', async (route) => {
@@ -346,10 +357,11 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(page.locator(selectors.research.answerNow)).toBeVisible()
 
     // The writer's words arrive while it writes: the draft grows under the
-    // phases and says the check comes next.
+    // phases and says the check comes next. One snapshot has to carry both.
+    // A list of strings would ask for one element per string.
     const draft = bubble.locator(selectors.research.draft)
-    await expect(draft).toContainText(DRAFT_START + DRAFT_END)
-    await expect(bubble.locator(selectors.research.draftNote)).toContainText('Draft of the answer')
+    const sentence = `${DRAFT_START}${DRAFT_END}`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    await expect(draft).toContainText(new RegExp(`Draft of the answer[\\s\\S]*${sentence}`))
 
     // Once it is done, the report is the reply and one line stays below it.
     // Opening it lists the phases folded; each unfolds on a click.
@@ -444,7 +456,7 @@ test.describe('@ci @research Research the chat starts on its own', () => {
 
     const turn = chat.conversationBubbles().last().locator(selectors.research.turn)
     await expect(turn).toBeVisible()
-    // The stubbed run ends on its fifth poll, about five seconds in.
+    // The stubbed run ends on its fifth poll, once the draft has been readable.
     await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete', {
       timeout: 15_000,
     })

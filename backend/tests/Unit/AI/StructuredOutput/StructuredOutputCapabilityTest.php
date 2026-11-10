@@ -92,6 +92,9 @@ final class StructuredOutputCapabilityTest extends TestCase
     public static function anthropicModelsRejectingForcedToolChoice(): array
     {
         return [
+            'fable 5.2' => ['claude-fable-5-2'],
+            'fable 5.2 dated alias' => ['claude-fable-5-2-20261109'],
+            'mythos 5.2' => ['claude-mythos-5-2'],
             'fable 5.1' => ['claude-fable-5-1'],
             'fable 5.1 dated alias' => ['claude-fable-5-1-20260812'],
             'mythos 5.1' => ['claude-mythos-5-1'],
@@ -122,6 +125,7 @@ final class StructuredOutputCapabilityTest extends TestCase
     public function testTheRestrictionDoesNotLeakIntoNativeToolCalling(): void
     {
         self::assertTrue((new \App\AI\ToolCalling\ToolCallingCapability())->supports('anthropic', 'claude-fable-5-1', false));
+        self::assertTrue((new \App\AI\ToolCalling\ToolCallingCapability())->supports('anthropic', 'claude-fable-5-2', false));
     }
 
     public function testUnknownProviderHasNoDialect(): void

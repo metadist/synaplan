@@ -42,7 +42,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * declared tools are dropped
  * ({@see ToolCallingCapability::conflictsWithStructuredOutput()}).
  *
- * Note on Claude Fable 5.1 / Claude Mythos 5.1 / Claude Opus 5.5 / Claude
+ * Note on Claude Fable 5.2 / Fable 5.1 / Mythos 5.1 / Opus 5.5 / Claude
  * Sonnet 5.5: those models reject forced tool_choice ({"type": "any"} or
  * {"type": "tool", "name": ...}) with a 400 invalid_request_error — only
  * "auto" (default) and "none" are accepted. That rules out the
@@ -79,21 +79,18 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-haiku-4-5',
-        'claude-fable-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
+        'claude-fable-5',
     ];
 
     /**
-     * Models that reject `thinking.type: disabled` and still think when the
-     * field is omitted. Reasoning off sends `output_config.effort: low`.
-     *
-     * Measured on Claude Opus 5.5. Opus 5 and Fable 5.1 are omitted until the
-     * same rejection is confirmed. Claude Sonnet 5.5 is listed separately
-     * ({@see self::BETWEEN_TOOLS_MODELS}): omitting the field turns adaptive
-     * thinking on, and `disabled` is a 400.
+     * Reject `thinking.type: disabled` and still think if the field is omitted.
+     * Reasoning off sends effort `low`. Opus 5 and Fable 5.1 stay off this list
+     * until that 400 is confirmed. Sonnet 5.5 uses {@see self::BETWEEN_TOOLS_MODELS}.
      */
     private const ALWAYS_ON_THINKING_MODELS = [
-        'claude-opus-5-5',
+        'claude-opus-5-5', 'claude-fable-5-2',
     ];
 
     /**
@@ -125,6 +122,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5-5',
         'claude-opus-5',
         'claude-sonnet-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
     ];
@@ -144,8 +142,9 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
-        'claude-fable-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
+        'claude-fable-5',
     ];
 
     /**
@@ -161,8 +160,9 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
-        'claude-fable-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
+        'claude-fable-5',
     ];
 
     /**
@@ -965,10 +965,9 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
      *
      * Absent when the caller did not pick a level, so reasoning-on stays
      * adaptive with no forced effort. xhigh and max clamp to high — Claude
-     * rejects those names — except on models that accept the extended ladder
-     * ({@see self::BETWEEN_TOOLS_MODELS}). Medium and high turn thinking on
-     * when the model supports it; low stays a real (cheapest) level and does
-     * not force it.
+     * rejects those names — except on Sonnet 5.5 and Fable 5.2.
+     * Medium and high turn thinking on when the model supports it. Low stays
+     * a real (cheapest) level and does not force it.
      *
      * @param array<string, mixed> $requestBody
      * @param array<string, mixed> $options
@@ -1065,12 +1064,12 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     }
 
     /**
-     * xhigh and max pass through only on the extended ladder. Every other
+     * xhigh and max pass through on Sonnet 5.5 and Fable 5.2. Every other
      * adaptive model still clamps them to high.
      */
     private function normalizeEffort(string $model, string $requested): ?string
     {
-        if ($this->usesBetweenToolsThinking($model)) {
+        if ($this->usesBetweenToolsThinking($model) || str_starts_with($model, 'claude-fable-5-2')) {
             return match ($requested) {
                 'low', 'medium', 'high', 'xhigh', 'max' => $requested,
                 default => null,

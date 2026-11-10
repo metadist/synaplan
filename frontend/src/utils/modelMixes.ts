@@ -132,18 +132,21 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
     // user's current setting, and the panel subtitle only lists what is set.
     candidates: {
       CHAT: [
+        anthropic('claude-fable-5-2'),
         anthropic('claude-fable-5-1'),
         anthropic('claude-fable-5'),
         anthropic('claude-sonnet-5-5'),
         anthropic('claude-sonnet-5'),
       ],
       ANALYZE: [
+        anthropic('claude-fable-5-2'),
         anthropic('claude-fable-5-1'),
         anthropic('claude-fable-5'),
         anthropic('claude-sonnet-5-5'),
         anthropic('claude-sonnet-5'),
       ],
       PIC2TEXT: [
+        anthropic('claude-fable-5-2'),
         anthropic('claude-fable-5-1'),
         anthropic('claude-fable-5'),
         anthropic('claude-sonnet-5-5'),
