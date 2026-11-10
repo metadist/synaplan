@@ -122,6 +122,9 @@ OC_CLIENT_ID="${KC_OC_CLIENT_ID:-opencloud}"
 OC_CALLBACK="${KC_OC_CALLBACK:-https://host.docker.internal:9200/oidc-callback.html}"
 OC_ORIGIN="${KC_OC_ORIGIN:-https://host.docker.internal:9200}"
 OC_DEV_ORIGIN="${KC_OC_DEV_ORIGIN:-https://host.docker.internal:9201}"
+# The synaplan-opencloud extension's own development server (fixed port), where
+# its consent callback page is served from during development.
+OC_EXTENSION_DEV_ORIGIN="${KC_OC_EXTENSION_DEV_ORIGIN:-https://host.docker.internal:9210}"
 EXCHANGE_CLIENT_ID="${KC_EXCHANGE_CLIENT_ID:-synaplan-opencloud}"
 EXCHANGE_CLIENT_SECRET="${KC_EXCHANGE_CLIENT_SECRET:-synaplan-opencloud-secret}"
 
@@ -167,8 +170,8 @@ $KCADM create clients -r synaplan \
   -s standardFlowEnabled=true \
   -s directAccessGrantsEnabled=false \
   -s serviceAccountsEnabled=false \
-  -s "redirectUris=[\"${OC_ORIGIN}/*\",\"${OC_DEV_ORIGIN}/*\"]" \
-  -s "webOrigins=[\"${OC_ORIGIN}\",\"${OC_DEV_ORIGIN}\"]" \
+  -s "redirectUris=[\"${OC_ORIGIN}/*\",\"${OC_DEV_ORIGIN}/*\",\"${OC_EXTENSION_DEV_ORIGIN}/*\"]" \
+  -s "webOrigins=[\"${OC_ORIGIN}\",\"${OC_DEV_ORIGIN}\",\"${OC_EXTENSION_DEV_ORIGIN}\"]" \
   -s 'attributes={"pkce.code.challenge.method":"S256"}'
 
 # Configure token exchange permissions using kcadm.sh.
