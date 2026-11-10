@@ -136,7 +136,6 @@
         "src/AI/Messages/Translator/OpenAiMessagesTranslator.php::OpenAiMessagesTranslator::streamResponsesToAnthropic": 217,
         "src/AI/Provider/AnthropicProvider.php::AnthropicProvider::chat": 179,
         "src/AI/Provider/AnthropicProvider.php::AnthropicProvider::chatStream": 169,
-        "src/AI/Provider/AnthropicProvider.php::AnthropicProvider::parseSSEStream": 149,
         "src/AI/Provider/GroqProvider.php::GroqProvider::chatStream": 110,
         "src/AI/Provider/OllamaProvider.php::OllamaProvider::chatStream": 201,
         "src/AI/Provider/TestProvider.php::TestProvider::generateContent": 106,
