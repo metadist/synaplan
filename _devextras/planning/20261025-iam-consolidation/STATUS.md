@@ -23,7 +23,7 @@ run are entries here, not chat messages.
 | IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | merged |
 | IC5+IC5b | | waits for D6 and D10 — one pull request, schema then the People row |
 | IC6 | | waits for IC5 — the identity guide |
-| IC8 | | in progress — password reset and the SSO-only login page |
+| IC8 | [#3077](https://github.com/metadist/synaplan/pull/3077) | in review — password reset and the SSO-only login page |
 | CH1 | | waits for IC6 (`synaplan-charts`) |
 | IC7 | | waits for D7 — own pull request |
 | PC3 | | waits for D5 |
