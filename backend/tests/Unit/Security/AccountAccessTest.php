@@ -40,6 +40,7 @@ use App\Service\Desktop\PairingService;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\IamConfig;
 use App\Service\OAuth\OAuthStateService;
+use App\Service\OAuth\Server\AccessTokenValidator;
 use App\Service\OidcUserService;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 use App\Service\PlatformLink\OutlookConnectService;
@@ -258,7 +259,7 @@ final class AccountAccessTest extends TestCase
         $oidcTokens->method('validateBearerToken')->willReturn(['sub' => 'sub-1', 'email' => 'ada@example.com']);
         $oidcUsers = $this->createStub(OidcUserService::class);
         $oidcUsers->method('findOrCreateFromClaims')->willReturn($user);
-        $bearer = new OidcBearerAuthenticator($oidcTokens, $oidcUsers, new NullLogger(), $this->createStub(PlatformBearerAttribution::class));
+        $bearer = new OidcBearerAuthenticator($oidcTokens, $oidcUsers, new NullLogger(), $this->createStub(PlatformBearerAttribution::class), $this->createStub(AccessTokenValidator::class));
 
         $req = Request::create('/api/v1/chats', 'GET', server: ['HTTP_AUTHORIZATION' => 'Bearer a.b.c']);
         if ($canSignIn) {

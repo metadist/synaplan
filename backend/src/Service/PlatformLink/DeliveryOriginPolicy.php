@@ -49,6 +49,37 @@ final readonly class DeliveryOriginPolicy
     }
 
     /**
+     * The one address Synaplan connects to for this delivery URL, resolved
+     * under the same rules {@see accepts()} applied, so the name cannot point
+     * somewhere else between the check and the connection (DNS rebinding).
+     * Null when nothing acceptable is left. A URL whose host is an IP is its
+     * own address.
+     */
+    public function pinnedAddress(PlatformInstance $instance, string $url): ?string
+    {
+        if (!$this->accepts($instance, $url)) {
+            return null;
+        }
+        $host = strtolower(trim((string) parse_url($url, \PHP_URL_HOST), '[]'));
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return $host;
+        }
+        $devLocal = $this->redirects->isDev() && $this->redirects->isLocalDevHost($host);
+        $privateAllowed = $devLocal
+            || $this->oidcCloud->isThisCloud($instance)
+            || in_array($host, $instance->getApprovedHosts(), true);
+        foreach ($this->ssrfGuard->pinnedIps($host, $privateAllowed) as $ip) {
+            if (!$devLocal && self::ipIsLoopbackOrLinkLocal($ip)) {
+                continue;
+            }
+
+            return $ip;
+        }
+
+        return null;
+    }
+
+    /**
      * Loopback and link-local targets are refused even for an approved
      * hostname: that is where this machine and cloud metadata services
      * answer. An approved hostname that resolves into one of them is

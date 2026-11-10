@@ -6,8 +6,6 @@ import { createI18n } from 'vue-i18n'
 import { nextTick, ref } from 'vue'
 
 const connectOutlook = vi.fn()
-const getPublicInstance = vi.fn()
-const createLinkCode = vi.fn()
 const getConfigSync = vi.fn()
 const isAuthenticated = ref(true)
 const userEmail = ref('demo@synaplan.com')
@@ -16,8 +14,6 @@ const logout = vi.fn()
 vi.mock('@/services/api/platformLinksApi', () => ({
   platformLinksApi: {
     connectOutlook: (...args: unknown[]) => connectOutlook(...args),
-    getPublicInstance: (...args: unknown[]) => getPublicInstance(...args),
-    createLinkCode: (...args: unknown[]) => createLinkCode(...args),
   },
 }))
 
@@ -117,8 +113,6 @@ describe('PlatformConnectView', () => {
     userEmail.value = 'demo@synaplan.com'
     getConfigSync.mockReturnValue({ features: { platformLinksEnabled: false } })
     connectOutlook.mockReset()
-    getPublicInstance.mockReset()
-    createLinkCode.mockReset()
     logout.mockReset()
     assign.mockReset()
     messageParent.mockReset()
@@ -137,19 +131,16 @@ describe('PlatformConnectView', () => {
     )
     expect(wrapper.find('[data-testid="section-ready"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(false)
-    expect(getPublicInstance).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Outlook')
   })
 
-  it('names the signed-in Synaplan account for a cloud app link', async () => {
+  it('sends a cloud away: clouds connect through the OAuth consent page', async () => {
     getConfigSync.mockReturnValue({ features: { platformLinksEnabled: true } })
-    getPublicInstance.mockResolvedValue({ host: 'cloud.example.org' })
     const { wrapper } = await mountAt(
       '/connect/platform?client=nextcloud&instance_id=pi_1&external_id=ada&state=abc'
     )
-    expect(wrapper.find('[data-testid="section-ready"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="signed-in-as"]').text()).toContain('demo@synaplan.com')
-    expect(wrapper.text()).toContain('ada')
+    expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
+    expect(connectOutlook).not.toHaveBeenCalled()
   })
 
   it('does not repeat the account for Outlook, whose card already shows it', async () => {
@@ -164,7 +155,6 @@ describe('PlatformConnectView', () => {
     const { wrapper } = await mountAt('/connect/platform?client=evil&state=abc')
     expect(wrapper.find('[data-testid="section-error"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('not recognised')
-    expect(getPublicInstance).not.toHaveBeenCalled()
     expect(connectOutlook).not.toHaveBeenCalled()
   })
 

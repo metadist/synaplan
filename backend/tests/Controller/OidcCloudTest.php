@@ -88,7 +88,6 @@ final class OidcCloudTest extends WebTestCase
     {
         $twin = new PlatformInstance('opencloud', 'twin-'.bin2hex(random_bytes(4)), 'cloud.example.com', [], PlatformInstance::STATUS_ACTIVE);
         $twin->setOidcClientId('zero-setup-people');
-        $twin->setSecretHash(password_hash('x', \PASSWORD_DEFAULT));
         $this->instances()->save($twin);
         $twinId = $twin->getInstanceId();
 
@@ -101,26 +100,29 @@ final class OidcCloudTest extends WebTestCase
         self::assertTrue($this->row()->isActive());
     }
 
-    public function testTheCloudHasNoCredentialForTheInstanceRoutes(): void
+    public function testTheCloudHasNoClientCredential(): void
     {
         $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
 
-        $this->client->request('GET', '/api/v1/platform-links/instances/self', server: [
-            'HTTP_X_INSTANCE_ID' => PlatformInstance::OIDC_CLOUD_ID,
-            'HTTP_X_INSTANCE_SECRET' => 'guess',
-        ]);
+        self::assertNull($this->row()->getJwks(), 'no keys: it cannot authenticate as an OAuth2 client');
+        $this->client->request('GET', '/oauth/register/'.PlatformInstance::OIDC_CLOUD_ID, server: ['HTTP_AUTHORIZATION' => 'Bearer guess']);
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
-    public function testTheConfiguredCloudGetsAllCapabilitiesUnlessNamed(): void
+    public function testTheCloudIsOfferedOnlyWhatItsAppTakes(): void
     {
         $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
+        self::assertSame([], $this->row()->getAppCapabilities(), 'the OpenCloud app takes lifecycle notices only');
+        self::assertFalse($this->row()->canReceiveCopies());
+
+        $this->seed('https://cloud.example.com', 'http://nextcloud', 'nextcloud');
         self::assertSame(OidcCloud::ALL_CAPABILITIES, $this->row()->getAppCapabilities());
+        self::assertTrue($this->row()->canReceiveCopies());
     }
 
-    private function seed(string $url, string $internalUrl): OidcCloud
+    private function seed(string $url, string $internalUrl, string $type = 'opencloud'): OidcCloud
     {
-        $cloud = new OidcCloud('opencloud', $url, 'zero-setup-people', $internalUrl);
+        $cloud = new OidcCloud($type, $url, 'zero-setup-people', $internalUrl);
         $seeder = new OidcCloudSeeder(
             $cloud,
             $this->instances(),

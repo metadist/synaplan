@@ -6,13 +6,10 @@ namespace App\Controller;
 
 use App\Entity\PlatformInstance;
 use App\Entity\User;
+use App\Repository\PlatformInstanceRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\AdminUserProvisioningService;
 use App\Service\Admin\UserProvisioningConflictException;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotFoundException;
-use App\Service\PlatformLink\Exception\PlatformInstanceSecretException;
-use App\Service\PlatformLink\InstanceCredential;
 use App\Service\Usage\UsageStatsService;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -37,7 +34,7 @@ final class AdminUserProvisioningController extends AbstractController
         private readonly AdminUserProvisioningService $provisioning,
         private readonly UserRepository $userRepository,
         private readonly UsageStatsService $usageStats,
-        private readonly InstanceCredential $instanceCredential,
+        private readonly PlatformInstanceRepository $instances,
     ) {
     }
 
@@ -45,11 +42,7 @@ final class AdminUserProvisioningController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/users',
         summary: 'Provision (create or fetch) a user for an external identity',
-        description: 'Idempotent on (source, external_id). With the instance credential the identity row is canonical (client, instance, bare uid) and the later key mint binds that key. Without it, behaviour is unchanged.',
-        parameters: [
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
-        ],
+        description: 'Idempotent on (source, external_id). With instance_id (the OAuth client id of the cloud) the identity row is canonical (client, instance, bare uid) and the later key mint binds that key. Without it, behaviour is unchanged.',
         security: [['Bearer' => []]],
         tags: ['Admin User Provisioning']
     )]
@@ -59,6 +52,7 @@ final class AdminUserProvisioningController extends AbstractController
             required: ['source', 'external_id', 'email'],
             properties: [
                 new OA\Property(property: 'source', type: 'string', example: 'nextcloud'),
+                new OA\Property(property: 'instance_id', type: 'string', nullable: true, description: 'The cloud\'s OAuth client id. With it the identity row is canonical and the key mint binds that key.'),
                 new OA\Property(property: 'external_id', type: 'string', example: 'nc-instance-42:alice'),
                 new OA\Property(property: 'email', type: 'string', example: 'alice@example.com'),
                 new OA\Property(property: 'display_name', type: 'string', nullable: true, example: 'Alice Example'),
@@ -124,11 +118,9 @@ final class AdminUserProvisioningController extends AbstractController
     #[OA\Post(
         path: '/api/v1/admin/users/{id}/api-keys',
         summary: 'Mint an API key on behalf of a user',
-        description: 'Returns the plaintext key ONCE. Use it as that user\'s X-API-Key. With the instance credential the key is bound to that user\'s canonical identity row.',
+        description: 'Returns the plaintext key ONCE. Use it as that user\'s X-API-Key. With instance_id in the body the key is bound to that user\'s canonical identity row.',
         parameters: [
             new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')),
-            new OA\Parameter(name: 'X-Instance-Id', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
-            new OA\Parameter(name: 'X-Instance-Secret', in: 'header', required: false, schema: new OA\Schema(type: 'string')),
         ],
         security: [['Bearer' => []]],
         tags: ['Admin User Provisioning']
@@ -138,6 +130,7 @@ final class AdminUserProvisioningController extends AbstractController
         content: new OA\JsonContent(
             properties: [
                 new OA\Property(property: 'name', type: 'string', example: 'nextcloud-alice'),
+                new OA\Property(property: 'instance_id', type: 'string', nullable: true, description: 'The cloud\'s OAuth client id, as at provisioning.'),
                 new OA\Property(property: 'scopes', type: 'array', items: new OA\Items(type: 'string'), example: ['chat', 'files', 'rag', 'cloud:watch']),
             ]
         )
@@ -225,23 +218,26 @@ final class AdminUserProvisioningController extends AbstractController
     }
 
     /**
-     * Both headers absent: no instance. One of them, or a bad pair: 401.
+     * The cloud the provisioning is for, named by its OAuth client id in the
+     * body. The caller is a Synaplan administrator, so naming it is enough;
+     * it must be an approved cloud.
      */
     private function optionalInstance(Request $request): PlatformInstance|JsonResponse|null
     {
-        $id = trim((string) $request->headers->get('X-Instance-Id', ''));
-        $secret = (string) $request->headers->get('X-Instance-Secret', '');
-        if ('' === $id && '' === $secret) {
+        $body = json_decode($request->getContent(), true);
+        $id = is_array($body) && is_string($body['instance_id'] ?? null) ? trim($body['instance_id']) : '';
+        if ('' === $id) {
             return null;
         }
-
-        try {
-            return $this->instanceCredential->require($id, $secret);
-        } catch (PlatformInstanceNotFoundException|PlatformInstanceSecretException) {
-            return $this->json(['error' => 'Invalid instance credentials.'], Response::HTTP_UNAUTHORIZED);
-        } catch (PlatformInstanceNotActiveException $e) {
-            return $this->json(['error' => $e->getMessage()], Response::HTTP_FORBIDDEN);
+        $instance = $this->instances->findByInstanceId($id);
+        if (!$instance instanceof PlatformInstance) {
+            return $this->json(['error' => 'Unknown instance_id.'], Response::HTTP_BAD_REQUEST);
         }
+        if (!$instance->isActive()) {
+            return $this->json(['error' => 'This cloud is waiting for approval by the Synaplan administrator.'], Response::HTTP_FORBIDDEN);
+        }
+
+        return $instance;
     }
 
     private function requireAdmin(?User $user): ?JsonResponse

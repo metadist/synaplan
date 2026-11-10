@@ -215,7 +215,6 @@
         "src/Service/Multitask/Execution/Runner/MediaGenerationRunner.php::MediaGenerationRunner::run": 187,
         "src/Service/Multitask/TaskPlanExecutor.php::TaskPlanExecutor::planForExecution": 102,
         "src/Service/Notification/SlackNotificationService.php::SlackNotificationService::buildHandoffPayload": 114,
-        "src/Service/PlatformLink/PlatformLinkExchangeService.php::PlatformLinkExchangeService::exchange": 125,
         "src/Service/RateLimitService.php::RateLimitService::recordUsage": 190,
         "src/Service/Research/UrlContentService.php::UrlContentService::fetchForCrawling": 153,
         "src/Service/Research/UrlContentService.php::UrlContentService::fetchForReading": 122,

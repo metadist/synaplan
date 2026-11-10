@@ -152,6 +152,8 @@ final class ModuleOwnershipTest extends TestCase
             'PLATFORM_LINKS_OIDC_CLOUD_URL',
             'PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID',
             'PLATFORM_LINKS_OIDC_CLOUD_INTERNAL_URL',
+            'PLATFORM_LINKS_REGISTRATION',
+            'PLATFORM_LINKS_REGISTRATION_TOKEN',
             'OIDC_ADMIN_ROLES',
             'OIDC_ROLE_CLAIMS',
             'OIDC_SCOPES',

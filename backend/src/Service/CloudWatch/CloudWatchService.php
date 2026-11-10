@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\CloudWatch;
 
+use App\Entity\ApiKey;
 use App\Entity\CloudWatch;
 use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
@@ -11,6 +12,7 @@ use App\Entity\User;
 use App\Repository\CloudWatchItemRepository;
 use App\Repository\CloudWatchRepository;
 use App\Repository\ExternalIdentityRepository;
+use App\Security\OAuthBearerAuthenticator;
 use App\Service\File\CloudFilesConfig;
 use App\Service\PlatformLink\SourceInstanceResolver;
 use Doctrine\DBAL\LockMode;
@@ -40,7 +42,10 @@ final readonly class CloudWatchService
     public function list(User $user, Request $request): array
     {
         $identity = $this->identity($user, $request);
-        $rows = $this->watches->forOwnerInstance((int) $user->getId(), $identity->getInstanceId());
+        $rows = array_values(array_filter(
+            $this->watches->forOwnerInstance((int) $user->getId(), $identity->getInstanceId()),
+            static fn (CloudWatch $watch): bool => $watch->getIdentityId() === (int) $identity->getId(),
+        ));
         $paused = 0;
         $items = [];
         foreach ($rows as $watch) {
@@ -171,17 +176,41 @@ final readonly class CloudWatchService
         if ('' === $instanceId && $this->instances->isAmbiguous($request)) {
             throw new CloudWatchException(409, 'More than one cloud is registered for this login. Ask a Synaplan administrator to remove the one no longer in use.', 'platform_ambiguous');
         }
-        foreach ($this->identities->findByUserId((int) $user->getId()) as $identity) {
-            if ($identity->getInstanceId() === $instanceId && '' !== $instanceId) {
-                if ($identity->isOff()) {
-                    throw new CloudWatchException(403, 'Synaplan is turned off for this cloud.', 'platform_disconnected');
-                }
-
-                return $identity;
+        $account = $request->attributes->get(OAuthBearerAuthenticator::EXTERNAL_ID_ATTRIBUTE);
+        $account = is_string($account) && '' !== $account ? $account : null;
+        $key = $request->attributes->get('api_key');
+        if ($key instanceof ApiKey && null === $account) {
+            $bound = $this->identities->findOneByApiKeyId((int) $key->getId());
+            if ($bound instanceof ExternalIdentity
+                && $bound->getUserId() === (int) $user->getId()
+                && '' !== $instanceId
+                && $bound->getInstanceId() === $instanceId) {
+                return $this->requireOn($bound);
             }
+
+            throw new CloudWatchException(403, 'This key is not linked to a cloud.', 'platform_disconnected');
+        }
+        foreach ($this->identities->findByUserId((int) $user->getId()) as $identity) {
+            if ($identity->getInstanceId() !== $instanceId || '' === $instanceId) {
+                continue;
+            }
+            if (null !== $account && $identity->getExternalId() !== $account) {
+                continue;
+            }
+
+            return $this->requireOn($identity);
         }
 
         throw new CloudWatchException(403, 'This key is not linked to a cloud.', 'platform_disconnected');
+    }
+
+    private function requireOn(ExternalIdentity $identity): ExternalIdentity
+    {
+        if ($identity->isOff()) {
+            throw new CloudWatchException(403, 'Synaplan is turned off for this cloud.', 'platform_disconnected');
+        }
+
+        return $identity;
     }
 
     private function host(ExternalIdentity $identity): string

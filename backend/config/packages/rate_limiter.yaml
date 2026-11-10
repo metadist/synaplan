@@ -53,15 +53,6 @@ framework:
         # window for good — so this limit exists to blunt scripted hammering of
         # a virgin instance, not to ration a workflow. A human needs one or two
         # attempts; 10/minute leaves room for a mistyped password.
-        # Failed instance credentials (X-Instance-Id + X-Instance-Secret),
-        # keyed per client IP in PlatformInstanceAuthenticator. Only failures
-        # count; once the window is full the secret is not even hashed, so an
-        # anonymous caller cannot keep the bcrypt check busy.
-        platform_instance_auth_failures:
-            policy: 'sliding_window'
-            limit: 30
-            interval: '1 minute'
-            cache_pool: 'cache.rate_limiter'
         setup_attempt:
             policy: 'sliding_window'
             limit: 10
@@ -186,6 +177,16 @@ framework:
             policy: 'sliding_window'
             limit: '%env(int:PAID_SIGNUP_ALERT_LIMIT)%'
             interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
+        # Failed client authentications on the OAuth server endpoints
+        # (ClientAuthentication), keyed per client IP. A cloud signs every
+        # call with its own key, so a real one fails only while misconfigured;
+        # 30 a minute leaves room for that and stops assertion guessing.
+        # Successful calls never count.
+        oauth_client_auth_failures:
+            policy: 'sliding_window'
+            limit: 30
+            interval: '1 minute'
             cache_pool: 'cache.rate_limiter'
         # One OAuth state nonce may authorise one callback. The signed state
         # lives for ten minutes; spending the nonce here stops one solved

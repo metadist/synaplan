@@ -18,7 +18,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 final class UserErasureCoverageTest extends KernelTestCase
 {
     private const ORDER = [
-        'AccessCredentialsEraser', 'ConnectionEraser', 'KnowledgeEraser', 'DesktopEraser',
+        'AccessCredentialsEraser', 'ConnectionEraser', 'OAuthTokenEraser', 'KnowledgeEraser', 'DesktopEraser',
         'UsageLogEraser', 'WidgetEraser', 'ShareEraser', 'AgentEraser',
         'ApprovalEraser', 'SavedTaskEraser', 'CloudWatchEraser', 'UrlWatchEraser', 'NotionEraser', 'ConversationEraser',
         'VoiceSessionEraser', 'FileEraser', 'ComputeEraser', 'InboxEraser',

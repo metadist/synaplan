@@ -63,8 +63,19 @@ class PlatformInstance
     #[ORM\Column(name: 'BHOST', length: 255)]
     private string $host;
 
+    /**
+     * Unused since clouds authenticate by private_key_jwt. Still mapped so
+     * the column survives until a later release drops it (expand/contract,
+     * docs/MIGRATIONS.md).
+     *
+     * @deprecated phase-2 removal
+     */
     #[ORM\Column(name: 'BSECRETHASH', length: 255, options: ['default' => ''])]
     private string $secretHash = '';
+
+    /** The cloud's public keys (a JWK Set as JSON): it authenticates by private_key_jwt. */
+    #[ORM\Column(name: 'BJWKS', type: 'text', nullable: true)]
+    private ?string $jwks = null;
 
     /** @var list<string>|null */
     #[ORM\Column(name: 'BREDIRECTURIS', type: 'json', nullable: true)]
@@ -182,14 +193,30 @@ class PlatformInstance
         return $this->host;
     }
 
-    public function getSecretHash(): string
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getJwks(): ?array
     {
-        return $this->secretHash;
+        $decoded = null === $this->jwks ? null : json_decode($this->jwks, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
-    public function setSecretHash(string $secretHash): void
+    /**
+     * @param array<string, mixed>|null $jwks
+     */
+    public function setJwks(?array $jwks): void
     {
-        $this->secretHash = $secretHash;
+        $this->jwks = null === $jwks ? null : json_encode($jwks, \JSON_UNESCAPED_SLASHES | \JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @param list<string> $redirectUris
+     */
+    public function setRedirectUris(array $redirectUris): void
+    {
+        $this->redirectUris = $redirectUris;
     }
 
     /**
@@ -203,6 +230,11 @@ class PlatformInstance
     public function getRegisteredBy(): int
     {
         return $this->registeredBy;
+    }
+
+    public function setRegisteredBy(int $registeredBy): void
+    {
+        $this->registeredBy = $registeredBy;
     }
 
     public function getStatus(): string

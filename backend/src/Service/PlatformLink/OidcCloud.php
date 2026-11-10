@@ -29,6 +29,16 @@ final readonly class OidcCloud
 {
     public const ALL_CAPABILITIES = ['deliveries', 'pickups', 'read_scope', 'source_events', 'watches'];
 
+    /**
+     * What each cloud app takes besides lifecycle notices. The OpenCloud app
+     * takes nothing else yet, so Synaplan offers it no copies or pickups
+     * that would wait for an answer forever.
+     */
+    public const CAPABILITIES = [
+        PlatformInstance::CLIENT_OPENCLOUD => [],
+        PlatformInstance::CLIENT_NEXTCLOUD => self::ALL_CAPABILITIES,
+    ];
+
     /** Where each cloud app takes Synaplan's notifications. */
     public const INBOUND_PATHS = [
         PlatformInstance::CLIENT_OPENCLOUD => '/api/synaplan/inbound',
@@ -50,7 +60,7 @@ final readonly class OidcCloud
         $base = '' !== trim($internalUrl) ? rtrim(trim($internalUrl), '/') : $this->url;
         $path = self::INBOUND_PATHS[$this->client] ?? null;
         $this->deliveryUrl = null !== $path && '' !== $base ? $base.$path : '';
-        $this->capabilities = self::ALL_CAPABILITIES;
+        $this->capabilities = self::CAPABILITIES[$this->client] ?? [];
     }
 
     public function isEnabled(): bool

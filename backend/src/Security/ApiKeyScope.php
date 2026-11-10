@@ -110,7 +110,6 @@ final class ApiKeyScope
         'POST /api/v1/media/generate' => [self::PLATFORM_CHAT],
         'POST /v1/chat/completions' => [self::PLATFORM_CHAT],
         'GET /api/v1/config/memory-service/check' => [self::PLATFORM_CHAT, self::PLATFORM_MEMORIES],
-        'POST /api/v1/platform-links/identities/adopt' => [self::PLATFORM_CHAT, self::PLATFORM_FILES, self::PLATFORM_RAG],
         'POST /api/v1/cloud/status' => [self::PLATFORM_FILES],
         'POST /api/v1/cloud/trials' => [self::PLATFORM_WATCH],
     ];
@@ -153,6 +152,13 @@ final class ApiKeyScope
      * @var list<string>
      */
     private const SELF_SERVICE_PATHS = ['/api/v1/auth/me', '/api/health'];
+
+    /**
+     * Paths no API key reaches ({@see isSessionOnly()}).
+     *
+     * @var list<string>
+     */
+    private const SESSION_ONLY_PREFIXES = ['/api/v1/cloud/watches/from-message', '/api/v1/oauth/consent'];
 
     /**
      * Legacy webhook scopes. A key whose list contains ONLY these keeps full
@@ -254,24 +260,23 @@ final class ApiKeyScope
     }
 
     /**
-     * The only scopes a background key carries: upload watched files and
-     * run the person's watches. No chat, no memories.
-     *
-     * @return list<string>
-     */
-    public static function backgroundKeyScopes(): array
-    {
-        return [self::PLATFORM_FILES, self::PLATFORM_RAG, self::PLATFORM_WATCH];
-    }
-
-    /**
-     * Pinning a chat turn into a watch is a signed-in action in Synaplan.
-     * Every API key is refused, including a legacy or `*` key. Every method
-     * is refused: `$method` is part of the call shape and is not a filter.
+     * Actions of the signed-in person in Synaplan itself: pinning a chat
+     * turn into a watch, and allowing a cloud to act for them (OAuth
+     * consent; a key that could consent would turn itself into a grant that
+     * outlives it). Every API key is refused, including a legacy or `*`
+     * key. Every method is refused: `$method` is part of the call shape and
+     * is not a filter.
      */
     public static function isSessionOnly(string $method, string $path): bool
     {
-        return self::matchesPrefix(self::decodedPath($path), '/api/v1/cloud/watches/from-message');
+        $path = self::decodedPath($path);
+        foreach (self::SESSION_ONLY_PREFIXES as $prefix) {
+            if (self::matchesPrefix($path, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Security;
 use App\Entity\User;
 use App\Security\OidcBearerAuthenticator;
 use App\Service\Auth\OidcTokenService;
+use App\Service\OAuth\Server\AccessTokenValidator;
 use App\Service\OidcUserService;
 use App\Service\PlatformLink\Exception\PlatformDisconnectedException;
 use App\Service\PlatformLink\PlatformBearerAttribution;
@@ -40,9 +41,9 @@ final class OidcBearerAuthenticatorTest extends TestCase
         $users = $this->createStub(OidcUserService::class);
         $users->method('findOrCreateFromClaims')->willReturn($user);
         $attribution = $this->createMock(PlatformBearerAttribution::class);
-        $attribution->expects($this->once())->method('attribute')->with($user, $claims, false)->willThrowException(new PlatformDisconnectedException());
+        $attribution->expects($this->once())->method('attribute')->with($user, $claims)->willThrowException(new PlatformDisconnectedException());
 
-        $authenticator = new OidcBearerAuthenticator($tokens, $users, new NullLogger(), $attribution);
+        $authenticator = new OidcBearerAuthenticator($tokens, $users, new NullLogger(), $attribution, $this->createStub(AccessTokenValidator::class));
         $request = $this->request('GET', '/v1/models', 'aaa.bbb.ccc');
 
         try {
@@ -67,6 +68,7 @@ final class OidcBearerAuthenticatorTest extends TestCase
             $this->createStub(OidcUserService::class),
             new NullLogger(),
             $this->createStub(PlatformBearerAttribution::class),
+            $this->createStub(AccessTokenValidator::class),
         );
     }
 
