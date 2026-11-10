@@ -73,8 +73,34 @@ final class WhatsAppIntakeTest extends TestCase
         self::assertSame(0, $this->limitChecks);
     }
 
-    private function admit(IncomingMessageDto $dto, bool $anonymous = false, bool $agentEnabled = false): InboundWhatsApp
+    public function testASuspendedAccountIsRefusedBeforeTheLimit(): void
     {
+        try {
+            $this->admit(self::text(), status: User::ACCOUNT_STATUS_SUSPENDED);
+            self::fail('A suspended account does not get a reply.');
+        } catch (WhatsAppMessageAnswered $answered) {
+            self::assertSame('This account cannot receive replies.', $answered->answer['error']);
+        }
+        self::assertSame(0, $this->limitChecks);
+    }
+
+    public function testASuspendedAnonymousSenderIsRefusedBeforeTheLimit(): void
+    {
+        try {
+            $this->admit(self::text(), anonymous: true, status: User::ACCOUNT_STATUS_SUSPENDED);
+            self::fail('A suspended sender does not get a reply.');
+        } catch (WhatsAppMessageAnswered $answered) {
+            self::assertSame('This account cannot receive replies.', $answered->answer['error']);
+        }
+        self::assertSame(0, $this->limitChecks);
+    }
+
+    private function admit(
+        IncomingMessageDto $dto,
+        bool $anonymous = false,
+        bool $agentEnabled = false,
+        string $status = User::ACCOUNT_STATUS_ACTIVE,
+    ): InboundWhatsApp {
         $whatsApp = $this->createStub(WhatsAppService::class);
         $whatsApp->method('isAvailable')->willReturn(true);
         $whatsApp->method('sendMessage')->willReturnCallback(function (): array {
@@ -105,6 +131,8 @@ final class WhatsAppIntakeTest extends TestCase
         $binding->method('get')->willReturn(12);
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
+        $user->method('isActive')->willReturn(User::ACCOUNT_STATUS_ACTIVE === $status);
+        $user->method('isPendingPayment')->willReturn(User::ACCOUNT_STATUS_PENDING_PAYMENT === $status);
 
         $intake = new WhatsAppIntake($whatsApp, $cache, $locks, $limits, $this->createStub(EntityManagerInterface::class), new NullLogger(), 2, $binding, $agents);
 

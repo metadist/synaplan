@@ -56,11 +56,20 @@
           </svg>
         </div>
 
-        <!-- Error Message -->
-        <h2 class="text-2xl font-bold txt-primary mb-2">
-          {{ $t('auth.socialLoginError') }}
+        <!-- A known account refusal is the whole message. "Try again" would
+             send a suspended person back to the same door. -->
+        <h2
+          class="txt-primary"
+          :class="
+            knownBlock ? 'text-lg font-semibold leading-snug mb-6' : 'text-2xl font-bold mb-2'
+          "
+        >
+          {{ knownBlock ? $t(knownBlock) : $t('auth.socialLoginError') }}
         </h2>
-        <p class="txt-secondary text-sm mb-6">
+        <p
+          v-if="error && !knownBlock && error !== $t('auth.socialLoginError')"
+          class="txt-secondary text-sm mb-6"
+        >
           {{ error }}
         </p>
 
@@ -89,10 +98,18 @@ const { t } = useI18n()
 
 const provider = ref<string | null>(null)
 const error = ref<string | null>(null)
+const failureCode = ref<string | null>(null)
+
+const knownBlock = computed(() => {
+  if (failureCode.value === 'oidc_access_denied') return 'auth.oidcAccessDenied'
+  if (failureCode.value === 'oidc_not_authorized') return 'auth.oidcNotAuthorized'
+  return signupBlockedI18nKey(failureCode.value)
+})
 
 const providerName = computed(() => {
   if (provider.value === 'google') return 'Google'
   if (provider.value === 'github') return 'GitHub'
+  if (provider.value === 'apple') return 'Apple'
   if (provider.value === 'keycloak') return t('auth.enterpriseSso')
   return provider.value
 })
@@ -130,17 +147,12 @@ onMounted(async () => {
 
     provider.value = providerParam
 
-    console.log('🔐 OAuth Callback:', {
-      success: successParam,
-      provider: providerParam,
-      error: errorParam,
-    })
-
     // Check for error in URL params
     if (errorCode || errorParam) {
       // Cancelled / failed OAuth must not leave a pending deep-link in
       // sessionStorage, or the next plain login could be hijacked.
       clearPendingRedirect()
+      failureCode.value = errorCode
       error.value = oauthErrorMessage(errorCode, scopeParam, errorParam)
       return
     }
@@ -148,8 +160,6 @@ onMounted(async () => {
     // With cookie-based auth, cookies are already set by the redirect
     // We just need to verify the session and fetch user info
     if (successParam === 'true') {
-      console.log('✅ OAuth success indicated, verifying session...')
-
       try {
         // Use the OAuth callback handler which fetches user from /me
         const result = await authStore.handleOAuthCallback()
@@ -165,23 +175,19 @@ onMounted(async () => {
             router.push(target)
           }, 500)
         } else {
-          console.error('❌ Session verification failed')
           clearPendingRedirect()
           error.value = t('auth.socialLoginError')
         }
-      } catch (e: unknown) {
-        console.error('❌ Failed to verify session after OAuth:', e)
+      } catch {
         clearPendingRedirect()
         error.value = t('auth.socialLoginError')
       }
     } else {
       // No success param and no error - something went wrong
-      console.error('❌ OAuth callback without success or error')
       clearPendingRedirect()
       error.value = t('auth.socialLoginError')
     }
   } catch (e: unknown) {
-    console.error('❌ OAuth callback error:', e)
     clearPendingRedirect()
     error.value = getErrorMessage(e) || t('auth.socialLoginError')
   }

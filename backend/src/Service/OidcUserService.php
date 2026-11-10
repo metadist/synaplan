@@ -5,6 +5,7 @@ namespace App\Service;
 use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcAccessPolicy;
 use App\Service\Auth\OidcClaimResolver;
@@ -76,6 +77,10 @@ class OidcUserService
                     'existing_provider' => $user->getProviderId(),
                 ]);
                 throw new CustomUserMessageAuthenticationException('Authentication failed.');
+            }
+
+            if (null !== AccountAccess::signIn($user)) {
+                return $user;
             }
 
             $this->logger->info('Existing user logging in via OIDC', [

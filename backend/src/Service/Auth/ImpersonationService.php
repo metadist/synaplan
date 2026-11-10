@@ -6,6 +6,7 @@ namespace App\Service\Auth;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\IamConfig;
 use Psr\Log\LoggerInterface;
@@ -44,6 +45,8 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
  *   - You cannot impersonate yourself (the resulting session would be a
  *     no-op and only confuse the audit trail).
  *   - You cannot nest impersonations — exit first.
+ *   - A suspended or banned account cannot be impersonated. An account that
+ *     is waiting for payment can, so the admin can open checkout for it.
  *   - OIDC/Keycloak sessions are not supported, since we have no app-token
  *     refresh to stash. The caller gets a clean error and the impersonation
  *     is refused without mutating cookies.
@@ -415,6 +418,11 @@ final readonly class ImpersonationService
 
         if ($this->isImpersonating($request)) {
             throw new AccessDeniedException('Already impersonating — exit the current session first.');
+        }
+
+        $closed = AccountAccess::signIn($target);
+        if (null !== $closed) {
+            throw new AccessDeniedException(AccountAccess::message($closed));
         }
     }
 

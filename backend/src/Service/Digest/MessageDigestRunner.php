@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Service\RateLimitService;
 use Psr\Log\LoggerInterface;
 
@@ -240,7 +241,7 @@ final readonly class MessageDigestRunner
 
         foreach ($userIds as $index => $userId) {
             $user = $this->userRepository->find($userId);
-            if (null === $user || !$user->isMemoriesEnabled()) {
+            if (null === $user || null !== AccountAccess::credential($user) || !$user->isMemoriesEnabled()) {
                 ++$summary['skipped_users'];
                 $this->rememberScheduledPass($job, $dryRun, $userId);
                 continue;

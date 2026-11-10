@@ -6,6 +6,7 @@ namespace App\Service\Billing;
 
 use App\Entity\User;
 use App\Exception\ApiKeyPlanRequiredException;
+use App\Security\AccountAccess;
 use App\Service\RateLimitService;
 use App\Service\Usage\StorageQuotaService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -64,7 +65,7 @@ final readonly class PremiumFeatureGate
      */
     public function assertApiKeysAllowed(User $user): void
     {
-        if (!$this->isUnlockedFor($user)) {
+        if (null !== AccountAccess::credential($user) || !$this->isUnlockedFor($user)) {
             throw new ApiKeyPlanRequiredException();
         }
         if (!$user->isEmailVerified()) {

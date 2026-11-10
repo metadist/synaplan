@@ -24,7 +24,7 @@ use Symfony\Component\Security\Core\Authentication\Token\Storage\TokenStorageInt
  */
 final class PendingPaymentSubscriber implements EventSubscriberInterface
 {
-    public const CODE = 'ACCOUNT_PENDING_PAYMENT';
+    public const CODE = AccountAccess::PENDING;
 
     /** @var list<string> */
     private const PREFIXES = [
@@ -77,7 +77,7 @@ final class PendingPaymentSubscriber implements EventSubscriberInterface
             'success' => false,
             'error' => 'Payment required',
             'code' => self::CODE,
-            'message' => 'This account is waiting for payment. Finish checkout to use Synaplan.',
+            'message' => AccountAccess::PENDING_MESSAGE,
         ], Response::HTTP_FORBIDDEN));
     }
 

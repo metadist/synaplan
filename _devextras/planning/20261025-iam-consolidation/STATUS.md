@@ -19,8 +19,8 @@ run are entries here, not chat messages.
 | IC1 | [#3027](https://github.com/metadist/synaplan/pull/3027) | merged |
 | PC1 | | not started (`synaplan-platform`) |
 | PC2 | | waits for D4 |
-| IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | in review |
-| IC4 | | not started — own pull request, the fixes the matrix finds |
+| IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | merged |
+| IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | in review |
 | IC5+IC5b | | waits for D6 and D10 — one pull request, schema then the People row |
 | IC6+IC8 | | waits for IC2 and IC5 — one pull request, the guide and the journeys |
 | CH1 | | waits for IC6 (`synaplan-charts`) |

@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Entity\Widget;
 use App\Repository\PromptRepository;
 use App\Repository\WidgetRepository;
+use App\Security\AccountAccess;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -290,6 +291,16 @@ HTML;
             $this->logger->warning('Widget owner not found', [
                 'widget_id' => $widget->getWidgetId(),
                 'owner_id' => $widget->getOwnerId(),
+            ]);
+
+            return false;
+        }
+
+        if (null !== AccountAccess::credential($owner)) {
+            $this->logger->warning('Widget owner cannot use the platform', [
+                'widget_id' => $widget->getWidgetId(),
+                'owner_id' => $owner->getId(),
+                'status' => $owner->getAccountStatus(),
             ]);
 
             return false;

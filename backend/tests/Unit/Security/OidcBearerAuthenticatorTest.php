@@ -32,6 +32,7 @@ final class OidcBearerAuthenticatorTest extends TestCase
     {
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
+        $user->method('canSignIn')->willReturn(true);
         $claims = ['sub' => 'ada', 'azp' => 'synaplan-opencloud'];
 
         $tokens = $this->createStub(OidcTokenService::class);
