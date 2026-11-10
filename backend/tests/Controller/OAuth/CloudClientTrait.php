@@ -6,6 +6,7 @@ namespace App\Tests\Controller\OAuth;
 
 use App\Entity\User;
 use App\Repository\ConfigRepository;
+use App\Repository\OAuthTokenRepository;
 use App\Security\ApiKeyScope;
 use App\Service\Infrastructure\RedisService;
 use App\Service\OAuth\Server\AuthorizationRequestStore;
@@ -45,12 +46,18 @@ trait CloudClientTrait
         static::getContainer()->set(RegistrationPolicy::class, new RegistrationPolicy('pending', self::IAT));
         static::getContainer()->get(RedisService::class)->delete('oauth:register:'.sha1('127.0.0.1'));
         static::getContainer()->get(RedisService::class)->delete('oauth:register-token:'.sha1('127.0.0.1'));
+        static::getContainer()->get(OAuthTokenRepository::class)->forgetRegistrationToken(self::IAT);
         $this->forgetFailedAuthentications();
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => \OPENSSL_KEYTYPE_RSA]);
         self::assertNotFalse($key);
         openssl_pkey_export($key, $pem);
         $this->privateKey = (string) $pem;
         $this->host = 'cloud-'.bin2hex(random_bytes(4)).'.example.com';
+    }
+
+    private function reuseInitialAccessToken(): void
+    {
+        static::getContainer()->get(OAuthTokenRepository::class)->forgetRegistrationToken(self::IAT);
     }
 
     private function forgetFailedAuthentications(): void

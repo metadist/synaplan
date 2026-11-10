@@ -47,7 +47,7 @@ final class OAuthClientRegistrationController extends AbstractController
         path: '/oauth/register',
         operationId: 'oauthRegisterClient',
         summary: 'Register a cloud as OAuth2 client (RFC 7591)',
-        description: 'Open to anyone unless the installation asks for an initial access token (Authorization: Bearer). Without one the client waits for an administrator, unless registration is open.',
+        description: 'Open to anyone unless the installation asks for an initial access token (Authorization: Bearer). A token approves one client and is then spent. Without one the client waits for an administrator, unless registration is open.',
         tags: ['Platform Links'],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(ref: '#/components/schemas/OAuthClientMetadata')),
         responses: [

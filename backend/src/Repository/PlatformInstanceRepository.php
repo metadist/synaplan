@@ -86,4 +86,10 @@ class PlatformInstanceRepository extends ServiceEntityRepository
             $this->getEntityManager()->flush();
         }
     }
+
+    public function remove(PlatformInstance $instance): void
+    {
+        $this->getEntityManager()->remove($instance);
+        $this->getEntityManager()->flush();
+    }
 }

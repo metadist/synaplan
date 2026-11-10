@@ -923,9 +923,11 @@ Who may register is set by `PLATFORM_LINKS_REGISTRATION`:
 | `token` | Only with the initial access token in `PLATFORM_LINKS_REGISTRATION_TOKEN` |
 
 A registration that presents `PLATFORM_LINKS_REGISTRATION_TOKEN` is active at
-once in every mode. Registrations without it are limited to 10 per hour per
-address. Revoking an instance ends every person's link and every token it
-holds.
+once in every mode. That token approves one client and is then spent; the
+next cloud needs a new value. The token must be at least 32 characters, and
+a wrong guess is limited to 10 per hour per address. Registrations without
+it are limited to 10 per hour per address. Revoking an instance ends every
+person's link and every token it holds.
 
 **A cloud that shares Synaplan's identity provider (OpenCloud with the same
 Keycloak)** needs no registration: `PLATFORM_LINKS_OIDC_CLOUD*` configure it
