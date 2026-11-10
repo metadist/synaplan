@@ -51,6 +51,21 @@ nelmio_api_doc:
                         token_endpoint_auth_method:
                             type: string
                             example: private_key_jwt
+                        grant_types:
+                            type: array
+                            items:
+                                type: string
+                                enum: [authorization_code, refresh_token]
+                            description: Optional; no other grant is offered.
+                        response_types:
+                            type: array
+                            items:
+                                type: string
+                                enum: [code]
+                            description: Optional; no other response type is offered.
+                        client_id:
+                            type: string
+                            description: Optional in an update; it has to be the client's own.
                         delivery_url:
                             type: string
                             description: Where Synaplan's servers call the cloud.
