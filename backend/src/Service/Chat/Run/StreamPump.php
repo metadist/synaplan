@@ -12,6 +12,16 @@ use App\AI\Stream\StreamDecoderInterface;
  */
 final class StreamPump
 {
+    private const CREDENTIAL_KEYS = [
+        'api_key',
+        'apikey',
+        'api-key',
+        'authorization',
+        'proxy-authorization',
+        'x-api-key',
+        'x-goog-api-key',
+    ];
+
     /**
      * @param array<string, mixed> $call payload without a key or an authorization header
      */
@@ -20,43 +30,167 @@ final class StreamPump
         $this->assertNoSecret($call);
         $seq = 0;
         foreach ($decoder->feed($bytes) as $event) {
+            if ('error' === $event->kind) {
+                $this->fail($runId, $seq, $stream, self::errorMessage($event->data));
+            }
             $text = self::visible($event->kind, $event->data);
             if (null === $text) {
                 continue;
             }
-            $stream->append($runId, ++$seq, 'frame', 'data: '.json_encode(['text' => $text], \JSON_UNESCAPED_UNICODE)."\n\n");
+            $stream->append($runId, ++$seq, 'frame', self::dataFrame(['text' => $text]));
         }
         $stream->append($runId, ++$seq, 'terminal', "data: [DONE]\n\n");
     }
 
     /**
+     * A provider key is a credential field or header name. Message text is
+     * not scanned, so a sentence that says "authorization" is still a job.
+     *
      * @param array<string, mixed> $call
      */
     private function assertNoSecret(array $call): void
     {
-        $encoded = json_encode($call) ?: '';
-        foreach (['api_key', 'authorization', 'sk-'] as $needle) {
-            if (str_contains(strtolower($encoded), $needle)) {
+        $this->rejectCredentialKeys($call);
+    }
+
+    private function rejectCredentialKeys(mixed $value): void
+    {
+        if (!is_array($value)) {
+            return;
+        }
+        foreach ($value as $key => $item) {
+            if (is_string($key) && in_array(strtolower($key), self::CREDENTIAL_KEYS, true)) {
                 throw new \InvalidArgumentException('A stream job must not carry a provider key');
             }
+            $this->rejectCredentialKeys($item);
         }
+    }
+
+    /**
+     * The frames already written stay readable. The terminal marks the end,
+     * and the exception keeps a failed body from looking like an empty answer.
+     */
+    private function fail(string $runId, int &$seq, RunStream $stream, string $message): never
+    {
+        $stream->append($runId, ++$seq, 'frame', self::dataFrame(['error' => $message]));
+        $stream->append($runId, ++$seq, 'terminal', "data: [DONE]\n\n");
+
+        throw new \RuntimeException($message);
     }
 
     private static function visible(string $kind, mixed $data): ?string
     {
-        if ('content' === $kind && is_string($data) && '' !== $data) {
-            return $data;
+        if ('content' === $kind) {
+            return self::nonEmpty(self::textParts($data));
         }
-        if ('callback' === $kind && is_array($data) && 'content' === ($data['type'] ?? null) && is_string($data['content'] ?? null) && '' !== $data['content']) {
-            return $data['content'];
+        if ('callback' === $kind && is_array($data) && 'content' === ($data['type'] ?? null)) {
+            return self::nonEmpty(self::textParts($data['content'] ?? null));
         }
         if ('event' === $kind && is_array($data)) {
-            $text = $data['message']['content'] ?? $data['candidates'][0]['content']['parts'][0]['text'] ?? null;
-            if (is_string($text) && '' !== $text) {
-                return $text;
-            }
+            return self::nonEmpty(self::eventText($data));
         }
 
         return null;
+    }
+
+    /**
+     * OpenAI sends a string. Mistral Large 4 sends text and thinking parts.
+     * Thinking is not the answer.
+     */
+    private static function textParts(mixed $content): string
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+        if (!is_array($content)) {
+            return '';
+        }
+        if (isset($content['type']) || isset($content['text']) || isset($content['thinking'])) {
+            $content = [$content];
+        }
+
+        $text = '';
+        foreach ($content as $part) {
+            if (is_string($part)) {
+                $text .= $part;
+                continue;
+            }
+            if (!is_array($part)) {
+                continue;
+            }
+            $type = is_string($part['type'] ?? null) ? $part['type'] : 'text';
+            if ('thinking' === $type || 'reasoning' === $type) {
+                continue;
+            }
+            $piece = $part['text'] ?? '';
+            if (is_string($piece)) {
+                $text .= $piece;
+            }
+        }
+
+        return $text;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    private static function eventText(array $data): string
+    {
+        $message = is_array($data['message'] ?? null) ? ($data['message']['content'] ?? null) : null;
+        if (is_string($message)) {
+            return $message;
+        }
+        if (is_array($message)) {
+            return self::textParts($message);
+        }
+
+        $candidate = is_array($data['candidates'][0] ?? null) ? $data['candidates'][0] : null;
+        $content = is_array($candidate) && is_array($candidate['content'] ?? null) ? $candidate['content'] : null;
+        $parts = is_array($content) ? ($content['parts'] ?? null) : null;
+        if (!is_array($parts)) {
+            return '';
+        }
+
+        $text = '';
+        foreach ($parts as $part) {
+            if (!is_array($part) || !empty($part['thought'])) {
+                continue;
+            }
+            $piece = $part['text'] ?? '';
+            if (is_string($piece)) {
+                $text .= $piece;
+            }
+        }
+
+        return $text;
+    }
+
+    private static function errorMessage(mixed $data): string
+    {
+        if (is_string($data) && '' !== $data) {
+            return $data;
+        }
+        if (!is_array($data)) {
+            return 'The provider stream failed';
+        }
+        $error = is_array($data['error'] ?? null) ? $data['error'] : $data;
+        $message = $error['message'] ?? null;
+
+        return is_string($message) && '' !== $message ? $message : 'The provider stream failed';
+    }
+
+    private static function nonEmpty(string $text): ?string
+    {
+        return '' === $text ? null : $text;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private static function dataFrame(array $payload): string
+    {
+        $json = json_encode($payload, \JSON_UNESCAPED_UNICODE | \JSON_INVALID_UTF8_SUBSTITUTE);
+
+        return 'data: '.($json ?: '{}')."\n\n";
     }
 }

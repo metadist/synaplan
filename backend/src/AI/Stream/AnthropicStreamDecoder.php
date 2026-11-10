@@ -142,8 +142,14 @@ final class AnthropicStreamDecoder implements StreamDecoderInterface
                 }
                 break;
             case 'error':
-                $errorMessage = $event['data']['error']['message'] ?? 'Unknown error';
-                throw new \Exception($errorMessage);
+                $data = is_array($event['data'] ?? null) ? $event['data'] : [];
+                $error = is_array($data['error'] ?? null) ? $data['error'] : [];
+                $errorMessage = $error['message'] ?? null;
+                $chunks[] = new DecodedEvent(
+                    'error',
+                    is_string($errorMessage) && '' !== $errorMessage ? $errorMessage : 'Unknown error',
+                );
+                break;
             case 'message_stop':
             case 'ping':
                 break;
