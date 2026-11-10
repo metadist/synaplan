@@ -27,8 +27,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 final class AdminLevelGrantController extends AbstractController
 {
     public function __construct(
-        private UserRepository $users,
-        private AdminPeopleAccountService $people,
+        private readonly UserRepository $users,
+        private readonly AdminPeopleAccountService $people,
     ) {
     }
 

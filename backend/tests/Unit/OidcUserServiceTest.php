@@ -259,8 +259,8 @@ class OidcUserServiceTest extends TestCase
         $user = $this->makeKeycloakUser('directory-admin@example.com', 'NEW');
 
         $this->userRepository->method('findOneBy')->willReturn($user);
-        $this->em->expects($this->exactly(2))->method('persist');
-        $this->em->expects($this->exactly(2))->method('flush');
+        $this->em->expects($this->exactly(4))->method('persist');
+        $this->em->expects($this->exactly(4))->method('flush');
 
         $service->findOrCreateFromClaims([
             'sub' => 'sub-dir',
@@ -273,6 +273,20 @@ class OidcUserServiceTest extends TestCase
             'sub' => 'sub-dir',
             'email' => 'directory-admin@example.com',
             'realm_access' => ['roles' => ['member']],
+        ]);
+
+        $this->assertSame('NEW', $user->getUserLevel());
+
+        $service->findOrCreateFromClaims([
+            'sub' => 'sub-dir',
+            'email' => 'directory-admin@example.com',
+            'realm_access' => ['roles' => ['administrator']],
+        ]);
+        $this->assertSame('ADMIN', $user->getUserLevel());
+
+        $service->findOrCreateFromClaims([
+            'sub' => 'sub-dir',
+            'email' => 'directory-admin@example.com',
         ]);
 
         $this->assertSame('NEW', $user->getUserLevel());

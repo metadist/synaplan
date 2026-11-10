@@ -1196,6 +1196,7 @@
         "platform_instance_approved": "Plateforme approuvée",
         "platform_instance_revoked": "Plateforme révoquée",
         "admin_user_level_change": "Niveau utilisateur modifié",
+        "admin_level_grant_removed": "Attribution de niveau d'administrateur retirée",
         "messages_gateway_flags": "Réglages de la passerelle modifiés",
         "messages_gateway_upstream": "Adresse de la passerelle modifiée",
         "messages_gateway_aliases": "Alias de modèles modifiés",

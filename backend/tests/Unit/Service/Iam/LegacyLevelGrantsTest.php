@@ -72,15 +72,16 @@ final class LegacyLevelGrantsTest extends TestCase
         $user->setUserDetails(['oidc_roles' => ['Administrator']]);
         $plan = $this->planner()->plan($user, false);
 
-        self::assertSame(['admin' => 'ADMIN', 'directory' => 'ADMIN'], $this->levels($plan->bySource()));
+        self::assertSame(['directory' => 'ADMIN'], $this->levels($plan->bySource()));
         self::assertArrayNotHasKey('bootstrap', $plan->bySource());
+        self::assertArrayNotHasKey('admin', $plan->bySource());
     }
 
     public function testAnAdministratorWithoutADirectoryRoleIsBootstrap(): void
     {
         $plan = $this->planner()->plan($this->user('ADMIN', []), false);
 
-        self::assertSame(['admin' => 'ADMIN', 'bootstrap' => 'ADMIN'], $this->levels($plan->bySource()));
+        self::assertSame(['bootstrap' => 'ADMIN'], $this->levels($plan->bySource()));
     }
 
     public function testAnActiveStoreRecordWithoutAPlanOwnsTheCurrentPaidLevel(): void

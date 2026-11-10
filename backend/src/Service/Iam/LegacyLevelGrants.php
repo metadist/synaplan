@@ -39,18 +39,21 @@ final readonly class LegacyLevelGrants
             $grants[] = $this->grant(LevelGrantSource::IAP, $planLevel, null, $created);
         }
 
-        $billingHighest = AccountLevel::highest(array_column($grants, 'level'));
-        $auditLevel = $withAudit ? $this->auditLevel($user, $subscription) : null;
-        $adminLevel = $this->adminLevel($level, [] !== $grants, $billingHighest, $auditLevel);
-        if (null !== $adminLevel) {
-            $grants[] = $this->grant(LevelGrantSource::ADMIN, $adminLevel, null, time());
-        }
-
         $directory = $this->directoryAdmin($user);
-        if ($directory) {
-            $grants[] = $this->grant(LevelGrantSource::DIRECTORY, 'ADMIN', null, time());
-        } elseif ('ADMIN' === $level) {
-            $grants[] = $this->grant(LevelGrantSource::BOOTSTRAP, 'ADMIN', null, time());
+        if ('ADMIN' === $level) {
+            $grants[] = $this->grant(
+                $directory ? LevelGrantSource::DIRECTORY : LevelGrantSource::BOOTSTRAP,
+                'ADMIN',
+                null,
+                time(),
+            );
+        } else {
+            $billingHighest = AccountLevel::highest(array_column($grants, 'level'));
+            $auditLevel = $withAudit ? $this->auditLevel($user, $subscription) : null;
+            $adminLevel = $this->adminLevel($level, [] !== $grants, $billingHighest, $auditLevel);
+            if (null !== $adminLevel) {
+                $grants[] = $this->grant(LevelGrantSource::ADMIN, $adminLevel, null, time());
+            }
         }
 
         $rule1Only = [] !== $grants;

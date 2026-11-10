@@ -291,6 +291,7 @@ class AdminController extends AbstractController
                 ),
                 new OA\Property(
                     property: 'notice',
+                    type: 'object',
                     nullable: true,
                     allOf: [new OA\Schema(ref: new Model(type: LevelChangeNotice::class))],
                 ),

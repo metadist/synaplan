@@ -450,9 +450,6 @@ final readonly class LevelGrantService
     }
 
     /**
-     * @return array{source: string, level: string, created: string, reference: ?string}
-     */
-    /**
      * @param list<array{source: string, level: string, created: string, reference: ?string}> $views
      *
      * @return list<array{source: string, level: string, created: string, reference: ?string}>
@@ -467,6 +464,9 @@ final readonly class LevelGrantService
         return $views;
     }
 
+    /**
+     * @return array{source: string, level: string, created: string, reference: ?string}
+     */
     private function view(string $source, string $level, int $created, ?string $reference): array
     {
         if (LevelGrantSource::IAP === $source || (null !== $reference && strlen($reference) > 64)) {

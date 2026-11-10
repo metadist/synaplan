@@ -161,11 +161,11 @@ class OidcUserService
     {
         $oidcRoles = $this->claimResolver->roleValues($claims, $this->roleClaimPaths);
 
-        if (empty($oidcRoles)) {
+        $userDetails = $user->getUserDetails();
+        $hadRoles = !empty($userDetails['oidc_roles']);
+        if (empty($oidcRoles) && !$hadRoles) {
             return;
         }
-
-        $userDetails = $user->getUserDetails();
         $userDetails['oidc_roles'] = $oidcRoles;
         $user->setUserDetails($userDetails);
 

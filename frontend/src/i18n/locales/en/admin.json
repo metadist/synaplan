@@ -1196,6 +1196,7 @@
         "platform_instance_approved": "Platform approved",
         "platform_instance_revoked": "Platform revoked",
         "admin_user_level_change": "User level changed",
+        "admin_level_grant_removed": "Admin level grant removed",
         "messages_gateway_flags": "Gateway settings changed",
         "messages_gateway_upstream": "Gateway address changed",
         "messages_gateway_aliases": "Model aliases changed",
