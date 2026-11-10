@@ -30,8 +30,9 @@ final class StreamPump
         $this->assertNoSecret($call);
         $seq = 0;
         foreach ($decoder->feed($bytes) as $event) {
-            if ('error' === $event->kind) {
-                $this->fail($runId, $seq, $stream, self::errorMessage($event->data));
+            $failure = self::failureMessage($event->kind, $event->data);
+            if (null !== $failure) {
+                $this->fail($runId, $seq, $stream, $failure);
             }
             $text = self::visible($event->kind, $event->data);
             if (null === $text) {
@@ -43,8 +44,9 @@ final class StreamPump
     }
 
     /**
-     * A provider key is a credential field or header name. Message text is
-     * not scanned, so a sentence that says "authorization" is still a job.
+     * A provider key is a credential field, a header name, or a header line
+     * under `headers`. Message text is not scanned, so a sentence that says
+     * "authorization" is still a job.
      *
      * @param array<string, mixed> $call
      */
@@ -53,7 +55,7 @@ final class StreamPump
         $this->rejectCredentialKeys($call);
     }
 
-    private function rejectCredentialKeys(mixed $value): void
+    private function rejectCredentialKeys(mixed $value, bool $headerList = false): void
     {
         if (!is_array($value)) {
             return;
@@ -62,8 +64,38 @@ final class StreamPump
             if (is_string($key) && in_array(strtolower($key), self::CREDENTIAL_KEYS, true)) {
                 throw new \InvalidArgumentException('A stream job must not carry a provider key');
             }
-            $this->rejectCredentialKeys($item);
+            if ($headerList && is_string($item) && self::isCredentialHeaderLine($item)) {
+                throw new \InvalidArgumentException('A stream job must not carry a provider key');
+            }
+            $this->rejectCredentialKeys($item, is_string($key) && 'headers' === strtolower($key));
         }
+    }
+
+    private static function isCredentialHeaderLine(string $line): bool
+    {
+        $colon = strpos($line, ':');
+        if (false === $colon) {
+            return false;
+        }
+        $name = strtolower(trim(substr($line, 0, $colon)));
+
+        return in_array($name, self::CREDENTIAL_KEYS, true);
+    }
+
+    private static function failureMessage(string $kind, mixed $data): ?string
+    {
+        if ('error' === $kind) {
+            return self::errorMessage($data);
+        }
+        if ('event' !== $kind || !is_array($data) || !array_key_exists('error', $data)) {
+            return null;
+        }
+        $error = $data['error'];
+        if (null === $error || '' === $error || [] === $error) {
+            return null;
+        }
+
+        return self::errorMessage($data);
     }
 
     /**
@@ -173,7 +205,13 @@ final class StreamPump
         if (!is_array($data)) {
             return 'The provider stream failed';
         }
-        $error = is_array($data['error'] ?? null) ? $data['error'] : $data;
+        $error = $data['error'] ?? null;
+        if (is_string($error) && '' !== $error) {
+            return $error;
+        }
+        if (!is_array($error)) {
+            $error = $data;
+        }
         $message = $error['message'] ?? null;
 
         return is_string($message) && '' !== $message ? $message : 'The provider stream failed';

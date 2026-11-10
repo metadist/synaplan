@@ -70,6 +70,43 @@ final class StreamPumpTest extends TestCase
         self::assertSame('terminal', $frames[array_key_last($frames)]->kind);
     }
 
+    public function testAHeaderLineIsRejected(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        (new StreamPump())->run('run-1', self::BODY, new OpenAiChatCompletionsDecoder(), new MemoryRunStream(), [
+            'headers' => ['Authorization: Bearer sk-example'],
+        ]);
+    }
+
+    public function testAnOllamaErrorIsNotAnEmptyAnswer(): void
+    {
+        $stream = new MemoryRunStream();
+        try {
+            (new StreamPump())->run('run-1', "{\"error\":\"model failed\"}\n", new OllamaNdjsonDecoder(), $stream);
+            self::fail('An Ollama error must not look like a finished empty answer');
+        } catch (\RuntimeException $e) {
+            self::assertSame('model failed', $e->getMessage());
+        }
+
+        $frames = $stream->after('run-1', 0);
+        self::assertSame('data: {"error":"model failed"}'."\n\n", $frames[0]->frame);
+        self::assertSame('terminal', $frames[1]->kind);
+    }
+
+    public function testAGeminiErrorIsNotAnEmptyAnswer(): void
+    {
+        $stream = new MemoryRunStream();
+        $body = 'data: {"error":{"message":"overloaded"}}'."\n";
+        try {
+            (new StreamPump())->run('run-1', $body, new GeminiStreamDecoder(), $stream);
+            self::fail('A Gemini error must not look like a finished empty answer');
+        } catch (\RuntimeException $e) {
+            self::assertSame('overloaded', $e->getMessage());
+        }
+
+        self::assertSame('terminal', $stream->after('run-1', 0)[1]->kind);
+    }
+
     public function testAHeaderKeyIsRejectedEvenWithoutAnSkPrefix(): void
     {
         $this->expectException(\InvalidArgumentException::class);
