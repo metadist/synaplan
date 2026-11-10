@@ -66,7 +66,7 @@ final readonly class LevelGrantService
      * back a bootstrap grant. The directory grant is left for the identity
      * provider to remove.
      *
-     * @return array{kind: string, level: string, source: ?string, removed?: string}|null
+     * @return array{kind: string, level: string, source: ?string, removed: ?string}|null
      */
     public function assignFromAdministrator(User $user, string $requested, ?int $actorId): ?array
     {
