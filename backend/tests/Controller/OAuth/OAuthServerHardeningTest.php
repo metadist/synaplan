@@ -11,6 +11,7 @@ use App\Repository\ExternalIdentityRepository;
 use App\Repository\OAuthTokenRepository;
 use App\Repository\PlatformInstanceRepository;
 use App\Security\ApiKeyScope;
+use App\Service\OAuth\Server\Repository\RefreshTokenRepository;
 use App\Service\PlatformLink\PlatformInstanceService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\Response;
@@ -239,6 +240,51 @@ final class OAuthServerHardeningTest extends WebTestCase
         $this->em->clear();
         self::assertSame([], $this->liveTokens($clientId));
         self::assertSame(PlatformInstance::STATUS_REVOKED, static::getContainer()->get(PlatformInstanceRepository::class)->findByInstanceId($clientId)?->getStatus());
+    }
+
+    public function testARefreshWhoseAnswerGotLostCanBeRepeatedForAMinuteOnly(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $tokens = $this->grant($clientId, $this->person(), 'ada');
+        $refresh = fn (string $token): array => $this->tokenRequest($this->assertion($clientId, '/oauth/token'), ['grant_type' => 'refresh_token', 'refresh_token' => $token]);
+
+        $lost = $refresh((string) $tokens['refresh_token']);
+        self::assertResponseIsSuccessful();
+        $repeated = $refresh((string) $tokens['refresh_token']);
+        self::assertResponseIsSuccessful('the cloud never saw the first answer and asks again');
+        self::assertNotSame($lost['refresh_token'], $repeated['refresh_token']);
+
+        $repository = static::getContainer()->get(OAuthTokenRepository::class);
+        foreach ($this->liveTokens($clientId) as $token) {
+            if (OAuthToken::KIND_REFRESH === $token->getKind() && $token->getExpires() <= time() + RefreshTokenRepository::ROTATION_GRACE) {
+                $repository->retire($token->getId(), time() - 1);
+            }
+        }
+        $refresh((string) $tokens['refresh_token']);
+        self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST, 'after the grace the replaced token is spent');
+        self::assertSame('invalid_grant', $this->json()['error']);
+        $refresh((string) $repeated['refresh_token']);
+        self::assertResponseIsSuccessful('the newest token goes on');
+    }
+
+    public function testACloudClockAMinuteOffStillAuthenticates(): void
+    {
+        $clientId = (string) $this->register(self::IAT)['client_id'];
+        $configuration = fn (array $times) => $this->client->request('GET', '/oauth/register/'.$clientId, server: [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$this->assertion($clientId, '/oauth/register/'.$clientId, times: $times),
+        ]);
+
+        $configuration(['iat' => time() + 45, 'nbf' => time() + 45, 'exp' => time() + 105]);
+        self::assertResponseIsSuccessful('the cloud clock runs ahead');
+        $configuration(['iat' => time() - 100, 'exp' => time() - 40]);
+        self::assertResponseIsSuccessful('the cloud clock runs behind');
+
+        $configuration(['iat' => time() + 90, 'exp' => time() + 150]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'issued in the future');
+        $configuration(['iat' => time() - 200, 'exp' => time() - 90]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'expired');
+        $configuration(['exp' => time() + 400]);
+        self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED, 'lives too long');
     }
 
     /**
