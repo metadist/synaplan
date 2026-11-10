@@ -89,7 +89,7 @@
     "denyButton": "Ablehnen",
     "permissionsTitle": "{client} darf dann:",
     "permissions": {
-      "chat": "Die KI von Synaplan für dich nutzen: Chat, Zusammenfassungen und generierte Medien",
+      "chat": "Die KI von Synaplan für dich nutzen, auch deine bisherigen Chats, und Zusammenfassungen und Medien erzeugen",
       "files": "Deine Synaplan-Dateien lesen und neue hinzufügen",
       "rag": "Dein Synaplan-Wissen durchsuchen",
       "watch": "Synaplan Dateien in deiner Cloud beobachten und auf Änderungen reagieren lassen",

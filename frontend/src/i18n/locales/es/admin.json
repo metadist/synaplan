@@ -89,7 +89,7 @@
     "denyButton": "Rechazar",
     "permissionsTitle": "{client} podrá:",
     "permissions": {
-      "chat": "Usar la IA de Synaplan por ti: chat, resúmenes y contenido generado",
+      "chat": "Usar la IA de Synaplan por ti, incluidos tus chats existentes, y crear resúmenes y contenido",
       "files": "Leer tus archivos de Synaplan y añadir nuevos",
       "rag": "Buscar en tu conocimiento de Synaplan",
       "watch": "Hacer que Synaplan vigile archivos de tu nube y reaccione a los cambios",

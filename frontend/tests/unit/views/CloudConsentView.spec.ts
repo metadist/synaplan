@@ -85,6 +85,7 @@ describe('CloudConsentView', () => {
     expect(permissions.findAll('li').map((item) => item.text())).toEqual([
       'platformConnect.permissions.chat',
       'platformConnect.permissions.watch',
+      'not-a-scope',
     ])
     await wrapper.get('[data-testid="btn-connect"]').trigger('click')
     await flushPromises()

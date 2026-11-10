@@ -89,7 +89,7 @@
     "denyButton": "Reddet",
     "permissionsTitle": "{client} şunları yapabilecek:",
     "permissions": {
-      "chat": "Synaplan yapay zekâsını sizin adınıza kullanmak: sohbet, özetler ve üretilen medya",
+      "chat": "Synaplan yapay zekâsını sizin adınıza kullanmak, mevcut sohbetleriniz dahil, özet ve medya oluşturmak",
       "files": "Synaplan dosyalarınızı okumak ve yenilerini eklemek",
       "rag": "Synaplan bilginizde arama yapmak",
       "watch": "Synaplan’ın bulutunuzdaki dosyaları izlemesini ve değişikliklere tepki vermesini sağlamak",
