@@ -317,6 +317,7 @@ class AdminController extends AbstractController
 
         $data = json_decode($request->getContent(), true);
         $newLevel = is_array($data) ? (string) ($data['level'] ?? '') : '';
+        $previousLevel = $targetUser->getUserLevel();
 
         try {
             $result = $this->peopleAccounts->changeLevel($user, $targetUser, $newLevel, (string) $request->getClientIp());
@@ -334,7 +335,7 @@ class AdminController extends AbstractController
         $this->logger->info('Admin updated user level', [
             'admin_id' => $user->getId(),
             'target_user_id' => $id,
-            'old_level' => $targetUser->getUserLevel(),
+            'old_level' => $previousLevel,
             'new_level' => $newLevel,
         ]);
 

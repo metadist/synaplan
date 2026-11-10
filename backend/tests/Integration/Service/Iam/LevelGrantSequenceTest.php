@@ -47,7 +47,7 @@ final class LevelGrantSequenceTest extends KernelTestCase
         $notice = $this->grants->assignFromAdministrator($user, 'PRO', null);
 
         self::assertSame('BUSINESS', $user->getUserLevel());
-        self::assertSame(['kind' => 'kept', 'level' => 'BUSINESS', 'source' => 'stripe'], $notice);
+        self::assertSame(['kind' => 'kept', 'level' => 'BUSINESS', 'source' => 'stripe', 'removed' => null], $notice);
     }
 
     public function testChoosingNewWithoutAnAdministratorGrantDoesNotInventARemoval(): void

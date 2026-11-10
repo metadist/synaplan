@@ -234,7 +234,7 @@ final readonly class LevelGrantService
     /**
      * @param array<string, array{level: string, ref?: ?string, created?: int}> $rows
      *
-     * @return array{kind: string, level: string, source: ?string}|null
+     * @return array{kind: string, level: string, source: ?string, removed: null}|null
      */
     public function keptNotice(string $requested, array $rows): ?array
     {
@@ -247,7 +247,7 @@ final readonly class LevelGrantService
             return null;
         }
 
-        return ['kind' => 'kept', 'level' => $effective, 'source' => $winner['source']];
+        return ['kind' => 'kept', 'level' => $effective, 'source' => $winner['source'], 'removed' => null];
     }
 
     /**
