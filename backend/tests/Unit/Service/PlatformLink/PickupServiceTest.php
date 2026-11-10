@@ -447,9 +447,20 @@ final class PickupServiceTest extends TestCase
 
     public function testTheSweepFailsPickupsNoRunWaitsFor(): void
     {
+        // The cutoff is time() minus the sweep age. Sampling the clock when the
+        // expectation is built fails when the second rolls before sweep() runs.
+        $opened = time();
         $pickups = $this->createMock(CloudPickupRepository::class);
         $pickups->expects(self::once())->method('failOpenOlderThan')
-            ->with(self::lessThanOrEqual(time() - 1200), 'unconfirmed')
+            ->with(
+                self::callback(static function (int $createdBefore) use ($opened): bool {
+                    self::assertGreaterThanOrEqual($opened - 1200, $createdBefore);
+                    self::assertLessThanOrEqual(time() - 1200, $createdBefore);
+
+                    return true;
+                }),
+                'unconfirmed',
+            )
             ->willReturn(2);
 
         self::assertSame(2, $this->service($pickups)->sweep());
