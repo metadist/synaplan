@@ -986,6 +986,10 @@ services:
         arguments:
             $bearerAudience: '%env(OIDC_BEARER_AUDIENCE)%'
 
+    App\Service\PlatformLink\SignedNotificationClient:
+        arguments:
+            $issuer: '%env(APP_URL)%'
+
     # OIDC Token Service for Keycloak integration
     App\Service\Auth\OidcTokenService:
         arguments:

@@ -9,6 +9,7 @@ use App\Repository\ConfigRepository;
 use App\Service\Federation\FederationSigner;
 use App\Service\Infrastructure\RedisService;
 use App\Service\PlatformLink\DeliveryOriginPolicy;
+use App\Service\PlatformLink\NotificationToken;
 use App\Service\PlatformLink\NotifyKeyStore;
 use App\Service\PlatformLink\RedirectUriPolicy;
 use App\Service\PlatformLink\SignedNotificationClient;
@@ -40,6 +41,35 @@ final class DeliveryNotifierTest extends TestCase
         $instance->setDeliveryUrl('https://files.example.org/index.php/apps/synaplan_integration/api/v1/inbound');
 
         self::assertNull($this->client($http)->post($instance, 'delivery', '9'));
+    }
+
+    public function testTheCloudReceivesATypedTokenFromThisSynaplanForThePerson(): void
+    {
+        $response = $this->createStub(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(202);
+        $response->method('getContent')->willReturn('{}');
+        $sent = null;
+        $http = $this->createMock(HttpClientInterface::class);
+        $http->expects(self::once())->method('request')->willReturnCallback(static function (string $method, string $url, array $options) use (&$sent, $response): ResponseInterface {
+            $sent = $options;
+
+            return $response;
+        });
+        $instance = new PlatformInstance('nextcloud', 'pi_abc', 'files.example.org');
+        $instance->setDeliveryUrl('https://files.example.org/inbound');
+
+        $this->client($http)->post($instance, 'pickup', '15', 'ada');
+
+        self::assertIsArray($sent);
+        self::assertSame('application/jwt', $sent['headers']['Content-Type'] ?? null);
+        [$header, $payload] = explode('.', (string) $sent['body']);
+        $decode = static fn (string $part): array => (array) json_decode((string) base64_decode(strtr($part, '-_', '+/')), true);
+        self::assertSame(NotificationToken::TYPE, $decode($header)['typ'] ?? null);
+        $claims = $decode($payload);
+        self::assertSame(
+            ['https://synaplan.example', 'pi_abc', 'ada', 'pickup', '15'],
+            [$claims['iss'] ?? null, $claims['aud'] ?? null, $claims['sub'] ?? null, $claims['type'] ?? null, $claims['id'] ?? null],
+        );
     }
 
     public function testAFinishedCopyReturnsTheCloudsAnswer(): void
@@ -78,6 +108,7 @@ final class DeliveryNotifierTest extends TestCase
             new FederationSigner(),
             new DeliveryOriginPolicy(new RedirectUriPolicy(new SsrfGuard(), 'prod'), new SsrfGuard()),
             new NullLogger(),
+            'https://synaplan.example/',
         );
     }
 }

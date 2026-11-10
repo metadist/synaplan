@@ -24,6 +24,7 @@ final readonly class SignedNotificationClient
         private FederationSigner $signer,
         private DeliveryOriginPolicy $origins,
         private LoggerInterface $logger,
+        private string $issuer,
     ) {
     }
 
@@ -37,25 +38,19 @@ final readonly class SignedNotificationClient
             return null;
         }
         $signing = $this->keys->signingKey();
-        $fields = [
-            'type' => $type,
-            'id' => $id,
-            'instance_id' => $instance->getInstanceId(),
-            'ts' => time(),
-            'kid' => $this->signer->fingerprint($signing['publicKey']),
-        ];
-        if (null !== $externalId) {
-            $fields['external_id'] = $externalId;
-        }
-        $body = $this->signer->signBody($fields, $signing['secretKey']);
+        $token = NotificationToken::encode(
+            NotificationToken::claimsFor(rtrim($this->issuer, '/'), $type, $id, $instance->getInstanceId(), $externalId, time()),
+            $signing['secretKey'],
+            $this->signer->fingerprint($signing['publicKey']),
+        );
 
         try {
             $response = $this->http->request('POST', $url, [
-                'json' => $body,
+                'body' => $token,
                 'timeout' => self::TIMEOUT_SECONDS,
                 'max_duration' => self::TIMEOUT_SECONDS,
                 'max_redirects' => 0,
-                'headers' => ['Accept' => 'application/json'],
+                'headers' => ['Accept' => 'application/json', 'Content-Type' => 'application/jwt'],
             ]);
             $status = $response->getStatusCode();
             if (200 !== $status) {

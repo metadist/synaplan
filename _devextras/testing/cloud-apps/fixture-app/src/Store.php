@@ -316,6 +316,7 @@ final class Store
             'inbound_url' => self::env('FIXTURE_INBOUND_URL', 'http://cloud-fixture:8099/inbound'),
             'instance' => ['id' => '', 'secret' => ''],
             'notify_keys' => [],
+            'issuer' => '',
             'switches' => array_fill_keys(self::SWITCHES, false),
             'scopes' => [],
             'links' => [],
