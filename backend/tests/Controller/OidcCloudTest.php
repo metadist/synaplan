@@ -109,15 +109,20 @@ final class OidcCloudTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
-    public function testTheConfiguredCloudGetsAllCapabilitiesUnlessNamed(): void
+    public function testTheCloudIsOfferedOnlyWhatItsAppTakes(): void
     {
         $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
+        self::assertSame([], $this->row()->getAppCapabilities(), 'the OpenCloud app takes lifecycle notices only');
+        self::assertFalse($this->row()->canReceiveCopies());
+
+        $this->seed('https://cloud.example.com', 'http://nextcloud', 'nextcloud');
         self::assertSame(OidcCloud::ALL_CAPABILITIES, $this->row()->getAppCapabilities());
+        self::assertTrue($this->row()->canReceiveCopies());
     }
 
-    private function seed(string $url, string $internalUrl): OidcCloud
+    private function seed(string $url, string $internalUrl, string $type = 'opencloud'): OidcCloud
     {
-        $cloud = new OidcCloud('opencloud', $url, 'zero-setup-people', $internalUrl);
+        $cloud = new OidcCloud($type, $url, 'zero-setup-people', $internalUrl);
         $seeder = new OidcCloudSeeder(
             $cloud,
             $this->instances(),
