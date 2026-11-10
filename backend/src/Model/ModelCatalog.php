@@ -6065,7 +6065,7 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Fable 5.1 - Anthropic\'s successor to Claude Fable 5 for the most demanding reasoning and long-horizon agentic coding, knowledge work and research. Adaptive thinking (always on). 1M context, 128K max output.',
+                'description' => 'Claude Fable 5.1 - Anthropic\'s successor to Claude Fable 5 for the most demanding reasoning and long-horizon agentic coding, knowledge work and research. Adaptive thinking (always on). 1M context, 128K max output. Anthropic keeps prompts for 30 days.',
                 'max_tokens' => 128000,
                 'params' => ['model' => 'claude-fable-5-1'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
@@ -6088,7 +6088,7 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Fable 5.1 for image analysis and vision tasks. Anthropic\'s most capable widely released vision model.',
+                'description' => 'Claude Fable 5.1 for image analysis and vision tasks. Anthropic keeps prompts for 30 days.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'claude-fable-5-1'],
                 'features' => ['vision'],
@@ -6123,7 +6123,7 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Fable 5.2 - for demanding reasoning and long-horizon agentic work. Adaptive thinking stays on. 1M context, 128K max output. Anthropic retains prompts for 30 days; a zero-retention workspace is rejected.',
+                'description' => 'Claude Fable 5.2 - for demanding reasoning and long-horizon agentic work. Adaptive thinking stays on. 1M context, 128K max output. Anthropic keeps prompts for 30 days. A workspace that stores nothing cannot use this model.',
                 'max_tokens' => 128000,
                 'params' => ['model' => 'claude-fable-5-2'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
@@ -6146,7 +6146,7 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Claude Fable 5.2 for image analysis and vision tasks. Anthropic retains prompts for 30 days; a zero-retention workspace is rejected.',
+                'description' => 'Claude Fable 5.2 for image analysis and vision tasks. Anthropic keeps prompts for 30 days. A workspace that stores nothing cannot use this model.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'claude-fable-5-2'],
                 'features' => ['vision'],

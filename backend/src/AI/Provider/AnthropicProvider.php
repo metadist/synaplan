@@ -79,18 +79,15 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5-5',
         'claude-sonnet-5',
         'claude-haiku-4-5',
-        'claude-fable-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
+        'claude-fable-5',
     ];
 
     /**
-     * Models that reject `thinking.type: disabled` and still think when the
-     * field is omitted. Reasoning off sends `output_config.effort: low`.
-     *
-     * Measured on Opus 5.5. Fable 5.2 is included (disabled is a 400). Opus 5
-     * and Fable 5.1 stay off this list. Claude Sonnet 5.5 is listed separately
-     * ({@see self::BETWEEN_TOOLS_MODELS}): omitting the field turns adaptive
-     * thinking on, and `disabled` is a 400.
+     * Reject `thinking.type: disabled` and still think if the field is omitted.
+     * Reasoning off sends effort `low`. Opus 5 and Fable 5.1 stay off this list
+     * until that 400 is confirmed. Sonnet 5.5 uses {@see self::BETWEEN_TOOLS_MODELS}.
      */
     private const ALWAYS_ON_THINKING_MODELS = [
         'claude-opus-5-5', 'claude-fable-5-2',
@@ -125,6 +122,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5-5',
         'claude-opus-5',
         'claude-sonnet-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
     ];
@@ -144,8 +142,9 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
-        'claude-fable-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
+        'claude-fable-5',
     ];
 
     /**
@@ -161,8 +160,9 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
-        'claude-fable-5',
+        'claude-fable-5-2',
         'claude-fable-5-1',
+        'claude-fable-5',
     ];
 
     /**

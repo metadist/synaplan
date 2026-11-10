@@ -872,6 +872,7 @@ class ModelCatalogTest extends TestCase
             $this->assertEqualsWithDelta(10.0, (float) $variant['priceIn'], 1e-9);
             $this->assertEqualsWithDelta(50.0, (float) $variant['priceOut'], 1e-9);
             $this->assertEqualsWithDelta(0.25, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertStringContainsString('keeps prompts for 30 days', (string) ($variant['json']['description'] ?? ''));
         }
     }
 
@@ -899,12 +900,14 @@ class ModelCatalogTest extends TestCase
             $this->assertEqualsWithDelta(40.0, (float) $variant['priceOut'], 1e-9);
             $this->assertEqualsWithDelta(0.20, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
             $this->assertArrayNotHasKey('cache_write_multiplier', $variant['json']);
+            $this->assertStringContainsString('keeps prompts for 30 days', (string) ($variant['json']['description'] ?? ''));
+            $this->assertStringNotContainsString('zero-retention', (string) ($variant['json']['description'] ?? ''));
         }
 
         $chat = ModelCatalog::find('anthropic:claude-fable-5-2:chat')[0];
         $this->assertSame('high', $chat['json']['meta']['reasoning_effort_default'] ?? null);
         $this->assertSame(128000, $chat['json']['max_tokens'] ?? null);
-        $this->assertStringContainsString('30 days', (string) ($chat['json']['description'] ?? ''));
+        $this->assertStringContainsString('stores nothing', (string) ($chat['json']['description'] ?? ''));
     }
 
     /**
