@@ -34,6 +34,14 @@ email:
     subject_named: '%name% — Ihre Ergebnisse von Synaplan'
     sent_confirmation: 'Die Ergebnisse wurden per E-Mail an %email% gesendet.'
 
+  cloud_grant:
+    connected:
+      subject: 'Eine Cloud kann jetzt in deinem Synaplan-Konto handeln'
+      body: '%client% auf %host% kann in Synaplan für das Konto %external_id% handeln. Wenn du das nicht warst, trenne die Verbindung unter Apps.'
+    lost:
+      subject: 'Eine Cloud wurde von deinem Synaplan-Konto getrennt'
+      body: '%client% auf %host% ist nicht mehr mit deinem Konto verbunden (%external_id%).'
+
   footer:
     support: 'Bei Problemen wenden Sie sich bitte an unser Support-Team.'
     help: 'Benötigen Sie Hilfe? Schauen Sie in unsere Dokumentation oder kontaktieren Sie den Support.'

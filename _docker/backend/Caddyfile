@@ -230,6 +230,10 @@
 		path('/.well-known/oauth-protected-resource') ||
 		path('/.well-known/oauth-protected-resource/*') ||
 		path('/.well-known/synaplan-federation') ||
+		path('/.well-known/jwks.json') ||
+		path('/.well-known/synaplan-configuration') ||
+		path('/.well-known/oauth-authorization-server') ||
+		path('/oauth/*') ||
 		({env.APP_ENV} == 'dev' && (path('/_profiler/*') || path('/_wdt/*') || path('/_error/*')))
 	`
 	handle @backend_php {

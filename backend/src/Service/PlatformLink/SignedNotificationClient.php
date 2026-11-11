@@ -11,8 +11,10 @@ use Symfony\Contracts\HttpClient\Exception\ExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * One signed notification. Redirects are not followed: the origin check
- * applies to the address that was stored, not to wherever it points next.
+ * One signed notification. Redirects are not followed and the connection
+ * goes to the address the origin check resolved: the check applies to the
+ * address that was stored, not to wherever its name or a redirect points
+ * next.
  */
 final readonly class SignedNotificationClient
 {
@@ -24,6 +26,7 @@ final readonly class SignedNotificationClient
         private FederationSigner $signer,
         private DeliveryOriginPolicy $origins,
         private LoggerInterface $logger,
+        private string $issuer,
     ) {
     }
 
@@ -33,29 +36,26 @@ final readonly class SignedNotificationClient
     public function post(PlatformInstance $instance, string $type, string $id, ?string $externalId = null): ?array
     {
         $url = $instance->getDeliveryUrl();
-        if (null === $url || '' === $url || !$this->origins->accepts($instance, $url)) {
+        $address = null === $url || '' === $url ? null : $this->origins->pinnedAddress($instance, $url);
+        if (null === $url || null === $address) {
             return null;
         }
+        $host = strtolower(trim((string) parse_url($url, \PHP_URL_HOST), '[]'));
         $signing = $this->keys->signingKey();
-        $fields = [
-            'type' => $type,
-            'id' => $id,
-            'instance_id' => $instance->getInstanceId(),
-            'ts' => time(),
-            'kid' => $this->signer->fingerprint($signing['publicKey']),
-        ];
-        if (null !== $externalId) {
-            $fields['external_id'] = $externalId;
-        }
-        $body = $this->signer->signBody($fields, $signing['secretKey']);
+        $token = NotificationToken::encode(
+            NotificationToken::claimsFor(rtrim($this->issuer, '/'), $type, $id, $instance->getInstanceId(), $externalId, time()),
+            $signing['secretKey'],
+            $this->signer->fingerprint($signing['publicKey']),
+        );
 
         try {
             $response = $this->http->request('POST', $url, [
-                'json' => $body,
+                'body' => $token,
                 'timeout' => self::TIMEOUT_SECONDS,
                 'max_duration' => self::TIMEOUT_SECONDS,
                 'max_redirects' => 0,
-                'headers' => ['Accept' => 'application/json'],
+                'resolve' => $host !== $address ? [$host => $address] : [],
+                'headers' => ['Accept' => 'application/json', 'Content-Type' => 'application/jwt'],
             ]);
             $status = $response->getStatusCode();
             if (200 !== $status) {

@@ -9,6 +9,7 @@ use App\Entity\PlatformInstance;
 use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\PlatformInstanceRepository;
+use App\Security\AccountAccess;
 use App\Security\ApiKeyScope;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
@@ -58,6 +59,10 @@ final readonly class OutlookConnectService
         }
         if (mb_strlen($state) > self::STATE_MAX_LENGTH) {
             throw new PlatformLinkValidationException(sprintf('state must be at most %d characters.', self::STATE_MAX_LENGTH));
+        }
+
+        if (null !== AccountAccess::credential($user)) {
+            throw new PlatformLinkValidationException('This account cannot connect an add-in.');
         }
 
         $redirectUri = trim($redirectUri);

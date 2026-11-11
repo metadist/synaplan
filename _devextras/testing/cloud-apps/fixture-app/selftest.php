@@ -30,12 +30,12 @@ $check = static function (string $name, bool $ok) use (&$failed): void {
 $vectors = json_decode((string) file_get_contents(__DIR__.'/../../../../backend/tests/Fixtures/cloud-apps-contract/notify-vectors.json'), true, flags: JSON_THROW_ON_ERROR);
 $keys = [['publicKey' => $vectors['public_key'], 'kid' => '']];
 foreach ($vectors['vectors'] as $vector) {
-    $outcome = Notification::verify($vector['body'], $vectors['receiver_instance_id'], $keys, $vectors['now'], $vectors['window_seconds']);
+    $outcome = Notification::verify($vector['token'], $vectors['issuer'], $vectors['receiver_instance_id'], $keys, $vectors['now']);
     $check('notify vector '.$vector['name'].' → '.$vector['expect'], $outcome === $vector['expect']);
 }
-$unsigned = $vectors['vectors'][0]['body'];
-unset($unsigned['sig']);
-$check('an unsigned notification is refused', Notification::BAD_SIGNATURE === Notification::verify($unsigned, $vectors['receiver_instance_id'], $keys, $vectors['now']));
+[$header, $payload] = explode('.', $vectors['vectors'][0]['token']);
+$check('an unsigned notification is refused', Notification::BAD_SIGNATURE === Notification::verify($header.'.'.$payload.'.', $vectors['issuer'], $vectors['receiver_instance_id'], $keys, $vectors['now']));
+$check('the valid vector names the person', 'ada' === (Notification::claims($vectors['vectors'][0]['token'])['sub'] ?? null));
 
 $check('keyed ids are numeric', 1 === preg_match('/^\d+$/', Profile::remoteId('keyed', 'ada', 'Invoices/a.pdf')));
 $check('keyed versions are bare', !str_contains(Profile::version('keyed', 'x'), '"'));

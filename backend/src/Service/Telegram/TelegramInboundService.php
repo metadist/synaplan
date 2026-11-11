@@ -11,6 +11,7 @@ use App\Message\ProcessTelegramAlbumCommand;
 use App\Model\AccountLanguage;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\LockInterface;
@@ -450,7 +451,7 @@ final readonly class TelegramInboundService
         }
 
         $owner = $this->users->find($bot->getOwnerId());
-        if (!$owner instanceof User) {
+        if (!$owner instanceof User || null !== AccountAccess::credential($owner)) {
             return null;
         }
         $token = $this->connections->revealToken($bot);

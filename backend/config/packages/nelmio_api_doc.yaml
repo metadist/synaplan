@@ -13,6 +13,132 @@ nelmio_api_doc:
             - url: http://localhost:8000
               description: Local development server
         components:
+            schemas:
+                # What Synaplan's OAuth server endpoints answer when they
+                # refuse (RFC 6749 section 5.2, RFC 7591 section 3.2.2).
+                OAuthError:
+                    type: object
+                    required: [error]
+                    properties:
+                        error:
+                            type: string
+                            example: invalid_request
+                        error_description:
+                            type: string
+                # Client metadata a cloud sends (RFC 7591). A registration
+                # needs software_id, client_uri, redirect_uris and jwks; an
+                # update changes what it names.
+                OAuthClientMetadata:
+                    type: object
+                    properties:
+                        software_id:
+                            type: string
+                            enum: [nextcloud, owncloud]
+                        client_uri:
+                            type: string
+                            example: https://cloud.example.com
+                            description: The cloud's address. It cannot change later.
+                        redirect_uris:
+                            type: array
+                            items: { type: string }
+                            description: On the cloud's host; at most ten.
+                        jwks:
+                            type: object
+                            description: >-
+                                One to five public signing keys (RFC 7517): RSA
+                                of 2048 bits or more (RS256) or EC P-256
+                                (ES256). Several keys each need a kid.
+                        token_endpoint_auth_method:
+                            type: string
+                            example: private_key_jwt
+                        grant_types:
+                            type: array
+                            items:
+                                type: string
+                                enum: [authorization_code, refresh_token]
+                            description: Optional; no other grant is offered.
+                        response_types:
+                            type: array
+                            items:
+                                type: string
+                                enum: [code]
+                            description: Optional; no other response type is offered.
+                        client_id:
+                            type: string
+                            description: Optional in an update; it has to be the client's own.
+                        delivery_url:
+                            type: string
+                            description: Where Synaplan's servers call the cloud.
+                        app_capabilities:
+                            type: array
+                            items: { type: string }
+                        software_version:
+                            type: string
+                        server_id:
+                            type: string
+                # The client as Synaplan keeps it (RFC 7591 / RFC 7592).
+                OAuthClient:
+                    type: object
+                    required:
+                        - client_id
+                        - client_uri
+                        - software_id
+                        - redirect_uris
+                        - token_endpoint_auth_method
+                        - jwks
+                        - registration_client_uri
+                        - status
+                    properties:
+                        client_id:
+                            type: string
+                            example: pi_3f9a1c0b7d2e4a6c8b1d0e2f
+                        client_id_issued_at:
+                            type: integer
+                            description: Only in the answer to a registration.
+                        client_uri:
+                            type: string
+                            example: https://cloud.example.com
+                        software_id:
+                            type: string
+                            enum: [nextcloud, owncloud]
+                        redirect_uris:
+                            type: array
+                            items: { type: string }
+                        grant_types:
+                            type: array
+                            items: { type: string }
+                            example: [authorization_code, refresh_token]
+                        response_types:
+                            type: array
+                            items: { type: string }
+                            example: [code]
+                        token_endpoint_auth_method:
+                            type: string
+                            example: private_key_jwt
+                        jwks:
+                            type: object
+                            description: The client's public signing keys (RFC 7517).
+                        registration_client_uri:
+                            type: string
+                            example: https://synaplan.example/oauth/register/pi_3f9a1c0b7d2e4a6c8b1d0e2f
+                        status:
+                            type: string
+                            enum: [pending, active, revoked]
+                            description: A pending client waits for an administrator and cannot link anyone yet.
+                        delivery_url:
+                            type: string
+                            description: Empty when the cloud has none.
+                        app_capabilities:
+                            type: array
+                            items: { type: string }
+                        reachable:
+                            type: boolean
+                            nullable: true
+                            description: Whether delivery_url answered; null when not tried.
+                        software_version:
+                            type: string
+                        server_id:
+                            type: string
             securitySchemes:
                 CookieAuth:
                     type: apiKey
@@ -28,19 +154,14 @@ nelmio_api_doc:
                     in: header
                     name: X-API-Key
                     description: 'Synaplan API key (sk_...), sent in the X-API-Key header.'
-                PlatformInstanceId:
-                    type: apiKey
-                    in: header
-                    name: X-Instance-Id
-                    description: 'A connected cloud''s instance id. Sent together with PlatformInstanceSecret on the calls the cloud makes as itself.'
-                PlatformInstanceSecret:
-                    type: apiKey
-                    in: header
-                    name: X-Instance-Secret
-                    description: 'The secret Synaplan issued when the cloud registered. Sent together with PlatformInstanceId.'
     areas:
         path_patterns:
             - ^/api(?!/doc$) # Accepts all routes except /api/doc
+            # Discovery documents a cloud reads before it trusts a notification.
+            - ^/\.well-known/(synaplan-configuration|jwks\.json)$
+            # The OAuth2 authorization server a cloud links people through.
+            - ^/\.well-known/oauth-authorization-server$
+            - ^/oauth/
             # Desktop project companion (paired keys). The rest of /v1 stays
             # out of the published spec — it is the OpenAI/Anthropic gateway.
             - ^/v1/models/catalog

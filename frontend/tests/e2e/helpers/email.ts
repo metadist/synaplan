@@ -13,6 +13,8 @@ interface MailHogMessage {
 
 const VERIFY_MARKER = 'verify-email-callback?token='
 const HREF_RE = /href=["']([^"']*\/verify-email-callback\?token=[^"']*)["']/i
+const RESET_MARKER = 'reset-password?token='
+const RESET_HREF_RE = /href=["']([^"']*\/reset-password\?token=[^"']*)["']/i
 
 /** GET MailHog messages. Non-OK tolerated (returns []); poll timeout = fail. */
 export async function fetchMessages(request: APIRequestContext): Promise<MailHogMessage[]> {
@@ -91,6 +93,40 @@ export async function waitForVerificationHref(
           const decoded = decodeQP(bodyOf(msg))
           if (!decoded.toLowerCase().includes(VERIFY_MARKER)) continue
           const m = decoded.match(HREF_RE)
+          if (m?.[1]) {
+            href = m[1]
+            return href
+          }
+        }
+        return null
+      },
+      { timeout, intervals }
+    )
+    .not.toBeNull()
+  return href!
+}
+
+/**
+ * Poll until a password-reset mail arrives and return its link.
+ * The token stays inside the URL the caller opens; this helper does not log it.
+ */
+export async function waitForPasswordResetHref(
+  request: APIRequestContext,
+  recipientEmail: string,
+  opts?: { timeout?: number; intervals?: [number, number] }
+): Promise<string> {
+  const timeout = opts?.timeout ?? 60_000
+  const intervals = opts?.intervals ?? INTERVALS.FAST()
+  let href: string | null = null
+  await expect
+    .poll(
+      async () => {
+        const messages = await fetchMessages(request)
+        for (const msg of messages) {
+          if (!toMatches(msg, recipientEmail)) continue
+          const decoded = decodeQP(bodyOf(msg))
+          if (!decoded.toLowerCase().includes(RESET_MARKER)) continue
+          const m = decoded.match(RESET_HREF_RE)
           if (m?.[1]) {
             href = m[1]
             return href

@@ -6,6 +6,7 @@ namespace App\Service\Email\Turn;
 
 use App\Entity\Message;
 use App\Entity\User;
+use App\Security\AccountAccess;
 use App\Service\Email\EmailChatService;
 use App\Service\Email\EmailWebhookIdempotencyService;
 use App\Service\Email\InternalEmailService;
@@ -76,9 +77,10 @@ final readonly class InboundEmailIntake
             throw $this->refuseSender((string) $account['error'], $fromEmail, $toEmail, $subject, $messageId, $reportsToDiscord);
         }
         $sender = $account['user'] ?? null;
-        if (!$sender instanceof User || !$sender->isActive()) {
-            $reason = $sender instanceof User && $sender->isPendingPayment()
-                ? 'This account is waiting for payment. Finish checkout to use Synaplan.'
+        $closed = $sender instanceof User ? AccountAccess::credential($sender) : AccountAccess::SUSPENDED;
+        if (null !== $closed) {
+            $reason = AccountAccess::PENDING === $closed
+                ? AccountAccess::PENDING_MESSAGE
                 : 'This account cannot receive replies.';
             throw $this->refuseSender($reason, $fromEmail, $toEmail, $subject, $messageId, $reportsToDiscord);
         }

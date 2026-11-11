@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace CloudFixture;
 
 /**
- * Checks a signed notification the way every cloud app must: Ed25519 over
- * the body without `sig`, keys sorted, as compact JSON; addressed to this
- * instance; at most five minutes old. The five contract vectors in
- * `backend/tests/Fixtures/cloud-apps-contract/notify-vectors.json` pin it.
+ * Checks a notification the way every cloud app must: a JSON Web Token in
+ * compact JWS form, typed `synaplan-notification+jwt`, EdDSA (Ed25519) with a
+ * key from Synaplan's JWK Set, issued by the Synaplan this cloud talks to
+ * (`iss`, as `/.well-known/synaplan-configuration` names it), addressed to
+ * this instance (`aud`), inside its window (`iat`, `exp`). The five contract
+ * vectors in `backend/tests/Fixtures/cloud-apps-contract/notify-vectors.json`
+ * pin it.
  */
 final class Notification
 {
@@ -16,84 +19,80 @@ final class Notification
     public const BAD_SIGNATURE = 'bad_signature';
     public const WRONG_INSTANCE = 'wrong_instance';
     public const STALE = 'stale';
+    public const WRONG_ISSUER = 'wrong_issuer';
 
-    public const WINDOW_SECONDS = 300;
-
+    private const TYPE = 'synaplan-notification+jwt';
+    private const SKEW_SECONDS = 60;
     private const PREFIX = 'ed25519:';
 
     /**
-     * @param array<mixed>                                     $body
      * @param list<array{publicKey?: mixed, kid?: mixed}|mixed> $keys Synaplan's notify keys
      */
-    public static function verify(array $body, string $instanceId, array $keys, int $now, int $window = self::WINDOW_SECONDS): string
+    public static function verify(string $token, string $issuer, string $instanceId, array $keys, int $now): string
     {
-        $signature = $body['sig'] ?? null;
-        if (!is_string($signature) || '' === $signature) {
+        $parts = explode('.', trim($token));
+        $header = self::header($token);
+        if (3 !== count($parts) || 'EdDSA' !== ($header['alg'] ?? null) || self::TYPE !== ($header['typ'] ?? null)) {
             return self::BAD_SIGNATURE;
         }
-        if (($body['instance_id'] ?? null) !== $instanceId) {
-            return self::WRONG_INSTANCE;
-        }
-        $ts = $body['ts'] ?? null;
-        if (!is_int($ts) || abs($now - $ts) > $window) {
-            return self::STALE;
-        }
-        $message = self::canonical($body);
+        $signature = self::b64decode($parts[2]);
+        $verified = false;
         foreach ($keys as $key) {
             $publicKey = is_array($key) ? ($key['publicKey'] ?? null) : null;
-            if (is_string($publicKey) && self::verifies($message, $signature, $publicKey)) {
-                return self::OK;
+            $raw = is_string($publicKey) && str_starts_with($publicKey, self::PREFIX) ? self::b64decode(substr($publicKey, strlen(self::PREFIX))) : null;
+            if (null !== $signature && null !== $raw && SODIUM_CRYPTO_SIGN_BYTES === strlen($signature) && SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES === strlen($raw)
+                && sodium_crypto_sign_verify_detached($signature, $parts[0].'.'.$parts[1], $raw)) {
+                $verified = true;
+                break;
             }
         }
-
-        return self::BAD_SIGNATURE;
-    }
-
-    /**
-     * @param array<mixed> $body
-     */
-    public static function canonical(array $body): string
-    {
-        unset($body['sig']);
-
-        return json_encode(self::sorted($body), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-    }
-
-    private static function verifies(string $message, string $signature, string $publicKey): bool
-    {
-        $sig = self::decode($signature, SODIUM_CRYPTO_SIGN_BYTES);
-        $key = self::decode($publicKey, SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES);
-
-        return null !== $sig && null !== $key && sodium_crypto_sign_verify_detached($sig, $message, $key);
-    }
-
-    private static function decode(string $encoded, int $length): ?string
-    {
-        if (!str_starts_with($encoded, self::PREFIX)) {
-            return null;
+        if (!$verified) {
+            return self::BAD_SIGNATURE;
         }
-        $b64 = strtr(substr($encoded, strlen(self::PREFIX)), '-_', '+/');
-        $raw = base64_decode($b64.str_repeat('=', (4 - strlen($b64) % 4) % 4), true);
+        $claims = self::claims($token);
+        if ('' === $issuer || ($claims['iss'] ?? null) !== $issuer) {
+            return self::WRONG_ISSUER;
+        }
+        if (($claims['aud'] ?? null) !== $instanceId) {
+            return self::WRONG_INSTANCE;
+        }
+        $iat = $claims['iat'] ?? null;
+        $exp = $claims['exp'] ?? null;
+        if (!is_int($iat) || !is_int($exp) || $now >= $exp || $iat > $now + self::SKEW_SECONDS) {
+            return self::STALE;
+        }
 
-        return is_string($raw) && strlen($raw) === $length ? $raw : null;
+        return self::OK;
     }
 
     /**
-     * @param array<mixed> $value
+     * The token's claims, unverified: call verify() first.
      *
-     * @return array<mixed>
+     * @return array<string, mixed>
      */
-    private static function sorted(array $value): array
+    public static function claims(string $token): array
     {
-        if (!array_is_list($value)) {
-            ksort($value, SORT_STRING);
-        }
-        foreach ($value as $key => $item) {
-            if (is_array($item)) {
-                $value[$key] = self::sorted($item);
-            }
-        }
+        $parts = explode('.', trim($token));
+        $decoded = 3 === count($parts) ? json_decode(self::b64decode($parts[1]) ?? '', true) : null;
 
-        return $value;
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function header(string $token): array
+    {
+        $parts = explode('.', trim($token));
+        $decoded = 3 === count($parts) ? json_decode(self::b64decode($parts[0]) ?? '', true) : null;
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    private static function b64decode(string $encoded): ?string
+    {
+        $raw = base64_decode(strtr($encoded, '-_', '+/'), true);
+
+        return false === $raw ? null : $raw;
     }
 }

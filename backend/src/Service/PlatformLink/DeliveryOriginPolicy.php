@@ -11,13 +11,15 @@ use App\Service\Security\SsrfGuard;
  * Synaplan calls only a delivery address that belongs to the registered
  * cloud (03 §2): the registered host over https; a hostname an
  * administrator approved, private addresses included but loopback and
- * link-local never; or, while developing, a host from the shared dev list.
+ * link-local never; for the cloud configured by environment (OidcCloud)
+ * exactly its configured address, with the same exception; or, while developing, a host from the shared dev list.
  */
 final readonly class DeliveryOriginPolicy
 {
     public function __construct(
         private RedirectUriPolicy $redirects,
         private SsrfGuard $ssrfGuard,
+        private OidcCloud $oidcCloud,
     ) {
     }
 
@@ -29,7 +31,11 @@ final readonly class DeliveryOriginPolicy
         }
         $host = strtolower(trim($parts['host'], '[]'));
         $scheme = strtolower($parts['scheme']);
-        if ($this->redirects->isDev() && $this->redirects->isLocalDevHost($host) && in_array($scheme, ['http', 'https'], true)) {
+        $devHost = $this->redirects->isDev() && $this->redirects->isLocalDevHost($host) && in_array($scheme, ['http', 'https'], true);
+        if ($this->oidcCloud->isThisCloud($instance)) {
+            return $this->oidcCloud->allowsDelivery($instance, $url) && ($devHost || !$this->isLoopbackOrLinkLocal($host));
+        }
+        if ($devHost) {
             return true;
         }
         if (in_array($scheme, ['http', 'https'], true) && in_array($host, $instance->getApprovedHosts(), true)) {
@@ -40,6 +46,37 @@ final readonly class DeliveryOriginPolicy
         }
 
         return $host === $this->registeredHost($instance) && !$this->ssrfGuard->isBlockedHost($host);
+    }
+
+    /**
+     * The one address Synaplan connects to for this delivery URL, resolved
+     * under the same rules {@see accepts()} applied, so the name cannot point
+     * somewhere else between the check and the connection (DNS rebinding).
+     * Null when nothing acceptable is left. A URL whose host is an IP is its
+     * own address.
+     */
+    public function pinnedAddress(PlatformInstance $instance, string $url): ?string
+    {
+        if (!$this->accepts($instance, $url)) {
+            return null;
+        }
+        $host = strtolower(trim((string) parse_url($url, \PHP_URL_HOST), '[]'));
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return $host;
+        }
+        $devLocal = $this->redirects->isDev() && $this->redirects->isLocalDevHost($host);
+        $privateAllowed = $devLocal
+            || $this->oidcCloud->isThisCloud($instance)
+            || in_array($host, $instance->getApprovedHosts(), true);
+        foreach ($this->ssrfGuard->pinnedIps($host, $privateAllowed) as $ip) {
+            if (!$devLocal && self::ipIsLoopbackOrLinkLocal($ip)) {
+                continue;
+            }
+
+            return $ip;
+        }
+
+        return null;
     }
 
     /**

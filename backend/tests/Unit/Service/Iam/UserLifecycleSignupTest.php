@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Iam;
 
 use App\Entity\User;
+use App\Repository\OAuthTokenRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupAdmission;
@@ -52,6 +53,7 @@ final class UserLifecycleSignupTest extends TestCase
             $users,
             $this->createStub(TokenService::class),
             $this->registration(),
+            $this->createStub(OAuthTokenRepository::class),
         );
 
         self::assertNull($service->createSignup('known@example.com', 'secret', [], 'PRO', null, '203.0.113.9'));
@@ -70,6 +72,7 @@ final class UserLifecycleSignupTest extends TestCase
             $this->createMock(UserRepository::class),
             $this->createStub(TokenService::class),
             $this->registration(true),
+            $this->createStub(OAuthTokenRepository::class),
         );
 
         $user = $open->buildExternalAccount(SignupDoor::Google, 'new@example.com', true);
@@ -85,6 +88,7 @@ final class UserLifecycleSignupTest extends TestCase
             $this->createMock(UserRepository::class),
             $this->createStub(TokenService::class),
             $this->registration(false),
+            $this->createStub(OAuthTokenRepository::class),
         );
         $this->expectException(SignupBlockedException::class);
         $closed->buildExternalAccount(SignupDoor::Apple, 'new@example.com', true);
@@ -101,6 +105,7 @@ final class UserLifecycleSignupTest extends TestCase
             $users,
             $this->createStub(TokenService::class),
             $this->registration(),
+            $this->createStub(OAuthTokenRepository::class),
         );
     }
 

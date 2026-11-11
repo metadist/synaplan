@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Security\AccountAccess;
 use App\Service\Auth\AuthCookieFactory;
 use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\TokenService;
@@ -182,6 +183,17 @@ final class ImpersonationServiceTest extends TestCase
         $this->expectExceptionMessage('Already impersonating');
 
         $this->service->startImpersonation($admin, $target, $request, new Response());
+    }
+
+    public function testStartImpersonationRefusesSuspendedTarget(): void
+    {
+        $admin = $this->makeUser(id: 1, level: 'ADMIN');
+        $target = $this->makeUser(id: 7, level: 'PRO', active: false);
+        $this->expectException(AccessDeniedException::class);
+        $this->expectExceptionMessage(AccountAccess::SUSPENDED_MESSAGE);
+        $this->tokenService->expects(self::never())->method('generateAccessToken');
+
+        $this->service->startImpersonation($admin, $target, $this->requestWithAppTokens(), new Response());
     }
 
     public function testStartImpersonationRefusesOidcSession(): void

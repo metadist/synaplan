@@ -7,172 +7,31 @@ namespace App\Service\PlatformLink;
 use App\Entity\ApiKey;
 use App\Entity\ExternalIdentity;
 use App\Entity\PlatformInstance;
-use App\Entity\User;
 use App\Repository\ApiKeyRepository;
 use App\Repository\ExternalIdentityRepository;
+use App\Repository\OAuthTokenRepository;
 use App\Repository\PlatformInstanceRepository;
-use App\Repository\UserRepository;
-use App\Security\ApiKeyScope;
-use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Iam\AuditLogWriter;
-use App\Service\PlatformLink\Exception\PlatformInstanceNotActiveException;
-use App\Service\PlatformLink\Exception\PlatformLinkCodeException;
 use App\Service\PlatformLink\Exception\PlatformManagedByAdministratorException;
 use App\Service\PlatformLink\Exception\PlatformSsoException;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Server-to-server exchange of a one-time link_code for a scoped API key.
- * Never creates or edits a BUSER row (C3).
+ * A person's links with clouds: listing them, and ending, turning off or
+ * resuming one. Ending a link also ends the cloud's OAuth2 grant for that
+ * person.
  */
 final readonly class PlatformLinkExchangeService
 {
     public function __construct(
-        private PlatformInstanceService $instanceService,
-        private LinkCodeService $linkCodeService,
-        private UserRepository $userRepository,
         private ApiKeyRepository $apiKeyRepository,
         private ExternalIdentityRepository $externalIdentityRepository,
         private PlatformInstanceRepository $instanceRepository,
         private AuditLogWriter $auditLogWriter,
         private DeliveryNotifier $notifier,
-        private PremiumFeatureGate $premiumFeatureGate,
         private LifecycleEffect $effects,
+        private OAuthTokenRepository $oauthTokens,
     ) {
-    }
-
-    /**
-     * @return array{
-     *   success: true,
-     *   api_key: array{id: int, key: string, name: string, scopes: list<string>},
-     *   user: array{id: int, email: string, display_name: string},
-     *   link_id: int
-     * }
-     */
-    public function exchange(string $instanceId, string $instanceSecret, string $code, string $ip): array
-    {
-        $instance = $this->instanceService->requireInstance($instanceId);
-        $this->instanceService->assertSecret($instance, $instanceSecret);
-        if (!$instance->isActive()) {
-            throw new PlatformInstanceNotActiveException('This platform is waiting for approval by the Synaplan administrator.');
-        }
-
-        $payload = $this->linkCodeService->consume($code);
-        if (null === $payload || $payload['instanceId'] !== $instanceId) {
-            $this->auditLogWriter->record(
-                0,
-                'platform_link.exchange_failed',
-                'platform_instance',
-                $instanceId,
-                ['reason' => 'unknown_code'],
-                $ip,
-            );
-            throw PlatformLinkCodeException::unknown();
-        }
-
-        $user = $this->linkingUser($payload['userId']);
-
-        $userCountBefore = $this->userRepository->count([]);
-        $mailBefore = $user->getMail();
-        $detailsBefore = $user->getUserDetails();
-
-        $existing = $this->externalIdentityRepository->findOneByTriple(
-            $instance->getClient(),
-            $instance->getInstanceId(),
-            $payload['externalId'],
-        );
-        $previousOwnerId = $existing instanceof ExternalIdentity ? $existing->getUserId() : null;
-        if ($existing instanceof ExternalIdentity && null !== $existing->getApiKeyId()) {
-            $previous = $this->apiKeyRepository->find($existing->getApiKeyId());
-            if ($previous instanceof ApiKey) {
-                $this->apiKeyRepository->remove($previous);
-            }
-        }
-
-        $name = $this->keyLabel($instance, $payload['externalId']);
-        $scopes = ApiKeyScope::platformLinkScopes($payload['withMemories']);
-        $plainKey = 'sk_'.bin2hex(random_bytes(29));
-
-        $apiKey = new ApiKey();
-        $apiKey->setOwner($user);
-        $apiKey->setKey($plainKey);
-        $apiKey->setName($name);
-        $apiKey->setStatus('active');
-        $apiKey->setScopes($scopes);
-        $this->apiKeyRepository->save($apiKey);
-
-        $identity = $this->externalIdentityRepository->upsert(
-            (int) $user->getId(),
-            $instance->getClient(),
-            $payload['externalId'],
-            $instance->getInstanceId(),
-            (int) $apiKey->getId(), ExternalIdentity::MODE_LINK,
-        );
-        $identity->setStatus(ExternalIdentity::STATUS_ACTIVE);
-        $identity->setRevokedAt(null);
-        $this->externalIdentityRepository->save($identity);
-
-        $instance->touchLastSeen();
-
-        $this->auditLogWriter->record(
-            (int) $user->getId(),
-            'platform_link.linked',
-            'platform_link',
-            (string) $identity->getId(),
-            [
-                'client' => $instance->getClient(),
-                'host' => $instance->getHost(),
-                'external_id' => $payload['externalId'],
-            ],
-            $ip,
-        );
-
-        // The external id moved to another Synaplan account: the previous
-        // owner's key was revoked above and the link is no longer theirs.
-        // Audited under both accounts so it shows up in either audit filter.
-        if (null !== $previousOwnerId && $previousOwnerId !== (int) $user->getId()) {
-            foreach ([$previousOwnerId, (int) $user->getId()] as $actorId) {
-                $this->auditLogWriter->record(
-                    $actorId,
-                    'platform_link.reassigned',
-                    'platform_link',
-                    (string) $identity->getId(),
-                    [
-                        'client' => $instance->getClient(),
-                        'host' => $instance->getHost(),
-                        'external_id' => $payload['externalId'],
-                        'previous_user_id' => $previousOwnerId,
-                        'new_user_id' => (int) $user->getId(),
-                    ],
-                    $ip,
-                );
-            }
-        }
-
-        if ($this->userRepository->count([]) !== $userCountBefore
-            || $user->getMail() !== $mailBefore
-            || $user->getUserDetails() !== $detailsBefore
-        ) {
-            throw new \LogicException('Linking must not create or edit a Synaplan user.');
-        }
-
-        $details = $user->getUserDetails();
-
-        return [
-            'success' => true,
-            'api_key' => [
-                'id' => (int) $apiKey->getId(),
-                'key' => $plainKey,
-                'name' => $apiKey->getName(),
-                'scopes' => $apiKey->getScopes(),
-            ],
-            'user' => [
-                'id' => (int) $user->getId(),
-                'email' => (string) $user->getMail(),
-                'display_name' => (string) ($details['display_name'] ?? $user->getMail()),
-            ],
-            'link_id' => (int) $identity->getId(),
-        ];
     }
 
     /**
@@ -284,6 +143,9 @@ final readonly class PlatformLinkExchangeService
                 $this->apiKeyRepository->remove($key, false);
             }
         }
+        if ('' !== $identity->getInstanceId()) {
+            $this->oauthTokens->revokeAll($identity->getInstanceId(), $userId, $identity->getExternalId());
+        }
         $identity->setStatus(ExternalIdentity::STATUS_REVOKED);
         $identity->setRevokedAt(time());
         $this->externalIdentityRepository->save($identity);
@@ -386,31 +248,5 @@ final readonly class PlatformLinkExchangeService
         }
 
         return $linked;
-    }
-
-    private function keyLabel(PlatformInstance $instance, string $externalId): string
-    {
-        $prefix = match ($instance->getClient()) {
-            PlatformInstance::CLIENT_NEXTCLOUD => 'Nextcloud',
-            PlatformInstance::CLIENT_OWNCLOUD => 'ownCloud.online',
-            default => ucfirst($instance->getClient()),
-        };
-
-        return sprintf('%s: %s (%s)', $prefix, $instance->getHost(), $externalId);
-    }
-
-    /**
-     * The account the code was issued for. Linking mints an API key, so a
-     * free account on an install that sells subscriptions is refused.
-     */
-    private function linkingUser(int $userId): User
-    {
-        $user = $this->userRepository->find($userId);
-        if (!$user instanceof User) {
-            throw PlatformLinkCodeException::unknown();
-        }
-        $this->premiumFeatureGate->assertApiKeysAllowed($user);
-
-        return $user;
     }
 }

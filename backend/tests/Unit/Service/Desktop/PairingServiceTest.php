@@ -150,6 +150,16 @@ final class PairingServiceTest extends TestCase
         $this->service->pair(999, 'x', []);
     }
 
+    public function testPairRefusesASuspendedAccount(): void
+    {
+        $user = $this->stubUser(7);
+        $user->setAccountStatus(User::ACCOUNT_STATUS_SUSPENDED);
+        $this->apiKeyRepository->expects(self::never())->method('save');
+
+        $this->expectException(\App\Service\Desktop\Exception\PairingException::class);
+        $this->service->pair(7, 'laptop', []);
+    }
+
     public function testRevokeRemovesKeyAndFlagsDevice(): void
     {
         $device = (new DesktopDevice())->setOwnerId(1)->setApiKeyId(55)->setStatus(DesktopDevice::STATUS_ACTIVE);

@@ -31,11 +31,9 @@ final class Control
             'POST' === $method && 'profile' === $route => $this->profile($body),
             'POST' === $method && 'switch' === $route => $this->switch($body),
             'POST' === $method && 'register' === $route => $this->register($body),
-            'POST' === $method && 'credential' === $route => $this->credential($body),
+            'GET' === $method && 'registration' === $route => $this->registration(),
+            'POST' === $method && 'unlink' === $route => $this->unlink($body),
             'POST' === $method && 'scope' === $route => $this->scope($body),
-            'POST' === $method && 'sso-status' === $route => $this->ssoStatus($body),
-            'POST' === $method && 'bind' === $route => $this->bind($body),
-            'POST' === $method && 'adopt' === $route => $this->adopt($body),
             'POST' === $method && 'watch-list' === $route => $this->watchList($body),
             'POST' === $method && 'watch-file' === $route => $this->watchFile($body),
             'POST' === $method && 'watch-reconcile' === $route => $this->watchReconcile($body),
@@ -53,11 +51,20 @@ final class Control
      */
     public static function refreshKeys(Store $store): array
     {
-        $self = Synaplan::from($store->state())->json('GET', '/api/v1/platform-links/instances/self');
-        $keys = is_array($self['body']['notify_keys'] ?? null) ? array_values(array_filter($self['body']['notify_keys'], 'is_array')) : [];
-        if (200 === $self['status']) {
-            $store->update(static function (array $s) use ($keys): array {
+        $synaplan = Synaplan::from($store->state());
+        $configuration = $synaplan->json('GET', '/.well-known/synaplan-configuration');
+        $jwks = $synaplan->json('GET', '/.well-known/jwks.json');
+        $issuer = is_string($configuration['body']['issuer'] ?? null) ? $configuration['body']['issuer'] : '';
+        $keys = [];
+        foreach (is_array($jwks['body']['keys'] ?? null) ? $jwks['body']['keys'] : [] as $jwk) {
+            if (is_array($jwk) && 'OKP' === ($jwk['kty'] ?? null) && 'Ed25519' === ($jwk['crv'] ?? null) && is_string($jwk['x'] ?? null)) {
+                $keys[] = ['publicKey' => 'ed25519:'.$jwk['x'], 'kid' => is_string($jwk['kid'] ?? null) ? $jwk['kid'] : ''];
+            }
+        }
+        if (200 === $configuration['status'] && 200 === $jwks['status'] && '' !== $issuer) {
+            $store->update(static function (array $s) use ($keys, $issuer): array {
                 $s['notify_keys'] = $keys;
+                $s['issuer'] = $issuer;
 
                 return $s;
             });
@@ -72,7 +79,10 @@ final class Control
     private function publicState(): array
     {
         $state = $this->store->state();
-        $state['instance']['secret'] = '' !== $state['instance']['secret'] ? 'set' : '';
+        $state['oauth_key'] = is_array($state['oauth_key'] ?? null) ? 'set' : '';
+        foreach ($state['links'] as $person => $link) {
+            $state['links'][$person] = is_array($link) ? ['linked_at' => $link['linked_at'] ?? null, 'scope' => $link['scope'] ?? ''] : $link;
+        }
         unset($state['pending']);
 
         return $state;
@@ -123,78 +133,59 @@ final class Control
     }
 
     /**
-     * Register with Synaplan as a new instance. With an administrator's API
-     * key (`admin_key`, used for this call only) the instance is active at
-     * once; without one it waits for an administrator in Synaplan.
+     * Register with Synaplan as an OAuth2 client (dynamic client
+     * registration). With the initial access token Synaplan's administrator
+     * handed out (`registration_token`) the client is active at once;
+     * otherwise it may wait for an administrator in Synaplan.
      *
      * @param array<mixed> $body
      */
     private function register(array $body): Response
     {
         $client = is_string($body['client'] ?? null) ? $body['client'] : 'nextcloud';
-        $state = $this->store->state();
-        $headers = is_string($body['admin_key'] ?? null) && '' !== $body['admin_key'] ? ['X-API-Key' => $body['admin_key']] : [];
-        $answer = (new Synaplan($state['synaplan_url'], '', ''))->json('POST', '/api/v1/platform-links/instances', [
-            'client' => $client,
-            'host' => (string) parse_url($state['fixture_url'], PHP_URL_HOST).(null !== parse_url($state['fixture_url'], PHP_URL_PORT) ? ':'.parse_url($state['fixture_url'], PHP_URL_PORT) : ''),
-            'redirect_uris' => [$state['fixture_url'].'/link/callback'],
-        ], $headers);
-        if (201 !== $answer['status']) {
-            return Response::json(502, ['error' => 'not_registered', 'synaplan' => $answer]);
-        }
-
-        return $this->remember(
-            (string) ($answer['body']['instance_id'] ?? ''),
-            (string) ($answer['body']['instance_secret'] ?? ''),
-            $client,
-            (string) ($answer['body']['status'] ?? ''),
-        );
-    }
-
-    /**
-     * Use an instance an administrator registered elsewhere.
-     *
-     * @param array<mixed> $body
-     */
-    private function credential(array $body): Response
-    {
-        $id = $body['instance_id'] ?? null;
-        $secret = $body['instance_secret'] ?? null;
-        if (!is_string($id) || !is_string($secret) || '' === $id || '' === $secret) {
-            throw new FixtureException(422, 'bad_credential', 'instance_id and instance_secret are required.');
-        }
-
-        return $this->remember($id, $secret, is_string($body['client'] ?? null) ? $body['client'] : 'nextcloud', '');
-    }
-
-    /**
-     * Store the credential, tell Synaplan where to call and what this app
-     * does, and read the keys Synaplan signs with.
-     */
-    private function remember(string $id, string $secret, string $client, string $status): Response
-    {
-        $state = $this->store->update(static function (array $s) use ($id, $secret, $client): array {
-            $s['instance'] = ['id' => $id, 'secret' => $secret];
+        $this->store->update(static function (array $s) use ($client): array {
             $s['client'] = $client;
             $s['notify_keys'] = [];
 
             return $s;
         });
-        $announced = Synaplan::from($state)->json('PATCH', '/api/v1/platform-links/instances/self', [
-            'delivery_url' => $state['inbound_url'],
-            'app_capabilities' => self::CAPABILITIES,
-            'app_version' => 'fixture-1',
-            'server_id' => 'cloud-fixture',
-        ]);
         $keys = self::refreshKeys($this->store);
+        $token = is_string($body['registration_token'] ?? null) ? $body['registration_token'] : '';
+        $answer = OAuth::register($this->store, $token, self::CAPABILITIES);
+        if (201 !== $answer['status']) {
+            return Response::json(502, ['error' => 'not_registered', 'synaplan' => $answer]);
+        }
+        $state = $this->store->state();
 
         return Response::json(200, [
-            'instance_id' => $id,
-            'status' => $status,
-            'announced' => 200 === $announced['status'] ? true : $announced,
+            'client_id' => $state['instance']['id'],
+            'status' => $answer['body']['status'] ?? '',
+            'reachable' => $answer['body']['reachable'] ?? null,
             'notify_keys' => count($keys),
             'link' => $state['fixture_url'].'/link/start?user=ada',
         ]);
+    }
+
+    /**
+     * This client's registration as Synaplan has it (RFC 7592).
+     */
+    private function registration(): Response
+    {
+        $answer = OAuth::configuration($this->store);
+
+        return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
+    }
+
+    /**
+     * The person leaves: revoke their grant at Synaplan, which ends the link.
+     *
+     * @param array<mixed> $body
+     */
+    private function unlink(array $body): Response
+    {
+        $person = Store::person(is_string($body['person'] ?? null) ? $body['person'] : '');
+
+        return Response::json(200, ['revoked' => OAuth::revoke($this->store, $person)]);
     }
 
     /**
@@ -221,7 +212,7 @@ final class Control
 
             return $s;
         });
-        $key = Store::personKey($state, $person);
+        $key = OAuth::accessToken($this->store, $person);
         if ('' === $key) {
             return Response::json(200, ['scope' => $state['scopes'][$person], 'reported' => ['error' => 'not_linked']]);
         }
@@ -235,62 +226,6 @@ final class Control
         ]);
 
         return Response::json(200, ['scope' => $state['scopes'][$person], 'reported' => 200 === $reported['status'] ? true : $reported]);
-    }
-
-    /**
-     * Organisation login: is this platform user bound? The bearer is the
-     * exchanged token; the instance credential is the one this fixture holds.
-     *
-     * @param array<mixed> $body
-     */
-    private function ssoStatus(array $body): Response
-    {
-        $externalId = $body['external_id'] ?? null;
-        $bearer = $body['bearer'] ?? null;
-        if (!is_string($externalId) || '' === $externalId || !is_string($bearer) || '' === $bearer) {
-            throw new FixtureException(422, 'bad_bind', 'external_id and bearer are required.');
-        }
-
-        return $this->forward('GET', '/api/v1/platform-links/sso/status?external_id='.rawurlencode($externalId), null, $bearer, false);
-    }
-
-    /**
-     * @param array<mixed> $body
-     */
-    private function bind(array $body): Response
-    {
-        $externalId = $body['external_id'] ?? null;
-        $bearer = $body['bearer'] ?? null;
-        if (!is_string($externalId) || '' === $externalId || !is_string($bearer) || '' === $bearer) {
-            throw new FixtureException(422, 'bad_bind', 'external_id and bearer are required.');
-        }
-
-        return $this->forward('POST', '/api/v1/platform-links/sso/bind', ['external_id' => $externalId], $bearer, false);
-    }
-
-    /**
-     * @param array<mixed> $body
-     */
-    private function adopt(array $body): Response
-    {
-        $externalId = $body['external_id'] ?? null;
-        $apiKey = $body['api_key'] ?? null;
-        if (!is_string($externalId) || '' === $externalId || !is_string($apiKey) || '' === $apiKey) {
-            throw new FixtureException(422, 'bad_adopt', 'external_id and api_key are required.');
-        }
-
-        return $this->forward('POST', '/api/v1/platform-links/identities/adopt', ['external_id' => $externalId], $apiKey, true);
-    }
-
-    /**
-     * @param array<string, mixed>|null $payload
-     */
-    private function forward(string $method, string $path, ?array $payload, string $credential, bool $asKey): Response
-    {
-        $header = $asKey ? ['X-API-Key' => $credential] : ['Authorization' => 'Bearer '.$credential];
-        $answer = Synaplan::from($this->store->state())->json($method, $path, $payload, $header);
-
-        return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
     }
 
     private function files(string $method, string $person, string $path, string $raw): Response
@@ -325,12 +260,11 @@ final class Control
     private function watchList(array $body): Response
     {
         $person = Store::person(is_string($body['person'] ?? null) ? $body['person'] : '');
-        $state = $this->store->state();
-        $key = Store::personKey($state, $person);
+        $key = OAuth::accessToken($this->store, $person);
         if ('' === $key) {
             return Response::json(409, ['error' => 'not_linked']);
         }
-        $answer = (new Watches(Synaplan::from($state)))->list($key);
+        $answer = (new Watches(Synaplan::from($this->store->state())))->list($key);
 
         return Response::json($answer['status'] > 0 ? $answer['status'] : 502, $answer['body']);
     }
@@ -338,12 +272,12 @@ final class Control
     /** @param array<mixed> $body */
     private function watchFile(array $body): Response
     {
-        $apiKey = $body['api_key'] ?? null;
+        $apiKey = OAuth::accessToken($this->store, Store::person(is_string($body['person'] ?? null) ? $body['person'] : ''));
         $watchId = $body['watch_id'] ?? null;
         $id = $body['id'] ?? null;
         $version = $body['version'] ?? null;
-        if (!is_string($apiKey) || !is_int($watchId) || !is_string($id) || !is_string($version)) {
-            throw new FixtureException(422, 'bad_watch_file', 'api_key, watch_id, id and version are required.');
+        if ('' === $apiKey || !is_int($watchId) || !is_string($id) || !is_string($version)) {
+            throw new FixtureException(422, 'bad_watch_file', 'a connected person, watch_id, id and version are required.');
         }
         $name = is_string($body['name'] ?? null) ? $body['name'] : 'file.bin';
         $bytes = is_string($body['content'] ?? null) ? $body['content'] : '';
@@ -360,11 +294,11 @@ final class Control
     /** @param array<mixed> $body */
     private function watchReconcile(array $body): Response
     {
-        $apiKey = $body['api_key'] ?? null;
+        $apiKey = OAuth::accessToken($this->store, Store::person(is_string($body['person'] ?? null) ? $body['person'] : ''));
         $watchId = $body['watch_id'] ?? null;
         $items = $body['items'] ?? null;
-        if (!is_string($apiKey) || !is_int($watchId) || !is_array($items)) {
-            throw new FixtureException(422, 'bad_watch_reconcile', 'api_key, watch_id and items are required.');
+        if ('' === $apiKey || !is_int($watchId) || !is_array($items)) {
+            throw new FixtureException(422, 'bad_watch_reconcile', 'a connected person, watch_id and items are required.');
         }
         $rows = [];
         foreach ($items as $item) {

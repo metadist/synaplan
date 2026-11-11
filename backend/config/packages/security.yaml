@@ -22,6 +22,7 @@ security:
             user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
+                - App\Security\OAuthBearerAuthenticator
                 - App\Security\OidcBearerAuthenticator
                 - App\Security\ApiKeyAuthenticator
 
@@ -36,18 +37,9 @@ security:
             user_checker: App\Security\AccountStatusChecker
             entry_point: App\Security\McpAuthenticationEntryPoint
             custom_authenticators:
+                - App\Security\OAuthBearerAuthenticator
                 - App\Security\OidcBearerAuthenticator
                 - App\Security\ApiKeyAuthenticator
-
-        # Calls a connected cloud makes as itself (X-Instance-Id +
-        # X-Instance-Secret). A firewall of its own, so a person's cookie,
-        # bearer or key can never stand in for the instance on these paths.
-        platform_instance:
-            pattern: ^/api/v1/platform-links/(instances/self$|lifecycle$)
-            stateless: true
-            entry_point: App\Security\PlatformInstanceAuthenticator
-            custom_authenticators:
-                - App\Security\PlatformInstanceAuthenticator
 
         api:
             pattern: ^/api
@@ -61,6 +53,7 @@ security:
             entry_point: App\Security\ApiAuthenticationEntryPoint
             custom_authenticators:
                 - App\Security\CookieTokenAuthenticator
+                - App\Security\OAuthBearerAuthenticator
                 - App\Security\OidcBearerAuthenticator
                 - App\Security\QueryTokenAuthenticator
                 - App\Security\ApiKeyAuthenticator
@@ -90,6 +83,12 @@ security:
         # Anchored so a future route under /mcp/ does not become public too.
         - { path: ^/\.well-known/oauth-protected-resource, roles: PUBLIC_ACCESS }
         - { path: ^/\.well-known/synaplan-federation, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/jwks\.json$, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/synaplan-configuration$, roles: PUBLIC_ACCESS }
+        - { path: ^/\.well-known/oauth-authorization-server$, roles: PUBLIC_ACCESS }
+        # OAuth2 server for clouds: clients authenticate with private_key_jwt
+        # in the controller, people consent through /api/v1/oauth/consent.
+        - { path: ^/oauth/, roles: PUBLIC_ACCESS }
         - { path: ^/mcp$, roles: PUBLIC_ACCESS }
         - { path: ^/mcp, roles: IS_AUTHENTICATED_FULLY }
 
@@ -172,13 +171,7 @@ security:
         # Partner-instance handshake: anonymous register (pending), public
         # confirm-card lookup, and code exchange (the instance secret travels
         # in the body there). All 404 when PLATFORM_LINKS.ENABLED is off.
-        - { path: ^/api/v1/platform-links/instances$, methods: [POST], roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/platform-links/instances/[^/]+/public$, roles: PUBLIC_ACCESS }
-        - { path: ^/api/v1/platform-links/exchange$, methods: [POST], roles: PUBLIC_ACCESS }
-
-        # The platform_instance firewall: PlatformInstanceAuthenticator.
-        - { path: ^/api/v1/platform-links/instances/self$, roles: ROLE_PLATFORM_INSTANCE }
-        - { path: ^/api/v1/platform-links/lifecycle$, roles: ROLE_PLATFORM_INSTANCE }
 
         # Partner handshake. The invite preview and the signed connect call
         # prove themselves (unguessable token, Ed25519 signature). Admin routes

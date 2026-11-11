@@ -19,7 +19,6 @@
         "src/Controller/ApiKeyController.php::ApiKeyController::update": 60,
         "src/Controller/AppleAuthController.php::AppleAuthController::callback": 58,
         "src/Controller/AppleAuthController.php::AppleAuthController::findOrCreateUser": 72,
-        "src/Controller/AppleAuthController.php::AppleAuthController::native": 59,
         "src/Controller/AuthController.php::AuthController::login": 96,
         "src/Controller/AuthController.php::AuthController::logout": 63,
         "src/Controller/AuthController.php::AuthController::refresh": 102,

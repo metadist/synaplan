@@ -26,7 +26,6 @@ final class PlatformInstanceRepositoryTest extends KernelTestCase
             PlatformInstance::STATUS_ACTIVE,
             0,
         );
-        $instance->setSecretHash('hash');
         $repo->save($instance);
 
         $found = $repo->findByInstanceId($id);

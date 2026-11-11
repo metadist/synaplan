@@ -7,9 +7,10 @@ row 45, brief E-9). Development only: nothing here asks for a login.
 
 It answers like an app:
 
-- `POST /inbound` takes Synaplan's signed notifications. Anything that is not
-  signed by Synaplan for this instance, addressed to it, and at most five
-  minutes old is refused with `401` (the five vectors in
+- `POST /inbound` takes Synaplan's notifications, signed JWTs. Anything that
+  is not signed with a key from Synaplan's JWK Set, issued by the Synaplan
+  `/.well-known/synaplan-configuration` names, addressed to this instance and
+  inside its five-minute window is refused with `401` (the vectors in
   `backend/tests/Fixtures/cloud-apps-contract/notify-vectors.json`).
 - **Copies** (Copy to cloud, CF3.1): claim, download, write into the person's
   files, report the result. A copy with no folder lands in the kind folder
@@ -49,11 +50,14 @@ Docker Desktop runs the containers.)
 ```bash
 F=http://localhost:8099/control
 
-# 1. Register. Without an admin key the instance waits for an administrator
-#    (People → Platform instances → Approve); with one it is active at once.
-curl -s -X POST $F/register -H 'content-type: application/json' -d '{"client":"owncloud"}'
+# 1. Register as an OAuth2 client. Without Synaplan's initial access token
+#    (PLATFORM_LINKS_REGISTRATION_TOKEN) the client waits for an administrator
+#    (People → Platform instances → Approve) unless Synaplan's registration
+#    policy is open; with it the client is active at once.
+curl -s -X POST $F/register -H 'content-type: application/json' \
+  -d '{"client":"owncloud","registration_token":"…"}'
 
-# 2. Link a person: open this in a browser signed in to Synaplan, confirm.
+# 2. Connect a person: open this in a browser signed in to Synaplan, allow.
 #    http://localhost:8099/link/start?user=ada
 
 # 3. What ada lets Synaplan read (kept here, reported to Synaplan).
@@ -71,13 +75,11 @@ the `nextcloud` channel, so the planner sees two distinct folder channels.
 
 | Call | What it does |
 | ---- | ------------ |
-| `GET /control/state` | Profile, client, credential (secret shown as `set`), switches, scopes, linked people |
-| `POST /control/register` `{client?, admin_key?}` | Register with Synaplan, announce the inbound address and the capabilities (`deliveries`, `pickups`), read the notify keys. `admin_key` is used for this call only |
-| `POST /control/credential` `{instance_id, instance_secret, client?}` | Use an instance registered elsewhere; announces and reads keys like `register` |
+| `GET /control/state` | Profile, client, client id (key shown as `set`), switches, scopes, connected people (no tokens) |
+| `POST /control/register` `{client?, registration_token?}` | Register as an OAuth2 client (RFC 7591) with a key pair made here, the inbound address and the capabilities (`deliveries`, `pickups`); read the issuer and the JWK Set |
+| `GET /control/registration` | The registration as Synaplan has it (RFC 7592, authenticated with a client assertion) |
+| `POST /control/unlink` `{person}` | Revoke the person's grant (RFC 7009), which ends their link in Synaplan |
 | `POST /control/scope` `{person, mode, folders}` | `mode` is `watched`, `allowed` or `all`; folders are paths |
-| `POST /control/sso-status` `{external_id, bearer}` | Asks Synaplan whether this platform user is bound. The answer is Synaplan's |
-| `POST /control/bind` `{external_id, bearer}` | Binds the person (`sso/bind`) with the exchanged token and this instance's credential |
-| `POST /control/adopt` `{external_id, api_key}` | Adopts a provisioned person's legacy row with that person's key |
 | `PUT /control/files/{person}/{path}` | Put a file (the request body is the content) |
 | `GET /control/files/{person}` | List a person's files |
 | `DELETE /control/files/{person}/{path}` | Remove a file |
@@ -94,8 +96,6 @@ copy reports.
 
 - `keyed` (default) behaves like Nextcloud: numeric file ids, bare etags.
 - `sso` behaves like OpenCloud: `storage$space!node` ids, quoted etags.
-  `sso-status` and `bind` are the organisation-login calls; the background
-  key comes with CF2.3.
 
 ## Test switches
 

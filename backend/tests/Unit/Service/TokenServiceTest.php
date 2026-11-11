@@ -8,6 +8,7 @@ use App\Entity\Token;
 use App\Entity\User;
 use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
+use App\Security\AccountSignInRefused;
 use App\Service\Auth\AuthCookieFactory;
 use App\Service\Auth\TokenService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -27,6 +28,22 @@ final class TokenServiceTest extends TestCase
 {
     private const SECRET_A = 'unit-test-secret-a';
     private const SECRET_B = 'unit-test-secret-b';
+
+    public function testASuspendedAccountIsNotMintedAToken(): void
+    {
+        $this->expectException(AccountSignInRefused::class);
+
+        $this->makeService(self::SECRET_A)->generateAccessToken($this->makeUser(User::ACCOUNT_STATUS_SUSPENDED));
+    }
+
+    public function testAPendingPaymentAccountCanStillBeMintedAToken(): void
+    {
+        $token = $this->makeService(self::SECRET_A)->generateAccessToken(
+            $this->makeUser(User::ACCOUNT_STATUS_PENDING_PAYMENT),
+        );
+
+        self::assertNotSame('', $token);
+    }
 
     public function testRefreshTokenTtlIsThirtyDays(): void
     {
@@ -85,7 +102,7 @@ final class TokenServiceTest extends TestCase
 
     public function testRefreshTokensRefusesSuspendedUserAndDoesNotSlideExpiry(): void
     {
-        $user = $this->makeUser(active: false);
+        $user = $this->makeUser(User::ACCOUNT_STATUS_SUSPENDED);
         $originalExpiry = time() + 3600;
         $refresh = new Token();
         $refresh->setUser($user);
@@ -113,11 +130,7 @@ final class TokenServiceTest extends TestCase
             new AuthCookieFactory('test', 'https://synaplan.example.com'),
             self::SECRET_A,
         );
-        $user = $this->createStub(User::class);
-        $user->method('getId')->willReturn(7);
-        $user->method('getMail')->willReturn('ada@example.com');
-        $user->method('getRoles')->willReturn(['ROLE_USER']);
-        $user->method('getUserLevel')->willReturn('PRO');
+        $user = $this->makeUser();
         $request = Request::create('/');
 
         $impersonated = $service->validateAccessToken(
@@ -156,16 +169,18 @@ final class TokenServiceTest extends TestCase
         );
     }
 
-    private function makeUser(bool $active = true): User&MockObject
+    private function makeUser(string $status = User::ACCOUNT_STATUS_ACTIVE): User&MockObject
     {
         $user = $this->createMock(User::class);
         $user->method('getId')->willReturn(7);
         $user->method('getMail')->willReturn('ada@example.com');
         $user->method('getRoles')->willReturn(['ROLE_USER']);
         $user->method('getUserLevel')->willReturn('PRO');
-        $user->method('isActive')->willReturn($active);
-        // A suspended mock may not sign in either; pending_payment is not modelled here.
-        $user->method('canSignIn')->willReturn($active);
+        $user->method('getAccountStatus')->willReturn($status);
+        $user->method('getMailboxGeneration')->willReturn(0);
+        $open = User::ACCOUNT_STATUS_ACTIVE === $status || User::ACCOUNT_STATUS_PENDING_PAYMENT === $status;
+        $user->method('isActive')->willReturn(User::ACCOUNT_STATUS_ACTIVE === $status);
+        $user->method('canSignIn')->willReturn($open);
 
         return $user;
     }

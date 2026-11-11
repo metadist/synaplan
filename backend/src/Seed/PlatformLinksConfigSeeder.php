@@ -66,13 +66,12 @@ final readonly class PlatformLinksConfigSeeder implements SeederInterface
 
         $this->connection->executeStatement(
             'INSERT INTO BPLATFORMINSTANCES
-                (BCLIENT, BINSTANCEID, BHOST, BSECRETHASH, BREDIRECTURIS, BREGISTEREDBY, BSTATUS, BCREATED, BLASTSEEN)
-             VALUES (:client, :id, :host, :secret, :uris, 0, :status, :created, 0)',
+                (BCLIENT, BINSTANCEID, BHOST, BREDIRECTURIS, BREGISTEREDBY, BSTATUS, BCREATED, BLASTSEEN)
+             VALUES (:client, :id, :host, :uris, 0, :status, :created, 0)',
             [
                 'client' => PlatformInstance::CLIENT_OUTLOOK,
                 'id' => PlatformInstance::OUTLOOK_BUILTIN_ID,
                 'host' => '*',
-                'secret' => '',
                 'uris' => json_encode(PlatformInstance::OUTLOOK_BUILTIN_REDIRECT_URIS, \JSON_THROW_ON_ERROR),
                 'status' => PlatformInstance::STATUS_ACTIVE,
                 'created' => time(),

@@ -188,6 +188,20 @@ const router = createRouter({
       },
     },
     {
+      // Consent for a cloud asking to act for the person (OAuth2). The
+      // cloud's server pushed the request; /oauth/authorize sends the
+      // browser here with its id under ?request=.
+      path: '/connect/cloud',
+      name: 'cloud-consent',
+      component: () => import('@/views/CloudConsentView.vue'),
+      meta: {
+        requiresAuth: false,
+        public: true,
+        titleKey: 'pageTitles.platformConnect',
+        i18n: ['admin'],
+      },
+    },
+    {
       // Kept so Synamail's buildDialogUrl stays unchanged. Every query
       // param survives; client=outlook is forced last so a forged client
       // on this legacy path cannot switch delivery mode.

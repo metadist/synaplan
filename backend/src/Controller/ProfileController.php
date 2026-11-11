@@ -7,6 +7,7 @@ use App\Repository\UserRepository;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Email\EmailChatService;
 use App\Service\Iam\UserDeletionService;
+use App\Service\Iam\UserLifecycleService;
 use App\Service\Profile\ToursSeen;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use OpenApi\Attributes as OA;
@@ -29,6 +30,7 @@ class ProfileController extends AbstractController
         private UserDeletionService $userDeletionService,
         private LoggerInterface $logger,
         private UserRepository $userRepository,
+        private UserLifecycleService $lifecycle,
     ) {
     }
 
@@ -530,10 +532,7 @@ class ProfileController extends AbstractController
             ], Response::HTTP_BAD_REQUEST);
         }
 
-        // Update password
-        $user->setPw($this->passwordHasher->hashPassword($user, $newPassword));
-        $user->setMustChangePassword(false);
-        $this->userRepository->save($user);
+        $this->lifecycle->replacePassword($user, $newPassword);
 
         $this->logger->info('Password changed', ['user_id' => $user->getId()]);
 

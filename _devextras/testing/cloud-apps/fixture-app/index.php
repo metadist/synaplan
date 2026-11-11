@@ -32,9 +32,9 @@ $body = is_array($decoded) ? $decoded : [];
 try {
     $store = Store::fromEnvironment();
     $response = match (true) {
-        'POST' === $method && '/inbound' === $path => Inbound::handle($store, $body),
+        'POST' === $method && '/inbound' === $path => Inbound::handle($store, $raw),
         'GET' === $method && '/link/start' === $path => Link::start($store, (string) ($_GET['user'] ?? 'ada')),
-        'GET' === $method && '/link/callback' === $path => Link::callback($store, (string) ($_GET['code'] ?? ''), (string) ($_GET['state'] ?? '')),
+        'GET' === $method && '/link/callback' === $path => Link::callback($store, (string) ($_GET['code'] ?? ''), (string) ($_GET['state'] ?? ''), (string) ($_GET['error'] ?? '')),
         str_starts_with($path, '/control/') => (new Control($store))->handle($method, substr($path, strlen('/control/')), $body, $raw),
         'GET' === $method && str_starts_with($path, '/files/') => (static function () use ($store, $path): Response {
             [$person, $file] = array_pad(explode('/', substr($path, strlen('/files/')), 2), 2, '');

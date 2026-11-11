@@ -35,6 +35,9 @@ final readonly class NotifyIdentityRevokedHandler
         if (!$instance instanceof PlatformInstance) {
             return;
         }
-        $this->client->post($instance, 'identity_revoked', $message->identityId);
+        // One id per revocation: the same link revoked again after a reconnect
+        // must not look like a replay of the first notice to the cloud.
+        $id = $message->identityId.'.'.(int) ($identity->getRevokedAt() ?? $message->revokedAt);
+        $this->client->post($instance, 'identity_revoked', $id, '' !== $message->externalId ? $message->externalId : $identity->getExternalId());
     }
 }
