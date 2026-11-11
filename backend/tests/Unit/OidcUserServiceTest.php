@@ -74,7 +74,7 @@ class OidcUserServiceTest extends TestCase
             $oidcClientId,
             'https://idp.example/realms/synaplan/.well-known/openid-configuration',
         );
-        $service->setLevelGrants($this->levelGrants());
+        $service->setLevelGrants($this->levelGrants($oidcAdminRoles));
 
         return $service;
     }
@@ -290,6 +290,27 @@ class OidcUserServiceTest extends TestCase
         ]);
 
         $this->assertSame('NEW', $user->getUserLevel());
+    }
+
+    public function testALegacyUnmigratedDirectoryAdminDropsWhenTheRoleLeaves(): void
+    {
+        $service = $this->createService('administrator');
+        $user = $this->makeKeycloakUser('legacy-dir-admin@example.com', 'ADMIN');
+        $user->setUserDetails(['oidc_roles' => ['administrator']]);
+
+        $this->userRepository->method('findOneBy')->willReturn($user);
+        $this->em->expects($this->once())->method('persist');
+        $this->em->expects($this->once())->method('flush');
+
+        $result = $service->findOrCreateFromClaims([
+            'sub' => 'sub-legacy-dir',
+            'email' => 'legacy-dir-admin@example.com',
+            'realm_access' => ['roles' => ['member']],
+        ]);
+
+        $this->assertSame('NEW', $result->getUserLevel());
+        $this->assertNotContains('ROLE_ADMIN', $result->getRoles());
+        $this->assertSame(['member'], $result->getUserDetails()['oidc_roles']);
     }
 
     public function testKeepsAdminWhenOidcRoleStillPresent(): void

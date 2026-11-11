@@ -40,21 +40,34 @@ test.describe('@ci Admin level grants', () => {
     try {
       await page.goto('/admin/people')
       await expect(page.locator(selectors.pages.people)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
-      await page.locator(selectors.admin.userSearch).fill(email)
 
       const select = page.locator(selectors.admin.userLevelSelect(userId!))
+      // Wait for the initial unfiltered fetch before typing into the debounced
+      // search input; otherwise the filtered response arrives while the confirm
+      // dialog is open and replaces the row instance mid-change.
       await expect(select).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+
+      const searchLoaded = page.waitForResponse(
+        (res) =>
+          res.url().includes('/api/v1/admin/users') && res.url().includes('search=') && res.ok()
+      )
+      await page.locator(selectors.admin.userSearch).fill(email)
+      await searchLoaded
+      await expect(page.locator(selectors.admin.userLevelSelectAny)).toHaveCount(1, {
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await expect(select).toBeVisible()
       await expect(select).toHaveValue('NEW')
       await expect(page.locator(`[data-testid="btn-remove-admin-grant-${userId}"]`)).toHaveCount(0)
 
       await select.selectOption('TEAM')
-      await page.locator('[data-testid="btn-dialog-confirm"]').click()
+      await page.locator(selectors.dialog.confirmBtn).click()
       await expect(select).toHaveValue('TEAM', { timeout: TIMEOUTS.STANDARD })
       const remove = page.locator(`[data-testid="btn-remove-admin-grant-${userId}"]`)
-      await expect(remove).toBeVisible()
+      await expect(remove).toBeVisible({ timeout: TIMEOUTS.STANDARD })
 
       await remove.click()
-      await page.locator('[data-testid="btn-dialog-confirm"]').click()
+      await page.locator(selectors.dialog.confirmBtn).click()
       await expect(select).toHaveValue('NEW', { timeout: TIMEOUTS.STANDARD })
       await expect(remove).toHaveCount(0)
     } finally {

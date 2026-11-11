@@ -179,7 +179,7 @@
                   <UserLevelGrants
                     :user="user"
                     :current-user-id="currentUserId"
-                    @changed="applyLevelChange(user, $event)"
+                    @changed="applyLevelChange(user.id, $event)"
                   />
                 </td>
                 <td class="py-3 px-4 txt-secondary text-sm" :data-label="$t('admin.users.type')">
@@ -422,11 +422,14 @@ const showDeleteModal = ref(false)
 const userToDelete = ref<AdminUser | null>(null)
 const deleteConfirmed = ref(false)
 
+let loadSequence = 0
+
 watch(currentPage, () => {
   loadUsers()
 })
 
 async function loadUsers() {
+  const seq = ++loadSequence
   usersLoading.value = true
   try {
     const response = await adminApi.getUsers(
@@ -434,6 +437,7 @@ async function loadUsers() {
       itemsPerPage.value,
       userSearch.value
     )
+    if (seq !== loadSequence) return
     if (response && response.users) {
       users.value = response.users
       totalUsers.value = response.total
@@ -441,9 +445,12 @@ async function loadUsers() {
       showError(t('admin.users.invalidResponse'))
     }
   } catch (error) {
+    if (seq !== loadSequence) return
     showError(error instanceof Error ? error.message : t('admin.users.loadFailed'))
   } finally {
-    usersLoading.value = false
+    if (seq === loadSequence) {
+      usersLoading.value = false
+    }
   }
 }
 
@@ -509,11 +516,13 @@ async function resendVerification(user: AdminUser): Promise<void> {
 }
 
 function applyLevelChange(
-  user: AdminUser,
+  userId: number,
   change: { level: AdminUser['level']; grants: LevelGrant[] }
 ): void {
-  user.level = change.level
-  user.grants = change.grants
+  const target = users.value.find((u) => u.id === userId)
+  if (!target) return
+  target.level = change.level
+  target.grants = change.grants
 }
 
 function confirmDeleteUser(user: AdminUser) {

@@ -16,12 +16,12 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 trait MemoryLevelGrants
 {
-    private function levelGrants(): LevelGrantService
+    private function levelGrants(string $oidcAdminRoles = 'admin,realm-admin,synaplan-admin,administrator'): LevelGrantService
     {
         return new LevelGrantService(
             $this->createStub(EntityManagerInterface::class),
             $this->createStub(UserLevelGrantRepository::class),
-            new LegacyLevelGrants($this->createStub(AuditLogEntryRepository::class)),
+            new LegacyLevelGrants($this->createStub(AuditLogEntryRepository::class), $oidcAdminRoles),
         );
     }
 }

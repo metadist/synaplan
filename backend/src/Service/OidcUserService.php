@@ -166,8 +166,6 @@ class OidcUserService
         if (empty($oidcRoles) && !$hadRoles) {
             return;
         }
-        $userDetails['oidc_roles'] = $oidcRoles;
-        $user->setUserDetails($userDetails);
 
         $grants = $this->levelGrantService;
         if (!$grants instanceof LevelGrantService) {
@@ -179,9 +177,17 @@ class OidcUserService
         if ($hasAdmin) {
             $grants->replace($user, LevelGrantSource::DIRECTORY, 'ADMIN', null, null);
         } else {
-            // Remove only the directory grant. A local administrator has a
-            // bootstrap grant and stays an administrator.
+            // Reconcile grants before overwriting oidc_roles so an unmigrated
+            // directory admin is reconstructed from their previous oidc_roles
+            // rather than mistaken for a bootstrap admin.
             $grants->remove($user, LevelGrantSource::DIRECTORY);
+        }
+
+        $userDetails = $user->getUserDetails();
+        $userDetails['oidc_roles'] = $oidcRoles;
+        $user->setUserDetails($userDetails);
+        if ($this->em->contains($user)) {
+            $this->em->flush();
         }
         if (!$wasAdmin && 'ADMIN' === $user->getUserLevel()) {
             $this->logger->info('User promoted to ADMIN via OIDC role', [

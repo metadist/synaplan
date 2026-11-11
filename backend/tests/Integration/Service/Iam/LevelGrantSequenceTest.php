@@ -175,6 +175,34 @@ final class LevelGrantSequenceTest extends KernelTestCase
         self::assertSame('PRO', $user->getUserLevel());
     }
 
+    public function testALegacyUnmigratedDirectoryAdminLosesAdminOnOidcDemotion(): void
+    {
+        $user = new User();
+        $user->setMail('oidc-legacy-'.bin2hex(random_bytes(6)).'@synaplan.test');
+        $user->setType('WEB');
+        $user->setProviderId('keycloak');
+        $user->setUserLevel('ADMIN');
+        $user->setCreated(date('Y-m-d H:i:s'));
+        $user->setEmailVerified(true);
+        $user->setUserDetails(['oidc_roles' => ['administrator']]);
+        $user->setPaymentDetails(['subscription' => $this->stripe('PRO')]);
+        $this->em->persist($user);
+        $this->em->flush();
+
+        self::assertSame(0, $this->grantCount($user));
+
+        $oidc = static::getContainer()->get(\App\Service\OidcUserService::class);
+        $updated = $oidc->findOrCreateFromClaims([
+            'sub' => 'legacy-oidc-sub-'.bin2hex(random_bytes(4)),
+            'email' => $user->getMail(),
+            'realm_access' => ['roles' => ['member']],
+        ]);
+
+        self::assertSame('PRO', $updated->getUserLevel());
+        self::assertNotContains('ROLE_ADMIN', $updated->getRoles());
+        self::assertSame(['stripe'], array_column($this->grants->views($updated), 'source'));
+    }
+
     public function testTheCommandIsADryRunUntilApplyAndThenChangesNothing(): void
     {
         $user = $this->account('BUSINESS');
