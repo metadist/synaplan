@@ -169,6 +169,12 @@ mirror_host() {
   printf '%s\n' "${url%%/*}"
 }
 
+# A mirror list line is "<url>\tpriority:N". The direct-source rewrite must
+# use one of these URLs: the first entry is the first mirror that resolved.
+mirror_url_from_line() {
+  printf '%s\n' "${1%%$'\t'*}"
+}
+
 use_fallback_mirrors() {
   local url host priority=1 line
   local -a lines=()
@@ -195,8 +201,12 @@ use_fallback_mirrors() {
   fi
 
   # Images that do not use apt-mirrors.txt name the archives directly.
-  local file patched=false
+  # Use a mirror that just resolved. Hardcoding the first candidate would
+  # point apt at a name that failed the DNS check when only a later mirror
+  # answered.
+  local chosen file patched=false
   local -a files=()
+  chosen="$(mirror_url_from_line "${lines[0]}")"
   if [ -f /etc/apt/sources.list ]; then
     files+=("/etc/apt/sources.list")
   fi
@@ -208,10 +218,10 @@ use_fallback_mirrors() {
     for file in "${files[@]}"; do
       if grep -qE 'archive\.ubuntu\.com|security\.ubuntu\.com' "$file"; then
         as_root sed -i -E \
-          -e 's#https?://(azure\.)?archive\.ubuntu\.com/ubuntu/?#https://mirrors.edge.kernel.org/ubuntu/#g' \
-          -e 's#https?://security\.ubuntu\.com/ubuntu/?#https://mirrors.edge.kernel.org/ubuntu/#g' \
+          -e "s#https?://(azure\\.)?archive\\.ubuntu\\.com/ubuntu/?#${chosen}#g" \
+          -e "s#https?://security\\.ubuntu\\.com/ubuntu/?#${chosen}#g" \
           "$file"
-        log "Rewrote Ubuntu archive URIs in ${file}."
+        log "Rewrote Ubuntu archive URIs in ${file} to ${chosen}."
         patched=true
       fi
     done
@@ -232,6 +242,8 @@ self_test() {
   [ "$host" = "ftp.fau.de" ]
   line="$(printf '%s\tpriority:%s' "https://mirrors.edge.kernel.org/ubuntu/" 1)"
   [ "$line" = $'https://mirrors.edge.kernel.org/ubuntu/\tpriority:1' ]
+  line="$(printf '%s\tpriority:%s' "https://ftp.fau.de/ubuntu/" 1)"
+  [ "$(mirror_url_from_line "$line")" = "https://ftp.fau.de/ubuntu/" ]
   log "self-test ok"
 }
 
