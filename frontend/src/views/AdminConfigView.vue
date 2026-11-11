@@ -173,7 +173,9 @@ function selectTab(tabId: string): void {
   requestedTab.value = tabId
   mobileTabMenuOpen.value = false
   if (route.query.tab === tabId) return
-  void router.replace({ query: { ...route.query, tab: tabId, section: undefined } })
+  void router.replace({
+    query: { ...route.query, tab: tabId, section: undefined, highlight: undefined },
+  })
 }
 
 watch(

@@ -73,6 +73,15 @@ function styleValueChanged(
   )
 }
 
+function feedsRuntimeConfig(field: ConfigFieldSchema | undefined): boolean {
+  if (!field) return false
+  return (
+    field.tab === 'features' ||
+    field.tab === 'branding' ||
+    (field.tab === 'auth' && field.source === 'database')
+  )
+}
+
 /**
  * Loads the admin config schema and values once per page and owns saving,
  * the restart notice and connection tests, so AI infrastructure and System
@@ -185,13 +194,13 @@ export function useSystemConfig() {
       if (result.requiresRestart) {
         restartRequired.value = true
       }
-      // Feature flags and branding feed the runtime config — reload it so the
-      // change is visible at once. A reload failure is not a save failure:
-      // the value is already stored, so the message must not invite a retry.
-      if (field?.tab === 'features' || field?.tab === 'branding') {
+      // Feature flags, branding and live access switches feed the runtime config —
+      // reload it so the change is visible at once. A reload failure is not a save
+      // failure: the value is already stored, so the message must not invite a retry.
+      if (feedsRuntimeConfig(field)) {
         try {
           await configStore.reload()
-          if (field.tab === 'branding') {
+          if (field?.tab === 'branding') {
             applyBrandingTheme()
           }
         } catch (err) {

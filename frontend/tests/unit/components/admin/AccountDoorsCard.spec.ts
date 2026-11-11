@@ -20,11 +20,11 @@ const mountCard = (props: {
 }) =>
   mount(AccountDoorsCard, {
     props: { values: {}, loading: false, failed: false, ...props },
-    global: { plugins: [router], stubs: { Icon: true } },
+    global: { plugins: [router] },
   })
 
 describe('AccountDoorsCard', () => {
-  it('shows the closed sentence and the environment pin', async () => {
+  it('shows the closed sentence and the environment pin', () => {
     const wrapper = mountCard({
       values: {
         REGISTRATION_ENABLED: {
@@ -42,6 +42,36 @@ describe('AccountDoorsCard', () => {
     )
     expect(row.text()).toContain('People who already have an account still sign in')
     expect(row.text()).toContain('Pinned by REGISTRATION_ENABLED')
+  })
+
+  it('says when only email is offered vs which social providers are configured', () => {
+    const emailOnly = mountCard({})
+    expect(emailOnly.get('[data-testid="account-door-selfSignup-social"]').text()).toContain(
+      'only email is offered right now'
+    )
+
+    const withSocial = mountCard({
+      values: {
+        GOOGLE_CLIENT_ID: { value: 'google-id', isSet: true },
+        GITHUB_CLIENT_ID: { value: 'github-id', isSet: true },
+      },
+    })
+    expect(withSocial.get('[data-testid="account-door-selfSignup-social"]').text()).toContain(
+      'Active social sign-in: Google, GitHub.'
+    )
+  })
+
+  it('notes company login restrictions without showing claim values', () => {
+    const wrapper = mountCard({
+      values: {
+        OIDC_DISCOVERY_URL: { value: 'https://idp.example.test', isSet: true },
+        OIDC_CLIENT_ID: { value: 'synaplan', isSet: true },
+        OIDC_ORG_CODE: { value: 'org_internal', isSet: true },
+      },
+    })
+    const note = wrapper.get('[data-testid="account-door-directory-restricted"]')
+    expect(note.text()).toContain('Organization, role or permission rules')
+    expect(wrapper.text()).not.toContain('org_internal')
   })
 
   it('shows the loading and error states without a door list', () => {
@@ -84,10 +114,10 @@ describe('AccountDoorsCard', () => {
     replace.mockRestore()
   })
 
-  it('opens a collapsed section when the address already points at that switch', async () => {
+  it('opens a collapsed section and focuses the switch even when tab was omitted from the URL', async () => {
     await router.push({
       path: '/admin/config',
-      query: { tab: 'auth', section: 'access', highlight: 'REGISTRATION_ENABLED' },
+      query: { section: 'access', highlight: 'REGISTRATION_ENABLED' },
     })
     await router.isReady()
     const panel = document.createElement('section')
@@ -101,6 +131,10 @@ describe('AccountDoorsCard', () => {
     const field = document.createElement('div')
     field.dataset.configField = 'REGISTRATION_ENABLED'
     field.scrollIntoView = vi.fn()
+    const toggle = document.createElement('button')
+    toggle.setAttribute('role', 'switch')
+    const focusSpy = vi.spyOn(toggle, 'focus')
+    field.append(toggle)
     panel.append(button, field)
     document.body.append(panel)
 
@@ -112,7 +146,12 @@ describe('AccountDoorsCard', () => {
 
     expect(panel.dataset.open).toBe('true')
     expect(field.scrollIntoView).toHaveBeenCalled()
-    expect(router.currentRoute.value.query.highlight).toBe('REGISTRATION_ENABLED')
+    expect(focusSpy).toHaveBeenCalled()
+    expect(router.currentRoute.value.query).toMatchObject({
+      tab: 'auth',
+      section: 'access',
+      highlight: 'REGISTRATION_ENABLED',
+    })
     panel.remove()
   })
 })

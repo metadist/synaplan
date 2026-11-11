@@ -14,14 +14,24 @@ const door = (id: string, values: Record<string, DoorValue | undefined> = {}) =>
 }
 
 describe('accountDoors', () => {
-  it('leaves self-sign-up open on the application default and hides every secret', () => {
+  it('leaves self-sign-up open on the application default and hides every secret or value', () => {
     const secret = 'turnstile-secret-value'
+    const googleId = 'google-client-id-value'
+    const orgCode = 'org-secret-code'
     const rows = accountDoors({
       TURNSTILE_SITE_KEY: set('0xpublic'),
       TURNSTILE_SECRET_KEY: { value: secret, isSet: true, isMasked: true },
+      GOOGLE_CLIENT_ID: set(googleId),
+      OIDC_DISCOVERY_URL: set('https://idp.example.test'),
+      OIDC_CLIENT_ID: set('synaplan-oidc'),
+      OIDC_ORG_CODE: set(orgCode),
     })
-    expect(JSON.stringify(rows)).not.toContain(secret)
-    expect(JSON.stringify(rows)).not.toContain('0xpublic')
+    const serialized = JSON.stringify(rows)
+    expect(serialized).not.toContain(secret)
+    expect(serialized).not.toContain('0xpublic')
+    expect(serialized).not.toContain(googleId)
+    expect(serialized).not.toContain('synaplan-oidc')
+    expect(serialized).not.toContain(orgCode)
     expect(
       door('selfSignup', { TURNSTILE_SITE_KEY: set('0xpublic'), TURNSTILE_SECRET_KEY: set(secret) })
     ).toMatchObject({
@@ -29,6 +39,7 @@ describe('accountDoors', () => {
       reason: 'open',
       source: 'default',
       humanCheck: true,
+      socialProviders: [],
       field: 'REGISTRATION_ENABLED',
     })
   })
@@ -86,25 +97,72 @@ describe('accountDoors', () => {
     ).toBe('registrationOff')
   })
 
-  it('treats a missing company login as not set up', () => {
+  it('reports configured social providers and ignores sample placeholders', () => {
+    expect(
+      door('selfSignup', {
+        GOOGLE_CLIENT_ID: set('google-real.apps.googleusercontent.com'),
+        GITHUB_CLIENT_ID: set('your-github-client-id'),
+        APPLE_CLIENT_ID: set('change-me'),
+      }).socialProviders
+    ).toEqual(['google'])
+
+    expect(
+      door('selfSignup', {
+        GOOGLE_CLIENT_ID: set('g-id'),
+        GITHUB_CLIENT_ID: set('gh-id'),
+        APPLE_CLIENT_ID: set('com.synaplan.web'),
+      }).socialProviders
+    ).toEqual(['google', 'github', 'apple'])
+  })
+
+  it('treats a missing or incomplete company login as not set up', () => {
     expect(door('directory')).toMatchObject({
       state: 'unset',
       reason: 'notConfigured',
       field: 'OIDC_DISCOVERY_URL',
     })
+
+    expect(
+      door('directory', {
+        OIDC_DISCOVERY_URL: set('https://idp.example.test'),
+        OIDC_CLIENT_ID: set('your-oidc-client-id'),
+      })
+    ).toMatchObject({
+      state: 'unset',
+      reason: 'missingClientId',
+      section: 'oidc',
+      field: 'OIDC_CLIENT_ID',
+    })
   })
 
-  it('a company login creates an account only while that switch is on', () => {
+  it('a company login creates an account only while that switch is on and accepts env boolean variants', () => {
     expect(
       door('directory', {
         OIDC_DISCOVERY_URL: set('https://idp.example.test'),
+        OIDC_CLIENT_ID: set('synaplan'),
       })
-    ).toMatchObject({ state: 'open', reason: 'open', source: 'default' })
+    ).toMatchObject({ state: 'open', reason: 'open', source: 'default', restricted: false })
 
     expect(
       door('directory', {
         OIDC_DISCOVERY_URL: set('https://idp.example.test'),
-        OIDC_ALLOW_USER_PROVISIONING: set('false'),
+        OIDC_BEARER_AUDIENCE: set('https://api.synaplan.test'),
+        OIDC_ALLOW_USER_PROVISIONING: set('1'),
+        OIDC_REQUIRED_ROLE: set('employees'),
+      })
+    ).toMatchObject({
+      state: 'open',
+      reason: 'open',
+      source: 'env',
+      pin: 'OIDC_ALLOW_USER_PROVISIONING',
+      restricted: true,
+    })
+
+    expect(
+      door('directory', {
+        OIDC_DISCOVERY_URL: set('https://idp.example.test'),
+        OIDC_CLIENT_ID: set('synaplan'),
+        OIDC_ALLOW_USER_PROVISIONING: set('0'),
       })
     ).toMatchObject({
       state: 'closed',
@@ -142,7 +200,7 @@ describe('accountDoors', () => {
     })
   })
 
-  it('counts a human check only when the keys that make it run are present', () => {
+  it('counts a human check only when real keys are present', () => {
     expect(
       door('selfSignup', {
         TURNSTILE_SITE_KEY: set('0xpublic'),
@@ -152,11 +210,18 @@ describe('accountDoors', () => {
     ).toBe(true)
     expect(
       door('selfSignup', {
-        RECAPTCHA_ENABLED: set('true'),
+        RECAPTCHA_ENABLED: set('1'),
         RECAPTCHA_SECRET_KEY: set('recaptcha-secret'),
         TURNSTILE_SITE_KEY: set('0xpublic'),
       }).humanCheck
     ).toBe(true)
+    expect(
+      door('selfSignup', {
+        RECAPTCHA_ENABLED: set('true'),
+        RECAPTCHA_SITE_KEY: set('your_site_key_here'),
+        RECAPTCHA_SECRET_KEY: set('recaptcha-secret'),
+      }).humanCheck
+    ).toBe(false)
     expect(door('selfSignup', { TURNSTILE_SITE_KEY: set('0xpublic') }).humanCheck).toBe(false)
     expect(door('selfSignup', { RECAPTCHA_ENABLED: set('true') }).humanCheck).toBe(false)
   })

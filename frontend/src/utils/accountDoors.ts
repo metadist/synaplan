@@ -9,6 +9,15 @@
 export type DoorId = 'selfSignup' | 'directory' | 'operator' | 'channel'
 export type DoorState = 'open' | 'closed' | 'unset'
 export type DoorSource = 'env' | 'admin' | 'default' | 'role'
+export type DoorSection = 'access' | 'oidc' | 'oidc_access'
+export type DoorPin =
+  | 'REGISTRATION_ENABLED'
+  | 'SIGNUP_PAUSED'
+  | 'REGISTRATION_MODE'
+  | 'OIDC_ALLOW_USER_PROVISIONING'
+  | 'GUEST_CHAT_ENABLED'
+export type DoorField = DoorPin | 'OIDC_DISCOVERY_URL' | 'OIDC_CLIENT_ID'
+export type SocialDoorProvider = 'google' | 'github' | 'apple'
 
 export interface DoorValue {
   value: string
@@ -24,26 +33,47 @@ export interface AccountDoor {
   reason: string
   source: DoorSource
   /** Environment variable that pins the deciding switch. Never a secret. */
-  pin: string | null
-  section: string | null
-  field: string | null
+  pin: DoorPin | null
+  section: DoorSection | null
+  field: DoorField | null
   /** Administrators create accounts on Users. There is no switch on this page. */
   people: boolean
   /** A human check is in front of self-sign-up. The keys themselves stay hidden. */
   humanCheck: boolean
+  /** Social providers currently enabled for self-sign-up / sign-in. Fixed ids only. */
+  socialProviders: readonly SocialDoorProvider[]
+  /** Organization, role or permission claims restrict the company login. */
+  restricted: boolean
 }
 
 type Reading = { on: boolean; source: DoorSource }
 
 const SELF_SIGNUP = 'selfSignup'
 const DIRECTORY = 'directory'
+const COMMON_PLACEHOLDERS = ['change-me', 'your_site_key_here', 'your_secret_key_here']
+
+function effectiveRaw(value: DoorValue): string {
+  return value.envOverride ? (value.effectiveValue ?? value.value) : value.value
+}
+
+/**
+ * Matches PHP's FILTER_VALIDATE_BOOL used by OidcAccessPolicy, RecaptchaService,
+ * RegistrationConfig, SignupPauseSwitch and GuestChatConfig.
+ */
+function parseBool(raw: string): boolean {
+  const normalized = raw.trim().toLowerCase()
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on'
+}
 
 function reading(value: DoorValue | undefined, fallback: boolean, envOnly: boolean): Reading {
   if (!value || !value.isSet) {
     return { on: fallback, source: 'default' }
   }
-  const raw = value.envOverride ? (value.effectiveValue ?? value.value) : value.value
-  const on = raw === 'true'
+  const raw = effectiveRaw(value).trim()
+  if (raw === '') {
+    return { on: fallback, source: 'default' }
+  }
+  const on = parseBool(raw)
   if (value.envOverride || envOnly) {
     return { on, source: 'env' }
   }
@@ -54,22 +84,46 @@ function mode(value: DoorValue | undefined): { mode: 'open' | 'admission'; sourc
   if (!value || !value.isSet) {
     return { mode: 'open', source: 'default' }
   }
-  const raw = value.envOverride ? (value.effectiveValue ?? value.value) : value.value
+  const raw = effectiveRaw(value).trim().toLowerCase()
   return {
     mode: raw === 'admission' ? 'admission' : 'open',
     source: value.envOverride ? 'env' : 'admin',
   }
 }
 
-function configured(value: DoorValue | undefined): boolean {
-  return value?.isSet === true
+function realSetting(
+  value: DoorValue | undefined,
+  extraPlaceholders: readonly string[] = []
+): boolean {
+  if (value?.isSet !== true) return false
+  if (value.isMasked) return true
+  const trimmed = effectiveRaw(value).trim()
+  if (trimmed === '') return false
+  const lower = trimmed.toLowerCase()
+  if (COMMON_PLACEHOLDERS.includes(lower)) return false
+  return !extraPlaceholders.some((placeholder) => placeholder.toLowerCase() === lower)
 }
 
 function humanCheckOn(values: Record<string, DoorValue | undefined>): boolean {
-  const turnstile = configured(values.TURNSTILE_SITE_KEY) && configured(values.TURNSTILE_SECRET_KEY)
+  const turnstile =
+    realSetting(values.TURNSTILE_SITE_KEY) && realSetting(values.TURNSTILE_SECRET_KEY)
   if (turnstile) return true
-  const recaptcha = reading(values.RECAPTCHA_ENABLED, false, false).on
-  return recaptcha && configured(values.RECAPTCHA_SECRET_KEY)
+  const recaptcha = reading(values.RECAPTCHA_ENABLED, false, true).on
+  if (!recaptcha || !realSetting(values.RECAPTCHA_SECRET_KEY)) return false
+  if (values.RECAPTCHA_SITE_KEY?.isSet && !realSetting(values.RECAPTCHA_SITE_KEY)) {
+    return false
+  }
+  return true
+}
+
+function socialProvidersOn(
+  values: Record<string, DoorValue | undefined>
+): readonly SocialDoorProvider[] {
+  const active: SocialDoorProvider[] = []
+  if (realSetting(values.GOOGLE_CLIENT_ID, ['your-google-client-id'])) active.push('google')
+  if (realSetting(values.GITHUB_CLIENT_ID, ['your-github-client-id'])) active.push('github')
+  if (realSetting(values.APPLE_CLIENT_ID, ['your-apple-client-id'])) active.push('apple')
+  return active
 }
 
 function selfSignup(values: Record<string, DoorValue | undefined>): AccountDoor {
@@ -77,6 +131,7 @@ function selfSignup(values: Record<string, DoorValue | undefined>): AccountDoor 
   const paused = reading(values.SIGNUP_PAUSED, false, false)
   const registrationMode = mode(values.REGISTRATION_MODE)
   const check = humanCheckOn(values)
+  const social = socialProvidersOn(values)
 
   if (!enabled.on) {
     return {
@@ -89,6 +144,8 @@ function selfSignup(values: Record<string, DoorValue | undefined>): AccountDoor 
       field: 'REGISTRATION_ENABLED',
       people: false,
       humanCheck: check,
+      socialProviders: social,
+      restricted: false,
     }
   }
 
@@ -103,6 +160,8 @@ function selfSignup(values: Record<string, DoorValue | undefined>): AccountDoor 
       field: 'SIGNUP_PAUSED',
       people: false,
       humanCheck: check,
+      socialProviders: social,
+      restricted: false,
     }
   }
 
@@ -117,6 +176,8 @@ function selfSignup(values: Record<string, DoorValue | undefined>): AccountDoor 
       field: 'REGISTRATION_MODE',
       people: false,
       humanCheck: check,
+      socialProviders: social,
+      restricted: false,
     }
   }
 
@@ -130,11 +191,13 @@ function selfSignup(values: Record<string, DoorValue | undefined>): AccountDoor 
     field: 'REGISTRATION_ENABLED',
     people: false,
     humanCheck: check,
+    socialProviders: social,
+    restricted: false,
   }
 }
 
 function directory(values: Record<string, DoorValue | undefined>): AccountDoor {
-  if (!configured(values.OIDC_DISCOVERY_URL)) {
+  if (!realSetting(values.OIDC_DISCOVERY_URL)) {
     return {
       id: DIRECTORY,
       state: 'unset',
@@ -145,10 +208,36 @@ function directory(values: Record<string, DoorValue | undefined>): AccountDoor {
       field: 'OIDC_DISCOVERY_URL',
       people: false,
       humanCheck: false,
+      socialProviders: [],
+      restricted: false,
+    }
+  }
+
+  const hasClient =
+    realSetting(values.OIDC_CLIENT_ID, ['your-oidc-client-id']) ||
+    realSetting(values.OIDC_BEARER_AUDIENCE)
+  if (!hasClient) {
+    return {
+      id: DIRECTORY,
+      state: 'unset',
+      reason: 'missingClientId',
+      source: 'default',
+      pin: null,
+      section: 'oidc',
+      field: 'OIDC_CLIENT_ID',
+      people: false,
+      humanCheck: false,
+      socialProviders: [],
+      restricted: false,
     }
   }
 
   const provisioning = reading(values.OIDC_ALLOW_USER_PROVISIONING, true, true)
+  const restricted =
+    realSetting(values.OIDC_ORG_CODE) ||
+    realSetting(values.OIDC_REQUIRED_ROLE) ||
+    realSetting(values.OIDC_REQUIRED_PERMISSIONS)
+
   return {
     id: DIRECTORY,
     state: provisioning.on ? 'open' : 'closed',
@@ -159,6 +248,8 @@ function directory(values: Record<string, DoorValue | undefined>): AccountDoor {
     field: 'OIDC_ALLOW_USER_PROVISIONING',
     people: false,
     humanCheck: false,
+    socialProviders: [],
+    restricted,
   }
 }
 
@@ -173,6 +264,8 @@ function operator(): AccountDoor {
     field: null,
     people: true,
     humanCheck: false,
+    socialProviders: [],
+    restricted: false,
   }
 }
 
@@ -188,6 +281,8 @@ function channel(values: Record<string, DoorValue | undefined>): AccountDoor {
     field: 'GUEST_CHAT_ENABLED',
     people: false,
     humanCheck: false,
+    socialProviders: [],
+    restricted: false,
   }
 }
 

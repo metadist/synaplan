@@ -529,26 +529,30 @@
         "doors": {
           "selfSignup": {
             "title": "Email, Google, GitHub and Apple",
-            "open": "New people can create an account with email, Google, GitHub or Apple. People who already have an account still sign in.",
+            "open": "New people can create an account with email, and with Google, GitHub or Apple when set up. People who already have an account still sign in.",
             "admission": "A new account needs a paid plan or an invitation code. People who already have an account still sign in.",
             "registrationOff": "New people can no longer sign up with email, Google, GitHub or Apple. People who already have an account still sign in.",
-            "paused": "New accounts are paused. People who already have an account still sign in.",
+            "paused": "New accounts are paused (a valid invitation code still works). People who already have an account still sign in.",
+            "emailOnly": "Google, GitHub and Apple are not set up, so only email is offered right now.",
+            "socialActive": "Active social sign-in: {providers}.",
             "humanCheck": "A human check runs before a new account."
           },
           "directory": {
             "title": "Company login",
             "open": "The first sign-in through the company login creates an account. Registration switches do not affect this.",
             "provisioningOff": "A first sign-in through the company login does not create an account. People who already signed in that way still can.",
-            "notConfigured": "No company login is set up, so this door creates no accounts."
+            "notConfigured": "No company login is set up, so this door creates no accounts.",
+            "missingClientId": "A discovery URL is set, but the client ID is missing, so company login is not active yet.",
+            "restricted": "Organization, role or permission rules also limit who may sign in."
           },
           "operator": {
             "title": "Added by an administrator",
             "admin": "An administrator can create an account on Users. Registration switches do not close this."
           },
           "channel": {
-            "title": "Guest chat and channels",
+            "title": "Guest chat (without an account)",
             "guestOn": "Visitors can try the chat without an account. Guest chat, inbound email, WhatsApp and Telegram do not create an account.",
-            "guestOff": "Guest chat is off, so visitors sign in. Guest chat, inbound email, WhatsApp and Telegram do not create an account."
+            "guestOff": "Guest chat is off, so visitors sign in first. Guest chat, inbound email, WhatsApp and Telegram do not create an account, and messaging channels use their own settings."
           }
         }
       },

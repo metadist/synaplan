@@ -57,10 +57,10 @@ async function reveal(sectionId: string): Promise<void> {
         )
       : null
   if (field) {
-    field.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    field.scrollIntoView?.({ behavior: 'smooth', block: 'center' })
     return
   }
-  panel?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  panel?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
 }
 
 watch(
@@ -68,6 +68,8 @@ watch(
   ([wanted]) => {
     if (typeof wanted === 'string' && sectionIds.value.includes(wanted)) {
       void reveal(wanted)
+    } else {
+      highlighted.value = null
     }
   },
   { immediate: true }

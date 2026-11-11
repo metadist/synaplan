@@ -64,6 +64,13 @@ const schema: ConfigSchema = {
       label: 'Features',
       sections: { people: { label: 'People', fields: ['FEATURE_X'] } },
     },
+    auth: {
+      label: 'Authentication',
+      sections: {
+        access: { label: 'Access', fields: ['REGISTRATION_ENABLED'] },
+        oidc: { label: 'OIDC', fields: ['OIDC_CLIENT_ID'] },
+      },
+    },
   },
   fields: {
     OPENAI_API_KEY: field('ai', 'cloud', {
@@ -76,6 +83,8 @@ const schema: ConfigSchema = {
     FLAG_A: field('ai', 'routingish', { type: 'boolean', source: 'database' }),
     FLAG_B: field('ai', 'routingish', { type: 'boolean' }),
     FEATURE_X: field('features', 'people', { type: 'boolean', source: 'database' }),
+    REGISTRATION_ENABLED: field('auth', 'access', { type: 'boolean', source: 'database' }),
+    OIDC_CLIENT_ID: field('auth', 'oidc'),
   },
 }
 
@@ -240,5 +249,20 @@ describe('useSystemConfig', () => {
     expect(ok).toBe(false)
     expect(showError).toHaveBeenCalledWith('Could not confirm the reset')
     expect(showError).not.toHaveBeenCalledWith('Reset failed')
+  })
+
+  it('reloads runtime config for live auth switches and skips env-only auth fields', async () => {
+    updateConfigValue.mockResolvedValue({ success: true, requiresRestart: false })
+    const wrapper = mountConfig()
+    await wrapper.vm.config.load()
+
+    await wrapper.vm.config.update('REGISTRATION_ENABLED', 'false')
+    await flushPromises()
+    expect(reload).toHaveBeenCalledTimes(1)
+
+    updateConfigValue.mockResolvedValue({ success: true, requiresRestart: true })
+    await wrapper.vm.config.update('OIDC_CLIENT_ID', 'synaplan')
+    await flushPromises()
+    expect(reload).toHaveBeenCalledTimes(1)
   })
 })

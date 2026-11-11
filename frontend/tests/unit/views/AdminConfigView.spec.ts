@@ -303,4 +303,15 @@ describe('AdminConfigView — topics', () => {
 
     expect(wrapper.find('[data-testid="config-load-error"]').exists()).toBe(true)
   })
+
+  it('clears section and field highlight query params when switching tabs', async () => {
+    const { wrapper, router } = await mountView(
+      '/admin/config?tab=auth&section=access&highlight=REGISTRATION_ENABLED'
+    )
+
+    await wrapper.get('[data-testid="btn-config-tab-email"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toEqual({ tab: 'email' })
+  })
 })

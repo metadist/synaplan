@@ -529,26 +529,30 @@
         "doors": {
           "selfSignup": {
             "title": "E-mail, Google, GitHub et Apple",
-            "open": "De nouvelles personnes peuvent créer un compte avec l'e-mail, Google, GitHub ou Apple. Quelqu'un qui a déjà un compte se connecte toujours.",
+            "open": "De nouvelles personnes peuvent créer un compte avec l'e-mail et, lorsqu'ils sont configurés, avec Google, GitHub ou Apple. Quelqu'un qui a déjà un compte se connecte toujours.",
             "admission": "Un nouveau compte a besoin d'une offre payante ou d'un code d'invitation. Quelqu'un qui a déjà un compte se connecte toujours.",
             "registrationOff": "De nouvelles personnes ne peuvent plus s'inscrire avec l'e-mail, Google, GitHub ou Apple. Quelqu'un qui a déjà un compte se connecte toujours.",
-            "paused": "Les nouveaux comptes sont en pause. Quelqu'un qui a déjà un compte se connecte toujours.",
+            "paused": "Les nouveaux comptes sont en pause (un code d'invitation valide fonctionne toujours). Quelqu'un qui a déjà un compte se connecte toujours.",
+            "emailOnly": "Google, GitHub et Apple ne sont pas configurés ; seul l'e-mail est proposé pour l'instant.",
+            "socialActive": "Connexion sociale active : {providers}.",
             "humanCheck": "Un contrôle vérifie qu'une personne est là avant un nouveau compte."
           },
           "directory": {
             "title": "Connexion d'entreprise",
             "open": "La première connexion via la connexion d'entreprise crée un compte. Les réglages d'inscription ne s'appliquent pas ici.",
             "provisioningOff": "Une première connexion via la connexion d'entreprise ne crée pas de compte. Quelqu'un qui s'est déjà connecté ainsi le peut toujours.",
-            "notConfigured": "Aucune connexion d'entreprise n'est configurée, donc cette porte ne crée pas de compte."
+            "notConfigured": "Aucune connexion d'entreprise n'est configurée, donc cette porte ne crée pas de compte.",
+            "missingClientId": "Une URL de découverte est définie, mais l'identifiant client manque : la connexion d'entreprise n'est pas encore active.",
+            "restricted": "Des règles d'organisation, de rôle ou de permissions limitent aussi qui peut se connecter."
           },
           "operator": {
             "title": "Créé par un administrateur",
             "admin": "Un administrateur peut créer un compte dans Utilisateurs. Les réglages d'inscription ne ferment pas cela."
           },
           "channel": {
-            "title": "Chat invité et canaux",
+            "title": "Chat invité (sans compte)",
             "guestOn": "Les visiteurs peuvent essayer le chat sans compte. Le chat invité, l'e-mail entrant, WhatsApp et Telegram ne créent pas de compte.",
-            "guestOff": "Le chat invité est arrêté, les visiteurs se connectent. Le chat invité, l'e-mail entrant, WhatsApp et Telegram ne créent pas de compte."
+            "guestOff": "Le chat invité est arrêté, les visiteurs se connectent d'abord. Le chat invité, l'e-mail entrant, WhatsApp et Telegram ne créent pas de compte, et les canaux utilisent leurs propres réglages."
           }
         }
       },
