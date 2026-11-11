@@ -123,13 +123,15 @@ configure_resolved() {
       printf 'nameserver %s\n' "$ns" >>"$resolv"
     done
     printf 'options timeout:2 attempts:3\n' >>"$resolv"
-    as_root tee /etc/resolv.conf <"$resolv" >/dev/null
+    as_root tee /etc/resolv.conf <"$resolv" >/dev/null || return 1
     rm -f "$resolv"
     return 0
   fi
 
-  as_root mkdir -p /etc/systemd/resolved.conf.d
-  as_root tee /etc/systemd/resolved.conf.d/public-dns.conf >/dev/null <<EOF
+  # Same as use_fallback_mirrors: the caller invokes this from `if`, so a
+  # failed write must return rather than fall through to a successful status.
+  as_root mkdir -p /etc/systemd/resolved.conf.d || return 1
+  as_root tee /etc/systemd/resolved.conf.d/public-dns.conf >/dev/null <<EOF || return 1
 [Resolve]
 DNS=${public_dns[*]}
 FallbackDNS=9.9.9.9 149.112.112.112
@@ -151,8 +153,8 @@ EOF
     iface="$(ip -4 route show default 2>/dev/null | awk '{print $5; exit}')"
   fi
   if [ -n "$iface" ]; then
-    as_root resolvectl dns "$iface" "${public_dns[@]}"
-    as_root resolvectl domain "$iface" '~.'
+    as_root resolvectl dns "$iface" "${public_dns[@]}" || return 1
+    as_root resolvectl domain "$iface" '~.' || return 1
     log "Default route ${iface} now uses ${public_dns[*]}."
   else
     log "::warning::No default IPv4 route; only the global resolver list was changed."
@@ -194,8 +196,11 @@ use_fallback_mirrors() {
     return 1
   fi
 
+  # Called from `if`, so set -e does not apply. A failed privileged write
+  # has to return, or the broken archive URLs stay and the caller is told
+  # the fallback worked.
   if [ -f /etc/apt/apt-mirrors.txt ]; then
-    printf '%s\n' "${lines[@]}" | as_root tee /etc/apt/apt-mirrors.txt >/dev/null
+    printf '%s\n' "${lines[@]}" | as_root tee /etc/apt/apt-mirrors.txt >/dev/null || return 1
     log "Apt mirror list is now outside ubuntu.com:"
     cat /etc/apt/apt-mirrors.txt
   fi
@@ -220,7 +225,7 @@ use_fallback_mirrors() {
         as_root sed -i -E \
           -e "s#https?://(azure\\.)?archive\\.ubuntu\\.com/ubuntu/?#${chosen}#g" \
           -e "s#https?://security\\.ubuntu\\.com/ubuntu/?#${chosen}#g" \
-          "$file"
+          "$file" || return 1
         log "Rewrote Ubuntu archive URIs in ${file} to ${chosen}."
         patched=true
       fi
