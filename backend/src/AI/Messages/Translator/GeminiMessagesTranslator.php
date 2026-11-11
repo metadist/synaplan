@@ -7,6 +7,7 @@ namespace App\AI\Messages\Translator;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
+use App\AI\Provider\Google\Gemini4Models;
 use App\AI\Provider\Google\GoogleUsage;
 use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -146,14 +147,18 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
             $payload['systemInstruction'] = $systemInstruction;
         }
 
+        $model = \is_string($requestBody['model'] ?? null) ? $requestBody['model'] : '';
+        $gemini4 = Gemini4Models::usesThinkingLevel($model);
+
         $generationConfig = [];
         if (isset($requestBody['max_tokens'])) {
             $generationConfig['maxOutputTokens'] = (int) $requestBody['max_tokens'];
         }
-        if (isset($requestBody['temperature'])) {
+        // Gemini 4 ignores sampling and warns when it is sent.
+        if (!$gemini4 && isset($requestBody['temperature'])) {
             $generationConfig['temperature'] = (float) $requestBody['temperature'];
         }
-        if (isset($requestBody['top_p'])) {
+        if (!$gemini4 && isset($requestBody['top_p'])) {
             $generationConfig['topP'] = (float) $requestBody['top_p'];
         }
         if ([] !== $generationConfig) {
@@ -432,7 +437,11 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     private function request(array $payload, array $context, array $requestBody, bool $stream): ResponseInterface
     {
         $upstream = rtrim((string) ($context['gemini_upstream_url'] ?? self::DEFAULT_UPSTREAM), '/');
-        $model = rawurlencode((string) ($requestBody['model'] ?? 'gemini-2.0-flash'));
+        $modelName = (string) ($requestBody['model'] ?? 'gemini-2.0-flash');
+        $model = rawurlencode($modelName);
+        $timeout = Gemini4Models::usesThinkingLevel($modelName)
+            ? Gemini4Models::TIMEOUT_SECONDS
+            : self::DEFAULT_TIMEOUT;
         $method = $stream ? 'streamGenerateContent' : 'generateContent';
         $url = sprintf('%s/%s/models/%s:%s', $upstream, self::API_VERSION, $model, $method);
         if ($stream) {
@@ -445,7 +454,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                 'x-goog-api-key' => $context['api_key'],
             ],
             'json' => $payload,
-            'timeout' => self::DEFAULT_TIMEOUT,
+            'timeout' => $timeout,
             'buffer' => !$stream,
         ]);
     }

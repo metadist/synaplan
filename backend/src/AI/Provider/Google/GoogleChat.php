@@ -28,9 +28,6 @@ final class GoogleChat
      */
     private const LOW_THINKING_BUDGET = 512;
 
-    /** Gemini 4 Argon can think for minutes before the first token. */
-    private const ARGON_TIMEOUT_SECONDS = 900;
-
     private const DEFAULT_CHAT_TIMEOUT_SECONDS = 60;
 
     private const DEFAULT_STREAM_TIMEOUT_SECONDS = 120;
@@ -410,10 +407,10 @@ final class GoogleChat
      */
     private function resolveThinkingConfig(array $options, string $model = ''): ?array
     {
-        // Gemini 4 Argon ignores thinking_budget and sampling. Map the effort
-        // onto thinkingLevel so a deprecated budget is never sent.
+        // Gemini 4 Argon and Carbon ignore thinking_budget and sampling.
+        // Map the effort onto thinkingLevel so a deprecated budget is never sent.
         if ('' !== $model && $this->usesThinkingLevel($model)) {
-            return $this->argonThinkingConfig($options);
+            return $this->thinkingLevelConfig($options);
         }
 
         // Native passthrough — admin/per-prompt override wins over the
@@ -452,11 +449,11 @@ final class GoogleChat
     }
 
     /**
-     * Sampling stays on every Gemini model except Argon, which ignores
-     * temperature, topP and topK and warns when they are sent.
+     * Sampling stays on every Gemini model except Gemini 4 Argon and Carbon,
+     * which ignore temperature, topP and topK and warn when they are sent.
      *
-     * Buffered chat only attaches a thinking config for Argon. Other models keep
-     * the previous buffered request, which never sent `thinkingBudget`.
+     * Buffered chat only attaches a thinking config for those two. Other models
+     * keep the previous buffered request, which never sent `thinkingBudget`.
      *
      * @param array<string, mixed> $options
      *
@@ -490,7 +487,7 @@ final class GoogleChat
      */
     private function requestTimeout(string $model, int $default, array $options = []): int
     {
-        $base = $this->usesThinkingLevel($model) ? self::ARGON_TIMEOUT_SECONDS : $default;
+        $base = $this->usesThinkingLevel($model) ? Gemini4Models::TIMEOUT_SECONDS : $default;
         $requested = self::namedTimeout($options);
 
         return null === $requested ? $base : min($base, $requested);
@@ -522,19 +519,19 @@ final class GoogleChat
 
     private function usesThinkingLevel(string $model): bool
     {
-        return 1 === preg_match('/(?:^|\/)gemini-4-argon(?:$|[:\/])/', strtolower($model));
+        return Gemini4Models::usesThinkingLevel($model);
     }
 
     /**
-     * Argon has no off switch. The lowest level is `low`; an omitted effort
+     * Gemini 4 has no off switch. The lowest level is `low`; an omitted effort
      * leaves Google's default (`medium`) in place. An explicit thinking_budget
-     * is ignored.
+     * is ignored. `minimal` is not a valid level and is not sent.
      *
      * @param array<string, mixed> $options
      *
      * @return array{thinkingLevel: string}|null
      */
-    private function argonThinkingConfig(array $options): ?array
+    private function thinkingLevelConfig(array $options): ?array
     {
         $effort = $this->reasoningEffort($options);
         if (null === $effort) {

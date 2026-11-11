@@ -15,13 +15,6 @@ final class GoogleVision
     private const DEFAULT_TIMEOUT_SECONDS = 60;
     private const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
-    /**
-     * Argon can think for minutes before the first token, and thinking tokens
-     * count against maxOutputTokens.
-     */
-    private const ARGON_TIMEOUT_SECONDS = 900;
-    private const ARGON_MAX_OUTPUT_TOKENS = 65536;
-
     public function __construct(
         private readonly GoogleApiClient $api,
         private readonly LoggerInterface $logger,
@@ -127,7 +120,7 @@ final class GoogleVision
             ]);
 
             $url = $this->api->modelUrl($model, 'generateContent');
-            $isArgon = 1 === preg_match('/(?:^|\/)gemini-4-argon(?:$|[:\/])/', strtolower($model));
+            $gemini4 = Gemini4Models::usesThinkingLevel($model);
 
             $payload = [
                 'contents' => [
@@ -149,11 +142,11 @@ final class GoogleVision
                 'generationConfig' => [
                     // Gemini 2.5 Pro uses ~1000 tokens for "thinking", so we need higher limit
                     // to leave room for actual text output (especially for OCR tasks)
-                    'maxOutputTokens' => $options['max_tokens'] ?? ($isArgon ? self::ARGON_MAX_OUTPUT_TOKENS : self::DEFAULT_MAX_OUTPUT_TOKENS),
+                    'maxOutputTokens' => $options['max_tokens'] ?? ($gemini4 ? Gemini4Models::MAX_OUTPUT_TOKENS : self::DEFAULT_MAX_OUTPUT_TOKENS),
                 ],
             ];
 
-            $timeout = $isArgon ? self::ARGON_TIMEOUT_SECONDS : self::DEFAULT_TIMEOUT_SECONDS;
+            $timeout = $gemini4 ? Gemini4Models::TIMEOUT_SECONDS : self::DEFAULT_TIMEOUT_SECONDS;
             $response = $this->api->postJson($url, $payload, $key, $timeout);
 
             $data = $response->toArray();

@@ -37,6 +37,37 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertSame('user', $payload['contents'][0]['role']);
     }
 
+    public function testGemini4DropsIgnoredSampling(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-4-carbon',
+            'max_tokens' => 128,
+            'temperature' => 0.2,
+            'top_p' => 0.9,
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ]);
+
+        $this->assertSame(128, $payload['generationConfig']['maxOutputTokens']);
+        $this->assertArrayNotHasKey('temperature', $payload['generationConfig']);
+        $this->assertArrayNotHasKey('topP', $payload['generationConfig']);
+    }
+
+    public function testOlderGeminiKeepsSampling(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-3.8-flash',
+            'max_tokens' => 32,
+            'temperature' => 0.2,
+            'top_p' => 0.9,
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ]);
+
+        $this->assertSame(0.2, $payload['generationConfig']['temperature']);
+        $this->assertSame(0.9, $payload['generationConfig']['topP']);
+    }
+
     public function testImageBlocksSurviveAsInlineAndFileData(): void
     {
         $t = new GeminiMessagesTranslator(new MockHttpClient());

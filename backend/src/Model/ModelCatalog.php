@@ -3706,6 +3706,61 @@ class ModelCatalog
             ],
         ],
         // ----------------------------------------------------------------
+        // Gemini 4 Carbon. Model card 2026-11-10, id gemini-4-carbon.
+        // Same introductory price as Argon (ai.google.dev/gemini-api/docs/pricing):
+        // through 2026-11-30 $2 input / $10 output per 1M, cached input $0.10.
+        // From 2026-12-01: $4 / $20, cache $0.20. One rate for the whole 1M
+        // window. The catalog stores the price in force today; there is no
+        // automatic date switch. Paid tier only. The public id is the only
+        // one offered — permissive cyber variants are not catalogued.
+        // ----------------------------------------------------------------
+        [
+            'id' => 433,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Carbon',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-carbon',
+            'priceIn' => 2.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.0,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Carbon - strongest public Gemini model for complex multi-step coding, scientific reasoning, and long agent workflows. 1M token context, thinking levels low, medium (default), and high. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20. Cached input is 95% off ($0.10, then $0.20). Paid tier only. Hard tasks spend more output tokens than Argon.',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-4-carbon'],
+                'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                'cache_read_price_per_1M' => 0.10,
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536', 'reasoning_effort_default' => 'medium'],
+            ],
+        ],
+        [
+            'id' => 434,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Carbon (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-carbon',
+            'priceIn' => 2.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.0,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Carbon for image, video, audio, and PDF understanding. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20 (cached input $0.10, then $0.20). Paid tier only.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-4-carbon'],
+                'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.10,
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        // ----------------------------------------------------------------
         // Google Gemini 3.6 / 3.7 / 3.8 Flash + 3.5 Flash-Lite + Omni video
         // + Nano Banana 2 Lite + Gemini 3.5 Transcribe.
         // Live-probed against generativelanguage.googleapis.com/v1beta on

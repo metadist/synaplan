@@ -53,4 +53,17 @@ final class GoogleVisionTest extends TestCase
         }
         self::assertSame([], $this->requests());
     }
+
+    public function testCarbonWaitsLongEnoughForThinkingAndCapsOutput(): void
+    {
+        $vision = new GoogleVision($this->api([self::json(['candidates' => [['content' => ['parts' => [['text' => 'A chart.']]]]]])]), new NullLogger(), $this->uploadDir);
+
+        self::assertSame('A chart.', $vision->analyzeImage('photo.png', 'Read it.', ['model' => 'gemini-4-carbon']));
+
+        $request = $this->requests()[0];
+        self::assertStringEndsWith('/models/gemini-4-carbon:generateContent', $request['url']);
+        self::assertSame(65536, $request['body']['generationConfig']['maxOutputTokens']);
+        self::assertArrayNotHasKey('temperature', $request['body']['generationConfig']);
+        self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
+    }
 }
