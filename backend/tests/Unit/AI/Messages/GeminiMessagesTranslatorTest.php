@@ -37,6 +37,57 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertSame('user', $payload['contents'][0]['role']);
     }
 
+    public function testGemini4DropsIgnoredSampling(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-4-carbon',
+            'max_tokens' => 128,
+            'temperature' => 0.2,
+            'top_p' => 0.9,
+            'output_config' => ['effort' => 'xhigh'],
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ]);
+
+        $this->assertSame(128, $payload['generationConfig']['maxOutputTokens']);
+        $this->assertSame(['thinkingLevel' => 'high'], $payload['generationConfig']['thinkingConfig']);
+        $this->assertArrayNotHasKey('temperature', $payload['generationConfig']);
+        $this->assertArrayNotHasKey('topP', $payload['generationConfig']);
+        $this->assertArrayNotHasKey('output_config', $payload);
+    }
+
+    public function testGemini4SkipsThoughtPartsAndMapsContinuationStopReason(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'CONTINUATION',
+                'content' => ['parts' => [
+                    ['text' => 'Hidden thought.', 'thought' => true],
+                    ['text' => 'Visible answer.'],
+                ]],
+            ]],
+        ], ['model' => 'gemini-4-carbon']);
+
+        $this->assertSame('max_tokens', $anthropic['stop_reason']);
+        $this->assertSame([['type' => 'text', 'text' => 'Visible answer.']], $anthropic['content']);
+    }
+
+    public function testOlderGeminiKeepsSampling(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-3.8-flash',
+            'max_tokens' => 32,
+            'temperature' => 0.2,
+            'top_p' => 0.9,
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ]);
+
+        $this->assertSame(0.2, $payload['generationConfig']['temperature']);
+        $this->assertSame(0.9, $payload['generationConfig']['topP']);
+    }
+
     public function testImageBlocksSurviveAsInlineAndFileData(): void
     {
         $t = new GeminiMessagesTranslator(new MockHttpClient());

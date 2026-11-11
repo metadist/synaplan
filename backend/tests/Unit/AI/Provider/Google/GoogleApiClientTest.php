@@ -58,6 +58,16 @@ final class GoogleApiClientTest extends TestCase
     {
         $api = $this->client();
         $api->checkFinishReason(['candidates' => [['finishReason' => 'MAX_TOKENS']]]);
+        $api->checkFinishReason(['candidates' => [['finishReason' => 'CONTINUATION']]]);
+
+        self::assertSame(
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-4-carbon:generateContent',
+            $api->modelUrl('models/gemini-4-carbon', 'generateContent'),
+        );
+        self::assertSame(
+            'https://generativelanguage.googleapis.com/v1beta/models/..%2Ffiles%3Fkey%3Dx%23:generateContent',
+            $api->modelUrl('../files?key=x#', 'generateContent'),
+        );
 
         try {
             $api->checkFinishReason(['candidates' => [['finishReason' => 'SAFETY', 'content' => ['parts' => [['text' => 'No.']]]]]]);

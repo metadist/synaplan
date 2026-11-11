@@ -28,7 +28,7 @@ final class ChatStopReason
             return $result;
         }
 
-        if (\in_array($stopReason, ['max_tokens', 'MAX_TOKENS'], true)) {
+        if (\in_array($stopReason, ['max_tokens', 'MAX_TOKENS', 'CONTINUATION'], true)) {
             $result['finish_reason'] = 'length';
         } elseif ('tool_use' === $stopReason) {
             $result['finish_reason'] = 'tool_calls';

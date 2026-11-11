@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\AI\Provider\Google;
 
 use App\AI\Exception\ProviderException;
@@ -14,13 +16,6 @@ final class GoogleVision
 {
     private const DEFAULT_TIMEOUT_SECONDS = 60;
     private const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
-
-    /**
-     * Argon can think for minutes before the first token, and thinking tokens
-     * count against maxOutputTokens.
-     */
-    private const ARGON_TIMEOUT_SECONDS = 900;
-    private const ARGON_MAX_OUTPUT_TOKENS = 65536;
 
     public function __construct(
         private readonly GoogleApiClient $api,
@@ -55,10 +50,13 @@ final class GoogleVision
 
             $imageData1 = file_get_contents($fullPath1);
             $imageData2 = file_get_contents($fullPath2);
+            if (false === $imageData1 || false === $imageData2) {
+                throw new \RuntimeException('Failed to read one or both images');
+            }
             $base64Image1 = base64_encode($imageData1);
             $base64Image2 = base64_encode($imageData2);
-            $mimeType1 = mime_content_type($fullPath1);
-            $mimeType2 = mime_content_type($fullPath2);
+            $mimeType1 = mime_content_type($fullPath1) ?: 'application/octet-stream';
+            $mimeType2 = mime_content_type($fullPath2) ?: 'application/octet-stream';
 
             $model = 'gemini-3.8-flash';
             $url = $this->api->modelUrl($model, 'generateContent');
@@ -91,13 +89,16 @@ final class GoogleVision
             $response = $this->api->postJson($url, $payload, $key, 60);
 
             $data = $response->toArray();
-            $comparison = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+            $this->api->checkFinishReason($data);
+            $comparison = self::extractText($data);
 
             return [
                 'comparison' => $comparison,
                 'image1' => basename($imageUrl1),
                 'image2' => basename($imageUrl2),
             ];
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google image comparison error: '.$e->getMessage(), 'google');
         }
@@ -117,8 +118,11 @@ final class GoogleVision
             }
 
             $imageData = file_get_contents($fullPath);
+            if (false === $imageData) {
+                throw new \RuntimeException("Failed to read image file: {$fullPath}");
+            }
             $base64Image = base64_encode($imageData);
-            $mimeType = mime_content_type($fullPath);
+            $mimeType = mime_content_type($fullPath) ?: 'application/octet-stream';
 
             $this->logger->info('Google: Analyzing image', [
                 'model' => $model,
@@ -127,7 +131,7 @@ final class GoogleVision
             ]);
 
             $url = $this->api->modelUrl($model, 'generateContent');
-            $isArgon = 1 === preg_match('/(?:^|\/)gemini-4-argon(?:$|[:\/])/', strtolower($model));
+            $gemini4 = Gemini4Models::usesThinkingLevel($model);
 
             $payload = [
                 'contents' => [
@@ -149,18 +153,44 @@ final class GoogleVision
                 'generationConfig' => [
                     // Gemini 2.5 Pro uses ~1000 tokens for "thinking", so we need higher limit
                     // to leave room for actual text output (especially for OCR tasks)
-                    'maxOutputTokens' => $options['max_tokens'] ?? ($isArgon ? self::ARGON_MAX_OUTPUT_TOKENS : self::DEFAULT_MAX_OUTPUT_TOKENS),
+                    'maxOutputTokens' => $options['max_tokens'] ?? ($gemini4 ? Gemini4Models::MAX_OUTPUT_TOKENS : self::DEFAULT_MAX_OUTPUT_TOKENS),
                 ],
             ];
 
-            $timeout = $isArgon ? self::ARGON_TIMEOUT_SECONDS : self::DEFAULT_TIMEOUT_SECONDS;
+            $timeout = $gemini4 ? Gemini4Models::TIMEOUT_SECONDS : self::DEFAULT_TIMEOUT_SECONDS;
             $response = $this->api->postJson($url, $payload, $key, $timeout);
 
             $data = $response->toArray();
+            $this->api->checkFinishReason($data);
 
-            return $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
+            return self::extractText($data);
+        } catch (ProviderException $e) {
+            throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('Google vision error: '.$e->getMessage(), 'google');
         }
+    }
+
+    /**
+     * Concatenate non-thought text parts from the first candidate so Gemini
+     * thinking parts never replace or hide the visible vision answer.
+     *
+     * @param array<string, mixed> $data
+     */
+    private static function extractText(array $data): string
+    {
+        $text = '';
+        $parts = $data['candidates'][0]['content']['parts'] ?? [];
+        if (!\is_array($parts)) {
+            return '';
+        }
+
+        foreach ($parts as $part) {
+            if (\is_array($part) && isset($part['text']) && \is_string($part['text']) && empty($part['thought'])) {
+                $text .= $part['text'];
+            }
+        }
+
+        return $text;
     }
 }

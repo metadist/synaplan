@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\AI\Provider\Google;
 
 use App\AI\Tool\OpenAiToolShapes;
@@ -56,12 +58,17 @@ final class GoogleMessageFormat
                 if (!is_array($args)) {
                     $args = [];
                 }
-                $parts[] = [
+                $part = [
                     'functionCall' => [
                         'name' => $name,
                         'args' => $args,
                     ],
                 ];
+                $sig = GoogleThoughtSignature::fromToolCall($call);
+                if (null !== $sig) {
+                    $part['thoughtSignature'] = $sig;
+                }
+                $parts[] = $part;
             }
 
             $parts = array_merge($parts, self::contentParts($content));
@@ -113,9 +120,9 @@ final class GoogleMessageFormat
     /**
      * @param array<string, mixed> $functionCall
      *
-     * @return array{id: string, type: 'function', function: array{name: string, arguments: string}}
+     * @return array{id: string, type: 'function', function: array{name: string, arguments: string}, thought_signature?: string}
      */
-    public static function toolCall(array $functionCall): array
+    public static function toolCall(array $functionCall, ?string $thoughtSignature = null): array
     {
         $args = $functionCall['args'] ?? $functionCall['arguments'] ?? [];
         if (is_string($args)) {
@@ -124,7 +131,7 @@ final class GoogleMessageFormat
             $arguments = json_encode($args, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '{}';
         }
 
-        return [
+        $call = [
             'id' => 'call_'.bin2hex(random_bytes(6)),
             'type' => 'function',
             'function' => [
@@ -132,6 +139,11 @@ final class GoogleMessageFormat
                 'arguments' => $arguments,
             ],
         ];
+        if (null !== $thoughtSignature && '' !== $thoughtSignature) {
+            $call['thought_signature'] = $thoughtSignature;
+        }
+
+        return $call;
     }
 
     /**

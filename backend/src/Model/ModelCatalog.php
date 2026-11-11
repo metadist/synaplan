@@ -3679,7 +3679,7 @@ class ModelCatalog
                 'params' => ['model' => 'gemini-4-argon'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
                 'cache_read_price_per_1M' => 0.10,
-                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536'],
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536', 'reasoning_effort_default' => 'medium'],
             ],
         ],
         [
@@ -3700,6 +3700,61 @@ class ModelCatalog
                 'description' => 'Google Gemini 4 Argon for image analysis, video understanding, and multimodal tasks. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20 (cached input $0.10, then $0.20).',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-4-argon'],
+                'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.10,
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // Gemini 4 Carbon. Model card 2026-11-10, id gemini-4-carbon.
+        // Same introductory price as Argon (ai.google.dev/gemini-api/docs/pricing):
+        // through 2026-11-30 $2 input / $10 output per 1M, cached input $0.10.
+        // From 2026-12-01: $4 / $20, cache $0.20. One rate for the whole 1M
+        // window. The catalog stores the price in force today; there is no
+        // automatic date switch. Paid tier only. The public id is the only
+        // one offered — permissive cyber variants are not catalogued.
+        // ----------------------------------------------------------------
+        [
+            'id' => 433,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Carbon',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-carbon',
+            'priceIn' => 2.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.0,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Carbon - flagship reasoning model for complex multi-step coding, scientific analysis, and long agent workflows. 1M token context, thinking levels low, medium (default), and high. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20. Cached input is 95% off ($0.10, then $0.20). Requires a paid Google AI API tier (no free tier); deeper reasoning uses more output tokens than Argon.',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-4-carbon'],
+                'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                'cache_read_price_per_1M' => 0.10,
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536', 'reasoning_effort_default' => 'medium'],
+            ],
+        ],
+        [
+            'id' => 434,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Carbon (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-carbon',
+            'priceIn' => 2.0,
+            'inUnit' => 'per1M',
+            'priceOut' => 10.0,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Carbon for image, video, audio, PDF, and Office document understanding. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20 (cached input $0.10, then $0.20). Requires a paid Google AI API tier (no free tier).',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-4-carbon'],
                 'features' => ['vision'],
                 'cache_read_price_per_1M' => 0.10,
                 'meta' => ['supports_images' => true, 'supports_video' => true],

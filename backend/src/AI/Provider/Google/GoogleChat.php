@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\AI\Provider\Google;
 
 use App\AI\Exception\ProviderException;
@@ -27,9 +29,6 @@ final class GoogleChat
      * below the medium budget (1024).
      */
     private const LOW_THINKING_BUDGET = 512;
-
-    /** Gemini 4 Argon can think for minutes before the first token. */
-    private const ARGON_TIMEOUT_SECONDS = 900;
 
     private const DEFAULT_CHAT_TIMEOUT_SECONDS = 60;
 
@@ -86,12 +85,26 @@ final class GoogleChat
 
             $textContent = '';
             $toolCalls = [];
-            foreach ($data['candidates'][0]['content']['parts'] ?? [] as $part) {
-                if (isset($part['functionCall']) && is_array($part['functionCall'])) {
-                    $toolCalls[] = GoogleMessageFormat::toolCall($part['functionCall']);
+            $candidate = \is_array($data['candidates'][0] ?? null) ? $data['candidates'][0] : [];
+            $candidateSig = GoogleThoughtSignature::fromPart($candidate);
+            $pendingSig = null;
+            foreach ($candidate['content']['parts'] ?? [] as $part) {
+                if (!\is_array($part)) {
                     continue;
                 }
-                if (isset($part['text']) && empty($part['thought'])) {
+                $fc = \is_array($part['functionCall'] ?? null) ? $part['functionCall'] : [];
+                $ownSig = GoogleThoughtSignature::fromPart($part, $fc);
+                if ([] !== $fc) {
+                    $sig = $ownSig ?? $pendingSig ?? $candidateSig;
+                    $pendingSig = null;
+                    $candidateSig = null;
+                    $toolCalls[] = GoogleMessageFormat::toolCall($fc, $sig);
+                    continue;
+                }
+                if (null !== $ownSig) {
+                    $pendingSig = $ownSig;
+                }
+                if (isset($part['text']) && \is_string($part['text']) && empty($part['thought'])) {
                     $textContent .= $part['text'];
                 }
             }
@@ -190,6 +203,8 @@ final class GoogleChat
         $finishReason = null;
         $sawFunctionCall = false;
         $toolIndex = 0;
+        $carrySig = null;
+        $candidateSig = null;
 
         $decoder = new GeminiStreamDecoder();
         foreach ($this->api->stream($response) as $chunk) {
@@ -208,23 +223,44 @@ final class GoogleChat
                     $usage = GoogleUsage::fromMetadata($data['usageMetadata']);
                 }
 
-                $parts = $data['candidates'][0]['content']['parts'] ?? [];
+                $candidate = \is_array($data['candidates'][0] ?? null) ? $data['candidates'][0] : [];
+                $eventCandidateSig = GoogleThoughtSignature::fromPart($candidate);
+                if (null !== $eventCandidateSig) {
+                    $candidateSig = $eventCandidateSig;
+                }
+
+                $parts = $candidate['content']['parts'] ?? [];
                 foreach ($parts as $part) {
-                    if (isset($part['functionCall']) && is_array($part['functionCall'])) {
-                        $call = GoogleMessageFormat::toolCall($part['functionCall']);
-                        $callback([
+                    if (!\is_array($part)) {
+                        continue;
+                    }
+                    $fc = \is_array($part['functionCall'] ?? null) ? $part['functionCall'] : [];
+                    $ownSig = GoogleThoughtSignature::fromPart($part, $fc);
+                    if ([] !== $fc) {
+                        $sig = $ownSig ?? $carrySig ?? $candidateSig;
+                        $carrySig = null;
+                        $candidateSig = null;
+                        $call = GoogleMessageFormat::toolCall($fc, $sig);
+                        $delta = [
                             'type' => 'tool_call_delta',
                             'index' => $toolIndex,
                             'id' => $call['id'],
                             'name' => $call['function']['name'],
                             'arguments' => $call['function']['arguments'],
-                        ]);
+                        ];
+                        if (null !== $sig) {
+                            $delta['thought_signature'] = $sig;
+                        }
+                        $callback($delta);
                         ++$toolIndex;
                         $sawFunctionCall = true;
                         continue;
                     }
+                    if (null !== $ownSig) {
+                        $carrySig = $ownSig;
+                    }
 
-                    if (!isset($part['text']) || '' === $part['text']) {
+                    if (!isset($part['text']) || !\is_string($part['text']) || '' === $part['text']) {
                         continue;
                     }
 
@@ -240,7 +276,7 @@ final class GoogleChat
                 $geminiFinishReason = $data['candidates'][0]['finishReason'] ?? null;
                 if (null !== $geminiFinishReason) {
                     $finishReason = match ($geminiFinishReason) {
-                        'MAX_TOKENS' => 'length',
+                        'MAX_TOKENS', 'CONTINUATION' => 'length',
                         'FUNCTION_CALL' => 'tool_calls',
                         'STOP', 'END_TURN' => $sawFunctionCall ? 'tool_calls' : 'stop',
                         default => $geminiFinishReason,
@@ -410,10 +446,10 @@ final class GoogleChat
      */
     private function resolveThinkingConfig(array $options, string $model = ''): ?array
     {
-        // Gemini 4 Argon ignores thinking_budget and sampling. Map the effort
-        // onto thinkingLevel so a deprecated budget is never sent.
+        // Gemini 4 Argon and Carbon ignore thinking_budget and sampling.
+        // Map the effort onto thinkingLevel so a deprecated budget is never sent.
         if ('' !== $model && $this->usesThinkingLevel($model)) {
-            return $this->argonThinkingConfig($options);
+            return $this->thinkingLevelConfig($options);
         }
 
         // Native passthrough — admin/per-prompt override wins over the
@@ -452,11 +488,11 @@ final class GoogleChat
     }
 
     /**
-     * Sampling stays on every Gemini model except Argon, which ignores
-     * temperature, topP and topK and warns when they are sent.
+     * Sampling stays on every Gemini model except Gemini 4 Argon and Carbon,
+     * which ignore temperature, topP and topK and warn when they are sent.
      *
-     * Buffered chat only attaches a thinking config for Argon. Other models keep
-     * the previous buffered request, which never sent `thinkingBudget`.
+     * Buffered chat only attaches a thinking config for those two. Other models
+     * keep the previous buffered request, which never sent `thinkingBudget`.
      *
      * @param array<string, mixed> $options
      *
@@ -490,7 +526,7 @@ final class GoogleChat
      */
     private function requestTimeout(string $model, int $default, array $options = []): int
     {
-        $base = $this->usesThinkingLevel($model) ? self::ARGON_TIMEOUT_SECONDS : $default;
+        $base = $this->usesThinkingLevel($model) ? Gemini4Models::TIMEOUT_SECONDS : $default;
         $requested = self::namedTimeout($options);
 
         return null === $requested ? $base : min($base, $requested);
@@ -522,31 +558,21 @@ final class GoogleChat
 
     private function usesThinkingLevel(string $model): bool
     {
-        return 1 === preg_match('/(?:^|\/)gemini-4-argon(?:$|[:\/])/', strtolower($model));
+        return Gemini4Models::usesThinkingLevel($model);
     }
 
     /**
-     * Argon has no off switch. The lowest level is `low`; an omitted effort
+     * Gemini 4 has no off switch. The lowest level is `low`; an omitted effort
      * leaves Google's default (`medium`) in place. An explicit thinking_budget
-     * is ignored.
+     * is ignored. `minimal` is not a valid level and is not sent.
      *
      * @param array<string, mixed> $options
      *
      * @return array{thinkingLevel: string}|null
      */
-    private function argonThinkingConfig(array $options): ?array
+    private function thinkingLevelConfig(array $options): ?array
     {
-        $effort = $this->reasoningEffort($options);
-        if (null === $effort) {
-            return null;
-        }
-
-        $level = match ($effort) {
-            'off', 'none', 'disabled', 'low' => 'low',
-            'medium', 'dynamic' => 'medium',
-            'high' => 'high',
-            default => null,
-        };
+        $level = Gemini4Models::thinkingLevel($this->reasoningEffort($options));
 
         return null === $level ? null : ['thinkingLevel' => $level];
     }
