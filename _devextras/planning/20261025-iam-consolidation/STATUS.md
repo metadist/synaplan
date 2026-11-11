@@ -24,14 +24,14 @@ run are entries here, not chat messages.
 | PC2 | | waits for D4 |
 | IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | merged |
 | IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | merged |
-| IC5+IC5b | [#3079](https://github.com/metadist/synaplan/pull/3079) | in review — the level is the highest grant, and People shows where it comes from |
-| IC6 | | waits for IC5 — the identity guide |
+| IC5+IC5b | [#3079](https://github.com/metadist/synaplan/pull/3079) | merged — the level is the highest grant, and People shows where it comes from |
+| IC6 | | in review — one identity guide, and the variables that are not switches |
 | IC8 | [#3077](https://github.com/metadist/synaplan/pull/3077) | merged — password reset and the SSO-only login page |
 | CH1 | | waits for IC6 (`synaplan-charts`) |
 | IC7 | | waits for D7 — own pull request |
 | PC3 | | waits for D5 |
 
-Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. D6 and D10 are accepted, so IC5 and IC5b share one pull request: `BUSER_LEVEL_GRANTS`, and the People row names each grant. The identity guide (IC6) still waits for IC5.
+Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. D6 and D10 are accepted, so IC5 and IC5b share one pull request: `BUSER_LEVEL_GRANTS`, and the People row names each grant. IC8 already landed on its own, so IC6 is the identity guide by itself. The public docs site links to it from its own repository.
 
 ## Audit 2026-10-25
 

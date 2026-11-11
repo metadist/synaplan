@@ -90,6 +90,7 @@ Once an instance is running, this track covers day-to-day administration: user a
 | Step | Guide | What you will learn |
 | ---- | ----- | ------------------- |
 | **2.1** | **[Day-2 Operations & Governance](ADMIN.md)** | Admin password recovery, the 5-lane background scheduler, portable backups, users & groups (`IAM`), sharing policies, directory sync, and AI plugs. |
+| | **[Who can create an account, and who can sign in](IDENTITY.md)** | The four install profiles, which door a new account comes through, which switch closes it, and the variables that look like switches and are not. |
 | **2.2** | **[Health Probes & Uptime Monitoring](HEALTH_MONITORING.md)** | The difference between `/api/health`, `/api/health/ready`, and `/api/health/probe`, and how to set up a dedicated Uptime Robot monitor key. |
 | **2.3** | **[Observability & Redacted Error Ring](OBSERVABILITY.md)** | How `X-Request-Id` correlates logs and how the Redis event ring exposes PII-scrubbed warnings/errors to `/api/v1/admin/logs` and MCP. |
 | **2.4** | **[Outbound Traffic & Egress Control](EGRESS.md)** | Every outbound connection Synaplan makes, how `ProviderCatalog` populates the allowlist, SSRF IP pinning, and the optional egress proxy. |
@@ -164,6 +165,7 @@ Everything you need to develop, test, and ship changes to Synaplan while keeping
 | Spin up Synaplan in 3 minutes | [Installation & Deployment](INSTALLATION.md) |
 | Add or rotate an AI provider key | [Configuration — AI Providers](CONFIGURATION.md#ai-providers) |
 | Recover a lost admin password | [Admin — Lost Administrator Password](ADMIN.md#lost-administrator-password) |
+| Decide who can create an account or sign in | [Who can create an account, and who can sign in](IDENTITY.md) |
 | Set up OIDC / Enterprise SSO | [Configuration — SSO-Only Instances](CONFIGURATION.md#sso-only-instances-no-local-accounts) |
 | Connect Microsoft 365, Dropbox, or Nextcloud | [External Connections](CONNECTIONS.md) |
 | Point Claude Code or Cursor at Synaplan | [Anthropic-Compatible API](ANTHROPIC_COMPATIBLE_API.md) · [OpenAI-Compatible API](OPENAI_COMPATIBLE_API.md) |

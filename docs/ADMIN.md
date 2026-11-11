@@ -47,12 +47,15 @@ Set every other password and token marked as required in the template. Secrets
 must remain stable across container recreation, updates, backup, and restore.
 Never commit the populated environment file.
 
-`APP_SECRET`, `TOKEN_SECRET`, both MariaDB passwords and the four `REALTIME_*`
-secrets may also be left unset. The lifecycle scripts then generate an
-independent value for each on the first start and record the set in
-`deploy/data/secrets.env` (mode `0600`), which is authoritative from then on and
-never rewritten. A value you configure yourself is adopted unchanged. Details:
-[deploy/README.md](../deploy/README.md#generated-secrets-deploydatasecretsenv).
+`APP_SECRET`, both MariaDB passwords and the four `REALTIME_*` secrets may
+also be left unset. The lifecycle scripts then generate an independent value
+for each on the first start and record the set in `deploy/data/secrets.env`
+(mode `0600`), which is authoritative from then on and never rewritten. A
+value you configure yourself is adopted unchanged. `TOKEN_SECRET` may still
+be generated for an older install; session cookies are signed with
+`APP_SECRET`, and realtime tokens use `REALTIME_TOKEN_SECRET`. Details:
+[deploy/README.md](../deploy/README.md#generated-secrets-deploydatasecretsenv)
+and [Who can sign in](IDENTITY.md#variables-that-look-like-switches-and-are-not).
 
 See [Configuration Guide](CONFIGURATION.md) for all environment variables.
 
@@ -367,7 +370,9 @@ Rotate `APP_SECRET`:
 
 ### CORS
 
-`CORS_ALLOW_ORIGIN` must match your frontend domain exactly. Never use `*` in production.
+`CORS_ALLOW_ORIGIN` is not read. The API allows any browser origin. The
+session cookies are HttpOnly. Setting the unused variable does not restrict
+which site can call the API.
 
 ### Sessions survive restarts
 

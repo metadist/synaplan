@@ -73,6 +73,8 @@ x-app-environment: &app-environment
   APP_URL: "${APP_URL:?Set APP_URL to the public HTTPS URL}"
   FRONTEND_URL: "${FRONTEND_URL:?Set FRONTEND_URL to the public HTTPS URL}"
   APP_SECRET: "${APP_SECRET:-}"
+  # Unused. Session cookies are signed with APP_SECRET. Kept so an older
+  # secrets.env that still contains TOKEN_SECRET is accepted. See docs/IDENTITY.md.
   TOKEN_SECRET: "${TOKEN_SECRET:-}"
   # Empty means the Secure flag follows the APP_URL scheme, which is what every
   # deployment following selfhost.env.example wants. Only a deployment whose TLS

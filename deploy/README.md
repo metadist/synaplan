@@ -53,8 +53,10 @@ deploy/scripts/smoke-test.sh
 ```
 
 `deploy/.env` is intentionally ignored. Keep a secure external copy of it.
-`APP_SECRET`, `TOKEN_SECRET`, both MariaDB passwords, and all `REALTIME_*`
-secrets must remain stable across every redeploy and restore. Keep a configured
+`APP_SECRET`, both MariaDB passwords, and all `REALTIME_*` secrets must
+remain stable across every redeploy and restore. `TOKEN_SECRET` is still
+accepted so an older file loads, and it is not read: session cookies are
+signed with `APP_SECRET`. Keep a configured
 `BOOTSTRAP_ADMIN_PASSWORD` unchanged as well: a later start never rotates the
 administrator account, so a regenerated value would no longer match the password
 that account actually has.
