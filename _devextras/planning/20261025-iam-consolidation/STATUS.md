@@ -25,7 +25,7 @@ run are entries here, not chat messages.
 | IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | merged |
 | IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | merged |
 | IC5+IC5b | [#3079](https://github.com/metadist/synaplan/pull/3079) | merged — the level is the highest grant, and People shows where it comes from |
-| IC6 | | in review — one identity guide, and the variables that are not switches |
+| IC6 | [#3086](https://github.com/metadist/synaplan/pull/3086) | in review — one identity guide, and the variables that are not switches |
 | IC8 | [#3077](https://github.com/metadist/synaplan/pull/3077) | merged — password reset and the SSO-only login page |
 | CH1 | | waits for IC6 (`synaplan-charts`) |
 | IC7 | | waits for D7 — own pull request |
