@@ -165,4 +165,7 @@ nelmio_api_doc:
             # Desktop project companion (paired keys). The rest of /v1 stays
             # out of the published spec — it is the OpenAI/Anthropic gateway.
             - ^/v1/models/catalog
+            # Except chat completions: the cloud apps ask about a file with it
+            # and generate their Synaplan client from this spec.
+            - ^/v1/chat/completions$
             - ^/v1/assistants
