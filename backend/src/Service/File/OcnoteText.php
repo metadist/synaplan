@@ -241,17 +241,38 @@ final class OcnoteText
     private function plain(array $node): string
     {
         $out = '';
-        foreach ($this->children($node) as $child) {
+        $children = $this->children($node);
+        $count = count($children);
+        for ($i = 0; $i < $count; ++$i) {
+            $child = $children[$i];
             $type = (string) ($child['type'] ?? '');
-            if ('text' === $type) {
-                $out .= (string) ($child['text'] ?? '').$this->linkSuffix($child);
-                continue;
-            }
             if ('hardBreak' === $type) {
                 $out .= "\n";
                 continue;
             }
-            $out .= $this->render($child);
+            if ('text' !== $type) {
+                $out .= $this->render($child);
+                continue;
+            }
+
+            $href = $this->linkHref($child);
+            $run = (string) ($child['text'] ?? '');
+            if (null === $href) {
+                $out .= $run;
+                continue;
+            }
+
+            // Bold or italic inside a link splits it into several text nodes
+            // that still share the href. Join them before adding the URL once.
+            while ($i + 1 < $count) {
+                $next = $children[$i + 1];
+                if ('text' !== (string) ($next['type'] ?? '') || $this->linkHref($next) !== $href) {
+                    break;
+                }
+                ++$i;
+                $run .= (string) ($next['text'] ?? '');
+            }
+            $out .= $href === $run ? $run : $run.' ('.$href.')';
         }
 
         return $out;
@@ -274,9 +295,22 @@ final class OcnoteText
      */
     private function linkSuffix(array $node): string
     {
+        $href = $this->linkHref($node);
+        if (null === $href || $href === (string) ($node['text'] ?? '')) {
+            return '';
+        }
+
+        return ' ('.$href.')';
+    }
+
+    /**
+     * @param array<mixed> $node
+     */
+    private function linkHref(array $node): ?string
+    {
         $marks = $node['marks'] ?? null;
         if (!is_array($marks)) {
-            return '';
+            return null;
         }
 
         foreach ($marks as $mark) {
@@ -284,18 +318,12 @@ final class OcnoteText
                 continue;
             }
             $href = trim((string) ($this->attrs($mark)['href'] ?? ''));
-            if (!$this->isSafeHref($href)) {
-                continue;
+            if ($this->isSafeHref($href)) {
+                return $href;
             }
-            $text = (string) ($node['text'] ?? '');
-            if ($href === $text) {
-                return '';
-            }
-
-            return ' ('.$href.')';
         }
 
-        return '';
+        return null;
     }
 
     private function isSafeHref(string $href): bool

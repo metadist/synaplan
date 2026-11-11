@@ -173,6 +173,35 @@ final class OcnoteTextTest extends TestCase
         self::assertStringContainsString('Hinweis', $text);
     }
 
+    public function testMixedFormattingInsideALinkKeepsTheWordTogether(): void
+    {
+        $json = json_encode([
+            'type' => 'doc',
+            'content' => [[
+                'type' => 'paragraph',
+                'content' => [
+                    [
+                        'type' => 'text',
+                        'text' => 'BER',
+                        'marks' => [
+                            ['type' => 'bold'],
+                            ['type' => 'link', 'attrs' => ['href' => 'https://example.com/dog']],
+                        ],
+                    ],
+                    [
+                        'type' => 'text',
+                        'text' => 'ND',
+                        'marks' => [
+                            ['type' => 'link', 'attrs' => ['href' => 'https://example.com/dog']],
+                        ],
+                    ],
+                ],
+            ]],
+        ], JSON_THROW_ON_ERROR);
+
+        self::assertSame('BERND (https://example.com/dog)', OcnoteText::fromJson($json));
+    }
+
     public function testGarbageIsNotANote(): void
     {
         self::assertNull(OcnoteText::fromJson('not json'));
