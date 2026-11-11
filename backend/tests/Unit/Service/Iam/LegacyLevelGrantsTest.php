@@ -106,6 +106,34 @@ final class LegacyLevelGrantsTest extends TestCase
         self::assertSame(['stripe' => 'PRO'], $this->levels($plan->bySource()));
     }
 
+    public function testCancelingAndPastDueSubscriptionsAreStillStripeOwned(): void
+    {
+        foreach (['canceling', 'trialing', 'past_due', 'paused'] as $status) {
+            $plan = $this->planner()->plan($this->user('PRO', [
+                'source' => 'stripe',
+                'status' => $status,
+                'plan' => 'PRO',
+                'stripe_subscription_id' => 'sub_'.$status,
+            ]), false);
+
+            self::assertTrue($plan->rule1Only, $status);
+            self::assertSame(['stripe' => 'PRO'], $this->levels($plan->bySource()), $status);
+        }
+    }
+
+    public function testAnUnsettledSubscriptionDoesNotClaimAnExistingAdminGrant(): void
+    {
+        $plan = $this->planner()->plan($this->user('TEAM', [
+            'source' => 'stripe',
+            'status' => 'active',
+            'plan' => 'TEAM',
+            'settled' => false,
+            'stripe_subscription_id' => 'sub_sepa_pending',
+        ]), false);
+
+        self::assertSame(['admin' => 'TEAM'], $this->levels($plan->bySource()));
+    }
+
     private function planner(): LegacyLevelGrants
     {
         return new LegacyLevelGrants($this->createStub(AuditLogEntryRepository::class), 'administrator');

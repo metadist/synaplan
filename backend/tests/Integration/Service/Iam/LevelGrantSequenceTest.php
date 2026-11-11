@@ -150,6 +150,25 @@ final class LevelGrantSequenceTest extends KernelTestCase
         self::assertSame('NEW', $user->getUserLevel());
     }
 
+    public function testALegacySubscriberDropsToNewWhenCanceledUpdatePrecedesRevoke(): void
+    {
+        $user = $this->account('PRO', $this->stripe('PRO'));
+        $entitlement = static::getContainer()->get(\App\Service\Billing\StripeEntitlement::class);
+        $canceled = \Stripe\StripeObject::constructFrom([
+            'id' => 'sub_legacy',
+            'status' => 'canceled',
+            'items' => \Stripe\StripeObject::constructFrom(['data' => [
+                \Stripe\StripeObject::constructFrom(['price' => \Stripe\StripeObject::constructFrom(['id' => 'price_unknown'])]),
+            ]]),
+        ]);
+
+        $entitlement->apply($user, $canceled, null);
+        $entitlement->revokeStripe($user);
+
+        self::assertSame('NEW', $user->getUserLevel());
+        self::assertSame([], $this->grants->views($user));
+    }
+
     public function testALegacyHigherLevelSurvivesTheStripeCancellation(): void
     {
         $user = $this->account('BUSINESS', $this->stripe('PRO'));

@@ -229,6 +229,11 @@ final readonly class StripeEntitlement
         $level = $this->levelForPrice($firstItem instanceof StripeObject ? ($firstItem->price->id ?? null) : null);
         $settled = $this->isSettled($subscription, $invoice);
 
+        // Materialize legacy grants while the previous subscription record is
+        // still intact, so an update to `canceled` does not turn a billing tier
+        // into an administrator grant on the subsequent `revokeStripe()`.
+        $this->levelGrants->reconstruct($user);
+
         $details = $user->getPaymentDetails();
         $previous = is_array($details['subscription'] ?? null) ? $details['subscription'] : [];
         $sameSubscription = ($previous['stripe_subscription_id'] ?? null) === ($subscription->id ?? null);

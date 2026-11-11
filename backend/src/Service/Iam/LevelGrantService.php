@@ -186,7 +186,20 @@ final readonly class LevelGrantService
      */
     public function reconstruct(User $user): bool
     {
-        if (!$this->managed($user) || $this->grants->countFor((int) $user->getId()) > 0) {
+        if (!$this->managed($user)) {
+            if (isset($this->memory[$user])) {
+                return false;
+            }
+            $plan = $this->legacy->plan($user, false);
+            if ([] === $plan->grants) {
+                return false;
+            }
+            $this->memory[$user] = $this->normalize($plan->bySource());
+            $this->applyLevel($user, $this->memory[$user]);
+
+            return true;
+        }
+        if ($this->grants->countFor((int) $user->getId()) > 0) {
             return false;
         }
         $plan = $this->legacy->plan($user, true);

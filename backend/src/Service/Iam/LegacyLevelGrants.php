@@ -14,6 +14,9 @@ use App\Repository\AuditLogEntryRepository;
  */
 final readonly class LegacyLevelGrants
 {
+    private const STRIPE_OWNED_STATUSES = ['active', 'trialing', 'canceling', 'past_due', 'paused'];
+    private const IAP_OWNED_STATUSES = ['active', 'grace_period', 'on_hold'];
+
     public function __construct(
         private AuditLogEntryRepository $audit,
         private string $oidcAdminRoles = '',
@@ -25,16 +28,17 @@ final readonly class LegacyLevelGrants
         $level = strtoupper($user->getUserLevel());
         $subscription = $user->getSubscriptionData();
         $status = (string) ($subscription['status'] ?? '');
+        $settled = false !== ($subscription['settled'] ?? true);
         $source = $user->getSubscriptionSource();
         $planLevel = $this->billingLevel($subscription, $level);
         $created = $this->timestamp($subscription['subscription_start'] ?? null);
         $grants = [];
 
-        if (LevelGrantSource::STRIPE === $source && 'active' === $status && null !== $planLevel) {
+        if (LevelGrantSource::STRIPE === $source && $settled && in_array($status, self::STRIPE_OWNED_STATUSES, true) && null !== $planLevel) {
             $ref = $subscription['stripe_subscription_id'] ?? null;
             $grants[] = $this->grant(LevelGrantSource::STRIPE, $planLevel, is_scalar($ref) ? (string) $ref : null, $created);
         }
-        if (in_array($source, ['apple', 'google'], true) && in_array($status, ['active', 'grace_period'], true) && null !== $planLevel) {
+        if (in_array($source, ['apple', 'google'], true) && in_array($status, self::IAP_OWNED_STATUSES, true) && null !== $planLevel) {
             // The store token stays in the payment record. The grant does not copy it.
             $grants[] = $this->grant(LevelGrantSource::IAP, $planLevel, null, $created);
         }

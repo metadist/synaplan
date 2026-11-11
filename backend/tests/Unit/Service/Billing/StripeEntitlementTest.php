@@ -140,6 +140,26 @@ final class StripeEntitlementTest extends TestCase
         $this->assertSame('ADMIN', $admin->getUserLevel());
     }
 
+    public function testCanceledSubscriptionUpdateFollowedByRevokeDropsLegacySubscriberToNew(): void
+    {
+        $user = $this->user('BUSINESS');
+        $user->setPaymentDetails(['subscription' => [
+            'source' => 'stripe',
+            'status' => 'active',
+            'plan' => 'BUSINESS',
+            'stripe_subscription_id' => 'sub_cancel_seq',
+        ]]);
+
+        $this->assertFalse($this->entitlement->apply(
+            $user,
+            $this->subscription(['id' => 'sub_cancel_seq', 'status' => 'canceled']),
+            $this->object(['status' => 'paid', 'paid' => true]),
+        ));
+        $this->entitlement->revokeStripe($user);
+
+        $this->assertSame('NEW', $user->getUserLevel());
+    }
+
     public function testApplyKeepsBookkeepingOfTheSameSubscriptionAndReplacesAnotherOne(): void
     {
         $user = $this->user('PRO');
