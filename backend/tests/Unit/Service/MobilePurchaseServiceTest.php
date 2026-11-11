@@ -29,6 +29,7 @@ use Psr\Log\NullLogger;
  */
 final class MobilePurchaseServiceTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private const APPLE_TX = 'orig-tx-123';
     private const GOOGLE_TOKEN = 'purchase-token-abc';
 
@@ -285,6 +286,7 @@ final class MobilePurchaseServiceTest extends TestCase
             $apple ?? new FakeAppleVerifier(null),
             $google ?? new FakeGoogleVerifier(null),
             new NullLogger(),
+            $this->levelGrants(),
         );
     }
 

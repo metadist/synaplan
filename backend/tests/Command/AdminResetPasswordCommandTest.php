@@ -24,6 +24,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 #[AllowMockObjectsWithoutExpectations]
 final class AdminResetPasswordCommandTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private UserRepository&MockObject $userRepository;
     private UserPasswordHasherInterface&MockObject $passwordHasher;
     private EntityManagerInterface&MockObject $entityManager;
@@ -252,6 +253,7 @@ final class AdminResetPasswordCommandTest extends TestCase
             $this->userRepository,
             $this->passwordHasher,
             $this->entityManager,
+            $this->levelGrants(),
         ));
 
         return new CommandTester($application->find('app:admin:reset-password'));

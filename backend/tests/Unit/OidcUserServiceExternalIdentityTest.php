@@ -21,6 +21,7 @@ use Psr\Log\NullLogger;
 
 final class OidcUserServiceExternalIdentityTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private UserRepository&MockObject $userRepository;
     private EntityManagerInterface&MockObject $em;
     private ExternalIdentityRepository&MockObject $externalIdentities;
@@ -148,7 +149,7 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
         $sync = $this->createMock(DirectoryGroupSync::class);
         $sync->method('shouldRun')->willReturn(false);
 
-        return new OidcUserService(
+        $service = new OidcUserService(
             $this->userRepository,
             $this->em,
             $this->createStub(ModelConfigService::class),
@@ -162,6 +163,9 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
             'test-client-id',
             'https://idp.example/realms/synaplan/.well-known/openid-configuration',
         );
+        $service->setLevelGrants($this->levelGrants());
+
+        return $service;
     }
 
     private function keycloakUser(int $id, string $email): User

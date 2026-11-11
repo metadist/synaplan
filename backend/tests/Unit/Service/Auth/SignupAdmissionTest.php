@@ -18,6 +18,8 @@ use PHPUnit\Framework\TestCase;
 
 final class SignupAdmissionTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
+
     public function testOpenModeIgnoresPlanAndCode(): void
     {
         $registration = $this->createMock(RegistrationConfig::class);
@@ -91,6 +93,7 @@ final class SignupAdmissionTest extends TestCase
             $this->createMock(SignupCodeRepository::class),
             $this->createMock(EntityManagerInterface::class),
             new PlanAvailability($billing, $subscriptions),
+            $this->levelGrants(),
         );
     }
 }

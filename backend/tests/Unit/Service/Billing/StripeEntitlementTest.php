@@ -15,6 +15,7 @@ use Stripe\StripeObject;
 
 final class StripeEntitlementTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private const PRICE_PRO = 'price_pro';
     private const PRICE_TEAM = 'price_team';
     private const PRICE_BUSINESS = 'price_business';
@@ -31,6 +32,7 @@ final class StripeEntitlementTest extends TestCase
             self::PRICE_PRO,
             self::PRICE_TEAM,
             self::PRICE_BUSINESS,
+            $this->levelGrants(),
         );
     }
 
@@ -46,7 +48,7 @@ final class StripeEntitlementTest extends TestCase
 
     public function testAnEmptyConfiguredPriceNeverMatchesAnEmptyLookup(): void
     {
-        $entitlement = new StripeEntitlement($this->alert, new NullLogger(), '', '', '');
+        $entitlement = new StripeEntitlement($this->alert, new NullLogger(), '', '', '', $this->levelGrants());
 
         $this->assertSame('NEW', $entitlement->levelForPrice(''));
     }
@@ -136,6 +138,26 @@ final class StripeEntitlementTest extends TestCase
         $this->alert->expects($this->never())->method('paidTierGranted');
         $this->assertTrue($this->entitlement->apply($admin, $this->subscription(['id' => 'sub_a', 'status' => 'active']), $this->object(['status' => 'paid'])));
         $this->assertSame('ADMIN', $admin->getUserLevel());
+    }
+
+    public function testCanceledSubscriptionUpdateFollowedByRevokeDropsLegacySubscriberToNew(): void
+    {
+        $user = $this->user('BUSINESS');
+        $user->setPaymentDetails(['subscription' => [
+            'source' => 'stripe',
+            'status' => 'active',
+            'plan' => 'BUSINESS',
+            'stripe_subscription_id' => 'sub_cancel_seq',
+        ]]);
+
+        $this->assertFalse($this->entitlement->apply(
+            $user,
+            $this->subscription(['id' => 'sub_cancel_seq', 'status' => 'canceled']),
+            $this->object(['status' => 'paid', 'paid' => true]),
+        ));
+        $this->entitlement->revokeStripe($user);
+
+        $this->assertSame('NEW', $user->getUserLevel());
     }
 
     public function testApplyKeepsBookkeepingOfTheSameSubscriptionAndReplacesAnotherOne(): void

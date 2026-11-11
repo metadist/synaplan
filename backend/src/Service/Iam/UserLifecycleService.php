@@ -42,6 +42,7 @@ final readonly class UserLifecycleService
         private TokenService $tokenService,
         private RegistrationConfig $registration,
         private OAuthTokenRepository $oauthTokens,
+        private LevelGrantService $levelGrants,
     ) {
     }
 
@@ -75,21 +76,11 @@ final readonly class UserLifecycleService
             return null;
         }
 
-        $level = 'NEW';
-        if (null !== $admission && $admission['code'] instanceof \App\Entity\SignupCode) {
-            $level = $admission['code']->getLevel();
-        }
-
-        $user = $this->createUser($email, $plainPassword, SignupDoor::Email->value, 'WEB', $level, false, $userDetails);
+        $user = $this->createUser($email, $plainPassword, SignupDoor::Email->value, 'WEB', 'NEW', false, $userDetails);
         if (null === $admission) {
             return $user;
         }
-        if (null !== $admission['plan']) {
-            $this->signupAdmission->apply($user, $admission);
-            $this->em->flush();
-
-            return $user;
-        }
+        $this->signupAdmission->apply($user, $admission);
         if ($admission['code'] instanceof \App\Entity\SignupCode) {
             $this->signupAdmission->commitCode($user, $admission['code']);
         }
@@ -117,7 +108,7 @@ final readonly class UserLifecycleService
             throw SignupBlockedException::closed();
         }
 
-        return $this->newAccount($email, null, $door->value, 'WEB', 'NEW', $emailVerified, []);
+        return $this->newAccount($email, null, $door->value, 'WEB', $emailVerified, []);
     }
 
     /**
@@ -138,10 +129,11 @@ final readonly class UserLifecycleService
         bool $emailVerified = false,
         array $userDetails = [],
     ): User {
-        $user = $this->newAccount($email, $plainPassword, $providerId, $type, $userLevel, $emailVerified, $userDetails);
+        $user = $this->newAccount($email, $plainPassword, $providerId, $type, $emailVerified, $userDetails);
 
         $this->em->persist($user);
         $this->em->flush();
+        $this->grantInitialLevel($user, $userLevel);
 
         $this->modelConfigService->initializeNewUserDefaults((int) $user->getId());
 
@@ -162,7 +154,6 @@ final readonly class UserLifecycleService
         ?string $plainPassword,
         string $providerId,
         string $type,
-        string $userLevel,
         bool $emailVerified,
         array $userDetails,
     ): User {
@@ -175,7 +166,6 @@ final readonly class UserLifecycleService
         $user->setCreated(date('Y-m-d H:i:s'));
         $user->setType($type);
         $user->setProviderId($providerId);
-        $user->setUserLevel($userLevel);
         $user->setEmailVerified($emailVerified);
         $user->setUserDetails($userDetails);
         $user->setPaymentDetails([]);
@@ -185,6 +175,25 @@ final readonly class UserLifecycleService
         }
 
         return $user;
+    }
+
+    /**
+     * The level asked for at creation is a grant, written once the account
+     * has an id. NEW stays the entity default and records nothing. A sign-up
+     * code is not an administrator grant; that path passes NEW and the code
+     * writes its own grant after the account exists.
+     */
+    private function grantInitialLevel(User $user, string $userLevel): void
+    {
+        $userLevel = strtoupper($userLevel);
+        if ('ADMIN' === $userLevel) {
+            $this->levelGrants->replace($user, LevelGrantSource::BOOTSTRAP, 'ADMIN', null, null);
+
+            return;
+        }
+        if (AccountLevel::known($userLevel) && 'NEW' !== $userLevel) {
+            $this->levelGrants->replace($user, LevelGrantSource::ADMIN, $userLevel, null, null);
+        }
     }
 
     /**

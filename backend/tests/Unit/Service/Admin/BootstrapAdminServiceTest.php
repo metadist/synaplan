@@ -27,6 +27,7 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 #[AllowMockObjectsWithoutExpectations]
 final class BootstrapAdminServiceTest extends TestCase
 {
+    use \App\Tests\Support\MemoryLevelGrants;
     private UserRepository&MockObject $userRepository;
     private UserLifecycleService&MockObject $userLifecycleService;
     private EntityManagerInterface&MockObject $entityManager;
@@ -60,6 +61,7 @@ final class BootstrapAdminServiceTest extends TestCase
             $this->lockFactory,
             $this->setupState,
             $this->logger,
+            $this->levelGrants(),
         );
     }
 

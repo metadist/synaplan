@@ -38,6 +38,27 @@ class UserRepository extends ServiceEntityRepository
         return array_map(static fn (mixed $id): int => (int) $id, $ids);
     }
 
+    /**
+     * @return list<User>
+     */
+    public function findAfterId(int $afterId, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        /** @var list<User> $users */
+        $users = $this->createQueryBuilder('u')
+            ->andWhere('u.id > :afterId')
+            ->setParameter('afterId', $afterId)
+            ->orderBy('u.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+
+        return $users;
+    }
+
     public function findByEmail(string $email): ?User
     {
         return $this->findOneBy(['mail' => $email]);

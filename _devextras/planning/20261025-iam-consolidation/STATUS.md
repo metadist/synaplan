@@ -9,7 +9,10 @@ run are entries here, not chat messages.
 | -- | ----- |
 | D1 | accepted — registration off closes every self-sign-up door; an existing account still signs in; a code does not bypass it |
 | D2 | accepted — directory provisioning stays on `OIDC_ALLOW_USER_PROVISIONING` only |
-| D3–D10 | open — owner |
+| D3–D5 | open — owner |
+| D6 | accepted — grants live in `BUSER_LEVEL_GRANTS`, one row per account and source, deleted with the account |
+| D7–D9 | open — owner |
+| D10 | accepted — what an administrator sets is an `admin` grant; the level is the highest grant; billing only takes back its own |
 
 ## Steps
 
@@ -21,14 +24,14 @@ run are entries here, not chat messages.
 | PC2 | | waits for D4 |
 | IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | merged |
 | IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | merged |
-| IC5+IC5b | | waits for D6 and D10 — one pull request, schema then the People row |
+| IC5+IC5b | [#3079](https://github.com/metadist/synaplan/pull/3079) | in review — the level is the highest grant, and People shows where it comes from |
 | IC6 | | waits for IC5 — the identity guide |
-| IC8 | [#3077](https://github.com/metadist/synaplan/pull/3077) | in review — password reset and the SSO-only login page |
+| IC8 | [#3077](https://github.com/metadist/synaplan/pull/3077) | merged — password reset and the SSO-only login page |
 | CH1 | | waits for IC6 (`synaplan-charts`) |
 | IC7 | | waits for D7 — own pull request |
 | PC3 | | waits for D5 |
 
-Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. IC5 still waits for D6 and D10 before a `BUSER_LEVEL_GRANTS` table is added. IC8 walks the journeys that IC2 already made possible; the identity guide (IC6) still waits for IC5.
+Six pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. D6 and D10 are accepted, so IC5 and IC5b share one pull request: `BUSER_LEVEL_GRANTS`, and the People row names each grant. The identity guide (IC6) still waits for IC5.
 
 ## Audit 2026-10-25
 
@@ -44,4 +47,6 @@ in `synaplan-platform/planning/20261025-iam-security-note/`.
 
 ## Walks
 
-None yet.
+| Date | Where | What |
+| ---- | ----- | ---- |
+| 2026-11-10 | People → Users | Created an account, set Team, the row showed “Team · an administrator”, and removing that grant returned the account to New with no grant. The signed-in administrator cannot change their own level. Dark, 320 px. |

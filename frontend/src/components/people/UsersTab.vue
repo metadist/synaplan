@@ -176,22 +176,11 @@
                   </div>
                 </td>
                 <td class="py-3 px-4" :data-label="$t('admin.users.level')">
-                  <select
-                    :value="user.level"
-                    class="px-3 py-1.5 rounded-xl bg-chat border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:ring-2 focus:ring-[var(--brand)] focus:outline-none"
-                    :disabled="user.id === currentUserId"
-                    :data-testid="`select-user-level-${user.id}`"
-                    @change="
-                      updateUserLevel(user.id, ($event.target as HTMLSelectElement).value, $event)
-                    "
-                  >
-                    <option value="ANONYMOUS">ANONYMOUS</option>
-                    <option value="NEW">NEW</option>
-                    <option value="PRO">PRO</option>
-                    <option value="TEAM">TEAM</option>
-                    <option value="BUSINESS">BUSINESS</option>
-                    <option value="ADMIN">ADMIN</option>
-                  </select>
+                  <UserLevelGrants
+                    :user="user"
+                    :current-user-id="currentUserId"
+                    @changed="applyLevelChange(user.id, $event)"
+                  />
                 </td>
                 <td class="py-3 px-4 txt-secondary text-sm" :data-label="$t('admin.users.type')">
                   {{ user.type }}
@@ -382,11 +371,12 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { adminApi, type AdminUser } from '@/services/api/adminApi'
+import { adminApi, type AdminUser, type LevelGrant } from '@/services/api/adminApi'
 import PeopleLiteracyBar from '@/components/people/PeopleLiteracyBar.vue'
 import type { LiteracyAdmin } from '@/services/api/aiLiteracyApi'
 import { useAuthStore } from '@/stores/auth'
 import { useDateFormat } from '@/composables/useDateFormat'
+import UserLevelGrants from '@/components/people/UserLevelGrants.vue'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useEscapeKey } from '@/composables/useEscapeKey'
@@ -432,11 +422,14 @@ const showDeleteModal = ref(false)
 const userToDelete = ref<AdminUser | null>(null)
 const deleteConfirmed = ref(false)
 
+let loadSequence = 0
+
 watch(currentPage, () => {
   loadUsers()
 })
 
 async function loadUsers() {
+  const seq = ++loadSequence
   usersLoading.value = true
   try {
     const response = await adminApi.getUsers(
@@ -444,6 +437,7 @@ async function loadUsers() {
       itemsPerPage.value,
       userSearch.value
     )
+    if (seq !== loadSequence) return
     if (response && response.users) {
       users.value = response.users
       totalUsers.value = response.total
@@ -451,9 +445,12 @@ async function loadUsers() {
       showError(t('admin.users.invalidResponse'))
     }
   } catch (error) {
+    if (seq !== loadSequence) return
     showError(error instanceof Error ? error.message : t('admin.users.loadFailed'))
   } finally {
-    usersLoading.value = false
+    if (seq === loadSequence) {
+      usersLoading.value = false
+    }
   }
 }
 
@@ -518,39 +515,14 @@ async function resendVerification(user: AdminUser): Promise<void> {
   }
 }
 
-async function updateUserLevel(userId: number, newLevel: string, event?: Event) {
-  const user = users.value.find((u: AdminUser) => u.id === userId)
-  const oldLevel = user?.level
-  const revertSelect = () => {
-    const select = event?.target as HTMLSelectElement | undefined
-    if (select && oldLevel) select.value = oldLevel
-  }
-  const email = user?.email ?? `#${userId}`
-
-  const confirmed = await confirm({
-    title: t('admin.users.levelConfirmTitle', { email }),
-    message:
-      newLevel === 'ADMIN'
-        ? t('admin.users.levelConfirmAdmin', { email })
-        : t('admin.users.levelConfirmMessage', { email, oldLevel, newLevel }),
-    confirmText: t('admin.users.levelConfirmAction'),
-    danger: newLevel === 'ADMIN',
-  })
-  if (!confirmed) {
-    revertSelect()
-    return
-  }
-
-  try {
-    await adminApi.updateUserLevel(userId, newLevel)
-    if (user) {
-      user.level = newLevel as 'NEW' | 'PRO' | 'TEAM' | 'BUSINESS' | 'ADMIN'
-    }
-    success(t('admin.users.levelUpdated', { level: newLevel }))
-  } catch (error) {
-    revertSelect()
-    showError(error instanceof Error ? error.message : t('admin.users.levelUpdateFailed'))
-  }
+function applyLevelChange(
+  userId: number,
+  change: { level: AdminUser['level']; grants: LevelGrant[] }
+): void {
+  const target = users.value.find((u) => u.id === userId)
+  if (!target) return
+  target.level = change.level
+  target.grants = change.grants
 }
 
 function confirmDeleteUser(user: AdminUser) {

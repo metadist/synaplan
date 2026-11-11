@@ -7,6 +7,8 @@ namespace App\Command;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Admin\BootstrapAdminConfiguration;
+use App\Service\Iam\LevelGrantService;
+use App\Service\Iam\LevelGrantSource;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -53,6 +55,7 @@ final class AdminResetPasswordCommand extends Command
         private readonly UserRepository $userRepository,
         private readonly UserPasswordHasherInterface $passwordHasher,
         private readonly EntityManagerInterface $entityManager,
+        private readonly LevelGrantService $levelGrants,
     ) {
         parent::__construct();
     }
@@ -149,7 +152,7 @@ final class AdminResetPasswordCommand extends Command
         $user->setMustChangePassword($generate);
 
         if ($promote) {
-            $user->setUserLevel('ADMIN');
+            $this->levelGrants->replace($user, LevelGrantSource::BOOTSTRAP, 'ADMIN', null, null);
             // An unverified address would leave the recovered administrator stuck
             // behind the verification gate, with no mailer to get past it.
             $user->setEmailVerified(true);

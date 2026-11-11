@@ -6,6 +6,8 @@ namespace App\Service\Billing;
 
 use App\Entity\User;
 use App\Service\Auth\SignupAnomalyAlert;
+use App\Service\Iam\LevelGrantService;
+use App\Service\Iam\LevelGrantSource;
 use Psr\Log\LoggerInterface;
 use Stripe\Invoice;
 use Stripe\StripeObject;
@@ -21,11 +23,12 @@ use Stripe\Subscription;
  * arrives — and before it can bounce. On 2026-10-24 that window was used to
  * open several hundred paid accounts on fake IBANs within minutes.
  *
- * Every write of a Stripe-granted tier goes through {@see apply()}: the
- * webhook handlers (subscription.created / updated, invoice.payment_succeeded)
- * and the on-demand sync endpoint. Downgrades (subscription.deleted, no active
- * subscription in Stripe) stay with their callers; this class never lowers a
- * tier and never touches an ADMIN account.
+ * Every write of a Stripe grant goes through {@see apply()}: the webhook
+ * handlers (subscription.created / updated, invoice.payment_succeeded) and
+ * the on-demand sync endpoint. {@see revokeStripe()} is the only way a
+ * cancellation takes that grant back. The account's level is then the
+ * highest grant that remains, so an administrator's higher grant and an
+ * ADMIN account stay where they are.
  */
 final readonly class StripeEntitlement
 {
@@ -40,6 +43,7 @@ final readonly class StripeEntitlement
         private string $stripePricePro,
         private string $stripePriceTeam,
         private string $stripePriceBusiness,
+        private LevelGrantService $levelGrants,
     ) {
     }
 
@@ -225,6 +229,11 @@ final readonly class StripeEntitlement
         $level = $this->levelForPrice($firstItem instanceof StripeObject ? ($firstItem->price->id ?? null) : null);
         $settled = $this->isSettled($subscription, $invoice);
 
+        // Materialize legacy grants while the previous subscription record is
+        // still intact, so an update to `canceled` does not turn a billing tier
+        // into an administrator grant on the subsequent `revokeStripe()`.
+        $this->levelGrants->reconstruct($user);
+
         $details = $user->getPaymentDetails();
         $previous = is_array($details['subscription'] ?? null) ? $details['subscription'] : [];
         $sameSubscription = ($previous['stripe_subscription_id'] ?? null) === ($subscription->id ?? null);
@@ -261,18 +270,29 @@ final readonly class StripeEntitlement
             ]);
         }
 
-        if ($user->isAdmin() || $user->getUserLevel() === $level) {
+        $before = $user->getUserLevel();
+        $this->levelGrants->replace($user, LevelGrantSource::STRIPE, $level, $subscription->id, null);
+        if ($user->getUserLevel() === $before) {
             return true;
         }
 
-        $user->setUserLevel($level);
         $this->logger->info('Stripe entitlement granted', [
             'user_id' => $user->getId(),
             'subscription_id' => $subscription->id ?? null,
-            'level' => $level,
+            'level' => $user->getUserLevel(),
         ]);
         $this->anomalyAlert->paidTierGranted($user, $level);
 
         return true;
+    }
+
+    /**
+     * Take back the Stripe grant and recompute. Call this while the stored
+     * subscription still says active, so an account that never had grants is
+     * reconstructed as Stripe-owned and the cancellation actually lands.
+     */
+    public function revokeStripe(User $user): void
+    {
+        $this->levelGrants->remove($user, LevelGrantSource::STRIPE);
     }
 }
