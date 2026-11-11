@@ -39,9 +39,13 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
 | `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
-| `REGISTRATION_ENABLED` | *unset* | Pins local email/password self-registration; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
-| `REGISTRATION_MODE` | `open` | `open`: anyone may sign up. `admission`: a new account needs a paid plan or an invitation code ([details](ADMIN.md#who-may-create-an-account-open-or-admission)) |
-| `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial chat; **overrides** the switch in Admin → System Configuration ([details](#access-policy)) |
+| `REGISTRATION_ENABLED` | *unset* | Pins every self-sign-up door (email, Google, GitHub, Apple, setup wizards). An existing account still signs in. Does not govern OIDC. Overrides Admin → System Configuration ([Who can sign in](IDENTITY.md)) |
+| `REGISTRATION_MODE` | `open` | `open`: a self-sign-up is active at `NEW`. `admission`: a new account needs a paid plan or an invitation code ([details](IDENTITY.md)) |
+| `SIGNUP_PAUSED` | *unset* | Temporarily closes every self-sign-up door. The answer is `SIGNUP_PAUSED` (503) |
+| `OIDC_ALLOW_USER_PROVISIONING` | `true` | The only switch that stops a first OIDC sign-in from creating an account. Independent of `REGISTRATION_*` |
+| `SYMFONY_TRUSTED_PROXIES` | *unset* | The proxy that actually connects to Synaplan, so sign-up limits see the visitor and not the ingress. Trust only that hop |
+| `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | *unset* | Human check in front of sign-up and the social doors. When set, reCAPTCHA is ignored |
+| `GUEST_CHAT_ENABLED` | *unset* | Pins the anonymous guest trial. A channel door, not a self-sign-up door ([details](IDENTITY.md)) |
 | `FEATURE_<GROUP>_<SETTING>` | *unset* | Pins one wave feature flag (`FEATURE_IAM_SHARING_ENABLED=false`, `FEATURE_DESKTOP_AGENT_ENABLED=false`, …); **overrides** the toggle on Admin → System Configuration → Features. All flags default **on**. Full list: [FEATURE_FLAGS.md](FEATURE_FLAGS.md) |
 | `WEB_SPEECH_ENABLED` | `true` | Browser Web Speech API (cloud-backed) for chat speech-to-text; set `false` on air-gapped instances so the input records for the server-side transcription path instead |
 
@@ -132,9 +136,10 @@ usual, and the login page offers the identity provider instead of the wizard.
 
 **Administrators come from claims.** On sign-in, the roles found at
 `OIDC_ROLE_CLAIMS` are matched case-insensitively against `OIDC_ADMIN_ROLES`; a
-match sets `BUSERLEVEL=ADMIN`, and losing the role sets the account back to
-`NEW`. Both variables have Keycloak-shaped defaults and only need changing for a
-different provider:
+match writes a directory grant of `ADMIN`. Losing the role removes that
+grant. The level stays the highest grant that remains, so a tier Stripe still
+grants is not dropped to `NEW`. Both variables have Keycloak-shaped defaults
+and only need changing for a different provider:
 
 | Variable | Default | Notes |
 |----------|---------|-------|
@@ -196,23 +201,32 @@ The keys are listed in [RUNTIME_OPTIONS.md](RUNTIME_OPTIONS.md).
 
 ## Access Policy
 
-Self-registration and guest chat are switches in **Admin → System
+Who may create an account, who may sign in, and which switch controls it is
+[Who can create an account, and who can sign in](IDENTITY.md). Read that page
+before changing these variables. The rules that matter when you only have this
+table open:
+
+- `REGISTRATION_ENABLED=false` closes every self-sign-up door: the email form,
+  Google, GitHub, Apple, and an integration setup wizard. An account that
+  already exists still signs in through those doors.
+- `OIDC_ALLOW_USER_PROVISIONING` is a different door. Registration does not
+  stop the directory, and the directory does not stop registration.
+- `SIGNUP_PAUSED=true` is the same close as registration off, temporary, and
+  the runtime config shows it.
+- `REGISTRATION_MODE=admission` requires a paid plan or an invitation code.
+  Leave it at `open` until one of those exists.
+
+Self-registration and guest chat are also switches in **Admin → System
 Configuration**, stored in `BCONFIG` and effective without a restart. The setup
 wizard writes the same two rows.
 
-`REGISTRATION_ENABLED` and `GUEST_CHAT_ENABLED` used to be the only place these
-lived. They still work and now act as a **pin**: when either is set in the
-environment, it wins over the database and the admin UI marks the field as
-overridden instead of showing a value that has no effect. Leave them unset unless
-a deployment has to guarantee the setting — an SSO-only instance, for example,
-where nobody may ever register locally.
+`REGISTRATION_ENABLED` and `GUEST_CHAT_ENABLED` act as a **pin**: when either
+is set in the environment, it wins over the database and the admin UI marks
+the field as overridden. Leave them unset unless a deployment has to guarantee
+the setting, such as an SSO-only instance. Both accept `true`/`false`.
+Unsetting the variable and restarting hands control back to the database.
 
-Both accept `true`/`false`. Unsetting the variable and restarting hands control
-back to the database value.
-
-`REGISTRATION_MODE` follows the same rule and decides *how* a visitor gets an
-account while registration is on: `open` (default) or `admission`, where a new
-account needs a paid plan or an invitation code. See
+`REGISTRATION_MODE` follows the same pin. See
 [Who may create an account](ADMIN.md#who-may-create-an-account-open-or-admission).
 
 ---
@@ -793,8 +807,9 @@ APP_SECRET=generate_a_random_32_char_string
 APP_URL=https://your-domain.com
 FRONTEND_URL=https://your-domain.com
 
-# Security
-CORS_ALLOW_ORIGIN=https://your-domain.com
+# Session cookies are signed with APP_SECRET. TOKEN_SECRET is not read.
+# CORS_ALLOW_ORIGIN is not read either. The API allows any browser origin;
+# the session cookie is HttpOnly. Do not treat that unused variable as a lock.
 ```
 
 ### Authentication cookies over plain HTTP
