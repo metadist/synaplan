@@ -16,7 +16,7 @@
         <input
           type="file"
           class="hidden"
-          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
+          accept=".pdf,.doc,.docx,.txt,.md,.ocnote,.csv,.json"
           multiple
           data-testid="input-knowledge-files"
           @change="handleFilesSelected"

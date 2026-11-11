@@ -60,7 +60,7 @@
                 type="file"
                 multiple
                 class="hidden"
-                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.rtf,.txt,.md,.csv,.xlsx,.xls,.pptx,.ppt,.odt,.ods,.odp,.pages,.numbers,.key,.ics,.jar"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.rtf,.txt,.md,.ocnote,.csv,.xlsx,.xls,.pptx,.ppt,.odt,.ods,.odp,.pages,.numbers,.key,.ics,.jar"
                 data-testid="input-file-selection-upload"
                 @change="handleFileUpload"
               />

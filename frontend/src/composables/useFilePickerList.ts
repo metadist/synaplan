@@ -10,7 +10,7 @@ export const PICKER_TYPE_QUERIES: Record<string, string> = {
   images: 'jpg,jpeg,png,gif,webp,heic,heif,image',
   video: 'mp4,webm,mov,avi,mkv,video',
   audio: 'mp3,wav,ogg,m4a,audio',
-  docs: 'pdf,doc,docx,txt,xlsx,xls,csv,pptx,ppt,md,document',
+  docs: 'pdf,doc,docx,txt,xlsx,xls,csv,pptx,ppt,md,ocnote,document',
 }
 
 const PAGE_SIZE = 30

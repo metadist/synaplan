@@ -18,7 +18,7 @@ final class WatchLimits
 
     /** @var list<string> */
     public const DOCUMENT_EXTENSIONS = [
-        'pdf', 'doc', 'docx', 'odt', 'txt', 'md', 'markdown', 'ppt', 'pptx', 'odp', 'xls', 'xlsx', 'ods', 'csv', 'rtf',
+        'pdf', 'doc', 'docx', 'odt', 'txt', 'md', 'markdown', 'ocnote', 'ppt', 'pptx', 'odp', 'xls', 'xlsx', 'ods', 'csv', 'rtf',
     ];
 
     public function perHour(bool $searchable): int

@@ -916,7 +916,7 @@
                                     <input
                                       type="file"
                                       class="hidden"
-                                      accept=".pdf,.doc,.docx,.txt,.md,.csv,.xlsx"
+                                      accept=".pdf,.doc,.docx,.txt,.md,.ocnote,.csv,.xlsx"
                                       @change="handleWizardFileUpload"
                                     />
                                   </label>
@@ -1101,7 +1101,7 @@
                         <input
                           type="file"
                           class="hidden"
-                          accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
+                          accept=".pdf,.doc,.docx,.txt,.md,.ocnote,.csv,.json"
                           multiple
                           :disabled="knowledgeUploading"
                           data-testid="input-knowledge-upload"

@@ -355,7 +355,7 @@ final class FileHelper
     public static function getFileTypeCode(string $extension): int
     {
         return match (strtolower($extension)) {
-            'txt', 'md', 'csv' => 0,
+            'txt', 'md', 'csv', 'ocnote' => 0,
             'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif' => 1,
             'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2,
             'pdf' => 3,

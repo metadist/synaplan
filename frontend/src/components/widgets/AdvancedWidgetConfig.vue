@@ -1721,7 +1721,7 @@ SynaplanWidget.init({
                       <input
                         type="file"
                         class="hidden"
-                        accept=".pdf,.doc,.docx,.txt,.md,.csv,.json"
+                        accept=".pdf,.doc,.docx,.txt,.md,.ocnote,.csv,.json"
                         multiple
                         :disabled="uploadingFile"
                         @change="handleFileUpload"
