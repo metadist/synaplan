@@ -1922,6 +1922,7 @@ class ModelCatalogTest extends TestCase
 
         $this->assertContains('tool_use', $chat[0]['json']['features'] ?? []);
         $this->assertSame('1048576', $chat[0]['json']['meta']['context_window'] ?? null);
+        $this->assertSame('medium', $chat[0]['json']['meta']['reasoning_effort_default'] ?? null);
         $this->assertSame(65536, $chat[0]['json']['max_tokens'] ?? null);
     }
 

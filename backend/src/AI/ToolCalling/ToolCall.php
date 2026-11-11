@@ -31,6 +31,7 @@ final readonly class ToolCall
         public string $id,
         public string $name,
         public array $arguments = [],
+        public ?string $thoughtSignature = null,
     ) {
     }
 }

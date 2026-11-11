@@ -56,7 +56,15 @@ final class GoogleVisionTest extends TestCase
 
     public function testCarbonWaitsLongEnoughForThinkingAndCapsOutput(): void
     {
-        $vision = new GoogleVision($this->api([self::json(['candidates' => [['content' => ['parts' => [['text' => 'A chart.']]]]]])]), new NullLogger(), $this->uploadDir);
+        $vision = new GoogleVision($this->api([self::json([
+            'candidates' => [[
+                'content' => ['parts' => [
+                    ['text' => 'Internal reasoning.', 'thought' => true],
+                    ['text' => 'A chart.'],
+                ]],
+                'finishReason' => 'STOP',
+            ]],
+        ])]), new NullLogger(), $this->uploadDir);
 
         self::assertSame('A chart.', $vision->analyzeImage('photo.png', 'Read it.', ['model' => 'gemini-4-carbon']));
 

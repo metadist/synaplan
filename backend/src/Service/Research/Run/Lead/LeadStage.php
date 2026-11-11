@@ -348,7 +348,7 @@ final readonly class LeadStage
      */
     private function wire(ToolCall $call, int $index): array
     {
-        return [
+        $wire = [
             'id' => $this->callId($call, $index),
             'type' => 'function',
             'function' => [
@@ -356,6 +356,11 @@ final readonly class LeadStage
                 'arguments' => json_encode($call->arguments, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE),
             ],
         ];
+        if (null !== $call->thoughtSignature && '' !== $call->thoughtSignature) {
+            $wire['thought_signature'] = $call->thoughtSignature;
+        }
+
+        return $wire;
     }
 
     private function callId(ToolCall $call, int $index): string

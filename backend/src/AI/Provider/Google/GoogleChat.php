@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\AI\Provider\Google;
 
 use App\AI\Exception\ProviderException;
@@ -83,12 +85,26 @@ final class GoogleChat
 
             $textContent = '';
             $toolCalls = [];
-            foreach ($data['candidates'][0]['content']['parts'] ?? [] as $part) {
-                if (isset($part['functionCall']) && is_array($part['functionCall'])) {
-                    $toolCalls[] = GoogleMessageFormat::toolCall($part['functionCall']);
+            $candidate = \is_array($data['candidates'][0] ?? null) ? $data['candidates'][0] : [];
+            $candidateSig = GoogleThoughtSignature::fromPart($candidate);
+            $pendingSig = null;
+            foreach ($candidate['content']['parts'] ?? [] as $part) {
+                if (!\is_array($part)) {
                     continue;
                 }
-                if (isset($part['text']) && empty($part['thought'])) {
+                $fc = \is_array($part['functionCall'] ?? null) ? $part['functionCall'] : [];
+                $ownSig = GoogleThoughtSignature::fromPart($part, $fc);
+                if ([] !== $fc) {
+                    $sig = $ownSig ?? $pendingSig ?? $candidateSig;
+                    $pendingSig = null;
+                    $candidateSig = null;
+                    $toolCalls[] = GoogleMessageFormat::toolCall($fc, $sig);
+                    continue;
+                }
+                if (null !== $ownSig) {
+                    $pendingSig = $ownSig;
+                }
+                if (isset($part['text']) && \is_string($part['text']) && empty($part['thought'])) {
                     $textContent .= $part['text'];
                 }
             }
@@ -187,6 +203,8 @@ final class GoogleChat
         $finishReason = null;
         $sawFunctionCall = false;
         $toolIndex = 0;
+        $carrySig = null;
+        $candidateSig = null;
 
         $decoder = new GeminiStreamDecoder();
         foreach ($this->api->stream($response) as $chunk) {
@@ -205,23 +223,44 @@ final class GoogleChat
                     $usage = GoogleUsage::fromMetadata($data['usageMetadata']);
                 }
 
-                $parts = $data['candidates'][0]['content']['parts'] ?? [];
+                $candidate = \is_array($data['candidates'][0] ?? null) ? $data['candidates'][0] : [];
+                $eventCandidateSig = GoogleThoughtSignature::fromPart($candidate);
+                if (null !== $eventCandidateSig) {
+                    $candidateSig = $eventCandidateSig;
+                }
+
+                $parts = $candidate['content']['parts'] ?? [];
                 foreach ($parts as $part) {
-                    if (isset($part['functionCall']) && is_array($part['functionCall'])) {
-                        $call = GoogleMessageFormat::toolCall($part['functionCall']);
-                        $callback([
+                    if (!\is_array($part)) {
+                        continue;
+                    }
+                    $fc = \is_array($part['functionCall'] ?? null) ? $part['functionCall'] : [];
+                    $ownSig = GoogleThoughtSignature::fromPart($part, $fc);
+                    if ([] !== $fc) {
+                        $sig = $ownSig ?? $carrySig ?? $candidateSig;
+                        $carrySig = null;
+                        $candidateSig = null;
+                        $call = GoogleMessageFormat::toolCall($fc, $sig);
+                        $delta = [
                             'type' => 'tool_call_delta',
                             'index' => $toolIndex,
                             'id' => $call['id'],
                             'name' => $call['function']['name'],
                             'arguments' => $call['function']['arguments'],
-                        ]);
+                        ];
+                        if (null !== $sig) {
+                            $delta['thought_signature'] = $sig;
+                        }
+                        $callback($delta);
                         ++$toolIndex;
                         $sawFunctionCall = true;
                         continue;
                     }
+                    if (null !== $ownSig) {
+                        $carrySig = $ownSig;
+                    }
 
-                    if (!isset($part['text']) || '' === $part['text']) {
+                    if (!isset($part['text']) || !\is_string($part['text']) || '' === $part['text']) {
                         continue;
                     }
 
@@ -237,7 +276,7 @@ final class GoogleChat
                 $geminiFinishReason = $data['candidates'][0]['finishReason'] ?? null;
                 if (null !== $geminiFinishReason) {
                     $finishReason = match ($geminiFinishReason) {
-                        'MAX_TOKENS' => 'length',
+                        'MAX_TOKENS', 'CONTINUATION' => 'length',
                         'FUNCTION_CALL' => 'tool_calls',
                         'STOP', 'END_TURN' => $sawFunctionCall ? 'tool_calls' : 'stop',
                         default => $geminiFinishReason,
@@ -533,17 +572,7 @@ final class GoogleChat
      */
     private function thinkingLevelConfig(array $options): ?array
     {
-        $effort = $this->reasoningEffort($options);
-        if (null === $effort) {
-            return null;
-        }
-
-        $level = match ($effort) {
-            'off', 'none', 'disabled', 'low' => 'low',
-            'medium', 'dynamic' => 'medium',
-            'high' => 'high',
-            default => null,
-        };
+        $level = Gemini4Models::thinkingLevel($this->reasoningEffort($options));
 
         return null === $level ? null : ['thinkingLevel' => $level];
     }

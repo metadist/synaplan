@@ -7,6 +7,7 @@ namespace App\Tests\Unit\AI\Provider\Google;
 use App\AI\Provider\Google\GoogleChat;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Tool\ToolCallAccumulator;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -178,6 +179,68 @@ final class GoogleChatTest extends TestCase
         $request = $this->requests()[0];
         self::assertEqualsWithDelta(60, (float) $request['timeout'], 0.001);
         self::assertEqualsWithDelta(60, (float) $request['max_duration'], 0.001);
+    }
+
+    public function testCarbonClampsExtraHighEffortAndTreatsContinuationAsLength(): void
+    {
+        $chat = $this->chat([self::json([
+            'candidates' => [['content' => ['parts' => [['text' => 'Partial segment.']]], 'finishReason' => 'CONTINUATION']],
+            'usageMetadata' => ['promptTokenCount' => 10, 'candidatesTokenCount' => 100, 'thoughtsTokenCount' => 32668],
+        ])]);
+
+        $result = $chat->chat([['role' => 'user', 'content' => 'Prove it.']], [
+            'model' => 'models/gemini-4-carbon',
+            'reasoning_effort' => 'xhigh',
+        ]);
+
+        $request = $this->requests()[0];
+        self::assertStringEndsWith('/models/gemini-4-carbon:generateContent', $request['url']);
+        self::assertSame(['thinkingLevel' => 'high'], $request['body']['generationConfig']['thinkingConfig']);
+        self::assertSame('length', $result['finish_reason']);
+        self::assertSame('Partial segment.', $result['content']);
+    }
+
+    public function testCarbonRoundTripsThoughtSignaturesAcrossToolTurns(): void
+    {
+        $chunk = static fn (array $data): string => 'data: '.json_encode($data)."\r\n\r\n";
+        $chat = $this->chat([
+            new MockResponse([
+                $chunk([
+                    'candidates' => [[
+                        'content' => ['parts' => [
+                            ['thoughtSignature' => 'sig-round-1'],
+                            ['functionCall' => ['name' => 'lookup_doc', 'args' => ['id' => '42']]],
+                        ]],
+                        'finishReason' => 'STOP',
+                    ]],
+                ]),
+            ]),
+            self::json([
+                'candidates' => [['content' => ['parts' => [['text' => 'Found it.']]], 'finishReason' => 'STOP']],
+                'usageMetadata' => ['promptTokenCount' => 15, 'candidatesTokenCount' => 5],
+            ]),
+        ]);
+
+        $acc = new ToolCallAccumulator();
+        $chat->chatStream([['role' => 'user', 'content' => 'Check doc 42']], static function (mixed $event) use ($acc): void {
+            if (\is_array($event)) {
+                $acc->addDelta($event);
+            }
+        }, ['model' => 'gemini-4-carbon']);
+
+        $toolCalls = $acc->complete();
+        self::assertSame('sig-round-1', $toolCalls[0]['thought_signature'] ?? null);
+
+        $followUp = $chat->chat([
+            ['role' => 'user', 'content' => 'Check doc 42'],
+            ['role' => 'assistant', 'content' => '', 'tool_calls' => $toolCalls],
+            ['role' => 'tool', 'tool_call_id' => $toolCalls[0]['id'], 'content' => 'Doc body'],
+        ], ['model' => 'gemini-4-carbon']);
+
+        self::assertSame('Found it.', $followUp['content']);
+        $replayedPart = $this->requests()[1]['body']['contents'][1]['parts'][0];
+        self::assertSame('sig-round-1', $replayedPart['thoughtSignature'] ?? null);
+        self::assertArrayNotHasKey('thoughtSignature', $replayedPart['functionCall']);
     }
 
     /**

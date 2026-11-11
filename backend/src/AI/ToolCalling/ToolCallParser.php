@@ -46,6 +46,8 @@ final class ToolCallParser
                 continue;
             }
 
+            $sig = $rawCall['thought_signature'] ?? $rawCall['thoughtSignature'] ?? null;
+
             $calls[] = new ToolCall(
                 id: is_string($rawCall['id'] ?? null) ? $rawCall['id'] : '',
                 name: $name,
@@ -53,6 +55,7 @@ final class ToolCallParser
                 // that emits a truncated or malformed blob must still count
                 // as having called the tool.
                 arguments: self::decodeArguments($rawCall['function']['arguments'] ?? null),
+                thoughtSignature: is_string($sig) && '' !== $sig ? $sig : null,
             );
         }
 

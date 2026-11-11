@@ -15,17 +15,18 @@ final readonly class SpikeToolCall
         public string $id,
         public string $name,
         public array $arguments,
+        public ?string $thoughtSignature = null,
     ) {
     }
 
     /**
-     * @return array{id: string, type: string, function: array{name: string, arguments: string}}
+     * @return array{id: string, type: string, function: array{name: string, arguments: string}, thought_signature?: string}
      */
     public function toMessage(): array
     {
         $payload = [] === $this->arguments ? new \stdClass() : $this->arguments;
 
-        return [
+        $msg = [
             'id' => '' !== $this->id ? $this->id : 'call_spike',
             'type' => 'function',
             'function' => [
@@ -33,6 +34,11 @@ final readonly class SpikeToolCall
                 'arguments' => json_encode($payload, JSON_THROW_ON_ERROR),
             ],
         ];
+        if (null !== $this->thoughtSignature && '' !== $this->thoughtSignature) {
+            $msg['thought_signature'] = $this->thoughtSignature;
+        }
+
+        return $msg;
     }
 
     /**
@@ -41,7 +47,7 @@ final readonly class SpikeToolCall
     public static function fromProvider(mixed $call): ?self
     {
         if ($call instanceof ToolCall) {
-            return new self('' !== $call->id ? $call->id : 'call_'.bin2hex(random_bytes(6)), $call->name, $call->arguments);
+            return new self('' !== $call->id ? $call->id : 'call_'.bin2hex(random_bytes(6)), $call->name, $call->arguments, $call->thoughtSignature);
         }
         if (!\is_array($call)) {
             return null;
@@ -57,11 +63,13 @@ final readonly class SpikeToolCall
         }
 
         $id = (string) ($call['id'] ?? '');
+        $sig = $call['thought_signature'] ?? $call['thoughtSignature'] ?? null;
 
         return new self(
             '' !== $id ? $id : 'call_'.bin2hex(random_bytes(6)),
             (string) ($function['name'] ?? $call['name'] ?? ''),
             $arguments,
+            \is_string($sig) && '' !== $sig ? $sig : null,
         );
     }
 }

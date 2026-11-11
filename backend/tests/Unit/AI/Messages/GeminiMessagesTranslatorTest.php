@@ -45,12 +45,32 @@ final class GeminiMessagesTranslatorTest extends TestCase
             'max_tokens' => 128,
             'temperature' => 0.2,
             'top_p' => 0.9,
+            'output_config' => ['effort' => 'xhigh'],
             'messages' => [['role' => 'user', 'content' => 'hello']],
         ]);
 
         $this->assertSame(128, $payload['generationConfig']['maxOutputTokens']);
+        $this->assertSame(['thinkingLevel' => 'high'], $payload['generationConfig']['thinkingConfig']);
         $this->assertArrayNotHasKey('temperature', $payload['generationConfig']);
         $this->assertArrayNotHasKey('topP', $payload['generationConfig']);
+        $this->assertArrayNotHasKey('output_config', $payload);
+    }
+
+    public function testGemini4SkipsThoughtPartsAndMapsContinuationStopReason(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $anthropic = $t->fromGeminiResponse([
+            'candidates' => [[
+                'finishReason' => 'CONTINUATION',
+                'content' => ['parts' => [
+                    ['text' => 'Hidden thought.', 'thought' => true],
+                    ['text' => 'Visible answer.'],
+                ]],
+            ]],
+        ], ['model' => 'gemini-4-carbon']);
+
+        $this->assertSame('max_tokens', $anthropic['stop_reason']);
+        $this->assertSame([['type' => 'text', 'text' => 'Visible answer.']], $anthropic['content']);
     }
 
     public function testOlderGeminiKeepsSampling(): void

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\AI\Provider\Google;
 
 use App\AI\Credential\ProviderKeyStore;
@@ -69,7 +71,9 @@ final class GoogleApiClient
      */
     public function modelUrl(string $model, string $method): string
     {
-        return self::API_BASE."/models/{$model}:{$method}";
+        $encodedModel = self::encodeModelId($model);
+
+        return self::API_BASE."/models/{$encodedModel}:{$method}";
     }
 
     /**
@@ -101,9 +105,25 @@ final class GoogleApiClient
 
     public function vertexModelUrl(string $model, string $method): string
     {
+        $encodedModel = self::encodeModelId($model);
+
         return str_replace('{region}', $this->region, self::VERTEX_BASE)
             ."/projects/{$this->projectId}/locations/{$this->region}"
-            ."/publishers/google/models/{$model}:{$method}";
+            ."/publishers/google/models/{$encodedModel}:{$method}";
+    }
+
+    /**
+     * Strip an optional `models/` resource prefix and URL-encode the bare id so
+     * caller-controlled strings cannot traverse paths or inject query parameters.
+     */
+    public static function encodeModelId(string $model): string
+    {
+        $trimmed = trim($model);
+        if (1 === preg_match('#^models/(.+)$#i', $trimmed, $matches)) {
+            $trimmed = $matches[1];
+        }
+
+        return rawurlencode($trimmed);
     }
 
     /**
@@ -183,7 +203,7 @@ final class GoogleApiClient
 
         $finishReason = $candidate['finishReason'] ?? null;
 
-        if ($finishReason && !\in_array($finishReason, ['STOP', 'MAX_TOKENS', 'END_TURN', 'FUNCTION_CALL'], true)) {
+        if ($finishReason && !\in_array($finishReason, ['STOP', 'MAX_TOKENS', 'END_TURN', 'FUNCTION_CALL', 'CONTINUATION'], true)) {
             $textResponse = null;
             $parts = $candidate['content']['parts'] ?? [];
             foreach ($parts as $part) {

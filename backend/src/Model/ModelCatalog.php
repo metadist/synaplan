@@ -3679,7 +3679,7 @@ class ModelCatalog
                 'params' => ['model' => 'gemini-4-argon'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
                 'cache_read_price_per_1M' => 0.10,
-                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536'],
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536', 'reasoning_effort_default' => 'medium'],
             ],
         ],
         [
@@ -3729,7 +3729,7 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Gemini 4 Carbon - strongest public Gemini model for complex multi-step coding, scientific reasoning, and long agent workflows. 1M token context, thinking levels low, medium (default), and high. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20. Cached input is 95% off ($0.10, then $0.20). Paid tier only. Hard tasks spend more output tokens than Argon.',
+                'description' => 'Google Gemini 4 Carbon - flagship reasoning model for complex multi-step coding, scientific analysis, and long agent workflows. 1M token context, thinking levels low, medium (default), and high. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20. Cached input is 95% off ($0.10, then $0.20). Requires a paid Google AI API tier (no free tier); deeper reasoning uses more output tokens than Argon.',
                 'max_tokens' => 65536,
                 'params' => ['model' => 'gemini-4-carbon'],
                 'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
@@ -3752,7 +3752,7 @@ class ModelCatalog
             'quality' => 10,
             'rating' => 1,
             'json' => [
-                'description' => 'Google Gemini 4 Carbon for image, video, audio, and PDF understanding. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20 (cached input $0.10, then $0.20). Paid tier only.',
+                'description' => 'Google Gemini 4 Carbon for image, video, audio, PDF, and Office document understanding. Intro pricing $2 input / $10 output per 1M tokens through 2026-11-30, then $4 / $20 (cached input $0.10, then $0.20). Requires a paid Google AI API tier (no free tier).',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'params' => ['model' => 'gemini-4-carbon'],
                 'features' => ['vision'],

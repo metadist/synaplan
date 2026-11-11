@@ -15,7 +15,7 @@ namespace App\AI\Tool;
 final class ToolCallAccumulator
 {
     /**
-     * @var array<int, array{id: ?string, name: ?string, arguments: string}>
+     * @var array<int, array{id: ?string, name: ?string, arguments: string, thought_signature: ?string}>
      */
     private array $byIndex = [];
 
@@ -30,7 +30,7 @@ final class ToolCallAccumulator
 
         $index = (int) ($chunk['index'] ?? 0);
         if (!isset($this->byIndex[$index])) {
-            $this->byIndex[$index] = ['id' => null, 'name' => null, 'arguments' => ''];
+            $this->byIndex[$index] = ['id' => null, 'name' => null, 'arguments' => '', 'thought_signature' => null];
         }
 
         if (isset($chunk['id']) && is_string($chunk['id']) && '' !== $chunk['id']) {
@@ -42,10 +42,14 @@ final class ToolCallAccumulator
         if (isset($chunk['arguments']) && is_string($chunk['arguments'])) {
             $this->byIndex[$index]['arguments'] .= $chunk['arguments'];
         }
+        $sig = $chunk['thought_signature'] ?? $chunk['thoughtSignature'] ?? null;
+        if (is_string($sig) && '' !== $sig) {
+            $this->byIndex[$index]['thought_signature'] = $sig;
+        }
     }
 
     /**
-     * @return list<array{id: string, type: 'function', function: array{name: string, arguments: string}}>
+     * @return list<array{id: string, type: 'function', function: array{name: string, arguments: string}, thought_signature?: string}>
      */
     public function complete(): array
     {
@@ -56,7 +60,7 @@ final class ToolCallAccumulator
             if ('' === $id) {
                 $id = 'call_'.bin2hex(random_bytes(6));
             }
-            $out[] = [
+            $call = [
                 'id' => $id,
                 'type' => 'function',
                 'function' => [
@@ -64,6 +68,10 @@ final class ToolCallAccumulator
                     'arguments' => self::repairArguments($row['arguments']),
                 ],
             ];
+            if (null !== $row['thought_signature']) {
+                $call['thought_signature'] = $row['thought_signature'];
+            }
+            $out[] = $call;
         }
 
         return $out;

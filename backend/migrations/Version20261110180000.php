@@ -38,13 +38,16 @@ final class Version20261110180000 extends AbstractMigration
             $byId[(int) $row['id']] = $row;
         }
 
+        $existsStmt = $this->connection->prepare('SELECT BID FROM BMODELS WHERE BID = :bid');
+
         foreach (self::NEW_BIDS as $bid) {
             $this->abortIf(
                 !isset($byId[$bid]),
                 sprintf('ModelCatalog is missing BID %d — the migration cannot insert it.', $bid),
             );
 
-            $exists = $this->connection->fetchOne('SELECT BID FROM BMODELS WHERE BID = ?', [$bid]);
+            $existsStmt->bindValue('bid', $bid);
+            $exists = $existsStmt->executeQuery()->fetchOne();
             if (false !== $exists) {
                 continue;
             }

@@ -8,6 +8,8 @@ use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnthropicServerTools;
 use App\AI\Provider\Google\Gemini4Models;
+use App\AI\Provider\Google\GoogleApiClient;
+use App\AI\Provider\Google\GoogleThoughtSignature;
 use App\AI\Provider\Google\GoogleUsage;
 use App\AI\Tool\OpenAiToolShapes;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
@@ -115,6 +117,10 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
      */
     public function toGeminiRequest(array $requestBody): array
     {
+        $model = \is_string($requestBody['model'] ?? null) ? $requestBody['model'] : '';
+        $gemini4 = Gemini4Models::usesThinkingLevel($model);
+        $thinkingLevel = $gemini4 ? Gemini4Models::thinkingLevelFromMessagesRequest($requestBody) : null;
+
         foreach (self::STRIP_KEYS as $key) {
             unset($requestBody[$key]);
         }
@@ -147,9 +153,6 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
             $payload['systemInstruction'] = $systemInstruction;
         }
 
-        $model = \is_string($requestBody['model'] ?? null) ? $requestBody['model'] : '';
-        $gemini4 = Gemini4Models::usesThinkingLevel($model);
-
         $generationConfig = [];
         if (isset($requestBody['max_tokens'])) {
             $generationConfig['maxOutputTokens'] = (int) $requestBody['max_tokens'];
@@ -160,6 +163,9 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         }
         if (!$gemini4 && isset($requestBody['top_p'])) {
             $generationConfig['topP'] = (float) $requestBody['top_p'];
+        }
+        if (null !== $thinkingLevel) {
+            $generationConfig['thinkingConfig'] = ['thinkingLevel' => $thinkingLevel];
         }
         if ([] !== $generationConfig) {
             $payload['generationConfig'] = $generationConfig;
@@ -198,14 +204,14 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         $parts = $candidate['content']['parts'] ?? [];
         $content = [];
         $pendingSig = null;
-        $candidateSig = \is_array($candidate) ? self::thoughtSignatureFromPart($candidate, []) : null;
+        $candidateSig = \is_array($candidate) ? GoogleThoughtSignature::fromPart($candidate) : null;
         if (\is_array($parts)) {
             foreach ($parts as $i => $part) {
                 if (!\is_array($part)) {
                     continue;
                 }
                 $fc = \is_array($part['functionCall'] ?? null) ? $part['functionCall'] : [];
-                $ownSig = self::thoughtSignatureFromPart($part, $fc);
+                $ownSig = GoogleThoughtSignature::fromPart($part, $fc);
                 if ([] !== $fc) {
                     $args = $fc['args'] ?? [];
                     $block = [
@@ -226,7 +232,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                 if (null !== $ownSig) {
                     $pendingSig = $ownSig;
                 }
-                if (isset($part['text']) && \is_string($part['text'])) {
+                if (isset($part['text']) && \is_string($part['text']) && empty($part['thought'])) {
                     $content[] = ['type' => 'text', 'text' => $part['text']];
                 }
             }
@@ -242,7 +248,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
         }
         $stopReason = match (true) {
             $hasTools => 'tool_use',
-            'MAX_TOKENS' === $finish => 'max_tokens',
+            \in_array($finish, ['MAX_TOKENS', 'CONTINUATION'], true) => 'max_tokens',
             default => 'end_turn',
         };
 
@@ -392,29 +398,6 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     }
 
     /**
-     * Gemini 3.x requires the thought signature from a functionCall to be
-     * replayed on the next generateContent, or the follow-up 400s.
-     *
-     * @param array<string, mixed> $part
-     * @param array<string, mixed> $functionCall
-     */
-    private static function thoughtSignatureFromPart(array $part, array $functionCall): ?string
-    {
-        foreach ([
-            $functionCall['thoughtSignature'] ?? null,
-            $functionCall['thought_signature'] ?? null,
-            $part['thoughtSignature'] ?? null,
-            $part['thought_signature'] ?? null,
-        ] as $sig) {
-            if (\is_string($sig) && '' !== $sig) {
-                return $sig;
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * @param list<array<string, mixed>>|array<string, mixed> $blocks
      */
     private function flattenText(array $blocks): string
@@ -438,7 +421,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     {
         $upstream = rtrim((string) ($context['gemini_upstream_url'] ?? self::DEFAULT_UPSTREAM), '/');
         $modelName = (string) ($requestBody['model'] ?? 'gemini-2.0-flash');
-        $model = rawurlencode($modelName);
+        $model = GoogleApiClient::encodeModelId($modelName);
         $timeout = Gemini4Models::usesThinkingLevel($modelName)
             ? Gemini4Models::TIMEOUT_SECONDS
             : self::DEFAULT_TIMEOUT;
@@ -543,7 +526,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
 
                 $candidate = $decoded['candidates'][0] ?? [];
                 if (\is_array($candidate)) {
-                    $eventCandidateSig = self::thoughtSignatureFromPart($candidate, []);
+                    $eventCandidateSig = GoogleThoughtSignature::fromPart($candidate);
                     if (null !== $eventCandidateSig) {
                         $candidateSig = $eventCandidateSig;
                     }
@@ -559,11 +542,11 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                         continue;
                     }
                     $fc = \is_array($part['functionCall'] ?? null) ? $part['functionCall'] : [];
-                    $ownSig = self::thoughtSignatureFromPart($part, $fc);
+                    $ownSig = GoogleThoughtSignature::fromPart($part, $fc);
                     if ([] === $fc && null !== $ownSig) {
                         $carrySig = $ownSig;
                     }
-                    if (isset($part['text']) && \is_string($part['text']) && '' !== $part['text']) {
+                    if (isset($part['text']) && \is_string($part['text']) && '' !== $part['text'] && empty($part['thought'])) {
                         if (!$textStarted) {
                             $textIndex = $nextIndex++;
                             $emit([
@@ -627,7 +610,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
                 }
 
                 $finish = $decoded['candidates'][0]['finishReason'] ?? null;
-                if ('MAX_TOKENS' === $finish) {
+                if (\in_array($finish, ['MAX_TOKENS', 'CONTINUATION'], true)) {
                     $stopReason = 'max_tokens';
                 }
             }
