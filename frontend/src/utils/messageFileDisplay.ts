@@ -9,7 +9,7 @@ export const getFileIcon = (fileType: string): string => {
   if (['mp3', 'wav', 'ogg', 'm4a', 'opus'].includes(type)) return 'mdi:file-music'
   if (['mp4', 'avi', 'mov', 'webm'].includes(type)) return 'mdi:file-video'
   if (['zip', 'rar', '7z', 'tar', 'gz'].includes(type)) return 'mdi:folder-zip'
-  if (['txt', 'md'].includes(type)) return 'mdi:file-document-outline'
+  if (['txt', 'md', 'ocnote'].includes(type)) return 'mdi:file-document-outline'
   return 'mdi:file-outline'
 }
 

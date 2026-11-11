@@ -42,6 +42,7 @@ describe('filePreview helpers', () => {
     expect(kindFromExtension('mp3')).toBe('audio')
     expect(kindFromExtension('pdf')).toBe('pdf')
     expect(kindFromExtension('md')).toBe('text')
+    expect(kindFromExtension('ocnote')).toBe('text')
     expect(kindFromExtension('docx')).toBe('document')
     expect(kindFromExtension('ics')).toBe('calendar')
     expect(kindFromExtension('bin')).toBe('unknown')

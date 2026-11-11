@@ -13,7 +13,18 @@ const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif', '
 const VIDEO_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi', 'mkv', 'm4v']
 const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac', 'opus']
 /** Plain-text types whose `text_preview` snippet reads naturally as a preview. */
-const TEXT_EXTENSIONS = ['txt', 'md', 'markdown', 'csv', 'log', 'json', 'xml', 'yml', 'yaml']
+const TEXT_EXTENSIONS = [
+  'txt',
+  'md',
+  'markdown',
+  'ocnote',
+  'csv',
+  'log',
+  'json',
+  'xml',
+  'yml',
+  'yaml',
+]
 const DOCUMENT_EXTENSIONS = [
   'doc',
   'docx',

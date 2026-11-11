@@ -359,7 +359,7 @@
                 type="file"
                 multiple
                 class="hidden"
-                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.xlsx,.xls,.pptx,.ppt,.jar"
+                accept="image/*,.heic,.heif,video/*,audio/*,.pdf,.doc,.docx,.txt,.ocnote,.xlsx,.xls,.pptx,.ppt,.jar"
                 data-testid="input-chat-file"
                 @change="handleFileSelect"
               />

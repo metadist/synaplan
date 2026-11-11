@@ -507,7 +507,7 @@
               <input
                 ref="fileInput"
                 type="file"
-                accept="image/*,.heic,.heif,.pdf,.doc,.docx,.txt,.md,.csv"
+                accept="image/*,.heic,.heif,.pdf,.doc,.docx,.txt,.md,.ocnote,.csv"
                 class="hidden"
                 multiple
                 data-testid="input-file"

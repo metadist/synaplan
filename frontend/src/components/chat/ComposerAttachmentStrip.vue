@@ -82,7 +82,7 @@ function fileChipIcon(fileType: string): string {
   if (['doc', 'docx'].includes(ext)) return 'mdi:file-word'
   if (['xls', 'xlsx'].includes(ext)) return 'mdi:file-excel'
   if (['ppt', 'pptx'].includes(ext)) return 'mdi:file-powerpoint'
-  if (['txt'].includes(ext)) return 'mdi:file-document'
+  if (['txt', 'ocnote'].includes(ext)) return 'mdi:file-document'
   return 'mdi:file'
 }
 </script>

@@ -27,7 +27,7 @@ final readonly class CapabilityService
      * @var array<string, list<string>>
      */
     private const EXTENSION_CATEGORIES = [
-        'text' => ['txt', 'md', 'csv'],
+        'text' => ['txt', 'md', 'csv', 'ocnote'],
         'documents' => ['pdf', 'doc', 'docx', 'odt', 'odf', 'odg'],
         'spreadsheets' => ['xls', 'xlsx', 'ods'],
         'presentations' => ['ppt', 'pptx', 'odp'],

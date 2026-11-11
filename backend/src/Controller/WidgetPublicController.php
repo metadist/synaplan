@@ -702,7 +702,7 @@ class WidgetPublicController extends AbstractController
             'doc' => 'document', 'docx' => 'document',
             'xls' => 'spreadsheet', 'xlsx' => 'spreadsheet',
             'ppt' => 'presentation', 'pptx' => 'presentation',
-            'txt' => 'text', 'md' => 'text',
+            'txt' => 'text', 'md' => 'text', 'ocnote' => 'text',
             'jpg' => 'image', 'jpeg' => 'image', 'png' => 'image', 'gif' => 'image',
             'mp4' => 'video', 'mov' => 'video', 'avi' => 'video',
             'mp3' => 'audio', 'wav' => 'audio',
@@ -717,7 +717,7 @@ class WidgetPublicController extends AbstractController
     private function getFileTypeCode(string $extension): int
     {
         return match (strtolower($extension)) {
-            'txt', 'md', 'csv' => 0, // Plain text
+            'txt', 'md', 'csv', 'ocnote' => 0, // Plain text
             'jpg', 'jpeg', 'png', 'gif', 'webp' => 1, // Image
             'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2, // Audio/Video
             'pdf' => 3, // PDF

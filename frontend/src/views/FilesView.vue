@@ -45,7 +45,7 @@
             ref="fileInputRef"
             type="file"
             multiple
-            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.csv,.odt,.ods,.odp,.odg,.odf,.rtf,.pages,.numbers,.key,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv,.jar"
+            accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.txt,.md,.ocnote,.csv,.odt,.ods,.odp,.odg,.odf,.rtf,.pages,.numbers,.key,.ics,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.mp3,.mp4,.wav,.ogg,.m4a,.webm,.mov,.avi,.mkv,.jar"
             class="hidden"
             data-testid="input-files"
             @change="handleFileSelect"

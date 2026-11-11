@@ -815,7 +815,7 @@
                     type="file"
                     multiple
                     class="hidden"
-                    accept="image/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv"
+                    accept="image/*,.pdf,.doc,.docx,.txt,.ocnote,.xls,.xlsx,.csv"
                     @change="handleFileSelect"
                   />
                   <button

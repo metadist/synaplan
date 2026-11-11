@@ -38,6 +38,7 @@ final class WatchCoreTest extends TestCase
         self::assertSame(100, $limits->perHour(false));
         self::assertFalse($limits->readable('photo.png', false));
         self::assertTrue($limits->readable('notes.md', false));
+        self::assertTrue($limits->readable('note1.ocnote', false));
     }
 
     public function testTheLoopGuardDropsOwnWritesAndTranslatedNames(): void

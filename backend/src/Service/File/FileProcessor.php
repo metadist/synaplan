@@ -21,14 +21,8 @@ use Symfony\Component\Process\Process;
 /**
  * Universal File Processor.
  *
- * Extracts text from files using multiple strategies:
- * 1. Native (plain text files)
- * 2. Tika (documents: PDF, DOCX, XLSX, etc.)
- * 3. Rasterize + Vision AI (fallback for PDFs with low-quality Tika extraction)
- * 4. Vision AI (images)
- * 5. Speech-to-Text (audio/video files via Whisper.cpp)
- *
- * Strategy from legacy: Native -> Tika -> Rasterize+Vision fallback
+ * Extracts text from plain text, documents (Tika, then rasterize plus vision),
+ * images, and audio or video.
  */
 final readonly class FileProcessor
 {
@@ -172,6 +166,10 @@ final readonly class FileProcessor
         }
 
         $absolutePath = $this->resolveAbsolutePath($relativePath);
+        if ('ocnote' === $ext) {
+            return OcnoteText::extract($absolutePath, $this->textCleaner, $this->logger);
+        }
+
         $mime = mime_content_type($absolutePath) ?: '';
         $mime = $this->ensureOfficeMime($mime, $ext);
 

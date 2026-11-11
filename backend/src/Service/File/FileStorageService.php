@@ -17,7 +17,7 @@ final readonly class FileStorageService
 {
     public const MAX_FILE_SIZE = 128 * 1024 * 1024; // 128 MB
     public const ALLOWED_EXTENSIONS = [
-        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
+        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv', 'ocnote',
         'odt', 'ods', 'odp', 'odg', 'odf', 'rtf', 'pages', 'numbers', 'key', 'ics',
         'jpg', 'jpeg', 'png', 'gif', 'webp',
         // Apple HEIC/HEIF photos — transcoded to JPEG on store so browsers and

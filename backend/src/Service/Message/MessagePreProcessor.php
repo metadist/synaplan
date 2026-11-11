@@ -40,7 +40,7 @@ final readonly class MessagePreProcessor
     // the chat path, so FileTypeResolver returned '' and the turn never
     // force-routed to file_analysis.
     public const DOCUMENT_EXTENSIONS = [
-        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv',
+        'pdf', 'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt', 'txt', 'md', 'csv', 'ocnote',
         'odt', 'ods', 'odp', 'odg', 'odf', 'rtf', 'pages', 'numbers', 'key', 'ics',
     ];
     public const AUDIO_EXTENSIONS = ['ogg', 'mp3', 'wav', 'm4a', 'opus', 'flac', 'webm', 'amr'];
