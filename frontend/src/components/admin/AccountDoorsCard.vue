@@ -3,7 +3,7 @@
  * Who can create an account, read from the Authentication settings already
  * on this page. A row links to the existing switch. It does not save.
  */
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { accountDoors, type AccountDoor, type DoorValue } from '@/utils/accountDoors'
@@ -33,8 +33,17 @@ async function showSwitch(door: AccountDoor): Promise<void> {
     route.query.section === door.section &&
     route.query.highlight === door.field
   if (same) {
-    document
-      .querySelector(`[data-config-field="${CSS.escape(door.field)}"]`)
+    const panel = document.getElementById(`config-section-${door.section}`)
+    if (panel?.dataset.open !== 'true') {
+      panel
+        ?.querySelector<HTMLButtonElement>(
+          `[data-testid="btn-config-section-${CSS.escape(door.section)}"]`
+        )
+        ?.click()
+      await nextTick()
+    }
+    panel
+      ?.querySelector<HTMLElement>(`[data-config-field="${CSS.escape(door.field)}"]`)
       ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     return
   }

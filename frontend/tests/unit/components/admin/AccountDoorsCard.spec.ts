@@ -81,5 +81,38 @@ describe('AccountDoorsCard', () => {
       section: 'access',
       highlight: 'REGISTRATION_ENABLED',
     })
+    replace.mockRestore()
+  })
+
+  it('opens a collapsed section when the address already points at that switch', async () => {
+    await router.push({
+      path: '/admin/config',
+      query: { tab: 'auth', section: 'access', highlight: 'REGISTRATION_ENABLED' },
+    })
+    await router.isReady()
+    const panel = document.createElement('section')
+    panel.id = 'config-section-access'
+    panel.dataset.open = 'false'
+    const button = document.createElement('button')
+    button.dataset.testid = 'btn-config-section-access'
+    button.addEventListener('click', () => {
+      panel.dataset.open = 'true'
+    })
+    const field = document.createElement('div')
+    field.dataset.configField = 'REGISTRATION_ENABLED'
+    field.scrollIntoView = vi.fn()
+    panel.append(button, field)
+    document.body.append(panel)
+
+    const wrapper = mountCard({
+      values: { REGISTRATION_ENABLED: { value: 'true', isSet: true } },
+    })
+    await wrapper.get('[data-testid="account-door-selfSignup-switch"]').trigger('click')
+    await flushPromises()
+
+    expect(panel.dataset.open).toBe('true')
+    expect(field.scrollIntoView).toHaveBeenCalled()
+    expect(router.currentRoute.value.query.highlight).toBe('REGISTRATION_ENABLED')
+    panel.remove()
   })
 })
