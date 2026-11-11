@@ -508,6 +508,50 @@
         "interface": "Interface",
         "guest_landing": "Guest landing page"
       },
+      "accountDoors": {
+        "title": "Who can create an account here",
+        "hint": "This list only shows the current state. It does not change it. A closed door never stops someone who already has an account from signing in.",
+        "loading": "Checking who can create an account…",
+        "error": "The account doors could not be read. Refresh the page.",
+        "showSwitch": "Show the switch",
+        "openPeople": "Open Users",
+        "state": {
+          "open": "Open",
+          "closed": "Closed",
+          "unset": "Not set up"
+        },
+        "source": {
+          "env": "Pinned by {key}",
+          "admin": "Set on this page",
+          "default": "Application default",
+          "role": "Administrators"
+        },
+        "doors": {
+          "selfSignup": {
+            "title": "Email, Google, GitHub and Apple",
+            "open": "New people can create an account with email, Google, GitHub or Apple. People who already have an account still sign in.",
+            "admission": "A new account needs a paid plan or an invitation code. People who already have an account still sign in.",
+            "registrationOff": "New people can no longer sign up with email, Google, GitHub or Apple. People who already have an account still sign in.",
+            "paused": "New accounts are paused. People who already have an account still sign in.",
+            "humanCheck": "A human check runs before a new account."
+          },
+          "directory": {
+            "title": "Company login",
+            "open": "The first sign-in through the company login creates an account. Registration switches do not affect this.",
+            "provisioningOff": "A first sign-in through the company login does not create an account. People who already signed in that way still can.",
+            "notConfigured": "No company login is set up, so this door creates no accounts."
+          },
+          "operator": {
+            "title": "Added by an administrator",
+            "admin": "An administrator can create an account on Users. Registration switches do not close this."
+          },
+          "channel": {
+            "title": "Guest chat and channels",
+            "guestOn": "Visitors can try the chat without an account. Guest chat, inbound email, WhatsApp and Telegram do not create an account.",
+            "guestOff": "Guest chat is off, so visitors sign in. Guest chat, inbound email, WhatsApp and Telegram do not create an account."
+          }
+        }
+      },
       "tabIntro": {
         "auth": "Who may register and sign in, and which sign-in providers are offered.",
         "sharing": "What users may share with everyone, which login groups are synced, and how long the audit log is kept.",

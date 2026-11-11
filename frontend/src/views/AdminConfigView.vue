@@ -5,6 +5,7 @@ import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import AccountDoorsCard from '@/components/admin/AccountDoorsCard.vue'
 import BrandingStyleResetCard from '@/components/admin/BrandingStyleResetCard.vue'
 import ConfigSectionStack from '@/components/admin/ConfigSectionStack.vue'
 import RestartRequiredBanner from '@/components/admin/RestartRequiredBanner.vue'
@@ -537,6 +538,13 @@ onBeforeUnmount(() => {
             </p>
 
             <WebSearchPlugTab v-if="currentTab.panel === 'web-search'" />
+
+            <AccountDoorsCard
+              v-if="currentTab.id === 'auth'"
+              :values="systemConfig.values.value"
+              :loading="systemConfig.loading.value && !systemConfig.loaded.value"
+              :failed="systemConfig.loadFailed.value"
+            />
 
             <BrandingStyleResetCard v-if="currentTab.id === 'branding'" :config="systemConfig" />
 

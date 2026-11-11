@@ -64,7 +64,7 @@ async function reveal(sectionId: string): Promise<void> {
 }
 
 watch(
-  () => [route.query.section, sectionIds.value.join('\0')] as const,
+  () => [route.query.section, route.query.highlight, sectionIds.value.join('\0')] as const,
   ([wanted]) => {
     if (typeof wanted === 'string' && sectionIds.value.includes(wanted)) {
       void reveal(wanted)

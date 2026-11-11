@@ -508,6 +508,50 @@
         "interface": "Oberfläche",
         "guest_landing": "Gäste-Startseite"
       },
+      "accountDoors": {
+        "title": "Wer hier ein Konto anlegen kann",
+        "hint": "Diese Liste zeigt nur den aktuellen Stand. Sie ändert nichts. Eine geschlossene Tür hält niemanden auf, der schon ein Konto hat.",
+        "loading": "Es wird geprüft, wer ein Konto anlegen kann…",
+        "error": "Die Türen konnten nicht gelesen werden. Lade die Seite neu.",
+        "showSwitch": "Schalter anzeigen",
+        "openPeople": "Benutzer öffnen",
+        "state": {
+          "open": "Offen",
+          "closed": "Geschlossen",
+          "unset": "Nicht eingerichtet"
+        },
+        "source": {
+          "env": "Festgelegt durch {key}",
+          "admin": "Auf dieser Seite gesetzt",
+          "default": "Voreinstellung",
+          "role": "Administratoren"
+        },
+        "doors": {
+          "selfSignup": {
+            "title": "E-Mail, Google, GitHub und Apple",
+            "open": "Neue Personen können ein Konto mit E-Mail, Google, GitHub oder Apple anlegen. Wer schon ein Konto hat, meldet sich weiter an.",
+            "admission": "Ein neues Konto braucht einen bezahlten Tarif oder einen Einladungscode. Wer schon ein Konto hat, meldet sich weiter an.",
+            "registrationOff": "Neue Personen können sich nicht mehr mit E-Mail, Google, GitHub oder Apple registrieren. Wer schon ein Konto hat, meldet sich weiter an.",
+            "paused": "Neue Konten sind pausiert. Wer schon ein Konto hat, meldet sich weiter an.",
+            "humanCheck": "Vor einem neuen Konto läuft eine Prüfung, ob ein Mensch am Werk ist."
+          },
+          "directory": {
+            "title": "Firmenanmeldung",
+            "open": "Die erste Anmeldung über die Firmenanmeldung legt ein Konto an. Die Registrierungsschalter gelten hier nicht.",
+            "provisioningOff": "Eine erste Anmeldung über die Firmenanmeldung legt kein Konto an. Wer sich dort schon einmal angemeldet hat, kann es weiter.",
+            "notConfigured": "Es ist keine Firmenanmeldung eingerichtet. Diese Tür legt keine Konten an."
+          },
+          "operator": {
+            "title": "Von einer Administratorin oder einem Administrator angelegt",
+            "admin": "Eine Administratorin oder ein Administrator kann unter Benutzer ein Konto anlegen. Die Registrierungsschalter schließen das nicht."
+          },
+          "channel": {
+            "title": "Gast-Chat und Kanäle",
+            "guestOn": "Besucher können den Chat ohne Konto ausprobieren. Gast-Chat, eingehende E-Mail, WhatsApp und Telegram legen kein Konto an.",
+            "guestOff": "Der Gast-Chat ist aus, Besucher melden sich an. Gast-Chat, eingehende E-Mail, WhatsApp und Telegram legen kein Konto an."
+          }
+        }
+      },
       "tabIntro": {
         "auth": "Wer sich registrieren und anmelden darf und welche Anmeldeanbieter angeboten werden.",
         "sharing": "Was Benutzer mit allen teilen dürfen, welche Login-Gruppen übernommen werden und wie lange das Protokoll aufbewahrt wird.",

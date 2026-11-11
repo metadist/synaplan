@@ -504,6 +504,50 @@
         "interface": "Arayüz",
         "guest_landing": "Misafir karşılama sayfası"
       },
+      "accountDoors": {
+        "title": "Burada kim hesap açabilir",
+        "hint": "Bu liste yalnızca güncel durumu gösterir. Hiçbir şeyi değiştirmez. Kapalı bir kapı, hesabı olan birinin oturum açmasını engellemez.",
+        "loading": "Kimlerin hesap açabildiği kontrol ediliyor…",
+        "error": "Kapılar okunamadı. Sayfayı yenileyin.",
+        "showSwitch": "Ayarı göster",
+        "openPeople": "Kullanıcıları aç",
+        "state": {
+          "open": "Açık",
+          "closed": "Kapalı",
+          "unset": "Kurulu değil"
+        },
+        "source": {
+          "env": "{key} ile sabitlendi",
+          "admin": "Bu sayfada ayarlandı",
+          "default": "Uygulama varsayılanı",
+          "role": "Yöneticiler"
+        },
+        "doors": {
+          "selfSignup": {
+            "title": "E-posta, Google, GitHub ve Apple",
+            "open": "Yeni kişiler e-posta, Google, GitHub veya Apple ile hesap açabilir. Hesabı olanlar oturum açmaya devam eder.",
+            "admission": "Yeni bir hesap için ücretli bir plan veya davet kodu gerekir. Hesabı olanlar oturum açmaya devam eder.",
+            "registrationOff": "Yeni kişiler artık e-posta, Google, GitHub veya Apple ile kaydolamaz. Hesabı olanlar oturum açmaya devam eder.",
+            "paused": "Yeni hesaplar duraklatıldı. Hesabı olanlar oturum açmaya devam eder.",
+            "humanCheck": "Yeni bir hesaptan önce bir insanın orada olduğu kontrol edilir."
+          },
+          "directory": {
+            "title": "Şirket oturumu",
+            "open": "Şirket oturumuyla ilk giriş bir hesap açar. Kayıt anahtarları bunu etkilemez.",
+            "provisioningOff": "Şirket oturumuyla ilk giriş hesap açmaz. Daha önce bu yolla girmiş olanlar girmeye devam eder.",
+            "notConfigured": "Şirket oturumu kurulu değil, bu kapı hesap açmaz."
+          },
+          "operator": {
+            "title": "Bir yönetici tarafından eklendi",
+            "admin": "Bir yönetici Kullanıcılar'da hesap açabilir. Kayıt anahtarları bunu kapatmaz."
+          },
+          "channel": {
+            "title": "Misafir sohbeti ve kanallar",
+            "guestOn": "Ziyaretçiler hesabı olmadan sohbeti deneyebilir. Misafir sohbeti, gelen e-posta, WhatsApp ve Telegram hesap açmaz.",
+            "guestOff": "Misafir sohbeti kapalı, ziyaretçiler oturum açar. Misafir sohbeti, gelen e-posta, WhatsApp ve Telegram hesap açmaz."
+          }
+        }
+      },
       "tabIntro": {
         "auth": "Kimlerin kayıt olup oturum açabileceği ve hangi oturum açma sağlayıcılarının sunulduğu.",
         "sharing": "Kullanıcıların herkesle neleri paylaşabileceği, hangi oturum açma gruplarının eşitlendiği ve denetim kaydının ne kadar süre saklandığı.",

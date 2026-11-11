@@ -123,6 +123,7 @@ async function mountView(path = '/admin/config') {
       { path: '/', component: { template: '<div />' } },
       { path: '/admin', component: { template: '<div />' } },
       { path: '/admin/config', component: { template: '<div />' } },
+      { path: '/admin/people', component: { template: '<div />' } },
       { path: '/admin/setup', component: { template: '<div />' } },
     ],
   })
