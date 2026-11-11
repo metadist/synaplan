@@ -29,7 +29,7 @@ run are entries here, not chat messages.
 | IC6 | [#3086](https://github.com/metadist/synaplan/pull/3086) | merged — one identity guide, and the variables that are not switches |
 | IC8 | [#3077](https://github.com/metadist/synaplan/pull/3077) | merged — password reset and the SSO-only login page |
 | CH1 | [#110](https://github.com/metadist/synaplan-charts/pull/110) | merged — sign-up, human check and trusted proxies in the chart |
-| IC7 | | in review — who can create an account, on Authentication |
+| IC7 | [#3088](https://github.com/metadist/synaplan/pull/3088) | in review — who can create an account, on Authentication |
 | PC3 | | waits for D5 |
 
 Seven pull requests in this repository, not one per row. IC0, PC1–PC3 and CH1 stay in their own repositories. D1 and D2 are accepted, so IC2 and IC3 share one pull request. D6 and D10 are accepted, so IC5 and IC5b share one pull request: `BUSER_LEVEL_GRANTS`, and the People row names each grant. IC8 already landed on its own, so IC6 is the identity guide by itself. D7 is accepted, so IC7 is its own pull request: the card on Authentication. The public docs site links to the guide from its own repository.
