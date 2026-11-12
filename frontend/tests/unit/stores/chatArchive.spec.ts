@@ -6,6 +6,7 @@ import { useChatsStore } from '@/stores/chats'
 import { forgetPagedChat, useChatArchiveStore } from '@/stores/chatArchive'
 import { useChatHistory } from '@/composables/useChatHistory'
 import { useNotification } from '@/composables/useNotification'
+import { beginSessionTeardown, endSessionTeardown } from '@/services/sessionTeardown'
 
 const authUser = ref<{ id: number } | null>({ id: 1 })
 vi.mock('@/services/authService', () => ({
@@ -71,6 +72,7 @@ describe('chat archive store', () => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.clearAllMocks()
+    endSessionTeardown()
     useNotification().notifications.value = []
   })
 
@@ -177,6 +179,48 @@ describe('chat archive store', () => {
     expect(archive.chats).toEqual([])
     expect(archive.viewingArchived).toBe(false)
     expect(archive.loading).toBe(false)
+  })
+
+  it('drops a chat archived for the previous person when the principal changes mid-request', async () => {
+    const chats = useChatsStore()
+    const archive = useChatArchiveStore()
+    chats.chats = [listed(3, 'Secret title', { tags: ['private'] })]
+    chats.activeChatId = 3
+    let resolvePost: (value: { success: boolean }) => void = () => {}
+    httpClientMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePost = resolve
+      })
+    )
+
+    const saving = chats.setChatArchived(3, true)
+    chats.$reset()
+    chats.chats = [listed(7, 'Next person')]
+    resolvePost({ success: true })
+
+    expect(await saving).toBe(false)
+    expect(archive.chats).toEqual([])
+    expect(chats.chats.map((chat) => chat.id)).toEqual([7])
+  })
+
+  it('drops the local archive write when logout starts while the request is in flight', async () => {
+    const chats = useChatsStore()
+    const archive = useChatArchiveStore()
+    chats.chats = [listed(3, 'Secret title')]
+    let resolvePost: (value: { success: boolean }) => void = () => {}
+    httpClientMock.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolvePost = resolve
+      })
+    )
+
+    const saving = chats.setChatArchived(3, true)
+    beginSessionTeardown()
+    resolvePost({ success: true })
+
+    expect(await saving).toBe(false)
+    expect(archive.chats).toEqual([])
+    expect(chats.chats.map((chat) => chat.id)).toEqual([3])
   })
 
   it('clears a loaded archive when the open-chat store resets', async () => {

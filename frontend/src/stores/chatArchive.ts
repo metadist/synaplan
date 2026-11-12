@@ -22,6 +22,16 @@ function checkAuthOrRedirect(): boolean {
   return true
 }
 
+/**
+ * Bumped only when the signed-in person changes. A load must not bump it:
+ * an archive click that overlaps a page fetch is still the same person.
+ */
+let principalEpoch = 0
+
+function samePrincipal(epoch: number): boolean {
+  return !isSessionTerminating() && epoch === principalEpoch
+}
+
 function normalizeChat(chat: unknown): Chat {
   const row = chat as Chat
   return {
@@ -145,6 +155,7 @@ export const useChatArchiveStore = defineStore('chatArchive', () => {
 
   function $reset() {
     loadSeq += 1
+    principalEpoch += 1
     viewingArchived.value = false
     chats.value = []
     loading.value = false
@@ -203,6 +214,7 @@ export async function applyChatArchived(
   deps: ArchiveChangeDeps
 ): Promise<boolean> {
   if (!checkAuthOrRedirect()) return false
+  const epoch = principalEpoch
   const source =
     deps.chats.value.find((row) => row.id === chatId) ??
     deps.railChats.value.find((row) => row.id === chatId) ??
@@ -210,6 +222,9 @@ export async function applyChatArchived(
   await httpClient(`/api/v1/chats/${chatId}/${archived ? 'archive' : 'unarchive'}`, {
     method: 'POST',
   })
+  // Logout or impersonation may have swapped the person while the POST ran.
+  // The server change belongs to the previous person; these refs are the next one.
+  if (!samePrincipal(epoch)) return false
   const archive = useChatArchiveStore()
   if (archived) {
     if (source) archive.prependArchived({ ...source, archived: true })
