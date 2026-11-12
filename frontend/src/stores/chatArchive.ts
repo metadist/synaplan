@@ -34,6 +34,56 @@ function normalizeChat(chat: unknown): Chat {
   }
 }
 
+interface ArchivedPageState {
+  chats: Ref<Chat[]>
+  loading: Ref<boolean>
+  loadFailed: Ref<boolean>
+  hasMore: Ref<boolean>
+  offset: Ref<number>
+  seq: () => number
+  takeSeq: () => number
+}
+
+async function loadArchivedPage(reset: boolean, state: ArchivedPageState): Promise<void> {
+  if (!checkAuthOrRedirect()) return
+  if (!reset && (state.loading.value || !state.hasMore.value)) return
+
+  const seq = state.takeSeq()
+  const nextOffset = reset ? 0 : state.offset.value
+  state.loading.value = true
+  if (reset) state.loadFailed.value = false
+
+  try {
+    const data = await httpClient(
+      `/api/v1/chats?archived=1&limit=${CHAT_HISTORY_PAGE}&offset=${nextOffset}`,
+      { schema: GetApiChatsListResponseSchema }
+    )
+    if (seq !== state.seq()) return
+    const received = data.chats ?? []
+    const page = received.map((chat) => normalizeChat(chat))
+    if (reset) {
+      state.chats.value = page
+    } else {
+      const seen = new Set(state.chats.value.map((chat) => chat.id))
+      state.chats.value = [...state.chats.value, ...page.filter((chat) => !seen.has(chat.id))]
+    }
+    state.offset.value = nextOffset + received.length
+    state.hasMore.value = data.hasMore === true
+    state.loadFailed.value = false
+  } catch (err: unknown) {
+    if (seq !== state.seq()) return
+    state.loadFailed.value = true
+    if (reset) {
+      state.chats.value = []
+      state.offset.value = 0
+      state.hasMore.value = true
+    }
+    console.error('Error loading archived chats:', err)
+  } finally {
+    if (seq === state.seq()) state.loading.value = false
+  }
+}
+
 export const useChatArchiveStore = defineStore('chatArchive', () => {
   const viewingArchived = ref(false)
   const chats = ref<Chat[]>([])
@@ -73,43 +123,15 @@ export const useChatArchiveStore = defineStore('chatArchive', () => {
   }
 
   async function loadArchivedChats(reset = false) {
-    if (!checkAuthOrRedirect()) return
-    if (!reset && (loading.value || !hasMore.value)) return
-
-    const seq = ++loadSeq
-    const nextOffset = reset ? 0 : offset.value
-    loading.value = true
-    if (reset) loadFailed.value = false
-
-    try {
-      const data = await httpClient(
-        `/api/v1/chats?archived=1&limit=${CHAT_HISTORY_PAGE}&offset=${nextOffset}`,
-        { schema: GetApiChatsListResponseSchema }
-      )
-      if (seq !== loadSeq) return
-      const received = data.chats ?? []
-      const page = received.map((chat) => normalizeChat(chat))
-      if (reset) {
-        chats.value = page
-      } else {
-        const seen = new Set(chats.value.map((chat) => chat.id))
-        chats.value = [...chats.value, ...page.filter((chat) => !seen.has(chat.id))]
-      }
-      offset.value = nextOffset + received.length
-      hasMore.value = data.hasMore === true
-      loadFailed.value = false
-    } catch (err: unknown) {
-      if (seq !== loadSeq) return
-      loadFailed.value = true
-      if (reset) {
-        chats.value = []
-        offset.value = 0
-        hasMore.value = true
-      }
-      console.error('Error loading archived chats:', err)
-    } finally {
-      if (seq === loadSeq) loading.value = false
-    }
+    await loadArchivedPage(reset, {
+      chats,
+      loading,
+      loadFailed,
+      hasMore,
+      offset,
+      seq: () => loadSeq,
+      takeSeq: () => ++loadSeq,
+    })
   }
 
   async function toggleViewingArchived() {
