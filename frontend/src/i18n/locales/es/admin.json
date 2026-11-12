@@ -504,6 +504,54 @@
         "interface": "Interfaz",
         "guest_landing": "Página de invitados"
       },
+      "accountDoors": {
+        "title": "Quién puede crear una cuenta aquí",
+        "hint": "Esta lista solo muestra el estado actual. No cambia nada. Una puerta cerrada no impide que quien ya tiene una cuenta inicie sesión.",
+        "loading": "Comprobando quién puede crear una cuenta…",
+        "error": "No se han podido leer las puertas. Actualiza la página.",
+        "showSwitch": "Ver el ajuste",
+        "openPeople": "Abrir Usuarios",
+        "state": {
+          "open": "Abierta",
+          "closed": "Cerrada",
+          "unset": "Sin configurar"
+        },
+        "source": {
+          "env": "Fijado por {key}",
+          "admin": "Definido en esta página",
+          "default": "Valor de la aplicación",
+          "role": "Administradores"
+        },
+        "doors": {
+          "selfSignup": {
+            "title": "Correo, Google, GitHub y Apple",
+            "open": "Las personas nuevas pueden crear una cuenta con correo y, si están configurados, con Google, GitHub o Apple. Quien ya tiene una cuenta sigue entrando.",
+            "admission": "Una cuenta nueva necesita un plan de pago o un código de invitación. Quien ya tiene una cuenta sigue entrando.",
+            "registrationOff": "Las personas nuevas ya no pueden registrarse con correo, Google, GitHub o Apple. Quien ya tiene una cuenta sigue entrando.",
+            "paused": "Las cuentas nuevas están en pausa (un código de invitación válido sigue funcionando). Quien ya tiene una cuenta sigue entrando.",
+            "emailOnly": "Google, GitHub y Apple no están configurados, así que ahora solo se ofrece el correo.",
+            "socialActive": "Acceso social activo: {providers}.",
+            "humanCheck": "Antes de una cuenta nueva se comprueba que hay una persona."
+          },
+          "directory": {
+            "title": "Acceso de la empresa",
+            "open": "El primer acceso por el inicio de sesión de la empresa crea una cuenta. Los ajustes de registro no afectan a esto.",
+            "provisioningOff": "Un primer acceso por el inicio de sesión de la empresa no crea una cuenta. Quien ya entró así sigue pudiendo.",
+            "notConfigured": "No hay un inicio de sesión de empresa, así que esta puerta no crea cuentas.",
+            "missingClientId": "Hay una URL de descubrimiento, pero falta el ID de cliente, así que el acceso de empresa aún no está activo.",
+            "restricted": "Las reglas de organización, rol o permisos también limitan quién puede entrar."
+          },
+          "operator": {
+            "title": "Creada por un administrador",
+            "admin": "Un administrador puede crear una cuenta en Usuarios. Los ajustes de registro no cierran esto."
+          },
+          "channel": {
+            "title": "Chat de invitado (sin cuenta)",
+            "guestOn": "Las visitas pueden probar el chat sin cuenta. El chat de invitado, el correo entrante, WhatsApp y Telegram no crean una cuenta.",
+            "guestOff": "El chat de invitado está apagado, así que las visitas inician sesión primero. El chat de invitado, el correo entrante, WhatsApp y Telegram no crean una cuenta, y los canales usan sus propios ajustes."
+          }
+        }
+      },
       "tabIntro": {
         "auth": "Quién puede registrarse e iniciar sesión, y qué proveedores de inicio de sesión se ofrecen.",
         "sharing": "Qué pueden compartir los usuarios con todos, qué grupos de inicio de sesión se sincronizan y cuánto tiempo se guarda el registro de auditoría.",

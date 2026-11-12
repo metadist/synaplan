@@ -123,6 +123,7 @@ async function mountView(path = '/admin/config') {
       { path: '/', component: { template: '<div />' } },
       { path: '/admin', component: { template: '<div />' } },
       { path: '/admin/config', component: { template: '<div />' } },
+      { path: '/admin/people', component: { template: '<div />' } },
       { path: '/admin/setup', component: { template: '<div />' } },
     ],
   })
@@ -301,5 +302,16 @@ describe('AdminConfigView — topics', () => {
     const { wrapper } = await mountView()
 
     expect(wrapper.find('[data-testid="config-load-error"]').exists()).toBe(true)
+  })
+
+  it('clears section and field highlight query params when switching tabs', async () => {
+    const { wrapper, router } = await mountView(
+      '/admin/config?tab=auth&section=access&highlight=REGISTRATION_ENABLED'
+    )
+
+    await wrapper.get('[data-testid="btn-config-tab-email"]').trigger('click')
+    await flushPromises()
+
+    expect(router.currentRoute.value.query).toEqual({ tab: 'email' })
   })
 })

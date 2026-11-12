@@ -504,6 +504,54 @@
         "interface": "Arayüz",
         "guest_landing": "Misafir karşılama sayfası"
       },
+      "accountDoors": {
+        "title": "Burada kim hesap açabilir",
+        "hint": "Bu liste yalnızca güncel durumu gösterir. Hiçbir şeyi değiştirmez. Kapalı bir kapı, hesabı olan birinin oturum açmasını engellemez.",
+        "loading": "Kimlerin hesap açabildiği kontrol ediliyor…",
+        "error": "Kapılar okunamadı. Sayfayı yenileyin.",
+        "showSwitch": "Ayarı göster",
+        "openPeople": "Kullanıcıları aç",
+        "state": {
+          "open": "Açık",
+          "closed": "Kapalı",
+          "unset": "Kurulu değil"
+        },
+        "source": {
+          "env": "{key} ile sabitlendi",
+          "admin": "Bu sayfada ayarlandı",
+          "default": "Uygulama varsayılanı",
+          "role": "Yöneticiler"
+        },
+        "doors": {
+          "selfSignup": {
+            "title": "E-posta, Google, GitHub ve Apple",
+            "open": "Yeni kişiler e-posta ile ve kuruluysa Google, GitHub veya Apple ile hesap açabilir. Hesabı olanlar oturum açmaya devam eder.",
+            "admission": "Yeni bir hesap için ücretli bir plan veya davet kodu gerekir. Hesabı olanlar oturum açmaya devam eder.",
+            "registrationOff": "Yeni kişiler artık e-posta, Google, GitHub veya Apple ile kaydolamaz. Hesabı olanlar oturum açmaya devam eder.",
+            "paused": "Yeni hesaplar duraklatıldı (geçerli bir davet kodu çalışmaya devam eder). Hesabı olanlar oturum açmaya devam eder.",
+            "emailOnly": "Google, GitHub ve Apple kurulu değil; şu anda yalnızca e-posta sunuluyor.",
+            "socialActive": "Etkin sosyal giriş: {providers}.",
+            "humanCheck": "Yeni bir hesaptan önce bir insanın orada olduğu kontrol edilir."
+          },
+          "directory": {
+            "title": "Şirket oturumu",
+            "open": "Şirket oturumuyla ilk giriş bir hesap açar. Kayıt anahtarları bunu etkilemez.",
+            "provisioningOff": "Şirket oturumuyla ilk giriş hesap açmaz. Daha önce bu yolla girmiş olanlar girmeye devam eder.",
+            "notConfigured": "Şirket oturumu kurulu değil, bu kapı hesap açmaz.",
+            "missingClientId": "Keşif URL'si ayarlı ama istemci kimliği eksik; şirket oturumu henüz etkin değil.",
+            "restricted": "Kuruluş, rol veya izin kuralları da kimlerin oturum açabileceğini sınırlar."
+          },
+          "operator": {
+            "title": "Bir yönetici tarafından eklendi",
+            "admin": "Bir yönetici Kullanıcılar'da hesap açabilir. Kayıt anahtarları bunu kapatmaz."
+          },
+          "channel": {
+            "title": "Misafir sohbeti (hesapsız)",
+            "guestOn": "Ziyaretçiler hesabı olmadan sohbeti deneyebilir. Misafir sohbeti, gelen e-posta, WhatsApp ve Telegram hesap açmaz.",
+            "guestOff": "Misafir sohbeti kapalı, ziyaretçiler önce oturum açar. Misafir sohbeti, gelen e-posta, WhatsApp ve Telegram hesap açmaz; mesajlaşma kanalları kendi ayarlarını kullanır."
+          }
+        }
+      },
       "tabIntro": {
         "auth": "Kimlerin kayıt olup oturum açabileceği ve hangi oturum açma sağlayıcılarının sunulduğu.",
         "sharing": "Kullanıcıların herkesle neleri paylaşabileceği, hangi oturum açma gruplarının eşitlendiği ve denetim kaydının ne kadar süre saklandığı.",

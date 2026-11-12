@@ -837,6 +837,10 @@ export const selectors = {
      * selects drops to 0 while the request is still in flight).
      */
     usersEmpty: '[data-testid="admin-users-empty"]',
+    accountDoors: '[data-testid="account-doors"]',
+    accountDoor: (id: string) => `[data-testid="account-door-${id}"]`,
+    accountDoorSwitch: (id: string) => `[data-testid="account-door-${id}-switch"]`,
+    accountDoorPeople: '[data-testid="account-door-operator-people"]',
   },
   impersonation: {
     banner: '[data-testid="banner-impersonation"]',
