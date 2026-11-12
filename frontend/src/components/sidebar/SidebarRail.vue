@@ -44,7 +44,7 @@
         class="v2-rail-icon relative w-11 h-11 inline-flex items-center justify-center rounded-xl"
         :class="activeKey === section.key && 'v2-rail-icon--active'"
         :aria-label="railLabel(section)"
-        :aria-describedby="tip?.key === section.key ? TOOLTIP_ID : undefined"
+        :aria-describedby="tip?.key === section.key ? RAIL_TOOLTIP_ID : undefined"
         :aria-current="activeKey === section.key ? 'page' : undefined"
         :data-testid="section.testId"
         :data-tour="`rail-${section.key}`"
@@ -75,7 +75,7 @@
       >
         <div
           v-if="tip"
-          :id="TOOLTIP_ID"
+          :id="RAIL_TOOLTIP_ID"
           role="tooltip"
           class="dropdown-panel pointer-events-none fixed z-[200] -translate-y-1/2 px-3 py-2"
           :style="{ top: `${tip.top}px`, left: `${tip.left}px` }"
@@ -136,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed, watch, ref } from 'vue'
+import { onMounted, onUnmounted, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronDoubleRightIcon } from '@heroicons/vue/24/outline'
 import SchedulerStaleHint from '@/components/SchedulerStaleHint.vue'
@@ -148,6 +148,7 @@ import { useIncomingStore } from '@/stores/incoming'
 import { useTheme } from '@/composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useNavSections, type NavSection } from '@/composables/useNavSections'
+import { RAIL_TOOLTIP_ID, useRailTooltip } from '@/composables/useRailTooltip'
 import { formatRunningVersion } from '@/utils/formatRunningVersion'
 
 const configStore = useConfigStore()
@@ -169,47 +170,8 @@ function railLabel(section: NavSection): string {
 const { isDark } = useTheme()
 const { iconSrc } = useBrandLogo(isDark)
 const { sections, activeKey, selectSection, loadFeatureStatus } = useNavSections()
-
-const TOOLTIP_ID = 'tooltip-sidebar-rail'
-const TIP_DELAY_MS = 180
-
-const tip = ref<{
-  key: string
-  label: string
-  description: string
-  top: number
-  left: number
-} | null>(null)
-let tipTimer = 0
-
-function placeTip(section: NavSection, anchor: HTMLElement) {
-  const rect = anchor.getBoundingClientRect()
-  tip.value = {
-    key: section.key,
-    label: section.label,
-    description: section.description,
-    top: rect.top + rect.height / 2,
-    left: rect.right + 10,
-  }
-}
-
-function showTipOnKeyboardFocus(section: NavSection, event: FocusEvent) {
-  const anchor = event.currentTarget
-  if (!(anchor instanceof HTMLElement) || !anchor.matches(':focus-visible')) return
-  scheduleTip(section, event, true)
-}
-
-function scheduleTip(section: NavSection, event: Event, immediate = false) {
-  const anchor = event.currentTarget
-  if (!(anchor instanceof HTMLElement)) return
-  if (!immediate && !window.matchMedia('(hover: hover)').matches) return
-  window.clearTimeout(tipTimer)
-  if (immediate || tip.value) {
-    placeTip(section, anchor)
-    return
-  }
-  tipTimer = window.setTimeout(() => placeTip(section, anchor), TIP_DELAY_MS)
-}
+const { tip, scheduleTip, showTipOnKeyboardFocus, hideTipNow, hideTipSoon, suppressHover } =
+  useRailTooltip()
 
 function expand() {
   openPanel()
@@ -217,7 +179,9 @@ function expand() {
 }
 
 function openSection(key: NavSection['key']) {
-  hideTipNow()
+  // Remember the click before this rail is replaced, so the rail that mounts
+  // under the same pointer does not open the tooltip again.
+  suppressHover(key)
   // A rail icon names a panel. In the overlay, a second click on the open
   // section closes it again; otherwise choosing an icon shows its panel.
   if (panelOverlay.value && activeKey.value === key) {
@@ -226,19 +190,6 @@ function openSection(key: NavSection['key']) {
   }
   if (!panelVisible.value) openPanel()
   void selectSection(key)
-}
-
-function hideTipNow() {
-  window.clearTimeout(tipTimer)
-  tip.value = null
-}
-
-/** Brief pause so moving to the next icon keeps the tooltip and only moves it. */
-function hideTipSoon() {
-  window.clearTimeout(tipTimer)
-  tipTimer = window.setTimeout(() => {
-    tip.value = null
-  }, 80)
 }
 
 /** Five minutes. Polling while the admin is signed in, not a race workaround. */
@@ -252,7 +203,6 @@ function stopSchedulerPoll(): void {
 }
 
 onUnmounted(() => {
-  hideTipNow()
   stopSchedulerPoll()
 })
 
