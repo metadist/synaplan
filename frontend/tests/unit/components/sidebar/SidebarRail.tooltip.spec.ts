@@ -168,6 +168,23 @@ describe('SidebarRail tooltip', () => {
     second.unmount()
   })
 
+  it('keeps the click suppression when the panel shift leaves the pointer inside the rail', async () => {
+    const first = await mountRail()
+    await first.get(ASSISTANTS).trigger('click')
+    const rail = first.get('[data-testid="section-sidebar-rail"]').element
+    first
+      .get(ASSISTANTS)
+      .element.dispatchEvent(new PointerEvent('pointerleave', { relatedTarget: rail }))
+    first.unmount()
+
+    const second = await mountRail()
+    vi.useFakeTimers()
+    await second.get(ASSISTANTS).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()).toBeNull()
+    second.unmount()
+  })
+
   it('shows again after the pointer leaves the clicked icon and comes back', async () => {
     const first = await mountRail()
     await first.get(ASSISTANTS).trigger('click')

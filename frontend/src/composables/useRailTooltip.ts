@@ -26,6 +26,16 @@ export function resetRailTooltipState(): void {
   suppressedSectionKey = null
 }
 
+/** Opening the panel shifts the icons under a pointer that never left the rail. */
+function pointerStillInRail(event: Event | undefined): boolean {
+  if (!(event instanceof PointerEvent)) return false
+  const next = event.relatedTarget
+  const current = event.currentTarget
+  if (!(next instanceof Node) || !(current instanceof Element)) return false
+  const rail = current.closest('[data-testid="section-sidebar-rail"]')
+  return rail?.contains(next) === true
+}
+
 export function useRailTooltip() {
   const tip = ref<RailTip | null>(null)
   let tipTimer = 0
@@ -50,12 +60,13 @@ export function useRailTooltip() {
 
   /**
    * Moving to the next icon keeps the tooltip and only slides it. A leave
-   * caused by this rail unmounting is the route change under the pointer,
-   * so the click's suppression stays for the rail that mounts next.
+   * that stays inside this rail is the panel opening under the pointer, so
+   * the click's suppression stays. A leave caused by this rail unmounting is
+   * the route change, and `closing` keeps that suppression for the next rail.
    */
-  function hideTipSoon(): void {
+  function hideTipSoon(event?: Event): void {
     window.clearTimeout(tipTimer)
-    if (!closing) suppressedSectionKey = null
+    if (!closing && !pointerStillInRail(event)) suppressedSectionKey = null
     tipTimer = window.setTimeout(() => {
       tip.value = null
     }, RAIL_TIP_LEAVE_MS)
