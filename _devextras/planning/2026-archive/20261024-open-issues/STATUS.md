@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** The six fixes are on `main` ([#2703](https://github.com/metadist/synaplan/pull/2703), [#2704](https://github.com/metadist/synaplan/pull/2704), [#2706](https://github.com/metadist/synaplan/pull/2706), [#2707](https://github.com/metadist/synaplan/pull/2707), [#2709](https://github.com/metadist/synaplan/pull/2709), [#2710](https://github.com/metadist/synaplan/pull/2710)). #2635, #2636 and #2638 stay on plugin platform quality.
+
 # Status — open issues from #2617
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk is a dated entry

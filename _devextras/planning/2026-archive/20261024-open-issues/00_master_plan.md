@@ -66,7 +66,7 @@ Commit subjects are the lines in each sprint file.
 ## 2. Loop
 
 Each sprint file is the change. This section is how it becomes a pull
-request. Follow [`AGENTS.md`](../AGENTS.md).
+request. Follow [`AGENTS.md`](../../AGENTS.md).
 
 1. Read the sprint file. Stay inside the files it names.
 2. Write the test. For a bug, run it and see it fail for the reason in

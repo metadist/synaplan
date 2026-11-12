@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** AT0–AT6 are on `main`. No TrustMark (AT7).
+
 # Status — AI Act transparency
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk is a dated entry

@@ -1,6 +1,6 @@
 # AI Act transparency — people know it is an AI, and machines can tell what it made
 
-Row 36. Umbrella: [`20261102-enterprise-readiness/`](../20261102-enterprise-readiness/00_master_plan.md) (C7–C9).
+Row 36. Umbrella: [`20261102-enterprise-readiness/`](../../20261102-enterprise-readiness/00_master_plan.md) (C7–C9).
 
 Article 50 of the AI Act has applied since **2026-08-02**. Systems that
 were already on the market before that date must mark generated content

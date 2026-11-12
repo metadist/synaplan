@@ -1,7 +1,7 @@
 # Research quality — status
 
 > **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
-> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
+> [`20261028-loop-and-cloud-review/`](../2026-archive/20261028-loop-and-cloud-review/00_master_plan.md).
 > Do not turn `RESEARCH.ENABLED` on until RV1 and RV8 are merged.
 > RV8 keeps one paid attempt when the calls in one step, together,
 > run longer than the lease (240 seconds). A per-call cap that
@@ -54,7 +54,7 @@ chat message.
 
 **Superseded, 2026-10-28:** §0 #5 (people choose Standard or Thorough) and
 #15 (the Research chip on Desktop) are replaced by
-[`20261028-adaptive-research/`](../20261028-adaptive-research/00_master_plan.md):
+[`20261028-adaptive-research/`](../2026-archive/20261028-adaptive-research/00_master_plan.md):
 the sorter rates every message, the chat starts a run with depth `auto` on
 its own, and the only escapes are **Answer now** during a run and **Look
 deeper** under an answer. Tools → Research, `ResearchComposer.vue` and the

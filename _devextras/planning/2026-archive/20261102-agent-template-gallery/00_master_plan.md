@@ -1,6 +1,6 @@
 # Agent template gallery — start from a working agent instead of an empty form
 
-Row 42. Umbrella: [`20261102-enterprise-readiness/`](../20261102-enterprise-readiness/00_master_plan.md) (C20).
+Row 42. Umbrella: [`20261102-enterprise-readiness/`](../../20261102-enterprise-readiness/00_master_plan.md) (C20).
 
 Missing know-how is the first barrier to AI in German companies: 85 % in
 Bitkom 2026. An empty "New agent" form asks for the very know-how the

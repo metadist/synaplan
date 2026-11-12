@@ -51,3 +51,13 @@ shipped (#2568, #2569, #2576, #2577). It was never a roadmap row. The
 three journeys were not entered as walks. `20260903_more_nextcloud/`
 moved here the same day: S1 and S2 shipped, S3's product work is cloud
 file sharing, and the pairing-code fallback (NC18, NC19) is not scheduled.
+
+2026-11-12 housekeeping: shipped or closed tracks moved here.
+`20261008-live-voice/`, `20261001-single-scheduler/` (P3 stays in
+synaplan-platform), `20261024-open-issues/`, `20261027-custom-mcp-oauth/`,
+`20261028-loop-and-cloud-review/`, `20261028-adaptive-research/` (Desktop
+chip not done), `20261031-halloween-gui/` (not built; the OpenAI-compatible
+provider is the architecture update), `20261102-ai-act-transparency/`,
+`20261102-agent-template-gallery/` (no external catalog). Admission
+sign-up (row 28) has no folder in this repository. IAM consolidation stays
+live. Each folder has a dated note at the top.

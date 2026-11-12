@@ -79,13 +79,13 @@ ids are unique across the directory.
 | Row | Track | Folder | Closes | Size | First step |
 | --- | ----- | ------ | ------ | ---- | ---------- |
 | 35 | **Enterprise identity** — SAML 2.0 sign-in, SCIM 2.0 provisioning (Entra ID, Okta, Keycloak), two-factor for local accounts, the chart | [`20261102-enterprise-identity/`](../20261102-enterprise-identity/00_master_plan.md) | C1, C2, C3 | L | EI0 (after row 29 IC2–IC6) |
-| 36 | **AI Act transparency** — AI disclosure on every channel, C2PA marking of generated media, keep the provider's marks, an AI-literacy page and record | [`20261102-ai-act-transparency/`](../20261102-ai-act-transparency/00_master_plan.md) | C7, C8, C9 | M | AT1 — **deadline 2026-12-02** |
+| 36 | **AI Act transparency** — AI disclosure on every channel, C2PA marking of generated media, keep the provider's marks, an AI-literacy page and record | [`20261102-ai-act-transparency/`](../2026-archive/20261102-ai-act-transparency/00_master_plan.md) | C7, C8, C9 | M | AT1 — **deadline 2026-12-02** |
 | 37 | **Audit and usage reporting** — complete audit events, export, streaming to a SIEM (HTTPS, Splunk HEC, syslog over TLS), cost per department, the chart | [`20261102-audit-and-usage-reporting/`](../20261102-audit-and-usage-reporting/00_master_plan.md) | C5, C6 | M | AE1 |
 | 38 | **Service desk** — resolution and handoff rate per widget, unanswered questions as knowledge gaps, handoff into Zendesk, Freshdesk, HubSpot | [`20261102-service-desk/`](../20261102-service-desk/00_master_plan.md) | C19 | M | SD1 |
 | 39 | **Workplace channels** — the assistant in Microsoft Teams and Slack, per company, as feature modules beside Telegram | [`20261102-workplace-channels/`](../20261102-workplace-channels/00_master_plan.md) | C18 | L | WC0 spike |
 | 40 | **Permission-aware connectors** — SharePoint / OneDrive, Google Drive, Confluence as knowledge sources that keep the source's permissions | [`20261102-permission-aware-connectors/`](../20261102-permission-aware-connectors/00_master_plan.md) | C17 | XL | KC0 spike |
 | 41 | **Governance and privacy** — personal data masked before a cloud model, "local only" per group, agent review before publish, policy overview | [`20261102-governance-and-privacy/`](../20261102-governance-and-privacy/00_master_plan.md) | C11, C16 | L | GV1 |
-| 42 | **Agent template gallery** — the ten use cases as installable, tested templates in Assistants → New | [`20261102-agent-template-gallery/`](../20261102-agent-template-gallery/00_master_plan.md) | C20 | M | TG1 |
+| 42 | **Agent template gallery** — the ten use cases as installable, tested templates in Assistants → New | [`20261102-agent-template-gallery/`](../2026-archive/20261102-agent-template-gallery/00_master_plan.md) | C20 | M | TG1 |
 
 ## 4. Work outside this repository's code (ER steps)
 

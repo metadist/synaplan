@@ -1,7 +1,9 @@
+> **Archived 2026-11-12.** Not built. The setup wizard still does not connect an Ollama or vLLM server. The OpenAI-compatible provider is the architecture update (AU22, [#2918](https://github.com/metadist/synaplan/pull/2918)), not this plan.
+
 # Status — Halloween GUI (row 33)
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk is a dated entry
-here, not a chat message ([`../AGENTS.md`](../AGENTS.md)).
+here, not a chat message ([`../AGENTS.md`](../../AGENTS.md)).
 
 | Step | Topic | State |
 | ---- | ----- | ----- |

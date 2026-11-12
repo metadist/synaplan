@@ -8,9 +8,9 @@ an inbound watch upload is not an own write, and the research lease
 covers the model call itself. Copilot on #2857: the direct stream
 releases too, and the lease covers every call in the step.
 **Base:** `main` at `fa64e4c82` (28 Oct 2026, 15:28 Europe/Berlin).
-**Rows it guards:** [21 research quality](../20261017-research-quality/00_master_plan.md),
-[22 architecture update](../20261021-architecture-update/00_master_plan.md),
-[9 cloud file sharing](../20261013-cloud-file-sharing/00_master_plan.md).
+**Rows it guards:** [21 research quality](../../20261017-research-quality/00_master_plan.md),
+[22 architecture update](../../20261021-architecture-update/00_master_plan.md),
+[9 cloud file sharing](../../20261013-cloud-file-sharing/00_master_plan.md).
 **Goal:** Close the defects found by reading those three tracks against
 `main`, before research is switched on, before `AI.USAGE_HOOK` leaves
 `legacy`, and before a second cloud reuses a pickup copy.
