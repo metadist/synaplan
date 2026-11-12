@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\AI\Health;
 
 use App\AI\Health\FailureClassifier;
+use App\AI\Health\FailureKind;
 use App\AI\Health\ModelAutoDisabler;
 use App\AI\Health\ModelHealthAlerter;
 use App\AI\Health\ModelHealthConfig;
@@ -19,6 +20,7 @@ use App\AI\Service\ModelProbeResult;
 use App\AI\Service\ProviderDisplayNames;
 use App\AI\Service\ProviderRegistry;
 use App\Entity\Model;
+use App\Entity\ModelHealth;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelHealthRepository;
 use App\Repository\ModelRepository;
@@ -101,11 +103,38 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
         self::assertSame(['Ollama' => 'OLLAMA_BASE_URL is not configured.'], $run->skippedProviders);
     }
 
+    public function testProbeLessImportedModelKeepsListingVerdict(): void
+    {
+        $models = [
+            self::model(30, 'vllm/present', 'OpenAICompatible'),
+            self::model(31, 'vllm/gone', 'OpenAICompatible'),
+        ];
+        $healthRows = [
+            30 => (new ModelHealth())->setModelId(30)->setSource(ModelHealth::SOURCE_LISTING)->setState(ModelHealthState::Online),
+            31 => (new ModelHealth())->setModelId(31)->setSource(ModelHealth::SOURCE_LISTING)->setState(ModelHealthState::Offline)->setKind(FailureKind::Permanent->value)->setMessage('not offered by endpoint'),
+        ];
+
+        $run = $this->evaluatorFor(
+            $models,
+            ProbeResult::skipped('unused'),
+            'triton',
+            ['OpenAICompatible'],
+            $healthRows,
+        )->run(dryRun: true);
+
+        self::assertSame(ModelHealthState::Online, $run->verdicts[0]->state);
+        self::assertSame(ModelHealth::SOURCE_LISTING, $run->verdicts[0]->source);
+        self::assertSame(ModelHealthState::Offline, $run->verdicts[1]->state);
+        self::assertSame(FailureKind::Permanent, $run->verdicts[1]->kind);
+        self::assertSame('not offered by endpoint', $run->verdicts[1]->message);
+    }
+
     /**
-     * @param list<Model>       $catalog
-     * @param list<string>|null $services distinct BSERVICE values as stored; defaults to [$service]
+     * @param list<Model>             $catalog
+     * @param list<string>|null       $services   distinct BSERVICE values as stored; defaults to [$service]
+     * @param array<int, ModelHealth> $healthRows
      */
-    private function evaluatorFor(array $catalog, ProbeResult $probeResult, string $service = 'triton', ?array $services = null): ModelHealthEvaluator
+    private function evaluatorFor(array $catalog, ProbeResult $probeResult, string $service = 'triton', ?array $services = null, array $healthRows = []): ModelHealthEvaluator
     {
         $probe = new class($probeResult, $service) implements ModelListProbeInterface {
             public function __construct(
@@ -144,7 +173,7 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
         $config = new ModelHealthConfig($configRepository);
 
         $health = $this->createStub(ModelHealthRepository::class);
-        $health->method('findIndexedByModelId')->willReturn([]);
+        $health->method('findIndexedByModelId')->willReturn($healthRows);
 
         $alerter = new ModelHealthAlerter(
             new ArrayAdapter(),
@@ -157,7 +186,7 @@ final class ModelHealthEvaluatorUnconfiguredTest extends TestCase
 
         return new ModelHealthEvaluator(
             $models,
-            $this->createStub(ModelHealthRepository::class),
+            $health,
             new ModelListProbeRegistry([$probe]),
             new ModelHealthRecorder(
                 new ArrayAdapter(),

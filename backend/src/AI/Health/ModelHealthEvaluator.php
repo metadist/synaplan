@@ -113,6 +113,7 @@ final readonly class ModelHealthEvaluator
             }
 
             $serviceVerdicts = [];
+            $activeByKind = [];
             foreach ($catalogModels as $providerId => $rows) {
                 // Retired rows are skipped; operator-disabled rows stay in the
                 // check so recovery shows, but never raise alerts.
@@ -129,9 +130,12 @@ final readonly class ModelHealthEvaluator
 
                 foreach ($liveRows as $model) {
                     $existing = $healthByModel[(int) $model->getId()] ?? null;
+                    if (null !== $existing && $existing->isAlertActive() && null !== $existing->getLastAlertedKind() && '' !== $existing->getLastAlertedKind()) {
+                        $activeByKind[$existing->getLastAlertedKind()][(int) $model->getId()] = $model->getName();
+                    }
                     $switchedOff = ModelHealth::isSwitchedOffByOperator($model, $existing);
-                    $verdict = $this->judge($service, $model, (string) $providerId, $result, $presence, $now, $switchedOff);
-                    $streak = self::nextStreak($existing, $verdict);
+                    $verdict = $this->judge($service, $model, (string) $providerId, $result, $presence, $switchedOff, $existing, null !== $probe);
+                    $streak = self::nextStreak($existing, $verdict, $result);
                     $streaks[$verdict->modelId] = $streak;
                     if (!$dryRun) {
                         $verdict = $this->commit($verdict, $model, $now, $streak);
@@ -140,7 +144,10 @@ final readonly class ModelHealthEvaluator
                 }
             }
 
-            $outcome = $this->reconcileAlerts($service, $serviceVerdicts, $result, $streaks, $dryRun);
+            $outcome = $this->reconcileAlerts($service, $serviceVerdicts, $result, $streaks, $activeByKind, $dryRun);
+            if (!$dryRun) {
+                $this->clearRecoveredAlerts($serviceVerdicts, $now);
+            }
             $raised = array_merge($raised, $outcome['raised']);
             $resolved = array_merge($resolved, $outcome['resolved']);
 
@@ -264,8 +271,16 @@ final readonly class ModelHealthEvaluator
     /**
      * Decide the state of a single model.
      */
-    private function judge(string $service, Model $model, string $providerId, ProbeResult $probe, ModelProbeResult $presence, int $now, bool $switchedOff): ModelHealthVerdict
-    {
+    private function judge(
+        string $service,
+        Model $model,
+        string $providerId,
+        ProbeResult $probe,
+        ModelProbeResult $presence,
+        bool $switchedOff,
+        ?ModelHealth $existing = null,
+        bool $hasProbe = true,
+    ): ModelHealthVerdict {
         $modelId = (int) $model->getId();
         $counters = $this->recorder->snapshot($modelId);
 
@@ -283,11 +298,11 @@ final readonly class ModelHealthEvaluator
             switchedOff: $switchedOff,
         );
 
-        // A provider nobody configured is not broken. Saying otherwise would
-        // paint a self-hosted install red for the fifteen providers it never
-        // set up, and an operator who learns to ignore red stops reading it.
+        // A provider nobody configured is not broken. Preserve ImportedModelListingCheck
+        // verdicts for probe-less import services (OpenAICompatible) so a manual
+        // refresh or unreachable import endpoint never wipes them (C7).
         if ($probe->isSkipped()) {
-            return $make(ModelHealthState::Unconfigured, null, $probe->message, ModelHealth::SOURCE_PROBE);
+            return $this->judgeSkipped($probe, $existing, $hasProbe, $make);
         }
 
         if ($probe->isFailed()) {
@@ -324,10 +339,8 @@ final readonly class ModelHealthEvaluator
             );
         }
 
-        // The provider still offers it. Now ask real traffic whether it works
-        // for THIS account — the part a catalog lookup can never answer.
-        if ($counters->total() >= $this->config->minSampleSize()
-            && $counters->errorRatePercent() >= $this->config->errorRatePercent()) {
+        $minSamples = $this->config->minSampleSize();
+        if ($counters->total() >= $minSamples && $counters->errorRatePercent() >= $this->config->errorRatePercent()) {
             $state = FailureKind::Permanent === $counters->lastKind
                 ? ModelHealthState::Offline
                 : ModelHealthState::Degraded;
@@ -335,43 +348,76 @@ final readonly class ModelHealthEvaluator
             return $make(
                 $state,
                 $counters->lastKind,
-                trim(sprintf(
-                    '%d%% of the last %d calls failed. %s',
-                    $counters->errorRatePercent(),
-                    $counters->total(),
-                    $counters->lastMessage ?? ''
-                )),
+                trim(sprintf('%d%% of the last %d calls failed. %s', $counters->errorRatePercent(), $counters->total(), $counters->lastMessage ?? '')),
                 ModelHealth::SOURCE_TRAFFIC,
-                // Real calls failing permanently is the strongest evidence
-                // there is — that is a model the provider actually rejects.
                 safeToDisable: FailureKind::Permanent === $counters->lastKind,
             );
         }
 
-        if (!$probe->listingComplete && $counters->isEmpty()) {
-            // Nothing to go on: no catalog listing and no traffic. Reporting
-            // "online" here would be a guess dressed up as a fact.
-            return $make(ModelHealthState::Unknown, null, $probe->message, ModelHealth::SOURCE_PROBE);
+        if (!$probe->listingComplete && $counters->total() < $minSamples) {
+            return $this->judgeInconclusiveCatalog($probe, $existing, $make);
         }
 
         return $make(
             ModelHealthState::Online,
             null,
             '',
-            $counters->isEmpty() ? ModelHealth::SOURCE_PROBE : ModelHealth::SOURCE_TRAFFIC,
+            $counters->total() >= $minSamples ? ModelHealth::SOURCE_TRAFFIC : ModelHealth::SOURCE_PROBE,
         );
+    }
+
+    /**
+     * @param \Closure(ModelHealthState, ?FailureKind, string, string, bool=): ModelHealthVerdict $make
+     */
+    private function judgeSkipped(ProbeResult $probe, ?ModelHealth $existing, bool $hasProbe, \Closure $make): ModelHealthVerdict
+    {
+        if (!$hasProbe && null !== $existing && ModelHealth::SOURCE_LISTING === $existing->getSource()) {
+            return $make(
+                $existing->getState(),
+                FailureKind::tryFrom((string) $existing->getKind()),
+                $existing->getMessage() ?? '',
+                ModelHealth::SOURCE_LISTING,
+            );
+        }
+
+        return $make(ModelHealthState::Unconfigured, null, $probe->message, ModelHealth::SOURCE_PROBE);
+    }
+
+    /**
+     * No catalog listing (for example HTTP 429 on `/models` or a credential-only
+     * probe) and fewer than MIN_SAMPLE_SIZE real calls: keep a confirmed
+     * Offline+Permanent verdict so live routing keeps avoiding dead models, and
+     * report Unknown otherwise rather than guessing Online from noisy samples.
+     *
+     * @param \Closure(ModelHealthState, ?FailureKind, string, string, bool=): ModelHealthVerdict $make
+     */
+    private function judgeInconclusiveCatalog(ProbeResult $probe, ?ModelHealth $existing, \Closure $make): ModelHealthVerdict
+    {
+        if (null !== $existing
+            && ModelHealthState::Offline === $existing->getState()
+            && FailureKind::Permanent->value === $existing->getKind()) {
+            return $make(
+                ModelHealthState::Offline,
+                FailureKind::Permanent,
+                $existing->getMessage() ?? $probe->message,
+                $existing->getSource(),
+            );
+        }
+
+        return $make(ModelHealthState::Unknown, null, $probe->message, ModelHealth::SOURCE_PROBE);
     }
 
     /**
      * Aggregate this provider's verdicts into at most one alert per kind, and
      * send the all-clear for the kinds that recovered.
      *
-     * @param list<ModelHealthVerdict> $verdicts
-     * @param array<int, int>          $streaks  model id => consecutive failing checks
+     * @param list<ModelHealthVerdict>         $verdicts
+     * @param array<int, int>                  $streaks      model id => consecutive failing checks
+     * @param array<string, array<int,string>> $activeByKind alert kind => (model id => name) latched in DB before this run
      *
      * @return array{raised: list<ModelHealthAlert>, resolved: list<ModelHealthAlert>}
      */
-    private function reconcileAlerts(string $service, array $verdicts, ProbeResult $probe, array $streaks, bool $dryRun): array
+    private function reconcileAlerts(string $service, array $verdicts, ProbeResult $probe, array $streaks, array $activeByKind, bool $dryRun): array
     {
         $raised = [];
         $resolved = [];
@@ -429,10 +475,25 @@ final readonly class ModelHealthEvaluator
 
             // A model that moved to a worse kind or is currently unknown (for
             // example during a rate-limited catalog check) has not recovered.
-            $open = [] === $affected ? $this->alerter->openIncident($service, $kind) : null;
+            if ([] !== $affected) {
+                continue;
+            }
+
+            $redisOpen = $this->alerter->openIncident($service, $kind);
+            $dbOpen = $activeByKind[$kind] ?? null;
+            $open = $redisOpen ?? $dbOpen;
             $canResolve = null !== $open && ([] === $open ? !$anyUnknown : [] === array_intersect_key($open, $notHealthy));
             if ($canResolve) {
-                $alert = new ModelHealthAlert($kind, $service, [], 'All models are answering again.', $this->displayNames->forService($service));
+                $fallbackNames = null === $redisOpen && null !== $dbOpen ? array_values($dbOpen) : [];
+                $fallbackIds = null === $redisOpen && null !== $dbOpen ? array_keys($dbOpen) : [];
+                $alert = new ModelHealthAlert(
+                    $kind,
+                    $service,
+                    $fallbackNames,
+                    'All models are answering again.',
+                    $this->displayNames->forService($service),
+                    $fallbackIds,
+                );
                 if ($dryRun || $this->alerter->resolve($alert)) {
                     $resolved[] = $alert;
                 }
@@ -473,15 +534,44 @@ final readonly class ModelHealthEvaluator
         ));
     }
 
-    private static function nextStreak(?ModelHealth $existing, ModelHealthVerdict $verdict): int
+    private static function nextStreak(?ModelHealth $existing, ModelHealthVerdict $verdict, ProbeResult $probe): int
     {
         $previous = $existing?->getConsecutiveFailures() ?? 0;
 
-        return match (true) {
-            ModelHealthState::Online === $verdict->state, ModelHealthState::Unconfigured === $verdict->state => 0,
-            $verdict->state->needsAttention() => $previous + 1,
-            default => $previous,
-        };
+        if ($verdict->switchedOff || ModelHealthState::Online === $verdict->state || ModelHealthState::Unconfigured === $verdict->state) {
+            return 0;
+        }
+
+        if (!$verdict->needsAttention()) {
+            return $previous;
+        }
+
+        // A preserved listing/probe verdict on an inconclusive catalog check
+        // did not observe a new failure on this tick.
+        if (ModelHealth::SOURCE_LISTING === $verdict->source
+            || (!$probe->isFailed() && !$probe->listingComplete && ModelHealth::SOURCE_PROBE === $verdict->source)) {
+            return $previous;
+        }
+
+        return $previous + 1;
+    }
+
+    /**
+     * Clear active-alert latches after alert reconciliation so DB-backed open
+     * incidents can still resolve when Redis has expired, while individual
+     * recovered or operator-switched-off models anchor their quiet window now.
+     *
+     * @param list<ModelHealthVerdict> $verdicts
+     */
+    private function clearRecoveredAlerts(array $verdicts, int $now): void
+    {
+        foreach ($verdicts as $verdict) {
+            if ($verdict->switchedOff
+                || ModelHealthState::Online === $verdict->state
+                || ModelHealthState::Unconfigured === $verdict->state) {
+                $this->healthRepository->findOrCreate($verdict->modelId)->clearActiveAlert($now);
+            }
+        }
     }
 
     /**
@@ -500,10 +590,8 @@ final readonly class ModelHealthEvaluator
             ->setUpdated($now);
 
         if (ModelHealthState::Online === $verdict->state) {
-            $health->setLastSuccess($now)->setAlertActive(false);
-        } elseif (ModelHealthState::Unconfigured === $verdict->state) {
-            $health->setAlertActive(false);
-        } elseif ($verdict->state->needsAttention()) {
+            $health->setLastSuccess($now);
+        } elseif ($verdict->needsAttention()) {
             $health->setLastFailure($now);
         }
 

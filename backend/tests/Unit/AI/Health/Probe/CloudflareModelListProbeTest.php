@@ -52,4 +52,18 @@ final class CloudflareModelListProbeTest extends TestCase
         self::assertTrue($result->offers('@cf/meta/llama-3.1-8b-instruct'));
         self::assertSame(2, $attempts);
     }
+
+    public function testTransportErrorRedactsAccountIdFromFailureMessage(): void
+    {
+        $client = new MockHttpClient(static function (): MockResponse {
+            throw new \RuntimeException('Failed to connect for https://api.cloudflare.com/client/v4/accounts/secret-acct-99/ai/models/search');
+        });
+
+        $probe = new CloudflareModelListProbe($client, new NullLogger(), 'secret-acct-99', 'tok-1');
+        $result = $probe->probe('cloudflare');
+
+        self::assertTrue($result->isFailed());
+        self::assertStringNotContainsString('secret-acct-99', $result->message);
+        self::assertStringContainsString('[redacted]', $result->message);
+    }
 }

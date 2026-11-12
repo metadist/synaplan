@@ -89,9 +89,8 @@ class ModelHealth
     private int $updated = 0;
 
     /**
-     * Unix time of the last incident message that named this model.
-     * Zero means it has never been reported. Recovery does not clear it:
-     * the same model stays quiet for the configured period either way.
+     * Unix time of the last incident message (or recovery of an active
+     * incident) for this model. Zero means it has never been reported.
      */
     #[ORM\Column(name: 'BLASTALERTED', type: 'bigint', options: ['default' => 0])]
     private int $lastAlerted = 0;
@@ -327,6 +326,21 @@ class ModelHealth
     public function setAlertActive(bool $alertActive): self
     {
         $this->alertActive = $alertActive ? 1 : 0;
+
+        return $this;
+    }
+
+    /**
+     * Close an active incident on this row and anchor the post-recovery quiet
+     * window at recovery time so a multi-day outage still stays quiet after it
+     * clears instead of re-paging on the first brief relapse.
+     */
+    public function clearActiveAlert(int $now): self
+    {
+        if (1 === $this->alertActive) {
+            $this->alertActive = 0;
+            $this->lastAlerted = max($this->lastAlerted, $now);
+        }
 
         return $this;
     }

@@ -76,10 +76,11 @@ final class ModelHealthAlerterTest extends TestCase
                 $row->setLastAlerted($at)->setLastAlertedKind($kind);
             }
         });
-        $health->method('clearAlertActive')->willReturnCallback(function (array $ids): void {
+        $health->method('clearAlertActive')->willReturnCallback(function (array $ids, ?int $at = null): void {
+            $now = $at ?? time();
             foreach ($ids as $id) {
                 if (isset($this->healthRows[$id])) {
-                    $this->healthRows[$id]->setAlertActive(false);
+                    $this->healthRows[$id]->clearActiveAlert($now);
                 }
             }
         });

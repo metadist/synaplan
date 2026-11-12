@@ -117,7 +117,7 @@ final readonly class ModelHealthAlert
         }
 
         return sprintf(
-            'These models are not reported again until they recover and stay quiet for %s unless the problem gets worse. A different model is still reported on its own.',
+            'These models will not be reported again while this outage continues, or for %s after recovery, unless the problem gets worse. A different model is still reported on its own.',
             $this->quietPeriod(),
         );
     }
@@ -133,7 +133,7 @@ final readonly class ModelHealthAlert
         }
 
         return sprintf(
-            'If one of them fails again within %s of its incident message, it shows under Model health but no new message is sent.',
+            'If one of them fails again within %s of this recovery, it shows under Model health but no new message is sent unless the problem gets worse.',
             $this->quietPeriod(),
         );
     }
@@ -182,6 +182,21 @@ final readonly class ModelHealthAlert
      */
     private function distinctNames(): array
     {
-        return array_values(array_unique($this->modelNames));
+        $seen = [];
+        $distinct = [];
+        foreach ($this->modelNames as $name) {
+            $trimmed = trim($name);
+            if ('' === $trimmed) {
+                continue;
+            }
+            $key = mb_strtolower($trimmed);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $distinct[] = $trimmed;
+        }
+
+        return $distinct;
     }
 }

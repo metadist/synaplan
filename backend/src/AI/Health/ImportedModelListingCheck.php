@@ -149,7 +149,7 @@ final readonly class ImportedModelListingCheck
         if ($present) {
             $health->setLastSuccess($now)
                 ->setConsecutiveFailures(0)
-                ->setAlertActive(false);
+                ->clearActiveAlert($now);
         } else {
             // Do not increment BCONSECUTIVEFAILURES here: ModelHealthEvaluator
             // owns the alert failure streak, and imported Ollama rows run

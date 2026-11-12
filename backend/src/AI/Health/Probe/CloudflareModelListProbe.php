@@ -45,7 +45,7 @@ final readonly class CloudflareModelListProbe implements ModelListProbeInterface
             rawurlencode($this->accountId)
         );
 
-        $page = $this->requestCatalog($url, (string) $this->apiToken);
+        $page = $this->requestCatalog($url, (string) $this->apiToken, (string) $this->accountId);
         if ($page instanceof ProbeResult) {
             return $page;
         }
@@ -53,7 +53,7 @@ final readonly class CloudflareModelListProbe implements ModelListProbeInterface
         $status = $page['status'];
         $body = $page['body'];
         if (429 === $status) {
-            return ProbeResult::reachable('Cloudflare rate-limited the catalog check (HTTP 429); credentials accepted.');
+            return ProbeResult::reachable('Cloudflare rate-limited the catalog check (HTTP 429); skipping catalog check for this run.');
         }
         if ($status < 200 || $status >= 300) {
             return ProbeResult::failed(
@@ -92,7 +92,7 @@ final readonly class CloudflareModelListProbe implements ModelListProbeInterface
     /**
      * @return array{status: int, body: array<mixed>}|ProbeResult
      */
-    private function requestCatalog(string $url, string $token): array|ProbeResult
+    private function requestCatalog(string $url, string $token, string $accountId): array|ProbeResult
     {
         $lastError = 'the provider did not answer';
         for ($attempt = 0; $attempt < 2; ++$attempt) {
@@ -112,7 +112,7 @@ final readonly class CloudflareModelListProbe implements ModelListProbeInterface
                     'body' => $status >= 200 && $status < 300 ? $response->toArray(false) : [],
                 ];
             } catch (\Throwable $e) {
-                $lastError = $e->getMessage();
+                $lastError = '' !== $accountId ? str_replace($accountId, '[redacted]', $e->getMessage()) : $e->getMessage();
                 if (0 === $attempt) {
                     continue;
                 }

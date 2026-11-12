@@ -148,9 +148,10 @@ final readonly class ModelHealthAlerter
      */
     public function resolve(ModelHealthAlert $alert): bool
     {
+        $now = time();
         $key = $this->key($alert);
 
-        $reported = $this->openModels($key);
+        $reported = $this->openModels($key) ?? $this->activeModels($alert);
         if (null === $reported) {
             return false;
         }
@@ -164,7 +165,7 @@ final readonly class ModelHealthAlerter
 
         $this->forget(self::OPEN_PREFIX.$key);
         if ([] !== $deliver->modelIds) {
-            $this->health->clearAlertActive($deliver->modelIds);
+            $this->health->clearAlertActive($deliver->modelIds, $now);
         }
 
         $this->logger->info('Model health alert resolved', [
@@ -259,6 +260,31 @@ final readonly class ModelHealthAlerter
 
             return null;
         }
+    }
+
+    /**
+     * Fallback when Redis lost `model_health.open.*` (cache flush or an outage
+     * longer than OPEN_TTL_SECONDS): reconstruct the open incident from rows
+     * still latched active for this alert kind in BMODELHEALTH.
+     *
+     * @return array<int, string>|null
+     */
+    private function activeModels(ModelHealthAlert $alert): ?array
+    {
+        if ([] === $alert->modelIds) {
+            return null;
+        }
+
+        $rows = $this->health->findIndexedByModelId($alert->modelIds);
+        $active = [];
+        foreach ($alert->modelIds as $index => $id) {
+            $row = $rows[$id] ?? null;
+            if (null !== $row && $row->isAlertActive() && $row->getLastAlertedKind() === $alert->kind) {
+                $active[$id] = $alert->modelNames[$index] ?? ('model '.$id);
+            }
+        }
+
+        return [] === $active ? null : $active;
     }
 
     /**

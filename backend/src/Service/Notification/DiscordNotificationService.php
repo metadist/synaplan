@@ -952,10 +952,7 @@ final readonly class DiscordNotificationService
      * this one is an incident about models failing right now — including the
      * account-specific failures a catalog comparison cannot see.
      *
-     * One message per provider per check, not per model ({@see ModelHealthAlert}).
-     * `@everyone` is only for the credential case: a rejected key or an empty
-     * balance takes out every model behind that provider and only an operator
-     * can fix it, whereas a retired model can wait for office hours.
+     * One message per provider per check, never pinging `@everyone` ({@see ModelHealthAlert}).
      */
     public function notifyModelHealth(ModelHealthAlert $alert, bool $resolved = false): void
     {
@@ -1001,7 +998,9 @@ final readonly class DiscordNotificationService
                 : '🚨 [INCIDENT] '.$alert->headline(),
             color: $resolved ? self::COLOR_SUCCESS : self::COLOR_ERROR,
             fields: $fields,
-            footer: 'Synaplan Model Health · each model at most once per '.$alert->quietPeriod(),
+            footer: $alert->quietForSeconds > 0
+                ? 'Synaplan Model Health · once per outage, quiet for '.$alert->quietPeriod().' after recovery'
+                : 'Synaplan Model Health · once per outage',
         );
     }
 

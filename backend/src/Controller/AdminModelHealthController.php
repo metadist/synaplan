@@ -344,6 +344,7 @@ final class AdminModelHealthController extends AbstractController
                 ->setState(ModelHealthState::Unknown)
                 ->setKind(null)
                 ->setMessage(null)
+                ->setConsecutiveFailures(0)
                 ->setUpdated(time());
             $this->healthRepository->save($health);
         }

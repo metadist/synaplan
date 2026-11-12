@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service;
 
+use App\AI\Health\ModelHealthAlert;
 use App\Repository\UserRepository;
 use App\Service\Notification\DiscordNotificationService;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -129,8 +130,8 @@ final class DiscordNotificationServiceFallbackTest extends TestCase
             'https://discord.example/webhook',
         );
 
-        $service->notifyModelHealth(new \App\AI\Health\ModelHealthAlert(
-            \App\AI\Health\ModelHealthAlert::KIND_CREDENTIAL,
+        $service->notifyModelHealth(new ModelHealthAlert(
+            ModelHealthAlert::KIND_CREDENTIAL,
             'anthropic',
             ['Claude Sonnet 5'],
             'Provider catalog returned HTTP 401.',

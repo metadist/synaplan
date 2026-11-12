@@ -114,17 +114,19 @@ class ModelHealthRepository extends ServiceEntityRepository
     }
 
     /**
-     * Mark an open incident resolved on the affected health rows so a later
-     * outage after the quiet period can alert again.
+     * Mark an open incident resolved on the affected health rows and anchor
+     * their quiet period at recovery time so a later outage after the quiet
+     * window can alert again without immediate relapse spam.
      *
      * @param list<int> $modelIds
      */
-    public function clearAlertActive(array $modelIds): void
+    public function clearAlertActive(array $modelIds, ?int $at = null): void
     {
         if ([] === $modelIds) {
             return;
         }
 
+        $now = $at ?? time();
         $wanted = array_flip($modelIds);
         $rows = $this->findIndexedByModelId($modelIds);
         foreach ($this->getEntityManager()->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
@@ -138,7 +140,7 @@ class ModelHealthRepository extends ServiceEntityRepository
         }
 
         foreach ($rows as $row) {
-            $row->setAlertActive(false);
+            $row->clearActiveAlert($now);
         }
 
         $this->getEntityManager()->flush();

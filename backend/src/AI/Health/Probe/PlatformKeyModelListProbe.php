@@ -101,10 +101,10 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
             $status = $page['status'];
             $body = $page['body'];
             if (429 === $status) {
-                // A rate-limited catalog response proves the key was accepted
-                // and the provider is up; live traffic counters still catch
-                // real inference failures.
-                return ProbeResult::reachable('Provider rate-limited the catalog check (HTTP 429); credentials accepted.');
+                // Rate-limiting `/models` says nothing is broken about the
+                // models themselves; live traffic counters still catch real
+                // inference failures.
+                return ProbeResult::reachable('Provider rate-limited the catalog check (HTTP 429); skipping catalog check for this run.');
             }
             if ($status < 200 || $status >= 300) {
                 return ProbeResult::failed(self::kindForStatus($status), sprintf('Provider catalog returned HTTP %d.', $status));

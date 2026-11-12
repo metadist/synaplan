@@ -38,15 +38,18 @@ final class Version20261112120000 extends AbstractMigration
              )
             SQL);
 
-        // Rows that already paged and have not recovered yet stay marked active
-        // so the first check after deploy does not send a duplicate daily page.
+        // Active (or auto-disabled), non-retired rows that already paged and
+        // have not recovered yet stay latched so deploy does not re-page them.
         $this->addSql(<<<'SQL'
-            UPDATE BMODELHEALTH
-               SET BALERTACTIVE = 1,
-                   BCONSECUTIVEFAILURES = 5
-             WHERE BSTATE IN ('offline', 'degraded')
-               AND BLASTALERTED > 0
-               AND BLASTSUCCESS <= BLASTALERTED
+            UPDATE BMODELHEALTH h
+              INNER JOIN BMODELS m ON m.BID = h.BMODELID
+               SET h.BALERTACTIVE = 1,
+                   h.BCONSECUTIVEFAILURES = 5
+             WHERE h.BSTATE IN ('offline', 'degraded')
+               AND h.BLASTALERTED > 0
+               AND h.BLASTSUCCESS <= h.BLASTALERTED
+               AND (m.BACTIVE = 1 OR h.BAUTODISABLED = 1)
+               AND m.BRETIREDON IS NULL
             SQL);
     }
 
