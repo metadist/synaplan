@@ -160,6 +160,7 @@ final readonly class OAuthSignupGate
         if (!$this->registration->isEnabled()) {
             throw SignupBlockedException::closed();
         }
+        $this->protection->assertEdgeAllowed();
         if (!$verifiedNative) {
             $this->consumeNonce($statePayload, true);
         }

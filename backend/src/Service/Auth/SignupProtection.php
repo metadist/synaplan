@@ -6,8 +6,9 @@ namespace App\Service\Auth;
 
 /**
  * One entry point for everything that stands between a stranger and a new
- * account: the human check ({@see SignupChallenge}) and the limits plus pause
- * switch ({@see SignupGuard}). Controllers depend on this class only.
+ * account: the public edge gate ({@see SignupEdge}), the human check
+ * ({@see SignupChallenge}) and the limits plus pause switch ({@see SignupGuard}).
+ * Controllers depend on this class only.
  */
 final readonly class SignupProtection
 {
@@ -30,7 +31,18 @@ final readonly class SignupProtection
     }
 
     /**
-     * The limits always apply; the pause does not for a valid invitation code.
+     * Refuses new account creation when the install requires the public
+     * Cloudflare edge and this request bypassed it.
+     *
+     * @throws SignupBlockedException
+     */
+    public function assertEdgeAllowed(): void
+    {
+        $this->edge->assertCurrent();
+    }
+
+    /**
+     * The edge gate and limits always apply; the pause does not for a valid invitation code.
      *
      * @throws SignupBlockedException
      */

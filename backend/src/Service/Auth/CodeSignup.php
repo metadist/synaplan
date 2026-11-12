@@ -139,7 +139,7 @@ final readonly class CodeSignup
         }
 
         $code = $this->codes->find($codeId);
-        if (!$code instanceof SignupCode) {
+        if (!$code instanceof SignupCode || !$code->isRedeemable()) {
             $this->cache->deleteItem($key);
 
             return null;

@@ -9,23 +9,22 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
- * A hosted install can refuse a new account unless Cloudflare is the hop in
- * front of this deployment's own addresses.
+ * A hosted install can refuse a new account unless the request arrived through
+ * a trusted Cloudflare hop (`SIGNUP_REQUIRE_CLOUDFLARE=true`).
  *
  * The public default is off, so a self-hosted install is unchanged. Callers
  * run this only when they are about to create an account. An existing account
  * still signs in. Directory provisioning and accounts an operator creates do
  * not come through here.
  *
- * A CF-Connecting-IP header is not proof. The address immediately in front of
- * the load balancer (and the proxy that connected to PHP) has to be a
- * published Cloudflare edge. The edge proxy writes that chain. Copying the
- * visitor's own header would let them name the hop.
+ * A `CF-Connecting-IP` header is not proof. Every hop between PHP and a
+ * published Cloudflare edge must sit in `SYMFONY_TRUSTED_PROXIES` (with
+ * `SYMFONY_TRUSTED_HEADERS=x-forwarded-for`), and the edge proxy must write
+ * that chain rather than copying a visitor header.
  */
 final readonly class SignupEdge
 {
     public const ENV_REQUIRE = 'SIGNUP_REQUIRE_CLOUDFLARE';
-    public const ENV_HOPS = 'SIGNUP_EDGE_TRUSTED_HOPS';
 
     public function __construct(
         private RequestStack $requests,
@@ -50,7 +49,7 @@ final readonly class SignupEdge
      */
     public static function assertRequest(Request $request): void
     {
-        if (!self::required() || ClientAddress::hopInFrontIsCloudflare($request, self::ownHops())) {
+        if (!self::required() || ClientAddress::cameThroughTrustedCloudflare($request)) {
             return;
         }
 
@@ -65,10 +64,5 @@ final readonly class SignupEdge
         }
 
         return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? false;
-    }
-
-    private static function ownHops(): string
-    {
-        return trim((string) ($_ENV[self::ENV_HOPS] ?? ''));
     }
 }

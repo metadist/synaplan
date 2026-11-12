@@ -9,12 +9,15 @@ use App\Entity\User;
 use App\Message\ProvisionDefaultUserPluginsMessage;
 use App\Repository\ConfigRepository;
 use App\Repository\SignupCodeRepository;
+use App\Service\Auth\SignupBlockedException;
+use App\Service\Auth\SignupEdge;
 use App\Service\Auth\TokenService;
 use App\Service\Billing\PayFirst\PayFirstConfig;
 use App\Service\Iam\UserDeletionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\Transport\InMemory\InMemoryTransport;
 use Symfony\Component\Mime\Email;
 
@@ -31,6 +34,12 @@ final class CodeSignupControllerTest extends WebTestCase
     private EntityManagerInterface $em;
     private string $ip;
     private ?string $previousMailerDsn = null;
+    private ?string $previousEdgeRequire = null;
+
+    /** @var list<string> */
+    private array $previousProxies = [];
+
+    private int $previousHeaderSet = 0;
 
     /** @var list<int> */
     private array $codeIds = [];
@@ -43,12 +52,22 @@ final class CodeSignupControllerTest extends WebTestCase
         $this->em = static::getContainer()->get(EntityManagerInterface::class);
         $this->ip = '10.'.random_int(0, 255).'.'.random_int(0, 255).'.'.random_int(1, 254);
         $this->previousMailerDsn = $_ENV['MAILER_DSN'] ?? null;
+        $this->previousEdgeRequire = $_ENV[SignupEdge::ENV_REQUIRE] ?? null;
+        $this->previousProxies = Request::getTrustedProxies();
+        $this->previousHeaderSet = Request::getTrustedHeaderSet();
+        unset($_ENV[SignupEdge::ENV_REQUIRE]);
         $_ENV['MAILER_DSN'] = 'null://default';
         $this->removeTestUsers();
     }
 
     protected function tearDown(): void
     {
+        Request::setTrustedProxies($this->previousProxies, $this->previousHeaderSet);
+        if (null === $this->previousEdgeRequire) {
+            unset($_ENV[SignupEdge::ENV_REQUIRE]);
+        } else {
+            $_ENV[SignupEdge::ENV_REQUIRE] = $this->previousEdgeRequire;
+        }
         $this->removeTestUsers();
         $conn = $this->em->getConnection();
         foreach ($this->codeIds as $id) {
@@ -199,6 +218,55 @@ final class CodeSignupControllerTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(429);
         self::assertSame('CODE_SIGNUP_RATE_LIMITED', $this->json()['code']);
+    }
+
+    public function testEdgeRequirementRefusesNewCodeAccountPreservesLinkAndAllowsExistingAccount(): void
+    {
+        $this->switchOn();
+        $_ENV[SignupEdge::ENV_REQUIRE] = 'true';
+        Request::setTrustedProxies(['10.0.0.8', '104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR);
+
+        [$plain, $codeId] = $this->code('PRO', 1);
+        $newEmail = $this->address();
+        $this->post(['email' => $newEmail, 'code' => $plain]);
+        $newSecret = $this->secretFromMail();
+
+        // Direct connection (skipping Cloudflare) cannot create a new account and does not burn the link or code.
+        $this->postConsume($newSecret);
+        self::assertResponseStatusCodeSame(403);
+        self::assertSame(SignupBlockedException::CODE_EDGE_REQUIRED, $this->json()['code']);
+        self::assertSame(0, $this->countUsers($newEmail));
+        self::assertSame(0, $this->uses($codeId));
+
+        // The same link still opens the account once accessed through the public Cloudflare edge.
+        $this->client->request(
+            'POST',
+            '/api/v1/auth/code-signup/consume',
+            [],
+            [],
+            [
+                'CONTENT_TYPE' => 'application/json',
+                'REMOTE_ADDR' => '10.0.0.8',
+                'HTTP_X_FORWARDED_FOR' => '203.0.113.10, 104.16.1.1',
+                'HTTP_CF_CONNECTING_IP' => '203.0.113.10',
+            ],
+            json_encode(['token' => $newSecret], JSON_THROW_ON_ERROR),
+        );
+        self::assertResponseIsSuccessful();
+        self::assertTrue($this->json()['created']);
+        self::assertSame(1, $this->uses($codeId));
+
+        // An existing account still signs in even when skipping the public edge.
+        [$secondPlain, $secondCodeId] = $this->code('TEAM', 1);
+        $existingEmail = $this->address();
+        $this->user($existingEmail);
+        $this->post(['email' => $existingEmail, 'code' => $secondPlain]);
+        $existingSecret = $this->secretFromMail();
+
+        $this->postConsume($existingSecret);
+        self::assertResponseIsSuccessful();
+        self::assertFalse($this->json()['created']);
+        self::assertSame(0, $this->uses($secondCodeId));
     }
 
     private function switchOn(): void

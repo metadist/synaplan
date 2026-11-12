@@ -168,29 +168,20 @@ final class ClientAddressTest extends TestCase
         $this->assertSame('2001:db8::10', ClientAddress::resolve($request));
     }
 
-    public function testHopInFrontOfOurAddressesIsCloudflare(): void
-    {
-        $this->trustProxy();
-        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
-        $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 167.235.106.98');
-
-        $this->assertTrue(ClientAddress::hopInFrontIsCloudflare($request, '167.235.106.98/32'));
-    }
-
-    public function testTheHopCheckStillSeesCloudflareAfterTheVisitorAddressIsAligned(): void
+    public function testCameThroughTrustedCloudflareAcrossMultiHopProductionChain(): void
     {
         Request::setTrustedProxies(
-            ['10.0.0.8', '167.235.106.98/32', '104.16.0.0/13'],
+            ['127.0.0.1', '172.30.10.2', '167.235.106.98/32', '104.16.0.0/13'],
             Request::HEADER_X_FORWARDED_FOR,
         );
-        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
-        $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 167.235.106.98');
+        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 167.235.106.98, 172.30.10.2');
         $request->headers->set('CF-Connecting-IP', '203.0.113.10');
 
         ClientAddress::align($request);
 
         $this->assertSame('203.0.113.10', $request->getClientIp());
-        $this->assertTrue(ClientAddress::hopInFrontIsCloudflare($request, '167.235.106.98/32'));
+        $this->assertTrue(ClientAddress::cameThroughTrustedCloudflare($request));
     }
 
     public function testACloudflarePeerIsNotSkippedAsOurHop(): void
@@ -202,32 +193,51 @@ final class ClientAddressTest extends TestCase
 
         ClientAddress::align($request);
 
-        $this->assertTrue(ClientAddress::hopInFrontIsCloudflare($request, ''));
+        $this->assertTrue(ClientAddress::cameThroughTrustedCloudflare($request));
     }
 
-    public function testACloudflareAddressLeftOfAStrangerDoesNotOpenTheEdge(): void
+    public function testUntrustedCloudflareRangeBehindATrustedProxyDoesNotOpenTheEdge(): void
     {
-        Request::setTrustedProxies(
-            ['10.0.0.8', '167.235.106.98/32', '104.16.0.0/13'],
-            Request::HEADER_X_FORWARDED_FOR,
-        );
+        $this->trustProxy();
         $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
-        $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 198.51.100.9, 167.235.106.98');
+        $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1');
         $request->headers->set('CF-Connecting-IP', '203.0.113.10');
 
         ClientAddress::align($request);
 
-        $this->assertFalse(ClientAddress::hopInFrontIsCloudflare($request, '167.235.106.98/32'));
+        $this->assertFalse(ClientAddress::cameThroughTrustedCloudflare($request));
+    }
+
+    public function testACloudflareAddressLeftOfAStrangerOrMalformedTokenDoesNotOpenTheEdge(): void
+    {
+        Request::setTrustedProxies(
+            ['127.0.0.1', '172.30.10.2', '167.235.106.98/32', '104.16.0.0/13'],
+            Request::HEADER_X_FORWARDED_FOR,
+        );
+        $stranger = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $stranger->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 198.51.100.9, 167.235.106.98, 172.30.10.2');
+        $stranger->headers->set('CF-Connecting-IP', '203.0.113.10');
+        ClientAddress::align($stranger);
+        $this->assertFalse(ClientAddress::cameThroughTrustedCloudflare($stranger));
+
+        $malformed = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $malformed->headers->set('X-Forwarded-For', '104.16.1.1, unknown, 172.30.10.2');
+        $this->assertFalse(ClientAddress::cameThroughTrustedCloudflare($malformed));
     }
 
     public function testAnUntrustedNeighbourCannotPresentACloudflareHop(): void
     {
-        $this->trustProxy();
-        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '172.18.0.9']);
-        $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1');
-        $request->headers->set('CF-Connecting-IP', '203.0.113.10');
+        Request::setTrustedProxies(
+            ['127.0.0.1', '172.30.10.2', '104.16.0.0/13'],
+            Request::HEADER_X_FORWARDED_FOR,
+        );
+        $direct = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '172.18.0.9']);
+        $direct->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1');
+        $this->assertFalse(ClientAddress::cameThroughTrustedCloudflare($direct));
 
-        $this->assertFalse(ClientAddress::hopInFrontIsCloudflare($request, '167.235.106.98/32'));
+        $viaWorkerPool = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '127.0.0.1']);
+        $viaWorkerPool->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 172.18.0.9');
+        $this->assertFalse(ClientAddress::cameThroughTrustedCloudflare($viaWorkerPool));
     }
 
     public function testSubscriberAlignsGetClientIpWithTheResolver(): void

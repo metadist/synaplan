@@ -24,10 +24,10 @@ final readonly class ClientAddress
     private const RESOLVED_ATTRIBUTE = '_client_address';
 
     /**
-     * The forwarding chain before {@see align()} replaces it with the visitor.
-     * The signup edge check still has to see the Cloudflare hop.
+     * Cached before {@see align()} replaces `X-Forwarded-For` with the visitor,
+     * so a later {@see cameThroughTrustedCloudflare()} call still sees the edge hop.
      */
-    private const FORWARDED_FOR_ATTRIBUTE = '_client_address_forwarded_for';
+    private const CLOUDFLARE_HOP_ATTRIBUTE = '_client_address_cloudflare_hop';
 
     /**
      * Published Cloudflare edges (https://www.cloudflare.com/ips/).
@@ -103,20 +103,39 @@ final readonly class ClientAddress
             return;
         }
 
-        $original = $request->headers->get('X-Forwarded-For');
-        if (is_string($original) && !$request->attributes->has(self::FORWARDED_FOR_ATTRIBUTE)) {
-            $request->attributes->set(self::FORWARDED_FOR_ATTRIBUTE, $original);
-        }
-
         $request->headers->set('X-Forwarded-For', $cloudflare);
         if (0 !== (Request::getTrustedHeaderSet() & Request::HEADER_FORWARDED) && $request->headers->has('Forwarded')) {
             $request->headers->remove('Forwarded');
         }
     }
 
+    /**
+     * True only when at least one hop in the request's contiguous trusted-proxy
+     * suffix is both trusted by the deployment (`SYMFONY_TRUSTED_PROXIES`) and
+     * a published Cloudflare edge.
+     *
+     * Every hop between `REMOTE_ADDR` and that Cloudflare edge must also sit in
+     * `SYMFONY_TRUSTED_PROXIES` (for example the worker-pool loopback, the edge
+     * reverse proxy and the load balancer). A local proxy that does not trust
+     * Cloudflare ranges, an untrusted neighbour container, or a Cloudflare
+     * address left of an untrusted hop is refused.
+     */
+    public static function cameThroughTrustedCloudflare(Request $request): bool
+    {
+        $cached = $request->attributes->get(self::CLOUDFLARE_HOP_ATTRIBUTE);
+        if (is_bool($cached)) {
+            return $cached;
+        }
+
+        $viaCloudflare = self::walkTrustedCloudflareSuffix($request);
+        $request->attributes->set(self::CLOUDFLARE_HOP_ATTRIBUTE, $viaCloudflare);
+
+        return $viaCloudflare;
+    }
+
     private static function trustedCloudflareIp(Request $request): ?string
     {
-        if (!self::cameThroughTrustedCloudflareHop($request)) {
+        if (!self::cameThroughTrustedCloudflare($request)) {
             return null;
         }
 
@@ -138,56 +157,7 @@ final readonly class ClientAddress
         return $header;
     }
 
-    /**
-     * True when the address immediately in front of this deployment's own hops
-     * is a published Cloudflare edge.
-     *
-     * Own hops are the immediate trusted peer (the proxy that connected to PHP)
-     * and `$ownHops` (the load balancer, comma-separated). A Cloudflare address
-     * is never treated as one of ours, including the peer that connected. A
-     * request that did not come from a trusted proxy is refused here, so a
-     * neighbour on the machine cannot present its own forwarding chain. A
-     * Cloudflare address further left than that first foreign hop does not count.
-     */
-    public static function hopInFrontIsCloudflare(Request $request, string $ownHops): bool
-    {
-        if (!$request->isFromTrustedProxy()) {
-            return false;
-        }
-
-        $remote = self::normalizeHop((string) $request->server->get('REMOTE_ADDR', ''));
-        $own = self::hopList($ownHops);
-        $skippedPeer = false;
-        foreach (array_reverse(self::forwardingChain($request)) as $hop) {
-            if (
-                !$skippedPeer
-                && null !== $remote
-                && $hop === $remote
-                && !IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)
-            ) {
-                $skippedPeer = true;
-                continue;
-            }
-            if ([] !== $own && IpUtils::checkIp($hop, $own) && !IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)) {
-                continue;
-            }
-
-            return IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES);
-        }
-
-        return false;
-    }
-
-    /**
-     * True only when at least one hop in the request's contiguous trusted-proxy
-     * suffix is both trusted by the deployment (`SYMFONY_TRUSTED_PROXIES`) and
-     * a published Cloudflare edge.
-     *
-     * A local proxy on `127.0.0.1` is trusted for worker-pool forwarding, not
-     * as Cloudflare; an external Cloudflare Worker whose IP was never added to
-     * `SYMFONY_TRUSTED_PROXIES` is not a trusted proxy at all.
-     */
-    private static function cameThroughTrustedCloudflareHop(Request $request): bool
+    private static function walkTrustedCloudflareSuffix(Request $request): bool
     {
         $trusted = Request::getTrustedProxies();
         if ([] === $trusted || !$request->isFromTrustedProxy()) {
@@ -198,7 +168,7 @@ final readonly class ClientAddress
 
         for ($i = count($chain) - 1; $i >= 0; --$i) {
             $hop = $chain[$i];
-            if (!IpUtils::checkIp($hop, $trusted)) {
+            if (null === $hop || !IpUtils::checkIp($hop, $trusted)) {
                 return false;
             }
             if (IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)) {
@@ -210,50 +180,30 @@ final readonly class ClientAddress
     }
 
     /**
-     * @return list<string>
+     * Non-empty malformed tokens stay in the chain as `null` so a garbage value
+     * breaks the contiguous trusted suffix instead of bridging over an untrusted hop.
+     *
+     * @return list<?string>
      */
     private static function forwardingChain(Request $request): array
     {
         $chain = [];
         $trustsForwardedFor = 0 !== (Request::getTrustedHeaderSet() & Request::HEADER_X_FORWARDED_FOR);
-        $forwardedFor = $request->attributes->get(self::FORWARDED_FOR_ATTRIBUTE);
-        if (!is_string($forwardedFor)) {
-            $forwardedFor = $request->headers->get('X-Forwarded-For');
-        }
-        if ($trustsForwardedFor && is_string($forwardedFor)) {
-            foreach (explode(',', $forwardedFor) as $part) {
-                $ip = self::normalizeHop($part);
-                if (null !== $ip) {
-                    $chain[] = $ip;
+        if ($trustsForwardedFor && $request->headers->has('X-Forwarded-For')) {
+            foreach (explode(',', (string) $request->headers->get('X-Forwarded-For')) as $part) {
+                if ('' === trim($part)) {
+                    continue;
                 }
+                $chain[] = self::normalizeHop($part);
             }
         }
 
         $remote = $request->server->get('REMOTE_ADDR');
-        if (is_string($remote)) {
-            $remoteIp = self::normalizeHop($remote);
-            if (null !== $remoteIp) {
-                $chain[] = $remoteIp;
-            }
+        if (is_string($remote) && '' !== trim($remote)) {
+            $chain[] = self::normalizeHop($remote);
         }
 
         return $chain;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private static function hopList(string $raw): array
-    {
-        $hops = [];
-        foreach (explode(',', $raw) as $part) {
-            $hop = trim($part);
-            if ('' !== $hop) {
-                $hops[] = $hop;
-            }
-        }
-
-        return $hops;
     }
 
     private static function normalizeHop(string $raw): ?string

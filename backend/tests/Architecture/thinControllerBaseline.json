@@ -1,12 +1,12 @@
 {
     "_comment": "Thin-controller ledger (tests/Architecture/ThinControllerTest.php). Frozen offenders only; entries may shrink or disappear, never grow or be added. Regenerate with UPDATE_THIN_CONTROLLER=1 and review the diff.",
     "recorded": "2026-10-17",
-    "updated": "2026-11-10",
+    "updated": "2026-11-12",
     "limits": {
         "methodLines": 50
     },
     "counts": {
-        "methodLines": 101,
+        "methodLines": 100,
         "entityManager": 14,
         "aiFacade": 5
     },
@@ -23,7 +23,6 @@
         "src/Controller/AuthController.php::AuthController::refresh": 102,
         "src/Controller/AuthController.php::AuthController::refreshImpersonatedSession": 74,
         "src/Controller/AuthController.php::AuthController::refreshOidcTokens": 105,
-        "src/Controller/AuthController.php::AuthController::register": 73,
         "src/Controller/ChatController.php::ChatController::getMessages": 79,
         "src/Controller/DesktopController.php::DesktopController::enqueueJob": 75,
         "src/Controller/FileController.php::FileController::indexPrompt": 52,
