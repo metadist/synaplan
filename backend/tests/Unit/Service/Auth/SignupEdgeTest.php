@@ -89,6 +89,20 @@ final class SignupEdgeTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function testACloudflarePeerIsAllowedWhenTheEdgeIsRequired(): void
+    {
+        $_ENV[SignupEdge::ENV_REQUIRE] = 'true';
+        Request::setTrustedProxies(['104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR);
+        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '104.16.1.1']);
+        $request->headers->set('X-Forwarded-For', '203.0.113.10');
+        $request->headers->set('CF-Connecting-IP', '203.0.113.10');
+
+        ClientAddress::align($request);
+        SignupEdge::assertRequest($request);
+
+        $this->addToAssertionCount(1);
+    }
+
     private function direct(): Request
     {
         return Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '198.51.100.9']);

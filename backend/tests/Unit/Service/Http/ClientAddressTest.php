@@ -193,6 +193,18 @@ final class ClientAddressTest extends TestCase
         $this->assertTrue(ClientAddress::hopInFrontIsCloudflare($request, '167.235.106.98/32'));
     }
 
+    public function testACloudflarePeerIsNotSkippedAsOurHop(): void
+    {
+        Request::setTrustedProxies(['104.16.0.0/13'], Request::HEADER_X_FORWARDED_FOR);
+        $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '104.16.1.1']);
+        $request->headers->set('X-Forwarded-For', '203.0.113.10');
+        $request->headers->set('CF-Connecting-IP', '203.0.113.10');
+
+        ClientAddress::align($request);
+
+        $this->assertTrue(ClientAddress::hopInFrontIsCloudflare($request, ''));
+    }
+
     public function testACloudflareAddressLeftOfAStrangerDoesNotOpenTheEdge(): void
     {
         Request::setTrustedProxies(

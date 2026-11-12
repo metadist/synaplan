@@ -144,10 +144,10 @@ final readonly class ClientAddress
      *
      * Own hops are the immediate trusted peer (the proxy that connected to PHP)
      * and `$ownHops` (the load balancer, comma-separated). A Cloudflare address
-     * is never treated as one of ours. A request that did not come from a
-     * trusted proxy is refused here, so a neighbour on the machine cannot
-     * present its own forwarding chain. A Cloudflare address further left than
-     * that first foreign hop does not count.
+     * is never treated as one of ours, including the peer that connected. A
+     * request that did not come from a trusted proxy is refused here, so a
+     * neighbour on the machine cannot present its own forwarding chain. A
+     * Cloudflare address further left than that first foreign hop does not count.
      */
     public static function hopInFrontIsCloudflare(Request $request, string $ownHops): bool
     {
@@ -159,7 +159,12 @@ final readonly class ClientAddress
         $own = self::hopList($ownHops);
         $skippedPeer = false;
         foreach (array_reverse(self::forwardingChain($request)) as $hop) {
-            if (!$skippedPeer && null !== $remote && $hop === $remote) {
+            if (
+                !$skippedPeer
+                && null !== $remote
+                && $hop === $remote
+                && !IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)
+            ) {
                 $skippedPeer = true;
                 continue;
             }
