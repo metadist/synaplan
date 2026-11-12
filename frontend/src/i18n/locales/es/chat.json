@@ -193,7 +193,11 @@
     "tagsHint": "Escribe una etiqueta por línea.",
     "tagsSaved": "Etiquetas guardadas.",
     "tagsSaveFailed": "No se guardaron las etiquetas. Inténtalo de nuevo.",
-    "archivedDone": "Archivado. Está en Todos los chats → Archivados.",
+    "archivedDone": "Archivado. Está en Chats → Archivados.",
+    "archivedEmpty": "No hay chats archivados.",
+    "archiveFailed": "Este chat sigue abierto. No se archivó nada. Inténtalo de nuevo.",
+    "unarchiveFailed": "Este chat sigue archivado. No se restauró. Inténtalo de nuevo.",
+    "archiveLoadFailed": "No se pudieron cargar los chats archivados. Los chats abiertos no cambiaron. Inténtalo de nuevo.",
     "unarchivedDone": "De vuelta en la barra lateral.",
     "showOpenChats": "Chats abiertos",
     "versionLinkFailed": "La nueva respuesta se muestra, pero no se guardó como otra versión de la anterior."

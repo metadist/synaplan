@@ -3,6 +3,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useChatsStore, isDefaultChatTitle, type Chat as StoreChat } from '../stores/chats'
+import { useChatArchiveStore } from '../stores/chatArchive'
 import { useIncomingStore } from '../stores/incoming'
 import { useDialog } from './useDialog'
 import { useNotification } from './useNotification'
@@ -48,6 +49,40 @@ const shareModalChatTitle = ref('')
 const iamShareOpen = ref(false)
 const iamShareResourceId = ref('')
 
+function channelIcon(chat: StoreChat): string | null {
+  switch (chat.source) {
+    case 'whatsapp':
+      return 'mdi:whatsapp'
+    case 'telegram':
+      return 'mdi:telegram'
+    case 'email':
+      return 'mdi:email-outline'
+    case 'widget':
+      return 'mdi:widgets-outline'
+    case 'api':
+      return 'mdi:console'
+    default:
+      return null
+  }
+}
+
+function channelIconClass(chat: StoreChat): string {
+  switch (chat.source) {
+    case 'whatsapp':
+      return 'text-green-500'
+    case 'telegram':
+      return 'text-[var(--channel-telegram)]'
+    case 'email':
+      return 'text-blue-500'
+    case 'widget':
+      return 'text-purple-500'
+    case 'api':
+      return 'text-orange-500'
+    default:
+      return ''
+  }
+}
+
 /** Share dialogs render once in SidebarV2; every chat row opens the same pair. */
 export function useChatShareDialog() {
   return {
@@ -71,6 +106,7 @@ export function useChatHistory() {
   const { formatRelativeTime } = useDateFormat()
   const authStore = useAuthStore()
   const chatsStore = useChatsStore()
+  const archiveStore = useChatArchiveStore()
   const incomingStore = useIncomingStore()
 
   const iamSharingEnabled = computed(() => isIamSharingEnabled())
@@ -82,6 +118,7 @@ export function useChatHistory() {
     Date.parse(chat.updatedAt ?? '') || Date.parse(chat.createdAt ?? '') || 0
 
   const sidebarChats = computed(() => {
+    if (archiveStore.viewingArchived) return archiveStore.chats
     const byId = new Map(chatsStore.chats.map((chat) => [chat.id, chat]))
     const railIds = new Set<number>()
     const rail = chatsStore.railChats.map((chat) => {
@@ -168,42 +205,14 @@ export function useChatHistory() {
   const isGenerating = (chat: StoreChat): boolean => chatsStore.activeRunChatIds.has(chat.id)
   const isAnswerReady = (chat: StoreChat): boolean => chatsStore.readyChatIds.has(chat.id)
 
-  const channelIcon = (chat: StoreChat): string | null => {
-    switch (chat.source) {
-      case 'whatsapp':
-        return 'mdi:whatsapp'
-      case 'telegram':
-        return 'mdi:telegram'
-      case 'email':
-        return 'mdi:email-outline'
-      case 'widget':
-        return 'mdi:widgets-outline'
-      case 'api':
-        return 'mdi:console'
-      default:
-        return null
-    }
-  }
-
-  const channelIconClass = (chat: StoreChat): string => {
-    switch (chat.source) {
-      case 'whatsapp':
-        return 'text-green-500'
-      case 'telegram':
-        return 'text-[var(--channel-telegram)]'
-      case 'email':
-        return 'text-blue-500'
-      case 'widget':
-        return 'text-purple-500'
-      case 'api':
-        return 'text-orange-500'
-      default:
-        return ''
-    }
-  }
+  const findOwnChat = (chatId: number): StoreChat | undefined =>
+    chatsStore.chats.find((row) => row.id === chatId) ??
+    chatsStore.railChats.find((row) => row.id === chatId) ??
+    archiveStore.chats.find((row) => row.id === chatId)
 
   const createChat = async () => {
     if (isCreatingChat.value) return
+    archiveStore.showOpenChats()
     isCreatingChat.value = true
     try {
       await chatsStore.findOrCreateEmptyChat()
@@ -221,7 +230,7 @@ export function useChatHistory() {
   }
 
   const renameChat = async (chatId: number) => {
-    const chat = chatsStore.chats.find((row) => row.id === chatId)
+    const chat = findOwnChat(chatId)
     const newTitle = await dialog.prompt({
       title: t('chat.rename'),
       message: t('chat.enterNewName'),
@@ -253,15 +262,20 @@ export function useChatHistory() {
   }
 
   const toggleArchivedChats = () => {
-    void chatsStore.loadChats(chatsStore.viewingArchived ? '0' : '1')
+    void archiveStore.toggleViewingArchived()
   }
 
   const archiveChat = async (chatId: number) => {
-    const chat = chatsStore.chats.find((row) => row.id === chatId)
+    const chat = findOwnChat(chatId)
     const archived = chat?.archived === true
-    await chatsStore.setChatArchived(chatId, !archived)
-    const { success } = useNotification()
-    success(archived ? t('chat.unarchivedDone') : t('chat.archivedDone'))
+    try {
+      const saved = await chatsStore.setChatArchived(chatId, !archived)
+      if (!saved) return
+      useNotification().success(archived ? t('chat.unarchivedDone') : t('chat.archivedDone'))
+    } catch (err: unknown) {
+      console.error('Updating the archive failed', err)
+      useNotification().error(archived ? t('chat.unarchiveFailed') : t('chat.archiveFailed'))
+    }
   }
 
   const exportChat = (chatId: number) => {
@@ -269,7 +283,7 @@ export function useChatHistory() {
   }
 
   const shareChat = (chatId: number) => {
-    const chat = chatsStore.chats.find((row) => row.id === chatId)
+    const chat = findOwnChat(chatId)
     shareModalChatId.value = chatId
     shareModalChatTitle.value = chat ? displayTitle(chat) : t('chat.newChat')
     if (isIamSharingEnabled()) {

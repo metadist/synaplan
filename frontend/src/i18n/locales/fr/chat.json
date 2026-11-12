@@ -193,7 +193,11 @@
     "tagsHint": "Saisis un tag par ligne.",
     "tagsSaved": "Tags enregistrés.",
     "tagsSaveFailed": "Les tags n'ont pas été enregistrés. Réessaie.",
-    "archivedDone": "Archivé. Il est dans Tous les chats → Archivés.",
+    "archivedDone": "Archivé. Il est dans Chats → Archivés.",
+    "archivedEmpty": "Aucune discussion archivée.",
+    "archiveFailed": "Cette discussion est encore ouverte. Rien n'a été archivé. Réessayez.",
+    "unarchiveFailed": "Cette discussion est encore archivée. Elle n'a pas été restaurée. Réessayez.",
+    "archiveLoadFailed": "Les discussions archivées n'ont pas pu être chargées. Les discussions ouvertes sont inchangées. Réessayez.",
     "unarchivedDone": "De retour dans la barre latérale.",
     "showOpenChats": "Discussions ouvertes",
     "versionLinkFailed": "La nouvelle réponse s'affiche, mais elle n'a pas été enregistrée comme une autre version de la précédente."
