@@ -212,7 +212,7 @@ x-app-volumes: &app-volumes
 
 services:
   secrets-init:
-    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     restart: "no"
     environment:
       APP_SECRET: "${APP_SECRET:-}"
@@ -725,7 +725,7 @@ services:
     networks: [internal]
 
   whisper-models:
-    image: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+    image: alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf
     profiles: [local-ai]
     # The model name is passed as an environment variable and expanded by the
     # container's shell inside quotes, instead of being interpolated by Compose
