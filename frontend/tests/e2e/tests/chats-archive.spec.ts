@@ -1,6 +1,6 @@
 import { test, expect } from '../test-setup'
 import { openApp } from '../helpers/auth'
-import { nameActiveChat } from '../helpers/chat'
+import { ChatHelper, nameActiveChat } from '../helpers/chat'
 import { selectors } from '../helpers/selectors'
 import { TIMEOUTS } from '../config/config'
 
@@ -42,7 +42,9 @@ test.describe('@ci All chats archive', () => {
     page,
   }) => {
     await openApp(page)
-    await page.locator(selectors.nav.sidebarV2ChatNav).click()
+    // A cold boot can show the composer before any chat id is stored.
+    // New Chat waits until that id exists, which is what the rename needs.
+    await new ChatHelper(page).startNewChat()
     const title = `Archive walk ${Date.now()}`
     await nameActiveChat(page, title)
     const row = () => page.locator('[data-testid="row-chat-v2"]').filter({ hasText: title })
@@ -79,6 +81,7 @@ test.describe('@ci All chats archive', () => {
     await page.locator('[data-testid="btn-sidebar-archived-chats"]').click()
     await expect(row()).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
 
+    await row().hover()
     await row().locator('[data-testid="btn-chat-v2-row-menu"]').click()
     const archived = page.waitForResponse(
       (res) => res.url().includes('/archive') && res.request().method() === 'POST' && res.ok(),
@@ -100,6 +103,7 @@ test.describe('@ci All chats archive', () => {
 
     await page.locator('[data-testid="btn-sidebar-archived-chats"]').click()
     await expect(row()).toHaveCount(1, { timeout: TIMEOUTS.STANDARD })
+    await row().hover()
     await row().locator('[data-testid="btn-chat-v2-row-menu"]').click()
     const restored = page.waitForResponse(
       (res) => res.url().includes('/unarchive') && res.request().method() === 'POST' && res.ok(),
