@@ -182,7 +182,7 @@
               {{ $t('chat.archivedEmpty') }}
             </p>
             <p
-              v-else-if="chatsReady && pinnedChats.length === 0"
+              v-else-if="!archiveStore.viewingArchived && chatsReady && pinnedChats.length === 0"
               class="sidebar-empty-hint px-3 py-2 text-sm"
               data-testid="text-sidebar-v2-chats-empty"
             >

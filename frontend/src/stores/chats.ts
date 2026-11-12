@@ -1111,12 +1111,10 @@ export const useChatsStore = defineStore('chats', () => {
       archive().removeArchived(chatId)
       invalidateInFlightChatsLoad()
 
-      // If the deleted chat was active and it was the last chat, create a new one
-      if (wasActiveChat && chats.value.length === 0) {
-        await createChat()
-      } else if (wasActiveChat && chats.value.length > 0) {
-        // Select another chat if the deleted one was active
-        updateActiveChatSelection(chats.value[0].id)
+      if (wasActiveChat) {
+        const next = chats.value.find((chat) => !chat.widgetSession)
+        if (next) updateActiveChatSelection(next.id)
+        else await createChat()
       }
     } catch (err: unknown) {
       if (!silent) {

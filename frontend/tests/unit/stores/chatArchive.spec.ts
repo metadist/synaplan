@@ -236,6 +236,31 @@ describe('chat archive store', () => {
     expect(archive.viewingArchived).toBe(false)
   })
 
+  it('opens the next regular chat when the active chat is deleted', async () => {
+    const chats = useChatsStore()
+    chats.chats = [listed(1, 'Widget', { widgetSession: 'w' }), listed(2, 'Open')]
+    chats.activeChatId = 9
+    httpClientMock.mockResolvedValueOnce({ success: true })
+
+    await chats.deleteChat(9)
+
+    expect(chats.activeChatId).toBe(2)
+    expect(chats.chats.map((chat) => chat.id)).toEqual([1, 2])
+  })
+
+  it('starts a fresh chat when deleting the active chat leaves only a widget', async () => {
+    const chats = useChatsStore()
+    chats.chats = [listed(1, 'Widget', { widgetSession: 'w' })]
+    chats.activeChatId = 9
+    httpClientMock.mockResolvedValueOnce({ success: true })
+    httpClientMock.mockResolvedValueOnce({ success: true, chat: listed(10, 'New') })
+
+    await chats.deleteChat(9)
+
+    expect(chats.activeChatId).toBe(10)
+    expect(chats.chats.map((chat) => chat.id)).toEqual([10, 1])
+  })
+
   it('moves the next page back when a loaded row is forgotten', () => {
     const list = ref([listed(1, 'One'), listed(2, 'Two')])
     const offset = ref(2)

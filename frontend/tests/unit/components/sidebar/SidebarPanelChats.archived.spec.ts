@@ -72,6 +72,11 @@ describe('SidebarPanelChats archived view', () => {
     )
     expect(wrapper.find('[data-testid="section-sidebar-incoming"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="btn-chat-v2-show-all"]').exists()).toBe(false)
+
+    useChatArchiveStore().loading = true
+    await wrapper.vm.$nextTick()
+    expect(wrapper.find('[data-testid="text-sidebar-v2-archived-empty"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="text-sidebar-v2-chats-empty"]').exists()).toBe(false)
     wrapper.unmount()
   })
 })
