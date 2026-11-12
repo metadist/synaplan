@@ -7,6 +7,7 @@
         :aria-label="$t('nav.home')"
         :title="$t('nav.home')"
         data-testid="link-sidebar-brand"
+        @click="suppressHover(null, $event)"
       >
         <img
           :src="iconSrc"
@@ -26,7 +27,7 @@
       aria-controls="sidebar-v2-panel"
       aria-expanded="false"
       data-testid="btn-sidebar-v2-expand"
-      @click="expand"
+      @click="expand($event)"
     >
       <ChevronDoubleRightIcon class="h-4 w-4" aria-hidden="true" />
     </button>
@@ -49,10 +50,10 @@
         :data-testid="section.testId"
         :data-tour="`rail-${section.key}`"
         @pointerenter="scheduleTip(section, $event)"
-        @pointerleave="hideTipSoon"
+        @pointerleave="hideTipSoon($event)"
         @focus="showTipOnKeyboardFocus(section, $event)"
         @blur="hideTipNow"
-        @click="openSection(section.key)"
+        @click="openSection(section.key, $event)"
       >
         <component :is="section.icon" class="w-6 h-6" aria-hidden="true" />
         <span
@@ -66,10 +67,10 @@
 
     <Teleport to="body">
       <Transition
-        enter-active-class="transition-opacity duration-150 ease-out"
+        enter-active-class="transition-opacity duration-150 ease-out motion-reduce:transition-none"
         enter-from-class="opacity-0"
         enter-to-class="opacity-100"
-        leave-active-class="transition-opacity duration-100 ease-in"
+        leave-active-class="transition-opacity duration-100 ease-in motion-reduce:transition-none"
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
@@ -171,26 +172,25 @@ const { isDark } = useTheme()
 const { iconSrc } = useBrandLogo(isDark)
 const { sections, activeKey, selectSection, loadFeatureStatus } = useNavSections()
 const { tip, scheduleTip, showTipOnKeyboardFocus, hideTipNow, hideTipSoon, suppressHover } =
-  useRailTooltip()
+  useRailTooltip(sections)
 
-function expand() {
+function expand(event: MouseEvent) {
+  suppressHover(null, event)
   openPanel()
   focusSidebarToggle('collapse')
 }
 
-function openSection(key: NavSection['key']) {
-  const closingOverlay = panelOverlay.value && activeKey.value === key
-  const openingPanel = !closingOverlay && !panelVisible.value
-  // Remember the click before this rail shifts or is replaced, so icons that
-  // appear under the same pointer do not open the tooltip again.
-  suppressHover(key, closingOverlay || openingPanel)
+function openSection(key: NavSection['key'], event: MouseEvent) {
+  // Remember the click before the panel shifts or the rail is replaced, so a
+  // stationary pointer does not open a tooltip on the next frame.
+  suppressHover(key, event)
   // A rail icon names a panel. In the overlay, a second click on the open
   // section closes it again; otherwise choosing an icon shows its panel.
-  if (closingOverlay) {
+  if (panelOverlay.value && activeKey.value === key) {
     closePanel()
     return
   }
-  if (openingPanel) openPanel()
+  if (!panelVisible.value) openPanel()
   void selectSection(key)
 }
 

@@ -1,4 +1,4 @@
-import { defineComponent, onBeforeUnmount, ref } from 'vue'
+import { defineComponent, markRaw, onBeforeUnmount, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -10,10 +10,44 @@ import {
   resetRailTooltipState,
   useRailTooltip,
 } from '@/composables/useRailTooltip'
+import { useSidebarStore } from '@/stores/sidebar'
+import type { NavSection } from '@/composables/useNavSections'
 
 const CHATS = '[data-testid="btn-sidebar-v2-nav-chat"]'
-const ASSISTANTS = '[data-testid="btn-sidebar-v2-nav-assistants"]'
 const LIBRARY = '[data-testid="btn-sidebar-v2-nav-files"]'
+const ASSISTANTS = '[data-testid="btn-sidebar-v2-nav-assistants"]'
+const EXPAND = '[data-testid="btn-sidebar-v2-expand"]'
+
+const stubIcon = markRaw({ template: '<i />' })
+
+const defaultSections = (): NavSection[] => [
+  {
+    key: 'chats',
+    label: 'Chats',
+    description: 'Chat history',
+    icon: stubIcon,
+    testId: 'btn-sidebar-v2-nav-chat',
+    requiresAuth: false,
+  },
+  {
+    key: 'library',
+    label: 'Library',
+    description: 'Files the AI can use in your chats',
+    icon: stubIcon,
+    testId: 'btn-sidebar-v2-nav-files',
+    requiresAuth: true,
+  },
+  {
+    key: 'assistants',
+    label: 'Agents',
+    description: 'Agents, shortcuts, tasks and AI settings',
+    icon: stubIcon,
+    testId: 'btn-sidebar-v2-nav-assistants',
+    requiresAuth: true,
+  },
+]
+
+const navSections = ref<NavSection[]>(defaultSections())
 
 vi.mock('@/components/SchedulerStaleHint.vue', () => ({
   default: { name: 'SchedulerStaleHint', template: '<div />' },
@@ -55,32 +89,7 @@ vi.mock('@/stores/incoming', () => ({
 
 vi.mock('@/composables/useNavSections', () => ({
   useNavSections: () => ({
-    sections: ref([
-      {
-        key: 'chats',
-        label: 'Chats',
-        description: 'Chat history',
-        icon: { template: '<i />' },
-        testId: 'btn-sidebar-v2-nav-chat',
-        requiresAuth: false,
-      },
-      {
-        key: 'library',
-        label: 'Library',
-        description: 'Files the AI can use in your chats',
-        icon: { template: '<i />' },
-        testId: 'btn-sidebar-v2-nav-files',
-        requiresAuth: true,
-      },
-      {
-        key: 'assistants',
-        label: 'Agents',
-        description: 'Agents, shortcuts, tasks and AI settings',
-        icon: { template: '<i />' },
-        testId: 'btn-sidebar-v2-nav-assistants',
-        requiresAuth: true,
-      },
-    ]),
+    sections: navSections,
     activeKey: ref('chats'),
     selectSection: vi.fn(),
     loadFeatureStatus: vi.fn(),
@@ -117,9 +126,10 @@ const hoverMedia = (query: string) =>
 const tooltip = (): HTMLElement | null =>
   document.querySelector<HTMLElement>('[data-testid="tooltip-sidebar-rail"]')
 
-async function mountRail() {
+async function mountRail(collapsed = false) {
   const pinia = createPinia()
   setActivePinia(pinia)
+  useSidebarStore().isCollapsed = collapsed
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [{ path: '/', component: { template: '<div />' } }],
@@ -138,6 +148,7 @@ describe('SidebarRail tooltip', () => {
   beforeEach(() => {
     document.body.innerHTML = '<div id="app"></div>'
     localStorage.clear()
+    navSections.value = defaultSections()
     resetRailTooltipState()
     vi.useRealTimers()
     vi.spyOn(window, 'matchMedia').mockImplementation(hoverMedia)
@@ -169,33 +180,61 @@ describe('SidebarRail tooltip', () => {
     second.unmount()
   })
 
-  it('keeps the click suppression when the panel shift leaves the pointer inside the rail', async () => {
-    const first = await mountRail()
-    await first.get(ASSISTANTS).trigger('click')
-    const rail = first.get('[data-testid="section-sidebar-rail"]').element
+  it('suppresses neighbor hover and keeps click suppression when opening the panel shifts icons under a stationary pointer', async () => {
+    const first = await mountRail(true)
+    await first.get(CHATS).trigger('click', { clientX: 28, clientY: 122, detail: 1 })
+
+    // Removing the expand button shifts Chats away and Library under (28, 122).
     first
-      .get(ASSISTANTS)
-      .element.dispatchEvent(new PointerEvent('pointerleave', { relatedTarget: rail }))
+      .get(CHATS)
+      .element.dispatchEvent(new PointerEvent('pointerleave', { clientX: 28, clientY: 122 }))
+    vi.useFakeTimers()
+    first
+      .get(LIBRARY)
+      .element.dispatchEvent(new PointerEvent('pointerenter', { clientX: 28, clientY: 122 }))
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()).toBeNull()
     first.unmount()
 
-    const second = await mountRail()
-    vi.useFakeTimers()
-    await second.get(ASSISTANTS).trigger('pointerenter')
+    const second = await mountRail(false)
+    second
+      .get(LIBRARY)
+      .element.dispatchEvent(new PointerEvent('pointerenter', { clientX: 28, clientY: 122 }))
     await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
     expect(tooltip()).toBeNull()
     second.unmount()
   })
 
-  it('shows again after the pointer leaves the clicked icon and comes back', async () => {
+  it('suppresses Chats hover when clicking Expand shifts Chats under the stationary pointer', async () => {
+    const wrapper = await mountRail(true)
+    await wrapper.get(EXPAND).trigger('click', { clientX: 28, clientY: 74, detail: 1 })
+
+    vi.useFakeTimers()
+    wrapper
+      .get(CHATS)
+      .element.dispatchEvent(new PointerEvent('pointerenter', { clientX: 28, clientY: 74 }))
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('shows again after the pointer moves into empty rail space and comes back', async () => {
     const first = await mountRail()
-    await first.get(ASSISTANTS).trigger('click')
+    await first.get(ASSISTANTS).trigger('click', { clientX: 28, clientY: 196, detail: 1 })
     await flushPromises()
     first.unmount()
 
     const second = await mountRail()
+    const rail = second.get('[data-testid="section-sidebar-rail"]').element
     vi.useFakeTimers()
-    await second.get(ASSISTANTS).trigger('pointerleave')
-    await second.get(ASSISTANTS).trigger('pointerenter')
+    second
+      .get(ASSISTANTS)
+      .element.dispatchEvent(
+        new PointerEvent('pointerleave', { clientX: 28, clientY: 280, relatedTarget: rail })
+      )
+    second
+      .get(ASSISTANTS)
+      .element.dispatchEvent(new PointerEvent('pointerenter', { clientX: 28, clientY: 196 }))
     await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
     expect(tooltip()?.textContent).toContain('Agents')
     second.unmount()
@@ -213,6 +252,17 @@ describe('SidebarRail tooltip', () => {
     await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
     expect(tooltip()?.textContent).toContain('Library')
     second.unmount()
+  })
+
+  it('ignores touch pointerenter on hybrid hover-capable devices', async () => {
+    const wrapper = await mountRail()
+    vi.useFakeTimers()
+    wrapper
+      .get(ASSISTANTS)
+      .element.dispatchEvent(new PointerEvent('pointerenter', { pointerType: 'touch' }))
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()).toBeNull()
+    wrapper.unmount()
   })
 
   it('still shows the tooltip for a keyboard focus after the click', async () => {
@@ -236,6 +286,47 @@ describe('SidebarRail tooltip', () => {
     second.unmount()
   })
 
+  it('dismisses an open tooltip on Escape and on window resize', async () => {
+    const wrapper = await mountRail()
+    vi.useFakeTimers()
+    await wrapper.get(ASSISTANTS).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()?.textContent).toContain('Agents')
+
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+    document.dispatchEvent(escape)
+    await flushPromises()
+    expect(escape.defaultPrevented).toBe(true)
+    expect(tooltip()).toBeNull()
+
+    await wrapper.get(LIBRARY).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()?.textContent).toContain('Library')
+
+    window.dispatchEvent(new Event('resize'))
+    await flushPromises()
+    expect(tooltip()).toBeNull()
+    wrapper.unmount()
+  })
+
+  it('updates an open tooltip reactively when section labels change', async () => {
+    const wrapper = await mountRail()
+    vi.useFakeTimers()
+    await wrapper.get(ASSISTANTS).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()?.textContent).toContain('Agents')
+
+    navSections.value = navSections.value.map((section) =>
+      section.key === 'assistants'
+        ? { ...section, label: 'Agenten', description: 'Agenten und Kurzbefehle' }
+        : section
+    )
+    await flushPromises()
+    expect(tooltip()?.textContent).toContain('Agenten')
+    expect(tooltip()?.textContent).toContain('Agenten und Kurzbefehle')
+    wrapper.unmount()
+  })
+
   it('keeps the click suppression when pointerleave fires while the rail unmounts', async () => {
     const leaving = mount(LeaveOnUnmount)
     leaving.vm.suppressHover('assistants')
@@ -246,49 +337,6 @@ describe('SidebarRail tooltip', () => {
     await rail.get(ASSISTANTS).trigger('pointerenter')
     await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
     expect(tooltip()).toBeNull()
-    rail.unmount()
-  })
-
-  it('suppresses a neighbor icon shifted under the pointer when a folded panel opens', async () => {
-    localStorage.setItem('sidebar-panel-collapsed', 'true')
-    const first = await mountRail()
-
-    await first.get(LIBRARY).trigger('click')
-    const agents = first.get(ASSISTANTS).element
-    first
-      .get(LIBRARY)
-      .element.dispatchEvent(new PointerEvent('pointerleave', { relatedTarget: agents }))
-    await first.get(ASSISTANTS).trigger('pointerenter')
-    first.unmount()
-
-    const second = await mountRail()
-    vi.useFakeTimers()
-    await second.get(ASSISTANTS).trigger('pointerenter')
-    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
-    expect(tooltip()).toBeNull()
-
-    await second.get(ASSISTANTS).trigger('pointerleave')
-    await second.get(ASSISTANTS).trigger('pointerenter')
-    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
-    expect(tooltip()?.textContent).toContain('Agents')
-    second.unmount()
-  })
-
-  it('allows normal hover again once the shift guard expires without a remount', async () => {
-    vi.useFakeTimers()
-    localStorage.setItem('sidebar-panel-collapsed', 'true')
-    const rail = await mountRail()
-
-    await rail.get(CHATS).trigger('click')
-    await rail.get(CHATS).trigger('pointerleave')
-    await rail.get(LIBRARY).trigger('pointerenter')
-    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
-    expect(tooltip()).toBeNull()
-
-    await rail.get(LIBRARY).trigger('pointerleave')
-    await rail.get(LIBRARY).trigger('pointerenter')
-    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
-    expect(tooltip()?.textContent).toContain('Library')
     rail.unmount()
   })
 })

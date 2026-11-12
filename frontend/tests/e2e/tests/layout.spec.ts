@@ -578,7 +578,9 @@ test.describe('@ci @layout UI guard — axe scans (report-only, phase 0.5)', () 
       await new ChatHelper(page).startNewChat()
       await axeBlocking(page, 'empty-chat')
       await page.locator(NAV.sidebarV2Assistants).click()
-      await expect(page.locator(NAV.sidebarPanel)).toBeVisible({ timeout: TIMEOUTS.SHORT })
+      await expect(page.locator(NAV.panelGroup('assistants'))).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
       // The click hides the rail tooltip, but the leave transition keeps the
       // node mounted for a frame. axe folds that opacity into color-contrast,
       // so scan only once the node is gone.
