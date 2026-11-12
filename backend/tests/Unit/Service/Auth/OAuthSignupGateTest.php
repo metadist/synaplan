@@ -57,10 +57,27 @@ final class OAuthSignupGateTest extends TestCase
     {
         $this->users->expects($this->once())->method('findOneBy')->with(['mail' => 'known@example.com'])->willReturn(new User());
         $this->protection->method('challengeRequired')->willReturn(true);
+        $this->protection->expects($this->never())->method('assertEdgeAllowed');
         $this->protection->expects($this->never())->method('assertSignupAllowed');
 
         $this->gate()->assertGoogleSignup('known@example.com', ['nonce' => 'n1'], '203.0.113.1');
         $this->addToAssertionCount(1);
+    }
+
+    public function testNewOAuthAccountIsRefusedByTheEdgeGateBeforeTheHumanCheck(): void
+    {
+        $this->users->method('findOneBy')->willReturn(null);
+        $this->protection->method('challengeRequired')->willReturn(true);
+        $this->protection->expects($this->once())->method('assertEdgeAllowed')->willThrowException(SignupBlockedException::edgeRequired());
+        $this->protection->expects($this->never())->method('assertSignupAllowed');
+
+        try {
+            $this->gate()->assertGoogleSignup('new@example.com', ['nonce' => 'keep-me'], '203.0.113.1');
+            $this->fail('A new OAuth account that skips the public edge must be refused');
+        } catch (SignupBlockedException $e) {
+            $this->assertSame(SignupBlockedException::CODE_EDGE_REQUIRED, $e->getReasonCode());
+            $this->assertSame('signup_edge_required', $e->getErrorCodeParam());
+        }
     }
 
     public function testReturningAppleUserIsFoundBySubjectWhenTheEmailIsMissing(): void

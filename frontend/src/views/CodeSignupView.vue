@@ -113,7 +113,12 @@
             </router-link>
           </p>
           <p
-            v-if="errorKey === 'codeSignup.uncertain' || errorKey === 'codeSignup.external'"
+            v-if="
+              errorKey === 'codeSignup.uncertain' ||
+              errorKey === 'codeSignup.external' ||
+              errorKey === 'auth.signupBlocked.edgeRequired' ||
+              errorKey === 'auth.signupBlocked.closed'
+            "
             class="text-sm"
           >
             <router-link to="/login" class="txt-primary underline" data-testid="link-sign-in">
@@ -151,6 +156,7 @@ import { setSessionHint } from '@/services/sessionHint'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
 import { isSelfSignupOpen } from '@/utils/selfSignup'
+import { signupBlockedI18nKey } from '@/utils/signupBlockedMessage'
 
 const route = useRoute()
 const { locale } = useI18n()
@@ -182,6 +188,8 @@ function messageKey(error: unknown, forLink: boolean): string {
   if (error.code === 'CODE_SIGNUP_OFF') return 'codeSignup.off'
   if (error.code === 'SIGNUP_CHALLENGE_FAILED') return 'codeSignup.challenge'
   if (error.code === 'CODE_SIGNUP_EXTERNAL') return 'codeSignup.external'
+  const blocked = signupBlockedI18nKey(error.code)
+  if (blocked) return blocked
   if (forLink && error.code === 'CODE_SIGNUP_INVALID') return 'codeSignup.linkInvalid'
   return forLink ? 'codeSignup.linkInvalid' : 'codeSignup.unreachable'
 }

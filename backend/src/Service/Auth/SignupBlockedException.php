@@ -22,6 +22,7 @@ final class SignupBlockedException extends \RuntimeException
     public const CODE_ADMISSION_REQUIRED = 'SIGNUP_ADMISSION_REQUIRED';
     public const CODE_CODE_INVALID = 'SIGNUP_CODE_INVALID';
     public const CODE_PLAN_INVALID = 'SIGNUP_PLAN_INVALID';
+    public const CODE_EDGE_REQUIRED = 'SIGNUP_EDGE_REQUIRED';
 
     private function __construct(
         private readonly string $reasonCode,
@@ -88,6 +89,16 @@ final class SignupBlockedException extends \RuntimeException
             self::CODE_PLAN_INVALID,
             'That plan is not available.',
             Response::HTTP_BAD_REQUEST,
+            0,
+        );
+    }
+
+    public static function edgeRequired(): self
+    {
+        return new self(
+            self::CODE_EDGE_REQUIRED,
+            'New accounts can only be created from the public website. If you already have an account, sign in.',
+            Response::HTTP_FORBIDDEN,
             0,
         );
     }

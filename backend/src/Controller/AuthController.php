@@ -214,7 +214,7 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(response: 409, description: 'Email already registered')]
     #[OA\Response(response: 400, description: 'Validation error')]
-    #[OA\Response(response: 403, description: 'Self-sign-up is off (SIGNUP_CLOSED). An existing account is not revealed.')]
+    #[OA\Response(response: 403, description: 'Self-sign-up is off (SIGNUP_CLOSED), or this install only accepts new accounts through its public edge (SIGNUP_EDGE_REQUIRED). An existing account is not revealed.')]
     #[OA\Response(response: 429, description: 'Too many sign-ups from this connection (SIGNUP_RATE_LIMITED); Retry-After is set')]
     #[OA\Response(response: 503, description: 'Sign-up is paused by the operator and the request has no valid invitation code (SIGNUP_PAUSED)')]
     public function register(
@@ -226,18 +226,14 @@ class AuthController extends AbstractController
             return $this->signupBlocked(SignupBlockedException::closed());
         }
 
-        // Human check (Turnstile or reCAPTCHA), then the signup limits and the
-        // operator's pause switch. Both answer with a stable code the UI maps.
-        if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload($request->toArray()), 'register', ClientAddress::resolve($request))) {
-            return $this->json(['error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
-        }
+        // Public edge gate first, then the human check (Turnstile or reCAPTCHA)
+        // and the signup limits / pause switch. All answer with stable UI codes.
         try {
+            $this->signupProtection->assertEdgeAllowed();
+            if (!$this->signupProtection->verifyHuman(SignupProtection::tokenFromPayload($request->toArray()), 'register', ClientAddress::resolve($request))) {
+                return $this->json(['error' => 'Verification failed. Please try again.', 'code' => 'SIGNUP_CHALLENGE_FAILED'], Response::HTTP_BAD_REQUEST);
+            }
             $this->signupProtection->assertSignupAllowed(ClientAddress::resolve($request), $dto->code);
-        } catch (SignupBlockedException $e) {
-            return $this->signupBlocked($e);
-        }
-
-        try {
             $user = $this->userLifecycleService->createSignup(
                 $dto->email, $dto->password, null !== $dto->language ? ['language' => $dto->language] : [],
                 $dto->plan, $dto->code, ClientAddress::resolve($request),

@@ -153,4 +153,19 @@ describe('CodeSignupView', () => {
 
     expect(wrapper.get('[data-testid="link-register"]').attributes('href')).toBe('/login')
   })
+
+  it('shows the public-edge refusal and a sign-in link instead of claiming the link expired', async () => {
+    consumeCodeSignup.mockRejectedValue(
+      new ApiError(
+        403,
+        'New accounts can only be created from the public website. If you already have an account, sign in.',
+        'SIGNUP_EDGE_REQUIRED'
+      )
+    )
+    const wrapper = await mountView('/start/code?token=abc')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="text-error"]').text()).toContain('public website')
+    expect(wrapper.get('[data-testid="link-sign-in"]').attributes('href')).toBe('/login')
+  })
 })

@@ -9,6 +9,7 @@
 const KEYS: Record<string, string> = {
   SIGNUP_RATE_LIMITED: 'auth.signupBlocked.rateLimited',
   SIGNUP_CLOSED: 'auth.signupBlocked.closed',
+  SIGNUP_EDGE_REQUIRED: 'auth.signupBlocked.edgeRequired',
   ACCOUNT_SUSPENDED: 'auth.signupBlocked.suspended',
   SIGNUP_PAUSED: 'auth.signupBlocked.paused',
   SIGNUP_CHALLENGE_FAILED: 'auth.signupBlocked.challengeFailed',

@@ -117,6 +117,7 @@ The first matching row wins. An environment value beats the switch in Admin → 
 | Switch | Effect |
 | --- | --- |
 | `REGISTRATION_ENABLED=false` | No new account through any self-sign-up door. The register page says new accounts cannot be created and offers sign-in. `/login` keeps every configured sign-in method. A social callback for an address with no account answers `SIGNUP_CLOSED` and creates nothing. |
+| `SIGNUP_REQUIRE_CLOUDFLARE=true` | A new self-sign-up is refused (`SIGNUP_EDGE_REQUIRED`, 403) unless the contiguous `SYMFONY_TRUSTED_PROXIES` suffix includes a published Cloudflare edge. The public default is off. An existing account still signs in. Checkout webhooks, directory provisioning and accounts an operator creates are not affected. |
 | `SIGNUP_PAUSED=true` | The same close, temporary. The answer is `SIGNUP_PAUSED` (503). The runtime config shows it, so the form does not invite a person who will be refused. |
 | `REGISTRATION_MODE=open` | Self-sign-up doors are open. The account is `NEW` and active. This is the default. |
 | `REGISTRATION_MODE=admission` | A new self-sign-up needs a plan or a code. A plan stays `pending_payment`. A code is active at the code's tier. |
