@@ -151,8 +151,10 @@ final readonly class ImportedModelListingCheck
                 ->setConsecutiveFailures(0)
                 ->setAlertActive(false);
         } else {
-            $health->setLastFailure($now)
-                ->setConsecutiveFailures($health->getConsecutiveFailures() + 1);
+            // Do not increment BCONSECUTIVEFAILURES here: ModelHealthEvaluator
+            // owns the alert failure streak, and imported Ollama rows run
+            // through both passes in the same scheduled tick.
+            $health->setLastFailure($now);
         }
 
         $applied = $this->autoDisabler->apply($verdict, $model, $health, $now);
