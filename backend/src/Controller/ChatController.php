@@ -66,6 +66,7 @@ class ChatController extends AbstractController
         parameters: [
             new OA\Parameter(name: 'limit', in: 'query', required: false, description: 'When present, enables pagination and caps the page size.', schema: new OA\Schema(type: 'integer', default: 20, minimum: 1, maximum: 100)),
             new OA\Parameter(name: 'offset', in: 'query', required: false, description: 'Number of chats to skip (only used when `limit` is present).', schema: new OA\Schema(type: 'integer', default: 0, minimum: 0)),
+            new OA\Parameter(name: 'archived', in: 'query', required: false, description: '1 or true lists archived chats, all lists both, anything else lists open chats.', schema: new OA\Schema(type: 'string', enum: ['0', '1', 'all'], default: '0')),
         ],
         responses: [
             new OA\Response(
@@ -102,20 +103,17 @@ class ChatController extends AbstractController
                                     new OA\Property(property: 'firstMessagePreview', type: 'string', nullable: true, example: 'How do I reset my password?'),
                                     new OA\Property(property: 'pinned', type: 'boolean', example: false, description: 'When true, the chat is listed in the Pinned category.'),
                                     new OA\Property(property: 'pinnedAt', type: 'string', format: 'date-time', nullable: true, description: 'When the chat was last pinned. Null when it is not pinned.'),
-                                    new OA\Property(
-                                        property: 'widgetSession',
-                                        type: 'object',
-                                        nullable: true,
-                                        properties: [
-                                            new OA\Property(property: 'widgetId', type: 'string'),
-                                            new OA\Property(property: 'widgetName', type: 'string', nullable: true),
-                                            new OA\Property(property: 'sessionId', type: 'string'),
-                                            new OA\Property(property: 'messageCount', type: 'integer'),
-                                            new OA\Property(property: 'lastMessage', type: 'integer', nullable: true),
-                                            new OA\Property(property: 'created', type: 'integer'),
-                                            new OA\Property(property: 'expires', type: 'integer'),
-                                        ]
-                                    ),
+                                    new OA\Property(property: 'archived', type: 'boolean', example: false, description: 'True when the chat is in Archived.'),
+                                    new OA\Property(property: 'tags', type: 'array', items: new OA\Items(type: 'string')),
+                                    new OA\Property(property: 'widgetSession', type: 'object', nullable: true, properties: [
+                                        new OA\Property(property: 'widgetId', type: 'string'),
+                                        new OA\Property(property: 'widgetName', type: 'string', nullable: true),
+                                        new OA\Property(property: 'sessionId', type: 'string'),
+                                        new OA\Property(property: 'messageCount', type: 'integer'),
+                                        new OA\Property(property: 'lastMessage', type: 'integer', nullable: true),
+                                        new OA\Property(property: 'created', type: 'integer'),
+                                        new OA\Property(property: 'expires', type: 'integer'),
+                                    ]),
                                 ]
                             )
                         ),

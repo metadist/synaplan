@@ -18,6 +18,8 @@ import { chatGoneStatus } from '@/utils/chatAccessError'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { buildChatShareUrl } from '@/utils/urlHelper'
 import { CHAT_HISTORY_PAGE } from '@/components/sidebar/chatHistoryPaging'
+import { saveChatExport } from '@/services/chatExport'
+import { applyChatArchived, forgetPagedChat, useChatArchiveStore } from '@/stores/chatArchive'
 
 const ACTIVE_CHAT_STORAGE_KEY = 'synaplan_active_chat_id'
 /** Finished-but-unopened chats, per user. A reload must keep the dot until that chat is opened. */
@@ -288,6 +290,10 @@ export const useChatsStore = defineStore('chats', () => {
       return
     }
 
+    if (candidateId && archive().isOpenable(candidateId)) {
+      updateActiveChatSelection(candidateId)
+      return
+    }
     const firstRegularChat = chats.value.find((chat) => !chat.widgetSession)
     updateActiveChatSelection(firstRegularChat ? firstRegularChat.id : null)
   }
@@ -357,9 +363,9 @@ export const useChatsStore = defineStore('chats', () => {
     activeRunChatIds.value = applyLiveRunOverlay(serverRunIds, loadSeq)
   }
 
-  const viewingArchived = ref(false)
+  const archive = () => useChatArchiveStore()
 
-  async function loadChats(archived: '0' | '1' = '0') {
+  async function loadChats() {
     if (!checkAuthOrRedirect()) return
 
     const seq = ++chatsLoadSeq
@@ -369,9 +375,8 @@ export const useChatsStore = defineStore('chats', () => {
     const run = (async () => {
       try {
         const data = await httpClient<{ chats: unknown[]; activeRunChatIds?: number[] }>(
-          `/api/v1/chats?archived=${archived}`
+          '/api/v1/chats?archived=0'
         )
-        viewingArchived.value = archived === '1'
         if (seq !== chatsLoadSeq) {
           return
         }
@@ -404,9 +409,7 @@ export const useChatsStore = defineStore('chats', () => {
         listLoading = null
       }
     }
-    // A newer load superseded this one, so this response was dropped. Callers
-    // decide on the list right after (the chat view picks or creates the open
-    // chat), so they wait for the load whose list is actually applied.
+    // Wait out a superseded load so callers see the list that was applied.
     while (listLoading) {
       await listLoading
     }
@@ -966,7 +969,8 @@ export const useChatsStore = defineStore('chats', () => {
   async function toggleChatPin(chatId: number) {
     if (!checkAuthOrRedirect()) return
 
-    const chat = chats.value.find((c) => c.id === chatId)
+    const chat =
+      chats.value.find((c) => c.id === chatId) ?? archive().chats.find((c) => c.id === chatId)
     if (!chat || pinPendingChatIds.value.has(chatId)) return
 
     const previousPinned = chat.pinned === true
@@ -974,6 +978,7 @@ export const useChatsStore = defineStore('chats', () => {
     const nextPinned = !previousPinned
     chat.pinned = nextPinned
     chat.pinnedAt = nextPinned ? new Date().toISOString() : null
+    archive().patchArchived(chatId, { pinned: chat.pinned, pinnedAt: chat.pinnedAt })
     invalidateInFlightChatsLoad()
     pinPendingChatIds.value = new Set(pinPendingChatIds.value).add(chatId)
 
@@ -989,6 +994,7 @@ export const useChatsStore = defineStore('chats', () => {
         current.pinned = previousPinned
         current.pinnedAt = previousPinnedAt
       }
+      archive().patchArchived(chatId, { pinned: previousPinned, pinnedAt: previousPinnedAt })
       error.value = getErrorMessage(err) || 'Failed to update chat'
       useNotification().error(i18n.global.t('chat.pinSaveFailed'))
       console.error('Error pinning chat:', err)
@@ -1015,6 +1021,7 @@ export const useChatsStore = defineStore('chats', () => {
     if (chat) {
       chat.tags = stored
     }
+    archive().patchArchived(chatId, { tags: stored })
     invalidateInFlightChatsLoad()
     return stored
   }
@@ -1034,6 +1041,7 @@ export const useChatsStore = defineStore('chats', () => {
       if (chat) {
         chat.title = title
       }
+      archive().patchArchived(chatId, { title })
       // A load that started while the PATCH was in flight can have been
       // served the old title. Drop it so it cannot land after this write.
       invalidateInFlightChatsLoad()
@@ -1057,37 +1065,28 @@ export const useChatsStore = defineStore('chats', () => {
     if (rail && rail !== chat) {
       rail.title = title
     }
+    archive().patchArchived(chatId, { title })
   }
 
-  async function setChatArchived(chatId: number, archived: boolean) {
-    if (!checkAuthOrRedirect()) return
-    await httpClient(`/api/v1/chats/${chatId}/${archived ? 'archive' : 'unarchive'}`, {
-      method: 'POST',
+  function setChatArchived(chatId: number, archived: boolean): Promise<boolean> {
+    return applyChatArchived(chatId, archived, {
+      chats,
+      railChats,
+      historyChats,
+      historyOffset,
+      activeChatId,
+      locallyCreatedIds,
+      forgetRailChat,
+      updateActiveChatSelection,
+      createChat,
+      loadChats,
+      loadRailChats,
     })
-    const chat = chats.value.find((row) => row.id === chatId)
-    if (chat) chat.archived = archived
-    if (archived) {
-      chats.value = chats.value.filter((row) => row.id !== chatId)
-      forgetRailChat(chatId)
-      if (activeChatId.value === chatId) {
-        updateActiveChatSelection(chats.value[0]?.id ?? null)
-      }
-    } else {
-      await loadChats(viewingArchived.value ? '1' : '0')
-    }
   }
 
   async function downloadChatExport(chatId: number, format: 'md' | 'json' | 'pdf') {
     if (!checkAuthOrRedirect()) return
-    const blob = await httpClient<Blob>(`/api/v1/chats/${chatId}/export?format=${format}`, {
-      responseType: 'blob',
-    })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `chat-${chatId}.${format === 'md' ? 'md' : format}`
-    link.click()
-    URL.revokeObjectURL(url)
+    await saveChatExport(chatId, format)
   }
 
   async function deleteChat(chatId: number, silent: boolean = false) {
@@ -1108,6 +1107,8 @@ export const useChatsStore = defineStore('chats', () => {
       chats.value = chats.value.filter((c) => c.id !== chatId)
       removedChatIds.add(chatId)
       forgetRailChat(chatId)
+      forgetPagedChat(historyChats, historyOffset, chatId)
+      archive().removeArchived(chatId)
       invalidateInFlightChatsLoad()
 
       // If the deleted chat was active and it was the last chat, create a new one
@@ -1427,6 +1428,7 @@ export const useChatsStore = defineStore('chats', () => {
   }
 
   function $reset() {
+    archive().$reset()
     stopDetachedRunWatch()
     localTurnCompletions.clear()
     chats.value = []
@@ -1487,7 +1489,6 @@ export const useChatsStore = defineStore('chats', () => {
     markChatGenerating,
     watchDetachedRun,
     stopDetachedRunWatch,
-    viewingArchived,
     loadChats,
     loadChatHistory,
     createChat,

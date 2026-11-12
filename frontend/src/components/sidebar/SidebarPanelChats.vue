@@ -22,7 +22,11 @@
     </router-link>
   </div>
   <div v-else data-testid="section-sidebar-chats" :data-chats-loading="chatsLoading">
-    <div v-if="iamSharingEnabled" class="mt-4" data-testid="section-sidebar-incoming">
+    <div
+      v-if="iamSharingEnabled && !archiveStore.viewingArchived"
+      class="mt-4"
+      data-testid="section-sidebar-incoming"
+    >
       <div class="group/section relative">
         <button
           type="button"
@@ -128,10 +132,11 @@
           @click="chatsExpanded = !chatsExpanded"
         >
           <ClockIcon :class="sectionIconClass" aria-hidden="true" />
-          {{ $t('nav.chatHistory') }}
+          {{ archiveStore.viewingArchived ? $t('chat.archivedFilter') : $t('nav.chatHistory') }}
           <ChevronDownIcon :class="chevronClass(chatsExpanded)" aria-hidden="true" />
         </button>
         <router-link
+          v-if="!archiveStore.viewingArchived"
           to="/chats"
           :class="sectionHoverLinkClass"
           data-testid="btn-chat-v2-show-all"
@@ -161,7 +166,23 @@
         >
           <template #empty>
             <p
-              v-if="chatsReady && pinnedChats.length === 0"
+              v-if="archiveStore.viewingArchived && archiveStore.loadFailed"
+              class="sidebar-empty-hint px-3 py-2 text-sm"
+              data-testid="text-sidebar-v2-archived-error"
+            >
+              {{ $t('chat.archiveLoadFailed') }}
+            </p>
+            <p
+              v-else-if="
+                archiveStore.viewingArchived && !archiveStore.loading && pinnedChats.length === 0
+              "
+              class="sidebar-empty-hint px-3 py-2 text-sm"
+              data-testid="text-sidebar-v2-archived-empty"
+            >
+              {{ $t('chat.archivedEmpty') }}
+            </p>
+            <p
+              v-else-if="chatsReady && pinnedChats.length === 0"
               class="sidebar-empty-hint px-3 py-2 text-sm"
               data-testid="text-sidebar-v2-chats-empty"
             >
@@ -191,6 +212,7 @@ import { chatsPanelRefresh } from '@/composables/useNavSections'
 import { useMidnightNow } from '@/composables/useMidnightNow'
 import { useI18n } from 'vue-i18n'
 import { useChatHistory, type HistoryChat } from '@/composables/useChatHistory'
+import { useChatArchiveStore } from '@/stores/chatArchive'
 import { isIamGroupsEnabled } from '@/composables/useIamFeature'
 import { useAuthStore } from '@/stores/auth'
 import { useConfigStore } from '@/stores/config'
@@ -217,6 +239,7 @@ const {
   chatsStore,
   incomingStore,
 } = useChatHistory()
+const archiveStore = useChatArchiveStore()
 
 const CHATS_EXPANDED_KEY = 'sidebar-chats-expanded'
 const PINNED_EXPANDED_KEY = 'sidebar-pinned-expanded'
@@ -298,7 +321,10 @@ const incomingExpanded = ref(readExpanded(INCOMING_EXPANDED_KEY))
 const chatsReady = ref(false)
 let filling = false
 
-const chatsLoading = computed(() => (!chatsReady.value || chatsStore.loading ? 'true' : 'false'))
+const chatsLoading = computed(() => {
+  if (archiveStore.viewingArchived) return archiveStore.loading ? 'true' : 'false'
+  return !chatsReady.value || chatsStore.loading ? 'true' : 'false'
+})
 
 watch(chatsExpanded, (open) => {
   rememberExpanded(CHATS_EXPANDED_KEY, open)
@@ -321,30 +347,46 @@ const scrollRoot = (): HTMLElement | null => {
  * page of only pinned, empty, or widget-session chats adds no visible rows,
  * but the older valid chats are still waiting on later pages.
  */
+const paging = () =>
+  archiveStore.viewingArchived
+    ? {
+        hasMore: archiveStore.hasMore,
+        loading: archiveStore.loading,
+        offset: archiveStore.offset,
+        load: () => archiveStore.loadArchivedChats(false),
+      }
+    : {
+        hasMore: chatsStore.railHasMore,
+        loading: chatsStore.railLoading,
+        offset: chatsStore.railOffset,
+        load: () => chatsStore.loadRailChats(false),
+      }
+
 const fillUntilScrollable = async () => {
-  if (filling || !chatsExpanded.value || !chatsStore.railHasMore || chatsStore.railLoading) return
+  const page = paging()
+  if (filling || !chatsExpanded.value || !page.hasMore || page.loading) return
   const root = scrollRoot()
   if (!root || root.clientHeight === 0) return
   if (listOverflows(root.clientHeight, root.scrollHeight)) return
   const before = { clientHeight: root.clientHeight, scrollHeight: root.scrollHeight }
-  const beforeOffset = chatsStore.railOffset
+  const beforeOffset = page.offset
   filling = true
   try {
-    await chatsStore.loadRailChats(false)
+    await page.load()
   } finally {
     filling = false
   }
   await nextTick()
   const next = scrollRoot()
   if (!next || scrollerGrewWithContent(before, next)) return
-  if (chatsStore.railOffset === beforeOffset) return
+  if (paging().offset === beforeOffset) return
   await fillUntilScrollable()
 }
 
 /** One more page from the server. Further pages wait for the next scroll. */
 const showMoreChats = () => {
   if (!chatsExpanded.value) return
-  return chatsStore.loadRailChats(false)
+  return paging().load()
 }
 
 watch(
@@ -364,7 +406,8 @@ const refreshChats = async () => {
   // not hold the user's own list in its loading state.
   void incomingStore.load()
   try {
-    await chatsStore.loadRailChats(true)
+    if (archiveStore.viewingArchived) await archiveStore.loadArchivedChats(true)
+    else await chatsStore.loadRailChats(true)
   } finally {
     chatsReady.value = true
     void nextTick(() => fillUntilScrollable())

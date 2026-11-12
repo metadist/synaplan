@@ -188,7 +188,11 @@
     "tagsHint": "Gib ein Tag pro Zeile ein.",
     "tagsSaved": "Tags gespeichert.",
     "tagsSaveFailed": "Die Tags wurden nicht gespeichert. Versuche es erneut.",
-    "archivedDone": "Archiviert. Zu finden unter Alle Chats → Archiviert.",
+    "archivedDone": "Archiviert. Zu finden unter Chats → Archiviert.",
+    "archivedEmpty": "Keine archivierten Chats.",
+    "archiveFailed": "Dieser Chat ist noch offen. Es wurde nichts archiviert. Versuche es erneut.",
+    "unarchiveFailed": "Dieser Chat ist noch archiviert. Er wurde nicht wiederhergestellt. Versuche es erneut.",
+    "archiveLoadFailed": "Archivierte Chats konnten nicht geladen werden. Offene Chats sind unverändert. Versuche es erneut.",
     "unarchivedDone": "Wieder in der Seitenleiste.",
     "showOpenChats": "Offene Chats",
     "versionLinkFailed": "Die neue Antwort wird angezeigt, wurde aber nicht als weitere Version der vorherigen gespeichert."

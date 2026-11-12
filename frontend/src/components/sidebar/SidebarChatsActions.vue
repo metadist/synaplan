@@ -23,7 +23,7 @@
       data-testid="btn-sidebar-archived-chats"
       @click="toggleArchivedChats"
     >
-      {{ chatsStore.viewingArchived ? $t('chat.showOpenChats') : $t('chat.archivedFilter') }}
+      {{ archiveStore.viewingArchived ? $t('chat.showOpenChats') : $t('chat.archivedFilter') }}
     </button>
   </div>
 </template>
@@ -34,10 +34,10 @@ import { PlusIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { useChatHistory } from '@/composables/useChatHistory'
 import { useAuthStore } from '@/stores/auth'
-import { useChatsStore } from '@/stores/chats'
+import { useChatArchiveStore } from '@/stores/chatArchive'
 
 const authStore = useAuthStore()
-const chatsStore = useChatsStore()
+const archiveStore = useChatArchiveStore()
 const isGuest = computed(() => !authStore.isAuthenticated)
 const { isCreatingChat, createChat, toggleArchivedChats } = useChatHistory()
 </script>

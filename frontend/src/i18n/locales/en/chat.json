@@ -193,7 +193,11 @@
     "tagsHint": "Enter one tag per line.",
     "tagsSaved": "Tags saved.",
     "tagsSaveFailed": "Tags were not saved. Try again.",
-    "archivedDone": "Archived. It is under All chats → Archived.",
+    "archivedDone": "Archived. It is under Chats → Archived.",
+    "archivedEmpty": "No archived chats.",
+    "archiveFailed": "This chat is still open. Nothing was archived. Try again.",
+    "unarchiveFailed": "This chat is still archived. It was not restored. Try again.",
+    "archiveLoadFailed": "Archived chats could not be loaded. Open chats are unchanged. Try again.",
     "unarchivedDone": "Back in the sidebar.",
     "showOpenChats": "Open chats",
     "versionLinkFailed": "The new answer is shown, but it was not saved as another version of the previous one."

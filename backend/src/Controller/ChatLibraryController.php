@@ -73,6 +73,7 @@ final class ChatLibraryController extends AbstractController
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'archived', type: 'boolean', example: true),
             ])),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
@@ -98,6 +99,8 @@ final class ChatLibraryController extends AbstractController
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'archived', type: 'boolean', example: false),
             ])),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
     public function unarchive(int $id, #[CurrentUser] ?User $user): JsonResponse
@@ -125,6 +128,8 @@ final class ChatLibraryController extends AbstractController
                 new OA\Property(property: 'success', type: 'boolean'),
                 new OA\Property(property: 'tags', type: 'array', items: new OA\Items(type: 'string')),
             ])),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 404, description: 'Chat not found'),
         ]
     )]
     public function tags(int $id, Request $request, #[CurrentUser] ?User $user): JsonResponse
@@ -157,6 +162,7 @@ final class ChatLibraryController extends AbstractController
         ],
         responses: [
             new OA\Response(response: 200, description: 'The chat file'),
+            new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 403, description: 'Export is turned off'),
             new OA\Response(response: 404, description: 'Chat not found'),
         ]

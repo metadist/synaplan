@@ -9,6 +9,7 @@
 export async function resetPrincipalClientState(): Promise<void> {
   const [
     { useChatsStore },
+    { useChatArchiveStore },
     { useHistoryStore },
     { clearSseToken },
     { useMemoriesStore },
@@ -20,6 +21,7 @@ export async function resetPrincipalClientState(): Promise<void> {
     { useGuestStore },
   ] = await Promise.all([
     import('@/stores/chats'),
+    import('@/stores/chatArchive'),
     import('@/stores/history'),
     import('@/services/api/chatApi'),
     import('@/stores/userMemories'),
@@ -30,6 +32,7 @@ export async function resetPrincipalClientState(): Promise<void> {
     import('@/stores/commands'),
     import('@/stores/guest'),
   ])
+  useChatArchiveStore().$reset()
   useChatsStore().$reset()
   useHistoryStore().clear()
   useMemoriesStore().$reset()
