@@ -282,12 +282,319 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
         ], $sent);
     }
 
+    public function testOutageWaitsForFiveConsecutiveChecksAndBriefFlapsNeverPage(): void
+    {
+        $sent = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert, bool $resolved = false) use (&$sent): void {
+                $sent[] = [$alert->kind, $resolved];
+            }
+        );
+
+        $model = self::model(1, 'anthropic', 'claude-sonnet-5', 'Claude Sonnet 5');
+        $probe = new class implements ModelListProbeInterface {
+            public ProbeResult $next;
+
+            public function supports(string $service): bool
+            {
+                return true;
+            }
+
+            public function probe(string $service): ProbeResult
+            {
+                return $this->next;
+            }
+
+            public function confirm(string $service, string $providerModelId): ModelProbeResult
+            {
+                return ModelProbeResult::Inconclusive;
+            }
+        };
+
+        // Pass null to exercise the shipped default of 5 consecutive failures.
+        $evaluator = $this->evaluatorFor(['anthropic' => ['claude-sonnet-5' => [$model]]], [], $probe, consecutiveFailures: null);
+
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'Provider catalog returned HTTP 401.');
+        for ($i = 1; $i <= 4; ++$i) {
+            $run = $evaluator->run();
+            self::assertSame([], $run->alertsRaised, sprintf('Check %d below threshold must stay silent', $i));
+            self::assertSame([], $run->alertsResolved);
+            self::assertSame($i, $this->healthRows[1]->getConsecutiveFailures());
+        }
+
+        // One healthy check resets the streak and produces no resolved message.
+        $probe->next = ProbeResult::ok(['claude-sonnet-5']);
+        $healthy = $evaluator->run();
+        self::assertSame([], $healthy->alertsRaised);
+        self::assertSame([], $healthy->alertsResolved);
+        self::assertSame(0, $this->healthRows[1]->getConsecutiveFailures());
+
+        // Now fail 5 times in a row: only check 5 raises the incident.
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'Provider catalog returned HTTP 401.');
+        for ($i = 1; $i <= 4; ++$i) {
+            $run = $evaluator->run();
+            self::assertSame([], $run->alertsRaised);
+        }
+
+        $fifth = $evaluator->run();
+        self::assertCount(1, $fifth->alertsRaised);
+        self::assertSame(5, $this->healthRows[1]->getConsecutiveFailures());
+        self::assertTrue($this->healthRows[1]->isAlertActive());
+
+        // Recovery after a reported incident sends the all-clear and resets the latch.
+        $probe->next = ProbeResult::ok(['claude-sonnet-5']);
+        $recovered = $evaluator->run();
+        self::assertCount(1, $recovered->alertsResolved);
+        self::assertSame(0, $this->healthRows[1]->getConsecutiveFailures());
+        self::assertFalse($this->healthRows[1]->isAlertActive());
+
+        self::assertSame([
+            [ModelHealthAlert::KIND_CREDENTIAL, false],
+            [ModelHealthAlert::KIND_CREDENTIAL, true],
+        ], $sent);
+    }
+
+    public function testUnrecoveredOutageNeverPagesAgainAfter24HoursUntilRecovered(): void
+    {
+        $sent = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert, bool $resolved = false) use (&$sent): void {
+                $sent[] = [$alert->kind, $resolved];
+            }
+        );
+
+        $model = self::model(1, 'trustedtokens', 'zai-org/GLM-5.2', 'GLM 5.2');
+        $probe = new class implements ModelListProbeInterface {
+            public ProbeResult $next;
+
+            public function supports(string $service): bool
+            {
+                return true;
+            }
+
+            public function probe(string $service): ProbeResult
+            {
+                return $this->next;
+            }
+
+            public function confirm(string $service, string $providerModelId): ModelProbeResult
+            {
+                return ModelProbeResult::Inconclusive;
+            }
+        };
+
+        $evaluator = $this->evaluatorFor(['trustedtokens' => ['zai-org/GLM-5.2' => [$model]]], [], $probe, consecutiveFailures: 1);
+
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'Provider catalog returned HTTP 403.');
+        $first = $evaluator->run();
+        self::assertCount(1, $first->alertsRaised);
+
+        // Two days later, the key is still broken: must NOT page again.
+        $this->healthRows[1]->setLastAlerted(time() - (2 * 86400));
+        $stillDown = $evaluator->run();
+        self::assertSame([], $stillDown->alertsRaised);
+        self::assertSame([], $stillDown->alertsResolved);
+
+        // Recover after a multi-day outage: an immediate relapse stays inside
+        // the post-recovery quiet window instead of re-paging right away.
+        $probe->next = ProbeResult::ok(['zai-org/glm-5.2']);
+        $recovered = $evaluator->run();
+        self::assertCount(1, $recovered->alertsResolved);
+
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'Provider catalog returned HTTP 403.');
+        $immediateRelapse = $evaluator->run();
+        self::assertSame([], $immediateRelapse->alertsRaised, 'Quiet period after recovery must hold even when the outage lasted multiple days');
+
+        $this->healthRows[1]->setLastAlerted(time() - (2 * 86400));
+        $newOutage = $evaluator->run();
+        self::assertCount(1, $newOutage->alertsRaised);
+
+        self::assertSame([
+            [ModelHealthAlert::KIND_CREDENTIAL, false],
+            [ModelHealthAlert::KIND_CREDENTIAL, true],
+            [ModelHealthAlert::KIND_CREDENTIAL, false],
+        ], $sent);
+    }
+
+    public function testRateLimitedCatalogProbeDoesNotFalseResolveAnOpenIncident(): void
+    {
+        $model = self::model(1, 'cerebras', 'qwen-3.8-27b', 'Qwen 3.8 27B');
+        $probe = new class implements ModelListProbeInterface {
+            public ProbeResult $next;
+
+            public function supports(string $service): bool
+            {
+                return true;
+            }
+
+            public function probe(string $service): ProbeResult
+            {
+                return $this->next;
+            }
+
+            public function confirm(string $service, string $providerModelId): ModelProbeResult
+            {
+                return ModelProbeResult::Inconclusive;
+            }
+        };
+
+        $evaluator = $this->evaluatorFor(['cerebras' => ['qwen-3.8-27b' => [$model]]], [], $probe, consecutiveFailures: 1);
+
+        $probe->next = ProbeResult::failed(FailureKind::Transient, 'Provider catalog returned HTTP 503.');
+        $down = $evaluator->run();
+        self::assertCount(1, $down->alertsRaised);
+
+        // Next check gets HTTP 429 on /models -> reachable (inconclusive listing, Unknown state).
+        $probe->next = ProbeResult::reachable('Provider rate-limited the catalog check (HTTP 429); credentials accepted.');
+        $rateLimited = $evaluator->run();
+        self::assertSame(ModelHealthState::Unknown, $rateLimited->verdicts[0]->state);
+        self::assertSame([], $rateLimited->alertsResolved, 'An unknown state during rate limiting must not announce recovery');
+
+        // Once the catalog lists the model again, the all-clear goes out.
+        $probe->next = ProbeResult::ok(['qwen-3.8-27b']);
+        $back = $evaluator->run();
+        self::assertCount(1, $back->alertsResolved);
+    }
+
+    public function testRecoveryStillSendsAllClearWhenRedisLostTheOpenIncident(): void
+    {
+        $resolved = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert, bool $isResolved = false) use (&$resolved): void {
+                if ($isResolved) {
+                    $resolved[] = $alert;
+                }
+            }
+        );
+
+        $model = self::model(1, 'anthropic', 'claude-sonnet-5', 'Claude Sonnet 5');
+        $probe = new class implements ModelListProbeInterface {
+            public ProbeResult $next;
+
+            public function supports(string $service): bool
+            {
+                return true;
+            }
+
+            public function probe(string $service): ProbeResult
+            {
+                return $this->next;
+            }
+
+            public function confirm(string $service, string $providerModelId): ModelProbeResult
+            {
+                return ModelProbeResult::Inconclusive;
+            }
+        };
+
+        $evaluator = $this->evaluatorFor(['anthropic' => ['claude-sonnet-5' => [$model]]], [], $probe, consecutiveFailures: 1);
+
+        $probe->next = ProbeResult::failed(FailureKind::Credential, 'Provider catalog returned HTTP 401.');
+        self::assertCount(1, $evaluator->run()->alertsRaised);
+        self::assertTrue($this->healthRows[1]->isAlertActive());
+
+        // Simulate Redis restart or an outage outliving OPEN_TTL_SECONDS (7 days).
+        $this->alertCache->clear();
+
+        $probe->next = ProbeResult::ok(['claude-sonnet-5']);
+        $recovered = $evaluator->run();
+        self::assertCount(1, $recovered->alertsResolved);
+        self::assertSame(['Claude Sonnet 5'], $resolved[0]->modelNames);
+        self::assertFalse($this->healthRows[1]->isAlertActive());
+    }
+
+    public function testRateLimitedCatalogWithNoisyFailedCallsDoesNotFalselyMarkModelOnlineOrDropPermanentOffline(): void
+    {
+        $model = self::model(1, 'xAI', 'grok-tts', 'Grok TTS');
+        $probe = new class implements ModelListProbeInterface {
+            public ProbeResult $next;
+
+            public function supports(string $service): bool
+            {
+                return true;
+            }
+
+            public function probe(string $service): ProbeResult
+            {
+                return $this->next;
+            }
+
+            public function confirm(string $service, string $providerModelId): ModelProbeResult
+            {
+                return ModelProbeResult::Gone;
+            }
+        };
+
+        $recorderCache = new ArrayAdapter();
+        $evaluator = $this->evaluatorFor(['xAI' => ['grok-tts' => [$model]]], [], $probe, consecutiveFailures: 5, recorderCache: $recorderCache);
+
+        // Run 1: provider confirms grok-tts is Gone -> Offline + Permanent (streak 1).
+        $probe->next = ProbeResult::ok(['grok-4.5']);
+        $first = $evaluator->run();
+        self::assertSame(ModelHealthState::Offline, $first->verdicts[0]->state);
+        self::assertSame(FailureKind::Permanent, $first->verdicts[0]->kind);
+        self::assertSame(1, $this->healthRows[1]->getConsecutiveFailures());
+
+        // Two failed real calls (< MIN_SAMPLE_SIZE = 5) plus a 429 on /models:
+        // must keep Offline + Permanent for live routing and must NOT advance or reset the streak.
+        $configRepo = $this->createStub(ConfigRepository::class);
+        $modelRepo = $this->createStub(ModelRepository::class);
+        $modelRepo->method('findIdByServiceProviderIdAndTag')->willReturn(1);
+        $recorder = new ModelHealthRecorder(
+            $recorderCache,
+            new ModelHealthConfig($configRepo),
+            new FailureClassifier(),
+            $modelRepo,
+            $this->createStub(UsageFailureLogger::class),
+            new NullLogger(),
+        );
+        $recorder->recordFailure('chat', 'xAI', 'grok-tts', new \RuntimeException('HTTP 500 upstream error'));
+        $recorder->recordFailure('chat', 'xAI', 'grok-tts', new \RuntimeException('HTTP 500 upstream error'));
+        self::assertSame(2, $recorder->snapshot(1)->total());
+
+        $probe->next = ProbeResult::reachable('Provider rate-limited the catalog check (HTTP 429); skipping catalog check for this run.');
+        $second = $evaluator->run();
+        self::assertSame(ModelHealthState::Offline, $second->verdicts[0]->state);
+        self::assertSame(FailureKind::Permanent, $second->verdicts[0]->kind);
+        self::assertSame(1, $this->healthRows[1]->getConsecutiveFailures());
+
+        // Same 2 failed calls without a prior Permanent verdict must stay Unknown, never Online.
+        unset($this->healthRows[1]);
+        $third = $evaluator->run();
+        self::assertSame(ModelHealthState::Unknown, $third->verdicts[0]->state);
+    }
+
+    public function testOperatorSwitchedOffModelDoesNotAccumulateFailureStreak(): void
+    {
+        $model = self::model(1, 'xAI', 'grok-old', 'Grok Old');
+        $model->setActive(0);
+
+        $evaluator = $this->evaluatorFor(['xAI' => ['grok-old' => [$model]]], ['grok-4.5'], consecutiveFailures: 5);
+        for ($i = 0; $i < 6; ++$i) {
+            $run = $evaluator->run();
+            self::assertSame([], $run->alertsRaised);
+        }
+
+        self::assertSame(0, $this->healthRows[1]->getConsecutiveFailures());
+
+        // Re-enabling the model starts fresh at streak 1, not an instant alert.
+        $model->setActive(1);
+        $reenabledRun = $evaluator->run();
+        self::assertSame([], $reenabledRun->alertsRaised);
+        self::assertSame(1, $this->healthRows[1]->getConsecutiveFailures());
+    }
+
     /**
      * @param array<string, array<string, list<Model>>> $catalog service => provider id => rows
      * @param list<string>                              $listed
      */
-    private function evaluatorFor(array $catalog, array $listed, ?ModelListProbeInterface $probe = null): ModelHealthEvaluator
-    {
+    private function evaluatorFor(
+        array $catalog,
+        array $listed,
+        ?ModelListProbeInterface $probe = null,
+        ?int $consecutiveFailures = 1,
+        ?ArrayAdapter $recorderCache = null,
+    ): ModelHealthEvaluator {
         $probe ??= new class($listed) implements ModelListProbeInterface {
             /** @param list<string> $listed */
             public function __construct(private readonly array $listed)
@@ -317,7 +624,11 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
         );
 
         $configRepository = $this->createStub(ConfigRepository::class);
-        $configRepository->method('getValue')->willReturn(null);
+        $configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'CONSECUTIVE_FAILURES' === $setting && null !== $consecutiveFailures
+                ? (string) $consecutiveFailures
+                : null,
+        );
         $config = new ModelHealthConfig($configRepository);
 
         $health = $this->createStub(ModelHealthRepository::class);
@@ -343,16 +654,26 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
             foreach ($ids as $id) {
                 $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
                 $row = $this->healthRows[$id];
+                $wasActive = $row->isAlertActive();
+                $row->setAlertActive(true);
                 $last = $row->getLastAlerted();
                 $lastKind = $row->getLastAlertedKind();
-                if ($quietForSeconds > 0
-                    && $last > 0
+                $insideWindow = $quietForSeconds > 0 && ($at - $last) < $quietForSeconds;
+                if ($last > 0
                     && null !== $lastKind
-                    && ($at - $last) < $quietForSeconds
+                    && ($wasActive || $insideWindow)
                     && ModelHealthAlert::severity($kind) < ModelHealthAlert::severity($lastKind)) {
                     continue;
                 }
                 $row->setLastAlerted($at)->setLastAlertedKind($kind);
+            }
+        });
+        $health->method('clearAlertActive')->willReturnCallback(function (array $ids, ?int $at = null): void {
+            $now = $at ?? time();
+            foreach ($ids as $id) {
+                if (isset($this->healthRows[$id])) {
+                    $this->healthRows[$id]->clearActiveAlert($now);
+                }
             }
         });
 
@@ -370,7 +691,7 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
             $health,
             new ModelListProbeRegistry([$probe]),
             new ModelHealthRecorder(
-                new ArrayAdapter(),
+                $recorderCache ?? new ArrayAdapter(),
                 $config,
                 new FailureClassifier(),
                 $models,

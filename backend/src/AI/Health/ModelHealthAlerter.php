@@ -65,14 +65,25 @@ final readonly class ModelHealthAlerter
         $rows = $this->health->findIndexedByModelId($modelIds);
         $due = [];
         foreach ($modelIds as $id) {
-            $last = isset($rows[$id]) ? $rows[$id]->getLastAlerted() : 0;
-            $lastKind = isset($rows[$id]) ? $rows[$id]->getLastAlertedKind() : null;
+            $row = $rows[$id] ?? null;
+            $last = $row?->getLastAlerted() ?? 0;
+            $lastKind = $row?->getLastAlertedKind();
+            $active = $row?->isAlertActive() ?? false;
+            $escalated = $severity > ModelHealthAlert::severity($lastKind);
+
+            // An unrecovered incident pages once: expiry of the quiet period
+            // must not re-send the same open outage every 24 hours.
+            if ($active) {
+                if ($escalated) {
+                    $due[] = $id;
+                }
+                continue;
+            }
+
             // Inside the window the recorded kind only moves up. A milder
             // kind must not become the record, or the next worse incident
             // looks new and pages again the same day.
-            if ($last <= 0
-                || ($now - $last) >= $quietFor
-                || $severity > ModelHealthAlert::severity($lastKind)) {
+            if ($last <= 0 || ($now - $last) >= $quietFor || $escalated) {
                 $due[] = $id;
             }
         }
@@ -137,9 +148,10 @@ final readonly class ModelHealthAlerter
      */
     public function resolve(ModelHealthAlert $alert): bool
     {
+        $now = time();
         $key = $this->key($alert);
 
-        $reported = $this->openModels($key);
+        $reported = $this->openModels($key) ?? $this->activeModels($alert);
         if (null === $reported) {
             return false;
         }
@@ -152,6 +164,9 @@ final readonly class ModelHealthAlerter
         $this->discord->notifyModelHealth($deliver, resolved: true);
 
         $this->forget(self::OPEN_PREFIX.$key);
+        if ([] !== $deliver->modelIds) {
+            $this->health->clearAlertActive($deliver->modelIds, $now);
+        }
 
         $this->logger->info('Model health alert resolved', [
             'provider' => $deliver->provider,
@@ -245,6 +260,31 @@ final readonly class ModelHealthAlerter
 
             return null;
         }
+    }
+
+    /**
+     * Fallback when Redis lost `model_health.open.*` (cache flush or an outage
+     * longer than OPEN_TTL_SECONDS): reconstruct the open incident from rows
+     * still latched active for this alert kind in BMODELHEALTH.
+     *
+     * @return array<int, string>|null
+     */
+    private function activeModels(ModelHealthAlert $alert): ?array
+    {
+        if ([] === $alert->modelIds) {
+            return null;
+        }
+
+        $rows = $this->health->findIndexedByModelId($alert->modelIds);
+        $active = [];
+        foreach ($alert->modelIds as $index => $id) {
+            $row = $rows[$id] ?? null;
+            if (null !== $row && $row->isAlertActive() && $row->getLastAlertedKind() === $alert->kind) {
+                $active[$id] = $alert->modelNames[$index] ?? ('model '.$id);
+            }
+        }
+
+        return [] === $active ? null : $active;
     }
 
     /**

@@ -89,9 +89,8 @@ class ModelHealth
     private int $updated = 0;
 
     /**
-     * Unix time of the last incident message that named this model.
-     * Zero means it has never been reported. Recovery does not clear it:
-     * the same model stays quiet for the configured period either way.
+     * Unix time of the last incident message (or recovery of an active
+     * incident) for this model. Zero means it has never been reported.
      */
     #[ORM\Column(name: 'BLASTALERTED', type: 'bigint', options: ['default' => 0])]
     private int $lastAlerted = 0;
@@ -103,6 +102,20 @@ class ModelHealth
      */
     #[ORM\Column(name: 'BLASTALERTEDKIND', length: 16, nullable: true)]
     private ?string $lastAlertedKind = null;
+
+    /**
+     * Consecutive health checks that judged this model degraded or offline.
+     * Reset to zero as soon as a check sees the model online or unconfigured.
+     */
+    #[ORM\Column(name: 'BCONSECUTIVEFAILURES', type: 'integer', options: ['default' => 0])]
+    private int $consecutiveFailures = 0;
+
+    /**
+     * True while an incident message sent for this model has not yet been
+     * followed by a recovery, so an unfixed outage does not re-page every day.
+     */
+    #[ORM\Column(name: 'BALERTACTIVE', type: 'integer', options: ['default' => 0])]
+    private int $alertActive = 0;
 
     public function getId(): ?int
     {
@@ -289,6 +302,45 @@ class ModelHealth
     public function setLastAlertedKind(?string $lastAlertedKind): self
     {
         $this->lastAlertedKind = $lastAlertedKind;
+
+        return $this;
+    }
+
+    public function getConsecutiveFailures(): int
+    {
+        return $this->consecutiveFailures;
+    }
+
+    public function setConsecutiveFailures(int $consecutiveFailures): self
+    {
+        $this->consecutiveFailures = max(0, $consecutiveFailures);
+
+        return $this;
+    }
+
+    public function isAlertActive(): bool
+    {
+        return 1 === $this->alertActive;
+    }
+
+    public function setAlertActive(bool $alertActive): self
+    {
+        $this->alertActive = $alertActive ? 1 : 0;
+
+        return $this;
+    }
+
+    /**
+     * Close an active incident on this row and anchor the post-recovery quiet
+     * window at recovery time so a multi-day outage still stays quiet after it
+     * clears instead of re-paging on the first brief relapse.
+     */
+    public function clearActiveAlert(int $now): self
+    {
+        if (1 === $this->alertActive) {
+            $this->alertActive = 0;
+            $this->lastAlerted = max($this->lastAlerted, $now);
+        }
 
         return $this;
     }

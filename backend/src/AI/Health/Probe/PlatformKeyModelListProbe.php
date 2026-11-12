@@ -100,6 +100,12 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
 
             $status = $page['status'];
             $body = $page['body'];
+            if (429 === $status) {
+                // Rate-limiting `/models` says nothing is broken about the
+                // models themselves; live traffic counters still catch real
+                // inference failures.
+                return ProbeResult::reachable('Provider rate-limited the catalog check (HTTP 429); skipping catalog check for this run.');
+            }
             if ($status < 200 || $status >= 300) {
                 return ProbeResult::failed(self::kindForStatus($status), sprintf('Provider catalog returned HTTP %d.', $status));
             }
@@ -150,11 +156,9 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
     }
 
     /**
-     * One catalog page. A dropped connection, a 429, or a 5xx is retried once
-     * immediately: one blip used to mark every model of the provider degraded
-     * and page the operator. A rejected key (401, 403, 402) is not retried —
-     * the key in hand is the one the store just returned, and repeating it
-     * cannot change the answer.
+     * One catalog page. A dropped connection, a 429, a 5xx, or a transient
+     * upstream/WAF 401/403 is retried once so an edge hiccup does not count
+     * against the provider without blocking web requests (`POST .../refresh`).
      *
      * @param array<string, string> $headers
      *
@@ -170,7 +174,7 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
                     'timeout' => self::TIMEOUT_SECONDS,
                 ]);
                 $status = $response->getStatusCode();
-                if ((429 === $status || $status >= 500) && 0 === $attempt) {
+                if (self::shouldRetryStatus($status) && 0 === $attempt) {
                     $lastError = sprintf('HTTP %d', $status);
                     $this->logger->info('Model catalog probe retrying after an upstream error', [
                         'provider' => $provider,
@@ -203,16 +207,15 @@ final readonly class PlatformKeyModelListProbe implements ModelListProbeInterfac
         return ProbeResult::failed(FailureKind::Transient, 'Could not reach the provider API: '.$lastError);
     }
 
-    /**
-     * A rate-limited probe proves the credentials were accepted far enough to
-     * be throttled. Treating it as a failure would report a healthy provider as
-     * down every time the catalog endpoint is busy.
-     */
+    private static function shouldRetryStatus(int $status): bool
+    {
+        return 401 === $status || 403 === $status || 429 === $status || $status >= 500;
+    }
+
     private static function kindForStatus(int $status): FailureKind
     {
         return match (true) {
             401 === $status, 403 === $status, 402 === $status => FailureKind::Credential,
-            429 === $status => FailureKind::Transient,
             $status >= 500 => FailureKind::Transient,
             default => FailureKind::Permanent,
         };

@@ -163,7 +163,29 @@ final class PlatformKeyModelListProbeTest extends TestCase
         self::assertSame(2, $attempts);
     }
 
-    public function testARejectedKeyIsNotRetried(): void
+    public function testATransientAuthOrWafRejectionIsRetriedOnceAndSucceeds(): void
+    {
+        $attempts = 0;
+        $client = new MockHttpClient(function () use (&$attempts): MockResponse {
+            ++$attempts;
+            if (1 === $attempts) {
+                return new MockResponse('{}', ['http_code' => 403]);
+            }
+
+            return new MockResponse(json_encode([
+                'data' => [['id' => 'claude-a']],
+                'has_more' => false,
+            ], \JSON_THROW_ON_ERROR));
+        });
+
+        $result = $this->probe($client);
+
+        self::assertTrue($result->isOk());
+        self::assertContains('claude-a', $result->modelIds);
+        self::assertSame(2, $attempts);
+    }
+
+    public function testAPersistentRejectedKeyFailsAfterOneRetry(): void
     {
         $attempts = 0;
         $client = new MockHttpClient(function () use (&$attempts): MockResponse {
@@ -176,7 +198,24 @@ final class PlatformKeyModelListProbeTest extends TestCase
 
         self::assertTrue($result->isFailed());
         self::assertSame(FailureKind::Credential, $result->kind);
-        self::assertSame(1, $attempts);
+        self::assertSame(2, $attempts);
+    }
+
+    public function testARateLimitedCatalogCheckReturnsReachableInsteadOfFailing(): void
+    {
+        $attempts = 0;
+        $client = new MockHttpClient(function () use (&$attempts): MockResponse {
+            ++$attempts;
+
+            return new MockResponse('{}', ['http_code' => 429]);
+        });
+
+        $result = $this->probe($client);
+
+        self::assertTrue($result->isOk(), 'A 429 on /models proves the provider is up and accepted the key');
+        self::assertFalse($result->isFailed());
+        self::assertFalse($result->listingComplete);
+        self::assertSame(2, $attempts);
     }
 
     private function probe(HttpClientInterface $client): ProbeResult

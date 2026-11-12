@@ -81,7 +81,7 @@ final readonly class ModelHealthAlert
 
     public function modelCount(): int
     {
-        return count($this->modelNames);
+        return count($this->distinctNames());
     }
 
     /** Short one-liner used as the email subject and the Discord title. */
@@ -117,7 +117,7 @@ final readonly class ModelHealthAlert
         }
 
         return sprintf(
-            'These models are not reported again for %s unless the problem gets worse. A different model is still reported right away.',
+            'These models will not be reported again while this outage continues, or for %s after recovery, unless the problem gets worse. A different model is still reported on its own.',
             $this->quietPeriod(),
         );
     }
@@ -133,7 +133,7 @@ final readonly class ModelHealthAlert
         }
 
         return sprintf(
-            'If one of them fails again within %s of its incident message, it shows under Model health but no new message is sent.',
+            'If one of them fails again within %s of this recovery, it shows under Model health but no new message is sent unless the problem gets worse.',
             $this->quietPeriod(),
         );
     }
@@ -161,14 +161,42 @@ final readonly class ModelHealthAlert
         };
     }
 
-    /** At most this many model names go into an alert body; the rest are summarised. */
+    /** At most this many distinct model names go into an alert body; the rest are summarised. */
     public function previewNames(int $limit = 10): string
     {
-        if ($this->modelCount() <= $limit) {
-            return implode(', ', $this->modelNames);
+        $names = $this->distinctNames();
+        $count = count($names);
+        if ($count <= $limit) {
+            return implode(', ', $names);
         }
 
-        return implode(', ', array_slice($this->modelNames, 0, $limit))
-            .sprintf(' and %d more', $this->modelCount() - $limit);
+        return implode(', ', array_slice($names, 0, $limit))
+            .sprintf(' and %d more', $count - $limit);
+    }
+
+    /**
+     * One provider model often backs multiple capability rows (`chat`, `mem`)
+     * that share the same display name; list each name once for operators.
+     *
+     * @return list<string>
+     */
+    private function distinctNames(): array
+    {
+        $seen = [];
+        $distinct = [];
+        foreach ($this->modelNames as $name) {
+            $trimmed = trim($name);
+            if ('' === $trimmed) {
+                continue;
+            }
+            $key = mb_strtolower($trimmed);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $distinct[] = $trimmed;
+        }
+
+        return $distinct;
     }
 }

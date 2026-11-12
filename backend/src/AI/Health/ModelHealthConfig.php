@@ -26,8 +26,10 @@ final class ModelHealthConfig
         'MIN_SAMPLE_SIZE' => '5',
         'WINDOW_MINUTES' => '30',
         'PROBE_INTERVAL_MINUTES' => '15',
-        // Quiet period before the same model is reported again for the same
-        // or a milder problem. A different model is not held back.
+        // Consecutive failing checks required before an incident is sent.
+        'CONSECUTIVE_FAILURES' => '5',
+        // Quiet period before the same model is reported again after recovery.
+        // A different model is not held back.
         'ALERT_THROTTLE_MINUTES' => '1440',
         'AUTO_DISABLE_ENABLED' => '0',
         'SUPPRESSION_DAYS' => '7',
@@ -74,6 +76,12 @@ final class ModelHealthConfig
     public function probeIntervalSeconds(): int
     {
         return max(60, (int) $this->get('PROBE_INTERVAL_MINUTES') * 60);
+    }
+
+    /** Consecutive failing checks required before an incident message is sent. */
+    public function consecutiveFailures(): int
+    {
+        return max(1, (int) $this->get('CONSECUTIVE_FAILURES'));
     }
 
     /** How long the same model stays quiet after an incident message. */

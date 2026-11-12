@@ -67,6 +67,7 @@ final class ImportedModelListingCheckTest extends KernelTestCase
         self::assertSame(ModelHealthState::Offline, $goneHealth->getState());
         self::assertSame(ModelHealth::SOURCE_LISTING, $goneHealth->getSource());
         self::assertSame('not offered by endpoint', $goneHealth->getMessage());
+        self::assertSame(0, $goneHealth->getConsecutiveFailures(), 'ImportedModelListingCheck must not double-increment the evaluator alert streak');
 
         $this->em->clear();
         $gone = $this->models->findOneBy(['service' => 'OpenAICompatible', 'tag' => 'chat', 'providerId' => self::GONE]);

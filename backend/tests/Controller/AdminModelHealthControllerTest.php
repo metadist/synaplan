@@ -63,14 +63,23 @@ final class AdminModelHealthControllerTest extends WebTestCase
 
     public function testATrafficVerdictIsResetToUnknown(): void
     {
-        $this->em->persist((new ModelHealth())->setModelId($this->modelId)->setSource(ModelHealth::SOURCE_TRAFFIC)->setState(ModelHealthState::Degraded));
+        $this->em->persist(
+            (new ModelHealth())
+                ->setModelId($this->modelId)
+                ->setSource(ModelHealth::SOURCE_TRAFFIC)
+                ->setState(ModelHealthState::Degraded)
+                ->setConsecutiveFailures(4)
+        );
         $this->em->flush();
         $this->authenticateClient($this->client, $this->admin());
 
         $this->postJson('/reset', []);
 
         self::assertResponseIsSuccessful();
-        self::assertSame(ModelHealthState::Unknown, $this->health()?->getState());
+        $reloaded = $this->health();
+        self::assertInstanceOf(ModelHealth::class, $reloaded);
+        self::assertSame(ModelHealthState::Unknown, $reloaded->getState());
+        self::assertSame(0, $reloaded->getConsecutiveFailures());
     }
 
     public function testAUserWhoIsNotAnAdminIsRefusedWithoutAWrite(): void
