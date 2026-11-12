@@ -79,6 +79,12 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      # Azure's resolver on the hosted runner intermittently cannot resolve
+      # archive.ubuntu.com. Playwright's apt install then fails. Public
+      # resolvers still can; this points the job at them before apt runs.
+      - name: Use public DNS
+        run: bash scripts/ci-public-dns.sh
+
       - name: Install Playwright browsers
         working-directory: frontend
         run: |

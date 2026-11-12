@@ -1662,6 +1662,12 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ matrix.browser }}-${{ hashFiles('frontend/package-lock.json') }}
           restore-keys: ${{ runner.os }}-playwright-${{ matrix.browser }}-
 
+      # Azure's resolver on the hosted runner intermittently cannot resolve
+      # archive.ubuntu.com. Playwright's apt install then fails. Public
+      # resolvers still can; this points the job at them before apt runs.
+      - name: Use public DNS
+        run: bash scripts/ci-public-dns.sh
+
       - name: Install Playwright browsers
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         working-directory: frontend
@@ -1905,6 +1911,13 @@ jobs:
         if: steps.baselines.outputs.exists == 'true'
         working-directory: frontend
         run: npm ci
+
+      # Azure's resolver on the hosted runner intermittently cannot resolve
+      # archive.ubuntu.com. Playwright's apt install then fails. Public
+      # resolvers still can; this points the job at them before apt runs.
+      - name: Use public DNS
+        if: steps.baselines.outputs.exists == 'true'
+        run: bash scripts/ci-public-dns.sh
 
       - name: Install Playwright browsers
         if: steps.baselines.outputs.exists == 'true'
