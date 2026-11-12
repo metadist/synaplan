@@ -179,16 +179,18 @@ function expand() {
 }
 
 function openSection(key: NavSection['key']) {
-  // Remember the click before this rail is replaced, so the rail that mounts
-  // under the same pointer does not open the tooltip again.
-  suppressHover(key)
+  const closingOverlay = panelOverlay.value && activeKey.value === key
+  const openingPanel = !closingOverlay && !panelVisible.value
+  // Remember the click before this rail shifts or is replaced, so icons that
+  // appear under the same pointer do not open the tooltip again.
+  suppressHover(key, closingOverlay || openingPanel)
   // A rail icon names a panel. In the overlay, a second click on the open
   // section closes it again; otherwise choosing an icon shows its panel.
-  if (panelOverlay.value && activeKey.value === key) {
+  if (closingOverlay) {
     closePanel()
     return
   }
-  if (!panelVisible.value) openPanel()
+  if (openingPanel) openPanel()
   void selectSection(key)
 }
 

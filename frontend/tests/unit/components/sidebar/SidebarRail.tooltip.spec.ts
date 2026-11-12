@@ -11,6 +11,7 @@ import {
   useRailTooltip,
 } from '@/composables/useRailTooltip'
 
+const CHATS = '[data-testid="btn-sidebar-v2-nav-chat"]'
 const ASSISTANTS = '[data-testid="btn-sidebar-v2-nav-assistants"]'
 const LIBRARY = '[data-testid="btn-sidebar-v2-nav-files"]'
 
@@ -245,6 +246,49 @@ describe('SidebarRail tooltip', () => {
     await rail.get(ASSISTANTS).trigger('pointerenter')
     await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
     expect(tooltip()).toBeNull()
+    rail.unmount()
+  })
+
+  it('suppresses a neighbor icon shifted under the pointer when a folded panel opens', async () => {
+    localStorage.setItem('sidebar-panel-collapsed', 'true')
+    const first = await mountRail()
+
+    await first.get(LIBRARY).trigger('click')
+    const agents = first.get(ASSISTANTS).element
+    first
+      .get(LIBRARY)
+      .element.dispatchEvent(new PointerEvent('pointerleave', { relatedTarget: agents }))
+    await first.get(ASSISTANTS).trigger('pointerenter')
+    first.unmount()
+
+    const second = await mountRail()
+    vi.useFakeTimers()
+    await second.get(ASSISTANTS).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()).toBeNull()
+
+    await second.get(ASSISTANTS).trigger('pointerleave')
+    await second.get(ASSISTANTS).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()?.textContent).toContain('Agents')
+    second.unmount()
+  })
+
+  it('allows normal hover again once the shift guard expires without a remount', async () => {
+    vi.useFakeTimers()
+    localStorage.setItem('sidebar-panel-collapsed', 'true')
+    const rail = await mountRail()
+
+    await rail.get(CHATS).trigger('click')
+    await rail.get(CHATS).trigger('pointerleave')
+    await rail.get(LIBRARY).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()).toBeNull()
+
+    await rail.get(LIBRARY).trigger('pointerleave')
+    await rail.get(LIBRARY).trigger('pointerenter')
+    await vi.advanceTimersByTimeAsync(RAIL_TIP_DELAY_MS)
+    expect(tooltip()?.textContent).toContain('Library')
     rail.unmount()
   })
 })
