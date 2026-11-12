@@ -128,6 +128,41 @@ final readonly class ClientAddress
     }
 
     /**
+     * True when the address immediately in front of this deployment's own hops
+     * is a published Cloudflare edge.
+     *
+     * Own hops are the immediate trusted peer (the proxy that connected to PHP)
+     * and `$ownHops` (the load balancer, comma-separated). A Cloudflare address
+     * is never treated as one of ours. A request that did not come from a
+     * trusted proxy is refused here, so a neighbour on the machine cannot
+     * present its own forwarding chain. A Cloudflare address further left than
+     * that first foreign hop does not count.
+     */
+    public static function hopInFrontIsCloudflare(Request $request, string $ownHops): bool
+    {
+        if (!$request->isFromTrustedProxy()) {
+            return false;
+        }
+
+        $remote = self::normalizeHop((string) $request->server->get('REMOTE_ADDR', ''));
+        $own = self::hopList($ownHops);
+        $skippedPeer = false;
+        foreach (array_reverse(self::forwardingChain($request)) as $hop) {
+            if (!$skippedPeer && null !== $remote && $hop === $remote) {
+                $skippedPeer = true;
+                continue;
+            }
+            if ([] !== $own && IpUtils::checkIp($hop, $own) && !IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)) {
+                continue;
+            }
+
+            return IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES);
+        }
+
+        return false;
+    }
+
+    /**
      * True only when at least one hop in the request's contiguous trusted-proxy
      * suffix is both trusted by the deployment (`SYMFONY_TRUSTED_PROXIES`) and
      * a published Cloudflare edge.
@@ -143,8 +178,29 @@ final readonly class ClientAddress
             return false;
         }
 
+        $chain = self::forwardingChain($request);
+
+        for ($i = count($chain) - 1; $i >= 0; --$i) {
+            $hop = $chain[$i];
+            if (!IpUtils::checkIp($hop, $trusted)) {
+                return false;
+            }
+            if (IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function forwardingChain(Request $request): array
+    {
         $chain = [];
-        if (0 !== (Request::getTrustedHeaderSet() & Request::HEADER_X_FORWARDED_FOR) && $request->headers->has('X-Forwarded-For')) {
+        $trustsForwardedFor = 0 !== (Request::getTrustedHeaderSet() & Request::HEADER_X_FORWARDED_FOR);
+        if ($trustsForwardedFor && $request->headers->has('X-Forwarded-For')) {
             foreach (explode(',', (string) $request->headers->get('X-Forwarded-For')) as $part) {
                 $ip = self::normalizeHop($part);
                 if (null !== $ip) {
@@ -161,17 +217,23 @@ final readonly class ClientAddress
             }
         }
 
-        for ($i = count($chain) - 1; $i >= 0; --$i) {
-            $hop = $chain[$i];
-            if (!IpUtils::checkIp($hop, $trusted)) {
-                return false;
-            }
-            if (IpUtils::checkIp($hop, self::CLOUDFLARE_RANGES)) {
-                return true;
+        return $chain;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function hopList(string $raw): array
+    {
+        $hops = [];
+        foreach (explode(',', $raw) as $part) {
+            $hop = trim($part);
+            if ('' !== $hop) {
+                $hops[] = $hop;
             }
         }
 
-        return false;
+        return $hops;
     }
 
     private static function normalizeHop(string $raw): ?string

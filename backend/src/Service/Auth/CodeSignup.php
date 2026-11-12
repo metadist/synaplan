@@ -13,6 +13,7 @@ use App\Service\Iam\UserLifecycleService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
@@ -89,7 +90,7 @@ final readonly class CodeSignup
      * The link opens the account, or signs in the one this address already
      * has. Null when the link is unknown or already used.
      */
-    public function consume(string $secret): ?CodeSignupOutcome
+    public function consume(string $secret, Request $request): ?CodeSignupOutcome
     {
         $key = self::CACHE_PREFIX.hash('sha256', trim($secret));
         $lock = $this->lockFactory->createLock($key, 30);
@@ -97,30 +98,34 @@ final readonly class CodeSignup
             return null;
         }
         try {
-            return $this->open($key);
+            return $this->open($key, $request);
         } finally {
             $lock->release();
         }
     }
 
-    private function open(string $key): ?CodeSignupOutcome
+    private function open(string $key, Request $request): ?CodeSignupOutcome
     {
         $item = $this->cache->getItem($key);
         if (!$item->isHit()) {
             return null;
         }
-        $this->cache->deleteItem($key);
         $data = $item->get();
         if (!is_array($data) || !is_string($data['email'] ?? null)) {
+            $this->cache->deleteItem($key);
+
             return null;
         }
         $codeId = $data['codeId'] ?? null;
         if (!is_int($codeId)) {
+            $this->cache->deleteItem($key);
+
             return null;
         }
 
         $existing = $this->users->findOtherByNormalizedEmail($data['email'], 0);
         if ($existing instanceof User) {
+            $this->cache->deleteItem($key);
             if (!$existing->canSignIn()) {
                 return null;
             }
@@ -135,8 +140,13 @@ final readonly class CodeSignup
 
         $code = $this->codes->find($codeId);
         if (!$code instanceof SignupCode) {
+            $this->cache->deleteItem($key);
+
             return null;
         }
+
+        SignupEdge::assertRequest($request);
+        $this->cache->deleteItem($key);
 
         try {
             // Unverified first, then the false-to-true change, so the local

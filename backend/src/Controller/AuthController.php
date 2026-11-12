@@ -214,7 +214,7 @@ class AuthController extends AbstractController
     )]
     #[OA\Response(response: 409, description: 'Email already registered')]
     #[OA\Response(response: 400, description: 'Validation error')]
-    #[OA\Response(response: 403, description: 'Self-sign-up is off (SIGNUP_CLOSED). An existing account is not revealed.')]
+    #[OA\Response(response: 403, description: 'Self-sign-up is off (SIGNUP_CLOSED), or this install only accepts new accounts through its public edge (SIGNUP_EDGE_REQUIRED). An existing account is not revealed.')]
     #[OA\Response(response: 429, description: 'Too many sign-ups from this connection (SIGNUP_RATE_LIMITED); Retry-After is set')]
     #[OA\Response(response: 503, description: 'Sign-up is paused by the operator and the request has no valid invitation code (SIGNUP_PAUSED)')]
     public function register(

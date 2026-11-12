@@ -15,6 +15,7 @@ final readonly class SignupProtection
         private SignupChallenge $challenge,
         private SignupGuard $guard,
         private SignupAdmission $admission,
+        private SignupEdge $edge,
     ) {
     }
 
@@ -35,6 +36,7 @@ final readonly class SignupProtection
      */
     public function assertSignupAllowed(?string $clientIp, ?string $invitationCode = null): void
     {
+        $this->edge->assertCurrent();
         $this->guard->assertAllowed($clientIp, $this->admission->holdsInvitation($invitationCode));
     }
 

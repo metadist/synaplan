@@ -103,6 +103,7 @@ final class CodeSignupController extends AbstractController
                 ]
             )),
             new OA\Response(response: 400, description: 'The link is unknown, expired or already used (CODE_SIGNUP_INVALID), or the address signs in through an organisation (CODE_SIGNUP_EXTERNAL)'),
+            new OA\Response(response: 403, description: 'This install only accepts new accounts through its public edge (SIGNUP_EDGE_REQUIRED). An address that already has an account still signs in.'),
             new OA\Response(response: 415, description: 'The body must be sent as application/json (CODE_SIGNUP_JSON_REQUIRED)'),
         ]
     )]
@@ -113,8 +114,14 @@ final class CodeSignupController extends AbstractController
             return $refused;
         }
         $body = json_decode($request->getContent(), true);
+        $token = is_array($body) && is_string($body['token'] ?? null) ? $body['token'] : '';
         try {
-            $outcome = $this->signup->consume(is_array($body) && is_string($body['token'] ?? null) ? $body['token'] : '');
+            $outcome = $this->signup->consume($token, $request);
+        } catch (SignupBlockedException $e) {
+            return $this->json(
+                ['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()],
+                $e->getHttpStatus(),
+            );
         } catch (CodeSignupExternallyManaged) {
             return $this->json([
                 'success' => false,

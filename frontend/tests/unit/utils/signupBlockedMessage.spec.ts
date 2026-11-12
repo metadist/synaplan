@@ -12,6 +12,9 @@ describe('signupBlockedText', () => {
     expect(signupBlockedText(t, 'account_suspended', 'suspended')).toBe(
       't:auth.signupBlocked.suspended'
     )
+    expect(signupBlockedText(t, 'SIGNUP_EDGE_REQUIRED', 'public website')).toBe(
+      't:auth.signupBlocked.edgeRequired'
+    )
   })
 
   it('never shows the raw busy body or transport texts', () => {
