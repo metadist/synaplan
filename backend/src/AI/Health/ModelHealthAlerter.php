@@ -65,14 +65,25 @@ final readonly class ModelHealthAlerter
         $rows = $this->health->findIndexedByModelId($modelIds);
         $due = [];
         foreach ($modelIds as $id) {
-            $last = isset($rows[$id]) ? $rows[$id]->getLastAlerted() : 0;
-            $lastKind = isset($rows[$id]) ? $rows[$id]->getLastAlertedKind() : null;
+            $row = $rows[$id] ?? null;
+            $last = $row?->getLastAlerted() ?? 0;
+            $lastKind = $row?->getLastAlertedKind();
+            $active = $row?->isAlertActive() ?? false;
+            $escalated = $severity > ModelHealthAlert::severity($lastKind);
+
+            // An unrecovered incident pages once: expiry of the quiet period
+            // must not re-send the same open outage every 24 hours.
+            if ($active) {
+                if ($escalated) {
+                    $due[] = $id;
+                }
+                continue;
+            }
+
             // Inside the window the recorded kind only moves up. A milder
             // kind must not become the record, or the next worse incident
             // looks new and pages again the same day.
-            if ($last <= 0
-                || ($now - $last) >= $quietFor
-                || $severity > ModelHealthAlert::severity($lastKind)) {
+            if ($last <= 0 || ($now - $last) >= $quietFor || $escalated) {
                 $due[] = $id;
             }
         }
@@ -152,6 +163,9 @@ final readonly class ModelHealthAlerter
         $this->discord->notifyModelHealth($deliver, resolved: true);
 
         $this->forget(self::OPEN_PREFIX.$key);
+        if ([] !== $deliver->modelIds) {
+            $this->health->clearAlertActive($deliver->modelIds);
+        }
 
         $this->logger->info('Model health alert resolved', [
             'provider' => $deliver->provider,

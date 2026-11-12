@@ -147,9 +147,12 @@ final readonly class ImportedModelListingCheck
             ->setLastCheck($now)
             ->setUpdated($now);
         if ($present) {
-            $health->setLastSuccess($now);
+            $health->setLastSuccess($now)
+                ->setConsecutiveFailures(0)
+                ->setAlertActive(false);
         } else {
-            $health->setLastFailure($now);
+            $health->setLastFailure($now)
+                ->setConsecutiveFailures($health->getConsecutiveFailures() + 1);
         }
 
         $applied = $this->autoDisabler->apply($verdict, $model, $health, $now);

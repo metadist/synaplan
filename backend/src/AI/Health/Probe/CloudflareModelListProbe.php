@@ -45,24 +45,21 @@ final readonly class CloudflareModelListProbe implements ModelListProbeInterface
             rawurlencode($this->accountId)
         );
 
-        try {
-            $response = $this->httpClient->request('GET', $url, [
-                'headers' => ['Authorization' => 'Bearer '.$this->apiToken],
-                'timeout' => self::TIMEOUT_SECONDS,
-            ]);
-            $status = $response->getStatusCode();
-            $body = $status >= 200 && $status < 300 ? $response->toArray(false) : [];
-        } catch (\Throwable $e) {
-            $this->logger->info('Cloudflare catalog probe failed', ['error' => $e->getMessage()]);
-
-            return ProbeResult::failed(FailureKind::Transient, 'Could not reach the Cloudflare API: '.$e->getMessage());
+        $page = $this->requestCatalog($url, (string) $this->apiToken);
+        if ($page instanceof ProbeResult) {
+            return $page;
         }
 
+        $status = $page['status'];
+        $body = $page['body'];
+        if (429 === $status) {
+            return ProbeResult::reachable('Cloudflare rate-limited the catalog check (HTTP 429); credentials accepted.');
+        }
         if ($status < 200 || $status >= 300) {
             return ProbeResult::failed(
                 match (true) {
                     401 === $status, 403 === $status => FailureKind::Credential,
-                    429 === $status, $status >= 500 => FailureKind::Transient,
+                    $status >= 500 => FailureKind::Transient,
                     default => FailureKind::Permanent,
                 },
                 sprintf('Cloudflare catalog returned HTTP %d.', $status)
@@ -90,5 +87,40 @@ final readonly class CloudflareModelListProbe implements ModelListProbeInterface
     public function confirm(string $service, string $providerModelId): ModelProbeResult
     {
         return ModelProbeResult::Inconclusive;
+    }
+
+    /**
+     * @return array{status: int, body: array<mixed>}|ProbeResult
+     */
+    private function requestCatalog(string $url, string $token): array|ProbeResult
+    {
+        $lastError = 'the provider did not answer';
+        for ($attempt = 0; $attempt < 2; ++$attempt) {
+            try {
+                $response = $this->httpClient->request('GET', $url, [
+                    'headers' => ['Authorization' => 'Bearer '.$token],
+                    'timeout' => self::TIMEOUT_SECONDS,
+                ]);
+                $status = $response->getStatusCode();
+                if ((401 === $status || 403 === $status || 429 === $status || $status >= 500) && 0 === $attempt) {
+                    $lastError = sprintf('HTTP %d', $status);
+                    continue;
+                }
+
+                return [
+                    'status' => $status,
+                    'body' => $status >= 200 && $status < 300 ? $response->toArray(false) : [],
+                ];
+            } catch (\Throwable $e) {
+                $lastError = $e->getMessage();
+                if (0 === $attempt) {
+                    continue;
+                }
+            }
+        }
+
+        $this->logger->info('Cloudflare catalog probe failed', ['error' => $lastError]);
+
+        return ProbeResult::failed(FailureKind::Transient, 'Could not reach the Cloudflare API: '.$lastError);
     }
 }

@@ -104,6 +104,20 @@ class ModelHealth
     #[ORM\Column(name: 'BLASTALERTEDKIND', length: 16, nullable: true)]
     private ?string $lastAlertedKind = null;
 
+    /**
+     * Consecutive health checks that judged this model degraded or offline.
+     * Reset to zero as soon as a check sees the model online or unconfigured.
+     */
+    #[ORM\Column(name: 'BCONSECUTIVEFAILURES', type: 'integer', options: ['default' => 0])]
+    private int $consecutiveFailures = 0;
+
+    /**
+     * True while an incident message sent for this model has not yet been
+     * followed by a recovery, so an unfixed outage does not re-page every day.
+     */
+    #[ORM\Column(name: 'BALERTACTIVE', type: 'integer', options: ['default' => 0])]
+    private int $alertActive = 0;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -289,6 +303,30 @@ class ModelHealth
     public function setLastAlertedKind(?string $lastAlertedKind): self
     {
         $this->lastAlertedKind = $lastAlertedKind;
+
+        return $this;
+    }
+
+    public function getConsecutiveFailures(): int
+    {
+        return $this->consecutiveFailures;
+    }
+
+    public function setConsecutiveFailures(int $consecutiveFailures): self
+    {
+        $this->consecutiveFailures = max(0, $consecutiveFailures);
+
+        return $this;
+    }
+
+    public function isAlertActive(): bool
+    {
+        return 1 === $this->alertActive;
+    }
+
+    public function setAlertActive(bool $alertActive): self
+    {
+        $this->alertActive = $alertActive ? 1 : 0;
 
         return $this;
     }

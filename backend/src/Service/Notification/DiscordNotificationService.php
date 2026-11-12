@@ -1002,7 +1002,6 @@ final readonly class DiscordNotificationService
             color: $resolved ? self::COLOR_SUCCESS : self::COLOR_ERROR,
             fields: $fields,
             footer: 'Synaplan Model Health · each model at most once per '.$alert->quietPeriod(),
-            mentionEveryone: !$resolved && ModelHealthAlert::KIND_CREDENTIAL === $alert->kind,
         );
     }
 

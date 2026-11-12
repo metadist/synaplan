@@ -101,7 +101,9 @@ class ModelHealthRepository extends ServiceEntityRepository
     {
         foreach ($modelIds as $modelId) {
             $row = $this->findOrCreate($modelId);
-            if ($this->keepsStrongerIncident($row, $kind, $at, $quietForSeconds)) {
+            $wasActive = $row->isAlertActive();
+            $row->setAlertActive(true);
+            if ($this->keepsStrongerIncident($row, $kind, $at, $quietForSeconds, $wasActive)) {
                 continue;
             }
 
@@ -112,22 +114,51 @@ class ModelHealthRepository extends ServiceEntityRepository
     }
 
     /**
-     * True when this row already records a stronger incident and its quiet
-     * window has not elapsed. Rank is credential, then offline, then degraded.
+     * Mark an open incident resolved on the affected health rows so a later
+     * outage after the quiet period can alert again.
+     *
+     * @param list<int> $modelIds
      */
-    private function keepsStrongerIncident(ModelHealth $row, string $kind, int $at, int $quietForSeconds): bool
+    public function clearAlertActive(array $modelIds): void
     {
-        if ($quietForSeconds <= 0) {
-            return false;
+        if ([] === $modelIds) {
+            return;
         }
 
+        $wanted = array_flip($modelIds);
+        $rows = $this->findIndexedByModelId($modelIds);
+        foreach ($this->getEntityManager()->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
+            if ($entity instanceof ModelHealth && isset($wanted[$entity->getModelId()])) {
+                $rows[$entity->getModelId()] = $entity;
+            }
+        }
+
+        if ([] === $rows) {
+            return;
+        }
+
+        foreach ($rows as $row) {
+            $row->setAlertActive(false);
+        }
+
+        $this->getEntityManager()->flush();
+    }
+
+    /**
+     * True when this row already records a stronger incident that is either
+     * still active or still inside its quiet window. Rank is credential, then
+     * offline, then degraded.
+     */
+    private function keepsStrongerIncident(ModelHealth $row, string $kind, int $at, int $quietForSeconds, bool $wasActive): bool
+    {
         $last = $row->getLastAlerted();
         $lastKind = $row->getLastAlertedKind();
         if ($last <= 0 || null === $lastKind || '' === $lastKind) {
             return false;
         }
 
-        if (($at - $last) >= $quietForSeconds) {
+        $insideQuietWindow = $quietForSeconds > 0 && ($at - $last) < $quietForSeconds;
+        if (!$wasActive && !$insideQuietWindow) {
             return false;
         }
 

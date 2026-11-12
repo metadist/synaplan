@@ -102,7 +102,9 @@ final class ModelHealthEvaluatorRetirementTest extends TestCase
         $this->lastProbe = $probe;
 
         $configRepository = $this->createStub(ConfigRepository::class);
-        $configRepository->method('getValue')->willReturn(null);
+        $configRepository->method('getValue')->willReturnCallback(
+            static fn (int $owner, string $group, string $setting): ?string => 'CONSECUTIVE_FAILURES' === $setting ? '1' : null,
+        );
         $config = new ModelHealthConfig($configRepository);
 
         $models = $this->createMock(ModelRepository::class);

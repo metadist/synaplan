@@ -62,16 +62,25 @@ final class ModelHealthAlerterTest extends TestCase
             foreach ($ids as $id) {
                 $this->healthRows[$id] ??= (new ModelHealth())->setModelId($id);
                 $row = $this->healthRows[$id];
+                $wasActive = $row->isAlertActive();
+                $row->setAlertActive(true);
                 $last = $row->getLastAlerted();
                 $lastKind = $row->getLastAlertedKind();
-                if ($quietForSeconds > 0
-                    && $last > 0
+                $insideWindow = $quietForSeconds > 0 && ($at - $last) < $quietForSeconds;
+                if ($last > 0
                     && null !== $lastKind
-                    && ($at - $last) < $quietForSeconds
+                    && ($wasActive || $insideWindow)
                     && ModelHealthAlert::severity($kind) < ModelHealthAlert::severity($lastKind)) {
                     continue;
                 }
                 $row->setLastAlerted($at)->setLastAlertedKind($kind);
+            }
+        });
+        $health->method('clearAlertActive')->willReturnCallback(function (array $ids): void {
+            foreach ($ids as $id) {
+                if (isset($this->healthRows[$id])) {
+                    $this->healthRows[$id]->setAlertActive(false);
+                }
             }
         });
 
@@ -444,5 +453,67 @@ final class ModelHealthAlerterTest extends TestCase
         $alert = new ModelHealthAlert(ModelHealthAlert::KIND_OFFLINE, 'xAI', ['Grok Voice 3'], 'gone', 'xAI');
 
         self::assertFalse($this->alerter->raise($alert));
+    }
+
+    /**
+     * An expired API key or depleted balance that nobody fixed yet must not
+     * re-page every 24 hours; only recovery resets the active-alert latch.
+     */
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAnUnrecoveredOutageDoesNotPageAgainAfterTheQuietPeriod(): void
+    {
+        $this->email->expects(self::once())->method('sendModelHealthAlert');
+        $this->discord->expects(self::once())->method('notifyModelHealth');
+
+        $alert = self::alert(ModelHealthAlert::KIND_CREDENTIAL, [1], ['Claude Sonnet 5'], 'anthropic', 'Anthropic');
+        self::assertTrue($this->alerter->raise($alert));
+        self::assertTrue($this->healthRows[1]->isAlertActive());
+
+        // Fast-forward three days without resolving the incident.
+        $this->healthRows[1]->setLastAlerted(time() - (3 * 86400));
+
+        self::assertFalse($this->alerter->raise($alert));
+        self::assertFalse($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Claude Sonnet 5'], 'anthropic', 'Anthropic')));
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testAnUnrecoveredOutageStillEscalatesWhenFailureGetsWorseAfterQuietPeriod(): void
+    {
+        $this->email->expects(self::exactly(2))->method('sendModelHealthAlert');
+        $this->discord->expects(self::exactly(2))->method('notifyModelHealth');
+
+        self::assertTrue($this->alerter->raise(self::alert(ModelHealthAlert::KIND_DEGRADED, [1], ['Claude Sonnet 5'], 'anthropic', 'Anthropic')));
+        $this->healthRows[1]->setLastAlerted(time() - (3 * 86400));
+
+        self::assertTrue($this->alerter->raise(self::alert(ModelHealthAlert::KIND_CREDENTIAL, [1], ['Claude Sonnet 5'], 'anthropic', 'Anthropic')));
+        self::assertSame(ModelHealthAlert::KIND_CREDENTIAL, $this->healthRows[1]->getLastAlertedKind());
+    }
+
+    #[AllowMockObjectsWithoutExpectations]
+    public function testDuplicateCapabilityModelNamesAreCountedAndListedOnceWhileStampingEveryRow(): void
+    {
+        $sent = [];
+        $this->email->method('sendModelHealthAlert')->willReturnCallback(
+            static function (ModelHealthAlert $alert) use (&$sent): void {
+                $sent[] = $alert;
+            }
+        );
+
+        $alert = self::alert(
+            kind: ModelHealthAlert::KIND_DEGRADED,
+            modelIds: [101, 102, 103, 104],
+            names: ['Qwen 3.8 27B', 'Qwen 3.8 27B (Vision)', 'GPT OSS 120B', 'GPT OSS 120B'],
+            provider: 'cerebras',
+            displayName: 'Cerebras',
+        );
+
+        self::assertTrue($this->alerter->raise($alert));
+        self::assertCount(1, $sent);
+        self::assertSame(3, $sent[0]->modelCount());
+        self::assertSame('3 Cerebras model(s) failing', $sent[0]->headline());
+        self::assertSame('Qwen 3.8 27B, Qwen 3.8 27B (Vision), GPT OSS 120B', $sent[0]->previewNames());
+        foreach ([101, 102, 103, 104] as $id) {
+            self::assertTrue($this->healthRows[$id]->isAlertActive());
+        }
     }
 }

@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service;
 
 use App\Repository\UserRepository;
 use App\Service\Notification\DiscordNotificationService;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -21,6 +22,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * `allowed_mentions.parse: ['everyone']` flag — without both, Discord
  * does not actually notify the channel.
  */
+#[AllowMockObjectsWithoutExpectations]
 final class DiscordNotificationServiceFallbackTest extends TestCase
 {
     private HttpClientInterface&MockObject $httpClient;
@@ -97,5 +99,48 @@ final class DiscordNotificationServiceFallbackTest extends TestCase
         );
 
         $service->notifyEmbeddingFallback('ollama', 'cloudflare', 'Connection refused');
+    }
+
+    #[Test]
+    public function notifyModelHealthNeverPingsEveryoneEvenOnCredentialIncident(): void
+    {
+        $captured = null;
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with(
+                'POST',
+                'https://discord.example/webhook',
+                $this->callback(function (array $options) use (&$captured): bool {
+                    $captured = $options['json'] ?? null;
+
+                    return true;
+                })
+            )
+            ->willReturn($this->createConfiguredMock(ResponseInterface::class, [
+                'getStatusCode' => 204,
+            ]));
+
+        $service = new DiscordNotificationService(
+            $this->httpClient,
+            $this->logger,
+            $this->userRepository,
+            'https://discord.example/webhook',
+        );
+
+        $service->notifyModelHealth(new \App\AI\Health\ModelHealthAlert(
+            \App\AI\Health\ModelHealthAlert::KIND_CREDENTIAL,
+            'anthropic',
+            ['Claude Sonnet 5'],
+            'Provider catalog returned HTTP 401.',
+            'Anthropic',
+            [1],
+            86400,
+        ));
+
+        $this->assertIsArray($captured);
+        $this->assertArrayNotHasKey('content', $captured);
+        $this->assertArrayNotHasKey('allowed_mentions', $captured);
     }
 }
