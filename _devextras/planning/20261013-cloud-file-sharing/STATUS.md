@@ -1,7 +1,7 @@
 # Status — Cloud file sharing
 
 > **2026-10-28.** Defects against `main` `fa64e4c82` are row 31,
-> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
+> [`20261028-loop-and-cloud-review/`](../2026-archive/20261028-loop-and-cloud-review/00_master_plan.md).
 > RV4, RV5 and RV6 are on the platform-link path, which seeds on.
 > RV6 counts a file as sent only after the download was taken, and a
 > claimed row with no result expires on the same clock as a queued one.

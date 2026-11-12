@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** RV1–RV8 are on `main` ([#2860](https://github.com/metadist/synaplan/pull/2860)–[#2862](https://github.com/metadist/synaplan/pull/2862), [#2865](https://github.com/metadist/synaplan/pull/2865), [#2867](https://github.com/metadist/synaplan/pull/2867), [#2868](https://github.com/metadist/synaplan/pull/2868), [#2870](https://github.com/metadist/synaplan/pull/2870), [#2871](https://github.com/metadist/synaplan/pull/2871)).
+
 # Status — loop and cloud-file review
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk is a dated entry

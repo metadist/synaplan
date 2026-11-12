@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** P1, P2 and P4 are on `main` ([#2302](https://github.com/metadist/synaplan/pull/2302), [#2306](https://github.com/metadist/synaplan/pull/2306)). P3, the production rollout, stays in `synaplan-platform`. That ops work is not a reason to keep this folder live.
+
 # One scheduler, one job list
 
 **Status:** Plan drafted 2026-10-01, revised the same day after a critical
@@ -6,7 +8,7 @@ review (§9). **No code until §0 is ticked.**
 `_docker/backend/lib/container-runtime.sh` — on every install, including
 production. Slow jobs never hold up fast ones, a restart never repeats a
 daily job, and production alerts when jobs stop running.
-**Binding contracts:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md)
+**Binding contracts:** [`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md)
 (U1–U12) and AGENTS.md "Perfect UX & Stability".
 
 Four changes, in this order:

@@ -131,7 +131,7 @@ main
 
 Each step is one branch from current `main`, one pull request, Copilot
 answered, **All Checks Passed** green before the next one starts
-([`AGENTS.md`](../AGENTS.md)). MO2 and MO3 reference #2823 (`Refs #2823`
+([`AGENTS.md`](../../AGENTS.md)). MO2 and MO3 reference #2823 (`Refs #2823`
 for MO2, `Fixes #2823` for MO3). The owner merges.
 
 Classify before each push:

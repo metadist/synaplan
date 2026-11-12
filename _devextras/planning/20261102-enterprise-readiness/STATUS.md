@@ -20,10 +20,10 @@ the STATUS of rows 35–42.
 | Row | Track | State |
 | --- | ----- | ----- |
 | 35 | [Enterprise identity](../20261102-enterprise-identity/STATUS.md) | plan only |
-| 36 | [AI Act transparency](../20261102-ai-act-transparency/STATUS.md) | done 2026-11-06 — AT0–AT6 on `main` |
+| 36 | [AI Act transparency](../2026-archive/20261102-ai-act-transparency/STATUS.md) | archived 2026-11-12 — AT0–AT6 on `main` |
 | 37 | [Audit and usage reporting](../20261102-audit-and-usage-reporting/STATUS.md) | plan only |
 | 38 | [Service desk](../20261102-service-desk/STATUS.md) | plan only |
 | 39 | [Workplace channels](../20261102-workplace-channels/STATUS.md) | plan only |
 | 40 | [Permission-aware connectors](../20261102-permission-aware-connectors/STATUS.md) | plan only |
 | 41 | [Governance and privacy](../20261102-governance-and-privacy/STATUS.md) | plan only |
-| 42 | [Agent template gallery](../20261102-agent-template-gallery/STATUS.md) | plan only |
+| 42 | [Agent template gallery](../2026-archive/20261102-agent-template-gallery/STATUS.md) | archived 2026-11-12 — gallery on `main`; no external catalog |

@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** The gallery, the checklist, the installer and the eleven built-in templates are on `main` ([#2939](https://github.com/metadist/synaplan/pull/2939)). The external catalog `metadist/synaplan-templates` was not built.
+
 # Status — agent template gallery
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk is a dated entry

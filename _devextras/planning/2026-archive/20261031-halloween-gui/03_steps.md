@@ -9,7 +9,7 @@ bug's test fails on today's code for the reason in the finding.
 Every pull request: branch off current `main`, Conventional Commit, no
 attribution, `node scripts/mobile-impact.mjs --base origin/main --head HEAD`
 before the push, Copilot review requested, every thread answered, **All
-Checks Passed** green before the next step ([`../AGENTS.md`](../AGENTS.md)).
+Checks Passed** green before the next step ([`../AGENTS.md`](../../AGENTS.md)).
 
 ---
 
@@ -601,5 +601,5 @@ with the call `helpers/model-defaults.ts` uses for its snapshot);
   five-minute timing for J-HG-1.
 - ROADMAP row 33 removed, a decision-log line added, the folder moved to
   `2026-archive/` with a dated line at the top of STATUS
-  ([`../AGENTS.md`](../AGENTS.md) "Finished plans leave the live
+  ([`../AGENTS.md`](../../AGENTS.md) "Finished plans leave the live
   directory").

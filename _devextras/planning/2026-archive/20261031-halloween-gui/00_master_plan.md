@@ -5,7 +5,7 @@ before the owner ticks it.
 **Folder:** `20261031-halloween-gui`, the owner's name for the track.
 **Base:** `main` at `466b96818`.
 **Roadmap:** row 33 (not started).
-**Binding:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) U1–U12
+**Binding:** [`docs/UX_CONTRACT.md`](../../../../docs/UX_CONTRACT.md) U1–U12
 and its §6, and the AGENTS.md "Perfect UX & Stability" bar.
 
 | File | Content |
@@ -126,7 +126,7 @@ catalog, and its sentence names the path.
 ## 2. Steps
 
 One branch, one commit, one pull request per step
-([`../AGENTS.md`](../AGENTS.md)). Details in [`03_steps.md`](./03_steps.md).
+([`../AGENTS.md`](../../AGENTS.md)). Details in [`03_steps.md`](./03_steps.md).
 
 | Step | Topic | Class | Commit subject | Needs | Closes | Journey |
 | ---- | ----- | ----- | -------------- | ----- | ------ | ------- |

@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** The product is on `main`: the voice sidecar, the live panel in chat, and the live models ([#2477](https://github.com/metadist/synaplan/pull/2477), [#2507](https://github.com/metadist/synaplan/pull/2507)). LV7–LV8 merged in `synaplan-apps` [#122](https://github.com/metadist/synaplan-apps/pull/122). Provider and device walks were never entered here.
+
 # Live voice — measurements
 
 LV0 spike, 2026-10-12. Not product code. Command:

@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** The web chat chooses the effort: `BEFFORT`, Answer now, Look deeper, and the higher gateway ceiling are on `main`. The Desktop chip and the live acceptance after that were not done.
+
 # Adaptive research — status
 
 Every number here names the command, the model and the stack it came from.

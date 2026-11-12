@@ -1,3 +1,5 @@
+> **Archived 2026-11-12.** Signing in to a custom MCP server is on `main` ([#2830](https://github.com/metadist/synaplan/pull/2830)–[#2833](https://github.com/metadist/synaplan/pull/2833)). The walk against a real provider was not entered.
+
 # Status — sign in to your own MCP server
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk is a dated entry

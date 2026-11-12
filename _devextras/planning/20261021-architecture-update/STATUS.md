@@ -61,7 +61,7 @@
 > AU8 merged as [synaplan-charts#90](https://github.com/metadist/synaplan-charts/pull/90).
 
 > **2026-10-30.** Row 31 stays
-> [`20261028-loop-and-cloud-review/`](../20261028-loop-and-cloud-review/00_master_plan.md).
+> [`20261028-loop-and-cloud-review/`](../2026-archive/20261028-loop-and-cloud-review/00_master_plan.md).
 > RV2 ([#2867](https://github.com/metadist/synaplan/pull/2867)) and RV3
 > ([#2865](https://github.com/metadist/synaplan/pull/2865)) are on `main`.
 > `AI.USAGE_HOOK` stays seeded `legacy`. AU24 still keeps the wrap-up
