@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Auth;
 
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupEdge;
+use App\Service\Http\ClientAddress;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -74,9 +75,14 @@ final class SignupEdgeTest extends TestCase
     {
         $_ENV[SignupEdge::ENV_REQUIRE] = 'true';
         $_ENV[SignupEdge::ENV_HOPS] = '167.235.106.98/32';
-        Request::setTrustedProxies(['10.0.0.8'], Request::HEADER_X_FORWARDED_FOR);
+        Request::setTrustedProxies(
+            ['10.0.0.8', '167.235.106.98/32', '104.16.0.0/13'],
+            Request::HEADER_X_FORWARDED_FOR,
+        );
         $request = Request::create('/', 'POST', [], [], [], ['REMOTE_ADDR' => '10.0.0.8']);
         $request->headers->set('X-Forwarded-For', '203.0.113.10, 104.16.1.1, 167.235.106.98');
+        $request->headers->set('CF-Connecting-IP', '203.0.113.10');
+        ClientAddress::align($request);
 
         SignupEdge::assertRequest($request);
 

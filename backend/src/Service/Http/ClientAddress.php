@@ -24,6 +24,12 @@ final readonly class ClientAddress
     private const RESOLVED_ATTRIBUTE = '_client_address';
 
     /**
+     * The forwarding chain before {@see align()} replaces it with the visitor.
+     * The signup edge check still has to see the Cloudflare hop.
+     */
+    private const FORWARDED_FOR_ATTRIBUTE = '_client_address_forwarded_for';
+
+    /**
      * Published Cloudflare edges (https://www.cloudflare.com/ips/).
      *
      * @var list<string>
@@ -95,6 +101,11 @@ final readonly class ClientAddress
 
         if ($request->headers->get('X-Forwarded-For') === $cloudflare) {
             return;
+        }
+
+        $original = $request->headers->get('X-Forwarded-For');
+        if (is_string($original) && !$request->attributes->has(self::FORWARDED_FOR_ATTRIBUTE)) {
+            $request->attributes->set(self::FORWARDED_FOR_ATTRIBUTE, $original);
         }
 
         $request->headers->set('X-Forwarded-For', $cloudflare);
@@ -200,8 +211,12 @@ final readonly class ClientAddress
     {
         $chain = [];
         $trustsForwardedFor = 0 !== (Request::getTrustedHeaderSet() & Request::HEADER_X_FORWARDED_FOR);
-        if ($trustsForwardedFor && $request->headers->has('X-Forwarded-For')) {
-            foreach (explode(',', (string) $request->headers->get('X-Forwarded-For')) as $part) {
+        $forwardedFor = $request->attributes->get(self::FORWARDED_FOR_ATTRIBUTE);
+        if (!is_string($forwardedFor)) {
+            $forwardedFor = $request->headers->get('X-Forwarded-For');
+        }
+        if ($trustsForwardedFor && is_string($forwardedFor)) {
+            foreach (explode(',', $forwardedFor) as $part) {
                 $ip = self::normalizeHop($part);
                 if (null !== $ip) {
                     $chain[] = $ip;
