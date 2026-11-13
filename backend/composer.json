@@ -28,7 +28,7 @@
         "jumbojett/openid-connect-php": "^1.0.2",
         "league/oauth2-server": "^9.4",
         "lucianotonet/groq-php": "^1.3",
-        "mcp/sdk": "^0.9.0",
+        "mcp/sdk": "^0.10.0",
         "nelmio/api-doc-bundle": ">=5.10.0",
         "nelmio/cors-bundle": "^2.6.1",
         "netflie/whatsapp-cloud-api": "^4.0.0",
