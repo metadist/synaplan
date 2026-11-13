@@ -213,7 +213,7 @@ changes nothing.
 ## 6. Steps
 
 One step is one pull request from `main`, following
-[`AGENTS.md`](../AGENTS.md) of this directory. IC = this repository,
+[`AGENTS.md`](../../AGENTS.md) of the planning directory. IC = this repository,
 PC = `synaplan-platform`, plus one step in `synaplan-charts`.
 
 | Step | Commit subject | Release class | Depends on | Gate |
@@ -271,7 +271,7 @@ merges, never in parallel. The admission flip (row 28, AS6) waits for PC1.
 ## 9. Non-goals
 
 - New identity providers, SAML, SCIM.
-- Changing OIDC provisioning, directory groups or the IAM sharing model (archived track [`2026-archive/20260903_iam/`](../2026-archive/20260903_iam/)).
+- Changing OIDC provisioning, directory groups or the IAM sharing model (archived track [`20260903_iam/`](../20260903_iam/)).
 - The admission feature itself (row 28).
 - Multi-tenant identity.
 
