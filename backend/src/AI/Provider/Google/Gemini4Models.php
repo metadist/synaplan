@@ -30,6 +30,8 @@ final class Gemini4Models
 
     private const MEDIUM_BUDGET_UPPER_BOUND = 8192;
 
+    private const HIGH_BUDGET_UPPER_BOUND = 32768;
+
     public static function usesThinkingLevel(string $model): bool
     {
         return 1 === preg_match(
@@ -112,6 +114,9 @@ final class Gemini4Models
         }
         if ($budget < self::MEDIUM_BUDGET_UPPER_BOUND) {
             return 'medium';
+        }
+        if ($budget >= self::HIGH_BUDGET_UPPER_BOUND && null !== $model && self::acceptsExtraHigh($model)) {
+            return 'xhigh';
         }
 
         return 'high';

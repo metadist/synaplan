@@ -261,6 +261,7 @@ final class GoogleChatTest extends TestCase
 
         $request = $this->requests()[0];
         $config = $request['body']['generationConfig'];
+        self::assertSame(65536, $config['maxOutputTokens']);
         self::assertSame(['thinkingLevel' => 'xhigh'], $config['thinkingConfig']);
         self::assertArrayNotHasKey('temperature', $config);
         self::assertArrayNotHasKey('topP', $config);

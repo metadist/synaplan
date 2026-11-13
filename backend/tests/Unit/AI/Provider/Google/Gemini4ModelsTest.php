@@ -113,6 +113,15 @@ final class Gemini4ModelsTest extends TestCase
         self::assertSame('high', Gemini4Models::thinkingLevelFromMessagesRequest([
             'thinking' => ['type' => 'enabled', 'budget_tokens' => 16000],
         ]));
+        self::assertSame('high', Gemini4Models::thinkingLevelFromMessagesRequest([
+            'thinking' => ['type' => 'enabled', 'budget_tokens' => 48000],
+        ], 'gemini-4-carbon'));
+        self::assertSame('xhigh', Gemini4Models::thinkingLevelFromMessagesRequest([
+            'thinking' => ['type' => 'enabled', 'budget_tokens' => 32768],
+        ], 'gemini-4-hydrogen'));
+        self::assertSame('high', Gemini4Models::thinkingLevelFromMessagesRequest([
+            'thinking' => ['type' => 'enabled', 'budget_tokens' => 32768],
+        ], 'gemini-4-hydrogen-cyber'));
         self::assertNull(Gemini4Models::thinkingLevelFromMessagesRequest([
             'thinking' => ['type' => 'adaptive'],
         ]));

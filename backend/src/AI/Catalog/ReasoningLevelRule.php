@@ -23,7 +23,7 @@ final readonly class ReasoningLevelRule
 
     public function matches(string $providerModelId): bool
     {
-        $id = strtolower($providerModelId);
+        $id = strtolower(trim($providerModelId));
 
         return match ($this->match) {
             ReasoningMatch::Any => true,

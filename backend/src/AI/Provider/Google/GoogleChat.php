@@ -501,14 +501,19 @@ final class GoogleChat
      */
     private function generationConfig(array $options, string $model, bool $includeThinking): array
     {
+        $gemini4 = $this->usesThinkingLevel($model);
+        $defaultMaxTokens = $gemini4
+            ? Gemini4Models::MAX_OUTPUT_TOKENS
+            : ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS;
+
         $config = [
             'temperature' => $options['temperature'] ?? 0.7,
             'topP' => $options['top_p'] ?? 0.95,
             'topK' => $options['top_k'] ?? 40,
-            'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+            'maxOutputTokens' => $options['max_tokens'] ?? $defaultMaxTokens,
         ];
 
-        if ($this->usesThinkingLevel($model)) {
+        if ($gemini4) {
             unset($config['temperature'], $config['topP'], $config['topK']);
         }
 

@@ -42,6 +42,7 @@ final class ReasoningLadderTest extends TestCase
         ]);
 
         self::assertSame(['low', 'medium', 'high', 'xhigh'], $ladder->levelsFor('Gemini-4-Hydrogen'));
+        self::assertSame(['low', 'medium', 'high', 'xhigh'], $ladder->levelsFor(' gemini-4-hydrogen '));
         self::assertSame(['low', 'medium', 'high'], $ladder->levelsFor('gemini-4-hydrogen-cyber'));
         self::assertSame(['low', 'medium', 'high'], $ladder->levelsFor('gemini-4-carbon'));
     }
