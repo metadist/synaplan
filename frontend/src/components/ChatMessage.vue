@@ -48,8 +48,10 @@
         @preview="openPreview"
       />
 
-      <!-- Single bubble with content + footer -->
+      <!-- Single bubble with content + footer. A file-only user send has
+           nothing left in here, so the bubble stays unmounted. -->
       <div
+        v-if="role !== 'user' || showUserBubble"
         :class="[
           'flex flex-col relative group/bubble min-w-0 max-w-full',
           role === 'user' ? 'bubble-user' : 'bubble-ai',
@@ -278,6 +280,7 @@
                   tone="bubble"
                   :guest-session-id="isGuestMode ? guestSessionId : null"
                   :sibling-file-ids="officeSiblingIds"
+                  :can-reattach="canRewrite !== false && !isGuestMode"
                   @download="downloadFile"
                   @reattach="emit('reattachFile', $event)"
                   @open="openFileChip"
@@ -1878,6 +1881,15 @@ const infoPopoverOpen = ref(false)
 const whatWasSentOpen = ref(false)
 const infoButtonRef = ref<HTMLButtonElement | null>(null)
 const editing = ref(false)
+const showUserBubble = computed(
+  () =>
+    editing.value ||
+    Boolean(props.quotedText) ||
+    props.status === 'rate_limited' ||
+    Boolean(props.tool) ||
+    webSearchBadge.value != null ||
+    copyableText.value.length > 0
+)
 const editDraft = ref('')
 const openArtifact = ref<ChatArtifact | null>(null)
 

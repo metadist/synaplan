@@ -16,6 +16,7 @@
         tone="plain"
         :guest-session-id="guestSessionId"
         :sibling-file-ids="siblingFileIds"
+        :can-reattach="canReattach"
         @download="emit('download', $event)"
         @reattach="emit('reattach', $event)"
         @open="(file, event) => emit('open', file, event)"

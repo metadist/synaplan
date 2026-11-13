@@ -23,6 +23,7 @@
       <ArrowDownTrayIcon class="h-4 w-4" />
     </button>
     <button
+      v-if="canReattach"
       type="button"
       class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
       :aria-label="t('chatMessage.fileReattach')"
@@ -57,6 +58,7 @@ defineProps<{
   tone: 'plain' | 'bubble'
   guestSessionId: string | null
   siblingFileIds: number[]
+  canReattach: boolean
 }>()
 
 const emit = defineEmits<{
