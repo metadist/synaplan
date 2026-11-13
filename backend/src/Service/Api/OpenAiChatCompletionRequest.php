@@ -104,6 +104,8 @@ final readonly class OpenAiChatCompletionRequest
             flags: new OpenAiChatCompletionFlags(
                 reasoningEffort: $reasoningEffort,
                 incognito: true === ($body['incognito'] ?? false),
+                topP: isset($body['top_p']) && is_numeric($body['top_p']) ? (float) $body['top_p'] : null,
+                topK: isset($body['top_k']) && is_numeric($body['top_k']) ? (int) $body['top_k'] : null,
             ),
         );
     }
@@ -146,6 +148,12 @@ final readonly class OpenAiChatCompletionRequest
         }
         if (null !== $this->flags->reasoningEffort) {
             $options['reasoning_effort'] = $this->flags->reasoningEffort;
+        }
+        if (null !== $this->flags->topP) {
+            $options['top_p'] = $this->flags->topP;
+        }
+        if (null !== $this->flags->topK) {
+            $options['top_k'] = $this->flags->topK;
         }
 
         return $options;
