@@ -36,6 +36,18 @@
         />
       </template>
 
+      <!-- User attachments sit above the bubble so the text can stay narrow. -->
+      <MessageFileGroup
+        v-if="role === 'user' && (mediaFiles.length > 0 || documentFiles.length > 0)"
+        :files="files ?? []"
+        :guest-session-id="isGuestMode ? guestSessionId : null"
+        :can-reattach="canRewrite !== false && !isGuestMode"
+        @download="downloadFile"
+        @reattach="emit('reattachFile', $event)"
+        @open="openFileChip"
+        @preview="openPreview"
+      />
+
       <!-- Single bubble with content + footer -->
       <div
         :class="[
@@ -236,60 +248,41 @@
             {{ quotedText }}
           </div>
 
+          <!-- Pictures and videos keep the same thumb as the composer. The
+               filename only appears in the large view. -->
+          <MessageMediaStrip
+            v-if="role !== 'user' && mediaFiles.length > 0"
+            :files="mediaFiles"
+            align="start"
+            :guest-session-id="isGuestMode ? guestSessionId : null"
+            :can-reattach="canRewrite !== false && !isGuestMode"
+            @download="downloadFile"
+            @reattach="emit('reattachFile', $event)"
+          />
+
           <!-- Combined Badges: Files + Web Search + Tool (NEW) -->
-          <div v-if="(files && files.length > 0) || webSearchBadge || tool" class="space-y-2">
+          <div
+            v-if="(role !== 'user' && documentFiles.length > 0) || webSearchBadge || tool"
+            class="space-y-2"
+          >
             <!-- Show badges with smart collapsing -->
             <div class="flex flex-wrap gap-2">
               <!-- Files (show based on collapse state) -->
-              <template v-if="files && files.length > 0">
-                <div
+              <template v-if="role !== 'user' && documentFiles.length > 0">
+                <MessageDocumentChip
                   v-for="file in showAllBadges
-                    ? files
-                    : files.slice(0, totalBadgesCount > 3 ? 2 : files.length)"
+                    ? documentFiles
+                    : documentFiles.slice(0, totalBadgesCount > 3 ? 2 : documentFiles.length)"
                   :key="file.id"
-                  :class="[
-                    'flex items-center gap-2 px-3 py-2 rounded-lg transition-colors cursor-pointer text-sm min-w-0 max-w-full',
-                    role === 'user'
-                      ? 'bg-black/25 hover:bg-black/35'
-                      : 'bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20',
-                  ]"
-                  @click="openFileChip(file, $event)"
-                >
-                  <Icon :icon="getFileIcon(file.fileType)" class="w-4 h-4 flex-shrink-0" />
-                  <span class="font-medium truncate min-w-0 flex-1">{{ file.filename }}</span>
-                  <span
-                    v-if="file.fileSize"
-                    class="text-xs opacity-60 flex-shrink-0 whitespace-nowrap"
-                    >{{ formatFileSize(file.fileSize) }}</span
-                  >
-                  <button
-                    type="button"
-                    class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
-                    :aria-label="t('files.download')"
-                    data-testid="btn-message-file-download"
-                    @click.stop="downloadFile(file)"
-                  >
-                    <ArrowDownTrayIcon class="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    class="icon-ghost inline-flex h-7 w-7 items-center justify-center rounded-lg"
-                    :aria-label="t('chatMessage.fileReattach')"
-                    data-testid="btn-message-file-reattach"
-                    @click.stop="emit('reattachFile', file)"
-                  >
-                    <ArrowPathIcon class="h-4 w-4" />
-                  </button>
-                  <FileOfficeActions
-                    v-if="file.id && showOfficeActions(file)"
-                    :file-id="file.id"
-                    :filename="file.filename"
-                    :guest-session-id="guestSessionId"
-                    :sibling-file-ids="officeSiblingIds"
-                    @click.stop
-                    @preview="openPreview(file)"
-                  />
-                </div>
+                  :file="file"
+                  tone="bubble"
+                  :guest-session-id="isGuestMode ? guestSessionId : null"
+                  :sibling-file-ids="officeSiblingIds"
+                  @download="downloadFile"
+                  @reattach="emit('reattachFile', $event)"
+                  @open="openFileChip"
+                  @preview="openPreview"
+                />
               </template>
 
               <!-- Tool badge: small colored chip matching the composer badge. -->
@@ -337,7 +330,7 @@
 
               <!-- Show More/Less Button -->
               <button
-                v-if="totalBadgesCount > 3"
+                v-if="role !== 'user' && totalBadgesCount > 3"
                 class="flex items-center gap-1 px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition-colors text-sm txt-secondary font-medium"
                 data-testid="btn-message-badges-toggle"
                 @click="showAllBadges = !showAllBadges"
@@ -1119,7 +1112,6 @@ import {
   ChevronDownIcon,
   ClipboardDocumentIcon,
   CheckIcon,
-  ArrowDownTrayIcon,
   PencilIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -1133,9 +1125,13 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import type { AIModel } from '@/types/ai-models'
 import type { RagSourceRef } from '@/stores/history'
 import { useNotification } from '@/composables/useNotification'
-import FileOfficeActions from '@/components/files/FileOfficeActions.vue'
-import { isOfficeConvertEnabled } from '@/composables/useOfficeConvertFeature'
-import { kindFromExtension, extensionOf } from '@/services/filePreview'
+import MessageDocumentChip from '@/components/chat/MessageDocumentChip.vue'
+import MessageFileGroup from '@/components/chat/MessageFileGroup.vue'
+import MessageMediaStrip from '@/components/chat/MessageMediaStrip.vue'
+import {
+  isMessageMedia,
+  officeSiblingIds as siblingIdsOf,
+} from '@/components/chat/messageAttachmentFiles'
 import { useGuestStore } from '@/stores/guest'
 import { isChannelSource } from '@/utils/channelSource'
 import { useMemoriesStore } from '@/stores/userMemories'
@@ -1174,7 +1170,6 @@ import type { StreamEventMetadata } from '@/types/chatStream'
 import type { AgainData } from '@/types/ai-models'
 import { mediaHintFromClassificationTopic } from '@/utils/mediaGenerationHint'
 import { chatBadgeIcon } from '@/utils/chatModelBadge'
-import { formatFileSize, getFileIcon } from '@/utils/messageFileDisplay'
 import { replaceCitationMarkers } from '@/utils/citationLinks'
 import { markRedundantTaskPlanProse } from '@/utils/taskPlanDisplay'
 import { shouldHidePlaceholderReply } from '@/utils/placeholderReply'
@@ -1195,13 +1190,6 @@ const previewFile = ref<MessageFilePreview | null>(null)
 const fileReturnFocus = ref<HTMLElement | null>(null)
 const ChatFilePreview = defineAsyncComponent(() => import('@/components/chat/ChatFilePreview.vue'))
 const ArtifactPanel = defineAsyncComponent(() => import('@/components/chat/ArtifactPanel.vue'))
-
-const showOfficeActions = (file: MessageFile): boolean => {
-  if (!file.id) return false
-  const kind = kindFromExtension(extensionOf(file.filename) || file.fileType)
-  if ('pdf' === kind) return true
-  return isOfficeConvertEnabled() && 'document' === kind
-}
 
 const openPreview = (file: MessageFile) => {
   previewFile.value = messageFilePreview(file)
@@ -1234,15 +1222,7 @@ const reattachPreview = () => {
   emit('reattachFile', reattachFromPreview(file))
 }
 
-const officeSiblingIds = computed(() =>
-  (props.files ?? [])
-    .filter((file) => {
-      if (!file.id) return false
-      const kind = kindFromExtension(extensionOf(file.filename) || file.fileType)
-      return 'document' === kind || 'pdf' === kind
-    })
-    .map((file) => file.id)
-)
+const officeSiblingIds = computed(() => siblingIdsOf(props.files ?? []))
 
 // No purchase path on a custom server in the native app (store IAP only).
 const purchaseAllowed = isPurchaseAllowed()
@@ -1521,10 +1501,15 @@ const messageToolBadge = computed<'search' | 'pic' | 'vid' | null>(() => {
 // A research reply stores its cited sources like a web search so the numbers
 // link to them, but its fold already says what was read: no "Web Search" badge.
 const webSearchBadge = computed(() => (props.researchRunId ? null : (props.webSearch ?? null)))
-// Calculate total badges count (files + webSearch/tool)
+
+const mediaFiles = computed(() => (props.files ?? []).filter((file) => isMessageMedia(file)))
+
+const documentFiles = computed(() => (props.files ?? []).filter((file) => !isMessageMedia(file)))
+
+// Document chips and tool badges collapse together. Pictures stay in the
+// thumbnail strip, so they do not count toward that limit.
 const totalBadgesCount = computed(() => {
-  let count = 0
-  if (props.files) count += props.files.length
+  let count = documentFiles.value.length
   if (props.tool || webSearchBadge.value) count += 1
   return count
 })
