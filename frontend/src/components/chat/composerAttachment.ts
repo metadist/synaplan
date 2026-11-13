@@ -48,11 +48,20 @@ function typeOrExtension(value: string): string {
   return trimmed.split('.').pop() || trimmed
 }
 
-export function composerMediaKind(file: UploadedFile): 'image' | 'video' | null {
-  const type = typeOrExtension(file.file_type || file.filename || file.name || '')
-  if (isImageFileType(type, file.mime)) return 'image'
-  if (isVideoFileType(type, file.mime)) return 'video'
+export function attachmentMediaKind(
+  type: string,
+  mime?: string,
+  filename?: string
+): 'image' | 'video' | null {
+  const raw = type.trim() || filename || ''
+  const normalized = typeOrExtension(raw)
+  if (isImageFileType(normalized, mime) || isImageFileType(raw, mime)) return 'image'
+  if (isVideoFileType(normalized, mime) || isVideoFileType(raw, mime)) return 'video'
   return null
+}
+
+export function composerMediaKind(file: UploadedFile): 'image' | 'video' | null {
+  return attachmentMediaKind(file.file_type || '', file.mime, file.filename || file.name)
 }
 
 export function attachmentPreviewSrc(file: UploadedFile): string {
