@@ -1888,7 +1888,7 @@ const showUserBubble = computed(
     props.status === 'rate_limited' ||
     Boolean(props.tool) ||
     webSearchBadge.value != null ||
-    copyableText.value.length > 0
+    visibleContentParts.value.length > 0
 )
 const editDraft = ref('')
 const openArtifact = ref<ChatArtifact | null>(null)
