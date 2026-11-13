@@ -1154,7 +1154,7 @@ services:
 
   # phpMyAdmin (optional - for DB management)
   phpmyadmin:
-    image: phpmyadmin:latest@sha256:f54a37b908b26caa7032c4eb0c7f3495fdd90208a06eed9c4b2c8e691dd1662c
+    image: phpmyadmin:latest@sha256:e4b3eb5305cd42d21512bb55def2bab52625d56df927ad4ee1864a9354c84d40
     container_name: synaplan-phpmyadmin
     environment:
       PMA_HOST: db
@@ -1224,7 +1224,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak:
-    image: quay.io/keycloak/keycloak:26.8@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
+    image: quay.io/keycloak/keycloak:26.8@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     container_name: synaplan-keycloak
     depends_on:
       keycloak_certs:
@@ -1259,7 +1259,7 @@ services:
       - synaplan-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.8@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
+    image: quay.io/keycloak/keycloak:26.8@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     container_name: synaplan-keycloak-setup
     depends_on:
       keycloak:
