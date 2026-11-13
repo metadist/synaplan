@@ -3761,6 +3761,62 @@ class ModelCatalog
             ],
         ],
         // ----------------------------------------------------------------
+        // Gemini 4 Hydrogen. What's new page read 2026-11-13, id
+        // gemini-4-hydrogen.
+        // https://aistudio.google.com/docs/whats-new-gemini-4-hydrogen
+        // Flat paid price for the whole 1M window: $1.50 input / $7.50 output
+        // per 1M. Implicit cache hits (from 4,096 tokens) are 95% off ($0.075).
+        // There is no explicit cache API. Thinking levels are low, medium,
+        // high (default), and xhigh. Free and paid tiers. The public id is the
+        // only one offered — permissive cyber variants are not catalogued.
+        // ----------------------------------------------------------------
+        [
+            'id' => 435,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Hydrogen',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-hydrogen',
+            'priceIn' => 1.50,
+            'inUnit' => 'per1M',
+            'priceOut' => 7.50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Hydrogen - fast model for everyday coding, agentic workflows, and multimodal work. 1M token context shared by input, thinking, and output. Thinking levels low, medium, high (default), and xhigh. $1.50 input / $7.50 output per 1M tokens. Implicit cached input is 95% off ($0.075). Available on the free and paid Gemini API tiers.',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-4-hydrogen'],
+                'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                'cache_read_price_per_1M' => 0.075,
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536', 'reasoning_effort_default' => 'high'],
+            ],
+        ],
+        [
+            'id' => 436,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Hydrogen (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-hydrogen',
+            'priceIn' => 1.50,
+            'inUnit' => 'per1M',
+            'priceOut' => 7.50,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Hydrogen for image, video, audio, and PDF understanding. $1.50 input / $7.50 output per 1M tokens (cached input $0.075). Available on the free and paid Gemini API tiers.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-4-hydrogen'],
+                'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.075,
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        // ----------------------------------------------------------------
         // Google Gemini 3.6 / 3.7 / 3.8 Flash + 3.5 Flash-Lite + Omni video
         // + Nano Banana 2 Lite + Gemini 3.5 Transcribe.
         // Live-probed against generativelanguage.googleapis.com/v1beta on
