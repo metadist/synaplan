@@ -61,3 +61,7 @@ provider is the architecture update), `20261102-ai-act-transparency/`,
 `20261102-agent-template-gallery/` (no external catalog). Admission
 sign-up (row 28) has no folder in this repository. IAM consolidation stays
 live. Each folder has a dated note at the top.
+
+2026-11-13 housekeeping: `20261025-iam-consolidation/` moved here. The
+public steps are on main. PC3 still waits for D5. D8 and D9 stay owner
+decisions.
