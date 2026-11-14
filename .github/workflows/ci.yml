@@ -471,11 +471,17 @@ jobs:
       # The tests run inside the built image, not on the runner's .nvmrc Node,
       # so a base-image bump in the Dockerfile is what they exercise. The tar
       # is that same image: publish loads it instead of building again.
+      #
+      # Docker 29's containerd image store makes `docker build` export a
+      # provenance attestation index. Publish then records that index digest,
+      # while the multi-arch manifest's linux/amd64 entry is the image
+      # manifest inside it, and the digest check waits until it times out.
+      # The app image is exported without provenance for the same reason.
       - name: Build the image and run the tests in it
         working-directory: sidecars/synaplan-transcriber
         run: |
           set -euo pipefail
-          docker build -t synaplan-transcriber:ci .
+          docker build --provenance=false -t synaplan-transcriber:ci .
           docker run --rm -v "$PWD/test:/app/test:ro" synaplan-transcriber:ci node --test
           docker save synaplan-transcriber:ci -o /tmp/transcriber-image.tar
 
