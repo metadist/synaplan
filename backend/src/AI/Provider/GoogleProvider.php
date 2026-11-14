@@ -16,6 +16,8 @@ use App\AI\Catalog\ProviderKeySpec;
 use App\AI\Catalog\ProviderKeyValidation;
 use App\AI\Catalog\ProviderPricing;
 use App\AI\Catalog\ReasoningLadder;
+use App\AI\Catalog\ReasoningLevelRule;
+use App\AI\Catalog\ReasoningMatch;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
@@ -123,7 +125,17 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 structuredOutput: StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA,
                 catalogToolUse: true,
                 gatewayVisionRewrite: true,
-                reasoning: ReasoningLadder::always(['low', 'medium', 'high']),
+                // Hydrogen is the only public Gemini id that accepts xhigh.
+                // The match is exact so a suffixed id (gemini-4-hydrogen-cyber)
+                // stays on the shared ladder and is not offered that level.
+                reasoning: new ReasoningLadder([
+                    new ReasoningLevelRule(
+                        ReasoningMatch::Exact,
+                        ['gemini-4-hydrogen'],
+                        ['low', 'medium', 'high', 'xhigh'],
+                    ),
+                    new ReasoningLevelRule(ReasoningMatch::Any, [], ['low', 'medium', 'high']),
+                ]),
             ),
             defaults: new ProviderDefaults(bindings: [
                 'CHAT' => 'google:gemini-3.8-flash:chat',

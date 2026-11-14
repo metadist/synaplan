@@ -136,4 +136,20 @@ final class OpenAiChatCompletionRequestTest extends TestCase
 
         self::assertTrue($parsed->requestsTools());
     }
+
+    public function testTopPTopKAndReasoningEffortForwardToProviderOptions(): void
+    {
+        $parsed = OpenAiChatCompletionRequest::fromBody([
+            'messages' => [['role' => 'user', 'content' => 'hi']],
+            'reasoning_effort' => 'xhigh',
+            'top_p' => 0.85,
+            'top_k' => 25,
+        ]);
+
+        self::assertSame([
+            'reasoning_effort' => 'xhigh',
+            'top_p' => 0.85,
+            'top_k' => 25,
+        ], $parsed->providerToolOptions());
+    }
 }

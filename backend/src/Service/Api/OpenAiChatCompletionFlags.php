@@ -15,6 +15,8 @@ final readonly class OpenAiChatCompletionFlags
     public function __construct(
         public ?string $reasoningEffort = null,
         public bool $incognito = false,
+        public ?float $topP = null,
+        public ?int $topK = null,
     ) {
     }
 }

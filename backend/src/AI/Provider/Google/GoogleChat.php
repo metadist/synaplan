@@ -446,10 +446,10 @@ final class GoogleChat
      */
     private function resolveThinkingConfig(array $options, string $model = ''): ?array
     {
-        // Gemini 4 Argon and Carbon ignore thinking_budget and sampling.
+        // Public Gemini 4 ids ignore thinking_budget and sampling.
         // Map the effort onto thinkingLevel so a deprecated budget is never sent.
         if ('' !== $model && $this->usesThinkingLevel($model)) {
-            return $this->thinkingLevelConfig($options);
+            return $this->thinkingLevelConfig($options, $model);
         }
 
         // Native passthrough — admin/per-prompt override wins over the
@@ -488,10 +488,11 @@ final class GoogleChat
     }
 
     /**
-     * Sampling stays on every Gemini model except Gemini 4 Argon and Carbon,
-     * which ignore temperature, topP and topK and warn when they are sent.
+     * Sampling stays on every Gemini model except the public Gemini 4 ids,
+     * which ignore in-range temperature, topP and topK and reject out-of-range
+     * values. Those ids never receive sampling parameters.
      *
-     * Buffered chat only attaches a thinking config for those two. Other models
+     * Buffered chat only attaches a thinking config for those ids. Other models
      * keep the previous buffered request, which never sent `thinkingBudget`.
      *
      * @param array<string, mixed> $options
@@ -500,14 +501,19 @@ final class GoogleChat
      */
     private function generationConfig(array $options, string $model, bool $includeThinking): array
     {
+        $gemini4 = $this->usesThinkingLevel($model);
+        $defaultMaxTokens = $gemini4
+            ? Gemini4Models::MAX_OUTPUT_TOKENS
+            : ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS;
+
         $config = [
             'temperature' => $options['temperature'] ?? 0.7,
             'topP' => $options['top_p'] ?? 0.95,
             'topK' => $options['top_k'] ?? 40,
-            'maxOutputTokens' => $options['max_tokens'] ?? ChatProviderInterface::DEFAULT_MAX_COMPLETION_TOKENS,
+            'maxOutputTokens' => $options['max_tokens'] ?? $defaultMaxTokens,
         ];
 
-        if ($this->usesThinkingLevel($model)) {
+        if ($gemini4) {
             unset($config['temperature'], $config['topP'], $config['topK']);
         }
 
@@ -563,16 +569,17 @@ final class GoogleChat
 
     /**
      * Gemini 4 has no off switch. The lowest level is `low`; an omitted effort
-     * leaves Google's default (`medium`) in place. An explicit thinking_budget
-     * is ignored. `minimal` is not a valid level and is not sent.
+     * leaves Google's default in place. An explicit thinking_budget is ignored.
+     * `minimal` is not a valid level and is not sent. `xhigh` is sent only for
+     * Hydrogen.
      *
      * @param array<string, mixed> $options
      *
      * @return array{thinkingLevel: string}|null
      */
-    private function thinkingLevelConfig(array $options): ?array
+    private function thinkingLevelConfig(array $options, string $model): ?array
     {
-        $level = Gemini4Models::thinkingLevel($this->reasoningEffort($options));
+        $level = Gemini4Models::thinkingLevel($this->reasoningEffort($options), $model);
 
         return null === $level ? null : ['thinkingLevel' => $level];
     }

@@ -74,4 +74,25 @@ final class GoogleVisionTest extends TestCase
         self::assertArrayNotHasKey('temperature', $request['body']['generationConfig']);
         self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
     }
+
+    public function testHydrogenVisionUsesGemini4OutputBudgetAndTimeout(): void
+    {
+        $vision = new GoogleVision($this->api([self::json([
+            'candidates' => [[
+                'content' => ['parts' => [
+                    ['text' => 'Inspecting table.', 'thought' => true],
+                    ['text' => 'Quarterly revenue table.'],
+                ]],
+                'finishReason' => 'STOP',
+            ]],
+        ])]), new NullLogger(), $this->uploadDir);
+
+        self::assertSame('Quarterly revenue table.', $vision->analyzeImage('photo.png', 'Read it.', ['model' => 'gemini-4-hydrogen']));
+
+        $request = $this->requests()[0];
+        self::assertStringEndsWith('/models/gemini-4-hydrogen:generateContent', $request['url']);
+        self::assertSame(65536, $request['body']['generationConfig']['maxOutputTokens']);
+        self::assertArrayNotHasKey('temperature', $request['body']['generationConfig']);
+        self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
+    }
 }

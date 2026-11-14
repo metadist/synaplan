@@ -23,10 +23,11 @@ final readonly class ReasoningLevelRule
 
     public function matches(string $providerModelId): bool
     {
-        $id = strtolower($providerModelId);
+        $id = strtolower(trim($providerModelId));
 
         return match ($this->match) {
             ReasoningMatch::Any => true,
+            ReasoningMatch::Exact => in_array($id, $this->patterns, true),
             ReasoningMatch::Prefix => array_any($this->patterns, static fn (string $prefix): bool => str_starts_with($id, $prefix)),
             ReasoningMatch::Contains => array_any($this->patterns, static fn (string $needle): bool => str_contains($id, $needle)),
         };
