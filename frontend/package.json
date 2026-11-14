@@ -91,12 +91,12 @@
     "dotenv": "18.0.10",
     "eslint": "10.14.0",
     "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-vue": "10.12.0",
+    "eslint-plugin-vue": "10.12.1",
     "globals": "17.14.0",
     "happy-dom": "21.0.4",
     "openapi-zod-client": "1.18.3",
     "postcss": "8.5.32",
-    "prettier": "3.9.10",
+    "prettier": "3.10.0",
     "tailwindcss": "4.3.5",
     "terser": "5.51.2",
     "typescript": "6.0.3",
@@ -105,6 +105,6 @@
     "vue-tsc": "3.3.14"
   },
   "overrides": {
-    "minimatch": "11.0.5"
+    "minimatch": "11.0.8"
   }
 }
