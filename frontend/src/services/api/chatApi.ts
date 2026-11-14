@@ -22,6 +22,7 @@ export {
 } from './conversationFileSchema'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 import { fetchWithBusyRetry, isBusyRefusal } from './busyRetry'
+import { reconnectDelayMs, resumeFrom } from '@/services/chat/stream/reconnect'
 
 /**
  * Map a recorder MIME type to an audio file extension the backend accepts and
@@ -502,6 +503,46 @@ async function readSseBody(
   return terminalReceived
 }
 
+async function resumeAttachedStream(
+  runId: string,
+  sawId: () => boolean,
+  lastSeq: () => number,
+  onUpdate: (data: StreamUpdatePayload) => void,
+  noteId: (seq: number) => void,
+  isStopped: () => boolean
+): Promise<boolean> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (isStopped()) return false
+    onUpdate({ status: 'reconnecting' })
+    await new Promise((resolve) => setTimeout(resolve, reconnectDelayMs(attempt)))
+    if (isStopped()) return false
+    const plan = resumeFrom(sawId(), lastSeq())
+    if (plan.rebuild) onUpdate({ status: 'stream_rebuild' })
+
+    const authInit = sseTokenFetchInit()
+    const params = new URLSearchParams({ runId, from: String(plan.from) })
+    const load = () =>
+      fetch(`${getApiBaseUrl()}/api/v1/messages/stream/attach?${params}`, {
+        method: 'GET',
+        credentials: authInit.credentials,
+        headers: {
+          ...((authInit.headers as Record<string, string> | undefined) ?? {}),
+          Accept: 'text/event-stream',
+        },
+      })
+    let response = await load()
+    if (response.status === 401) {
+      const refreshed = await refreshAccessToken()
+      if (refreshed && !isStopped()) response = await load()
+    }
+    if (isStopped()) return false
+    if (!response.ok || !response.body) continue
+    const terminal = await readSseBody(response.body, onUpdate, isStopped, noteId)
+    if (terminal) return true
+  }
+  return false
+}
+
 function openStreamPost(
   body: Record<string, string | IncognitoHistoryEntry[]>,
   onUpdate: (data: StreamUpdatePayload) => void
@@ -527,6 +568,27 @@ function openStreamPost(
     if (!isStopped) onUpdate({ status: 'busy' })
   }
   ;(async () => {
+    let runId = ''
+    let lastSeq = 0
+    let sawId = false
+    const observe = (data: StreamUpdatePayload) => {
+      if (data.status === 'run_started' && typeof data.runId === 'string' && data.runId !== '') {
+        runId = data.runId
+      }
+      onUpdate(data)
+    }
+    const noteId = (seq: number) => {
+      lastSeq = seq
+      sawId = true
+    }
+    const giveUp = () => {
+      if (isStopped) return
+      onUpdate(
+        runId
+          ? { status: 'error', code: 'reconnect_exhausted', error: 'Connection interrupted' }
+          : { status: 'error', error: 'Connection interrupted' }
+      )
+    }
     try {
       // A full stream pool refuses before PHP starts (503 + server_busy):
       // retried here; the turn only sees `busy`, then a plain error.
@@ -567,21 +629,32 @@ function openStreamPost(
         return
       }
 
-      const terminalReceived = await readSseBody(response.body, onUpdate, () => isStopped)
+      const terminalReceived = await readSseBody(response.body, observe, () => isStopped, noteId)
 
       // Stream closed without a terminal event: the backend always ends a
       // turn with 'complete' or 'error', so this is a dropped connection or
-      // a crashed worker — surface it instead of leaving an empty bubble.
+      // a crashed worker. A turn that already has a run id is re-attached
+      // before that drop is shown.
       if (!terminalReceived && !isStopped) {
+        if (runId && (await resumeAttachedStream(runId, () => sawId, () => lastSeq, observe, noteId, () => isStopped))) {
+          return
+        }
         console.error('❌ Stream ended without completion event')
-        onUpdate({ status: 'error', error: 'Connection interrupted' })
+        giveUp()
       }
     } catch (error) {
       if (isStopped || (error instanceof DOMException && error.name === 'AbortError')) {
         return
       }
+      if (runId && (await resumeAttachedStream(runId, () => sawId, () => lastSeq, observe, noteId, () => isStopped))) {
+        return
+      }
       console.error('🚫 Stream setup error:', error)
-      onUpdate({ status: 'error', error: 'Failed to connect' })
+      if (!runId) {
+        onUpdate({ status: 'error', error: 'Failed to connect' })
+        return
+      }
+      giveUp()
     }
   })()
 

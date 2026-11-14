@@ -133,8 +133,15 @@ const docsLoaded: StreamStatusHandler<StreamTurn> = (payload, turn) => {
 const runStarted: StreamStatusHandler<StreamTurn> = (payload, turn) =>
   turn.run.noteStarted(payload.runId)
 
+/** A replay from the start replaces the accumulated text. The smoother keeps what is already painted until the replay catches up. */
+const streamRebuild: StreamStatusHandler<StreamTurn> = (_payload, turn) => {
+  turn.text.content = ''
+  turn.text.thinkOpen = false
+}
+
 export const contentHandlers: StreamHandlers<StreamTurn> = {
   run_started: runStarted,
+  stream_rebuild: streamRebuild,
   data,
   reasoning,
   file,

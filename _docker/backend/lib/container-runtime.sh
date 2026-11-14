@@ -673,6 +673,7 @@ run_scheduler_tick_lane() {
         run_scheduler_job 300 bin/console --env="$env" app:process-emails --no-interaction
     fi
     run_scheduler_job 300 bin/console --env="$env" app:cloud-watches:sweep --no-interaction
+    run_scheduler_job 60 bin/console --env="$env" app:runs:reap --no-interaction
 }
 
 # shellcheck disable=SC2317
@@ -847,6 +848,22 @@ run_scheduler_role() {
     fi
 
     runtime_log "Scheduler stopped."
+}
+
+# The pump claims chat turns and writes their frames. It restarts when the
+# process exits. SYNAPLAN_ROLE=pump is the only way in.
+run_pump_role() {
+    require_console || return
+    prepare_role_cache || return
+    wait_for_web_initialization || return
+    local env="${APP_ENV:-prod}"
+
+    runtime_log "Starting stream pump."
+    while true; do
+        php bin/console --env="$env" app:stream-pump --no-interaction || true
+        runtime_log "Stream pump exited; starting again."
+        sleep 1
+    done
 }
 
 # Every role starts the capacity watchdog beside its main process and restarts

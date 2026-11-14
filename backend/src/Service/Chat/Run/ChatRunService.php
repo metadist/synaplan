@@ -61,9 +61,10 @@ final readonly class ChatRunService
      * in that case the turn simply streams without resume support, exactly as
      * it did before this feature existed.
      */
-    public function begin(string $ownerKey, ?int $chatId, string $trackId): ?ChatRunRecorder
+    public function begin(string $ownerKey, ?int $chatId, string $trackId, ?string $runId = null): ?ChatRunRecorder
     {
-        $run = new ChatRun(Uuid::v4()->toRfc4122(), $ownerKey, $chatId, $trackId);
+        $id = null !== $runId && '' !== $runId ? $runId : Uuid::v4()->toRfc4122();
+        $run = new ChatRun($id, $ownerKey, $chatId, $trackId);
 
         if (!$this->buffer->save($run)) {
             $this->logger->warning('ChatRunService: could not open a resumable run, streaming without resume', [

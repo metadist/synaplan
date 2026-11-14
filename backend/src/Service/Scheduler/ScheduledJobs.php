@@ -32,6 +32,7 @@ final class ScheduledJobs
             'app:process-mail-handlers',
             'app:process-emails',
             'app:cloud-watches:sweep',
+            'app:runs:reap',
         ],
         self::LANE_TASKS => [
             'app:saved-tasks:tick',

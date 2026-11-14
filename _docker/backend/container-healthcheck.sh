@@ -52,6 +52,12 @@ case "$role" in
             exit 1
         }
         ;;
+    pump)
+        process_exists 'app:stream-pump' || {
+            echo "Stream pump process is not running." >&2
+            exit 1
+        }
+        ;;
     *)
         echo "Unsupported SYNAPLAN_ROLE: ${role}" >&2
         exit 64

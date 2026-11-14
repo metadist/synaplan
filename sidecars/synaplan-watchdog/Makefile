@@ -1,4 +1,4 @@
-# synaplan-watchdog — per-server capacity agent (AU6). No relay.
+# synaplan-watchdog — per-server capacity agent, and the stream relay when SYNAPLAN_RELAY=1.
 .PHONY: build test lint format
 
 GO ?= go

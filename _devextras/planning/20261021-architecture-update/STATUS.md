@@ -1,5 +1,13 @@
 # Architecture update — status
 
+> **2026-11-14 — S5, web chat.** A signed-in web chat can leave the web
+> worker. `RUNTIME.STREAM_PUMP` stays `off` and `STREAM_PUMP_PERCENT` stays
+> `0`. The pump role waits for a job. `SYNAPLAN_RELAY` stays unset, so the
+> watchdog does not take the connection until an operator turns it on and
+> the image that contains the relay is what is running. Guests, widgets,
+> incognito turns and the gateways still stream in the request. AU32, the
+> default-on after a soak, is not this change.
+
 > **2026-11-08 — AU25b.** People → Audit has a Tool calls chip. A row is
 > one sentence from the tool, the source and the outcome. An approval id
 > on the row opens Approvals. Arguments and results stay off the row.
@@ -103,7 +111,8 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-11-02 | AU23 | [#2935](https://github.com/metadist/synaplan/pull/2935) | merged (`39a07233d`) | `ToolLoopCharacterizationTest` + `tool_loops.json` on untouched code. Gaps below. No production change |
 | 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936) | merged (`926d7e4e3`) | Every loop and runner calls `ToolInvoker`. `tool_loops.json` matches the merged AU23 snapshot. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
 | 2026-11-04 | AU25 | [#2980](https://github.com/metadist/synaplan/pull/2980) | merged (`2026-11-04`) | The gate runs on every call. Writes are audited. The OpenAI loop and custom HTTP gain `TOOLS`. Own-file edits stay allowed |
-| 2026-11-08 | AU25b | [#3035](https://github.com/metadist/synaplan/pull/3035) | open | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
+| 2026-11-08 | AU25b | [#3035](https://github.com/metadist/synaplan/pull/3035) | merged | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
+| 2026-11-14 | S5 web chat | this branch | open | Pump role, run stream, watchdog relay behind `SYNAPLAN_RELAY`, live re-attach. Flags stay off. Gateways, widget, guest and incognito stay in the request. AU32 waits for the soak |
 
 ## 2026-11-08 — AU25b: tool calls in the audit log
 

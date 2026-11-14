@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\Chat\Run\PumpedTurn;
 use App\Service\Chat\Stream\CancelledTurns;
 use App\Service\Chat\Stream\ChatStreamOrchestrator;
 use App\Service\Chat\Stream\StreamRequestRejected;
@@ -40,6 +41,7 @@ class StreamController extends AbstractController
         private StreamRequestResolver $streamRequests,
         private ChatStreamOrchestrator $streams,
         private CancelledTurns $cancelledTurns,
+        private PumpedTurn $pumpedTurns,
     ) {
     }
 
@@ -239,6 +241,11 @@ class StreamController extends AbstractController
             $turn = $this->streamRequests->resolve($request, $user);
         } catch (StreamRequestRejected $rejected) {
             return $this->rejectedStream($rejected);
+        }
+
+        $pumped = $this->pumpedTurns->response($request, $turn);
+        if ($pumped instanceof Response) {
+            return $pumped;
         }
 
         $response = new StreamedResponse();
