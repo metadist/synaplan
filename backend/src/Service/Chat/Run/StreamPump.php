@@ -12,22 +12,12 @@ use App\AI\Stream\StreamDecoderInterface;
  */
 final class StreamPump
 {
-    private const CREDENTIAL_KEYS = [
-        'api_key',
-        'apikey',
-        'api-key',
-        'authorization',
-        'proxy-authorization',
-        'x-api-key',
-        'x-goog-api-key',
-    ];
-
     /**
      * @param array<string, mixed> $call payload without a key or an authorization header
      */
     public function run(string $runId, string $bytes, StreamDecoderInterface $decoder, RunStream $stream, array $call = []): void
     {
-        $this->assertNoSecret($call);
+        StreamJobGuard::reject($call);
         $seq = 0;
         foreach ($decoder->feed($bytes) as $event) {
             $failure = self::failureMessage($event->kind, $event->data);
@@ -41,45 +31,6 @@ final class StreamPump
             $stream->append($runId, ++$seq, 'frame', self::dataFrame(['text' => $text]));
         }
         $stream->append($runId, ++$seq, 'terminal', "data: [DONE]\n\n");
-    }
-
-    /**
-     * A provider key is a credential field, a header name, or a header line
-     * under `headers`. Message text is not scanned, so a sentence that says
-     * "authorization" is still a job.
-     *
-     * @param array<string, mixed> $call
-     */
-    private function assertNoSecret(array $call): void
-    {
-        $this->rejectCredentialKeys($call);
-    }
-
-    private function rejectCredentialKeys(mixed $value, bool $headerList = false): void
-    {
-        if (!is_array($value)) {
-            return;
-        }
-        foreach ($value as $key => $item) {
-            if (is_string($key) && in_array(strtolower($key), self::CREDENTIAL_KEYS, true)) {
-                throw new \InvalidArgumentException('A stream job must not carry a provider key');
-            }
-            if ($headerList && is_string($item) && self::isCredentialHeaderLine($item)) {
-                throw new \InvalidArgumentException('A stream job must not carry a provider key');
-            }
-            $this->rejectCredentialKeys($item, is_string($key) && 'headers' === strtolower($key));
-        }
-    }
-
-    private static function isCredentialHeaderLine(string $line): bool
-    {
-        $colon = strpos($line, ':');
-        if (false === $colon) {
-            return false;
-        }
-        $name = strtolower(trim(substr($line, 0, $colon)));
-
-        return in_array($name, self::CREDENTIAL_KEYS, true);
     }
 
     private static function failureMessage(string $kind, mixed $data): ?string

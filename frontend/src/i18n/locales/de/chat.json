@@ -515,6 +515,7 @@
     "busyAuth": "Die Sitzung ist abgelaufen. Bitte neu anmelden und die Nachricht dann senden.",
     "busyLimit": "Gerade kommen zu viele Nachrichten an. Es wurde nichts gesendet. Kurz warten und dann erneut versuchen.",
     "busyServer": "Der Server konnte die Nachricht gerade nicht annehmen. Es wurde nichts gesendet. Gleich erneut versuchen.",
+    "reconnectingFailed": "Die Verbindung zu Synaplan ist weg. Die Antwort wird weiter geschrieben und erscheint hier, sobald sie fertig ist.",
     "title": "Die Antwort ist nicht fertig geworden",
     "retry": "Mit einem anderen Modell erneut versuchen",
     "retryWith": "Mit {model} erneut versuchen",
@@ -919,6 +920,7 @@
     "modelId": "Model ID",
     "longRunningHint": "Diese Anfrage dauert etwas länger als üblich — bitte habe einen Moment Geduld.",
     "waitingDesc": "Einen Moment…",
+    "reconnectingDesc": "Verbindung wird wiederhergestellt — die Antwort geht gleich weiter.",
     "waitingAria": "Antwort wird vorbereitet"
   },
   "message": {

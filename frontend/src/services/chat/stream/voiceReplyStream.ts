@@ -28,6 +28,16 @@ export class VoiceReplyStream {
     return this.heard
   }
 
+  /**
+   * The same answer is about to be fed again from the start. Sentences
+   * already spoken stay spoken; only text past that point is new.
+   */
+  suppressReplay(): void {
+    this.spokenLength = this.heard.length
+    this.heard = ''
+    this.insideThink = false
+  }
+
   feed(chunk: string): void {
     const streamer = this.streamer()
     if (!streamer) return

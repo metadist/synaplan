@@ -215,6 +215,13 @@
 		file_server
 	}
 
+	# When SYNAPLAN_RELAY=1 the watchdog holds the long AI streams. The
+	# matcher is false otherwise, so the routes stay on PHP.
+	@watchdog_relay expression `{env.SYNAPLAN_RELAY} == "1" && (path('/api/v1/messages/stream') || path('/api/v1/messages/stream/*') || path('/api/v1/widget/*/message') || path('/v1/chat/completions') || path('/v1/messages') || path('/v1/messages/*'))`
+	handle @watchdog_relay {
+		reverse_proxy 127.0.0.1:8097
+	}
+
 	# Backend PHP routes last (API, dynamic routes, shared pages)
 	# Dev routes (_profiler, _wdt, _error) only when APP_ENV=dev
 	# /shared/* routes to PHP for Open Graph meta tags (social media previews)

@@ -148,7 +148,14 @@
             class="border-t border-gray-200 dark:border-gray-700 mb-3 -mx-4"
           ></div>
 
-          <ProcessingTimeline :steps="visibleTimelineSteps" :model="timelineModel">
+          <p
+            v-if="processingStatus === 'reconnecting'"
+            class="text-sm txt-secondary"
+            data-testid="stream-reconnecting"
+          >
+            {{ t('processing.reconnectingDesc') }}
+          </p>
+          <ProcessingTimeline v-else :steps="visibleTimelineSteps" :model="timelineModel">
             <template #active-extra="{ step }">
               <ul
                 v-if="step.key === 'file' && documentStepList.length > 0"

@@ -520,6 +520,7 @@
     "busyAuth": "Your session has expired. Sign in again, then send your message.",
     "busyLimit": "Too many messages right now. Nothing was sent. Wait a moment, then try again.",
     "busyServer": "The server could not take your message right now. Nothing was sent. Try again in a moment.",
+    "reconnectingFailed": "The connection to Synaplan was lost. Your answer is still being written and appears here when it is ready.",
     "title": "The answer did not finish",
     "retry": "Try again with another model",
     "retryWith": "Try again with {model}",
@@ -921,6 +922,7 @@
     "modelId": "Model ID",
     "longRunningHint": "This request is taking a bit longer than usual — please hang tight.",
     "waitingDesc": "Just a moment…",
+    "reconnectingDesc": "Reconnecting — your answer continues in a moment.",
     "waitingAria": "Preparing response"
   },
   "message": {

@@ -33,9 +33,9 @@ fi
 SYNAPLAN_ROLE="${SYNAPLAN_ROLE:-web}"
 export SYNAPLAN_ROLE
 case "$SYNAPLAN_ROLE" in
-    web|worker|scheduler) ;;
+    web|worker|scheduler|pump) ;;
     *)
-        echo "❌ ERROR: Unsupported SYNAPLAN_ROLE '${SYNAPLAN_ROLE}'. Expected web, worker, or scheduler."
+        echo "❌ ERROR: Unsupported SYNAPLAN_ROLE '${SYNAPLAN_ROLE}'. Expected web, worker, scheduler, or pump."
         exit 64
         ;;
 esac
@@ -360,6 +360,11 @@ case "$SYNAPLAN_ROLE" in
     scheduler)
         start_watchdog
         run_scheduler_role
+        exit $?
+        ;;
+    pump)
+        start_watchdog
+        run_pump_role
         exit $?
         ;;
 esac

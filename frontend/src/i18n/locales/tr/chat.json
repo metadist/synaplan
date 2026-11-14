@@ -513,6 +513,7 @@
     "busyAuth": "Oturumunuzun süresi doldu. Tekrar giriş yapın ve mesajınızı gönderin.",
     "busyLimit": "Şu anda çok fazla mesaj geliyor. Hiçbir şey gönderilmedi. Bir an bekleyip tekrar deneyin.",
     "busyServer": "Sunucu mesajınızı şu anda kabul edemedi. Hiçbir şey gönderilmedi. Birazdan tekrar deneyin.",
+    "reconnectingFailed": "Synaplan bağlantısı koptu. Yanıt yazılmaya devam ediyor ve hazır olunca burada görünür.",
     "title": "Yanıt tamamlanamadı",
     "retry": "Başka bir modelle tekrar dene",
     "retryWith": "{model} ile tekrar dene",
@@ -926,6 +927,7 @@
     "modelId": "Model ID",
     "longRunningHint": "Bu istek normalden biraz daha uzun sürüyor — lütfen biraz bekleyin.",
     "waitingDesc": "Bir saniye…",
+    "reconnectingDesc": "Yeniden bağlanılıyor — yanıt birazdan devam eder.",
     "waitingAria": "Yanıt hazırlanıyor"
   },
   "message": {

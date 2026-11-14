@@ -513,6 +513,7 @@
     "busyAuth": "Tu sesión ha caducado. Inicia sesión de nuevo y envía tu mensaje.",
     "busyLimit": "Hay demasiados mensajes ahora mismo. No se envió nada. Espera un momento e inténtalo de nuevo.",
     "busyServer": "El servidor no pudo aceptar tu mensaje ahora mismo. No se envió nada. Inténtalo de nuevo en un momento.",
+    "reconnectingFailed": "Se perdió la conexión con Synaplan. Tu respuesta se sigue escribiendo y aparece aquí cuando esté lista.",
     "title": "La respuesta no se completó",
     "retry": "Intentarlo de nuevo con otro modelo",
     "retryWith": "Intentarlo de nuevo con {model}",
@@ -926,6 +927,7 @@
     "modelId": "ID de Modelo",
     "longRunningHint": "Esta solicitud está tardando un poco más de lo habitual — por favor, ten paciencia.",
     "waitingDesc": "Un momento…",
+    "reconnectingDesc": "Reconectando — tu respuesta continúa en un momento.",
     "waitingAria": "Preparando respuesta"
   },
   "message": {

@@ -32,6 +32,21 @@ describe('VoiceReplyStream', () => {
     expect(audio.streamText).toHaveBeenCalledWith('Done.', undefined, 'en')
   })
 
+  it('does not speak a replay of text it has already said', () => {
+    const audio = streamer()
+    const voice = new VoiceReplyStream(() => audio as unknown as AudioStreamer, vi.fn(), 'en')
+
+    voice.feed('Hello. ')
+    voice.suppressReplay()
+    voice.feed('Hello. ')
+    voice.feed('Again.')
+
+    expect(audio.streamText.mock.calls).toEqual([
+      ['Hello. ', undefined, 'en'],
+      ['Again.', undefined, 'en'],
+    ])
+  })
+
   it('speaks the rest at the end and marks the stream complete', () => {
     const audio = streamer()
     const voice = new VoiceReplyStream(() => audio as unknown as AudioStreamer, vi.fn(), 'en')

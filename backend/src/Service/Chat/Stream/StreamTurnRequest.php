@@ -27,6 +27,7 @@ final readonly class StreamTurnRequest
         public bool $incognito = false,
         public array $incognitoHistory = [],
         public ?array $rateLimitError = null,
+        public ?string $assignedRunId = null,
     ) {
     }
 }
