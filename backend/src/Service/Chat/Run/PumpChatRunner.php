@@ -39,7 +39,15 @@ final readonly class PumpChatRunner
         if (!is_string($runId) || '' === $runId) {
             return;
         }
-        $this->redis->markRunning($runId, $incarnation);
+        // The body outlives the claim deadline. A reaper may already have
+        // failed this run; executing it would write frames after that terminal.
+        if (!$this->redis->markRunning($runId, $incarnation)) {
+            $this->logger->info('Stream pump skipped a run that was no longer queued', [
+                'run_id' => $runId,
+            ]);
+
+            return;
+        }
         try {
             StreamJobGuard::reject($payload);
             $userId = $payload['userId'] ?? null;

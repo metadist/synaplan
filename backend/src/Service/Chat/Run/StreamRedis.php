@@ -149,9 +149,9 @@ LUA,
         return is_array($decoded) ? $decoded : null;
     }
 
-    public function markRunning(string $runId, string $incarnation): void
+    public function markRunning(string $runId, string $incarnation): bool
     {
-        $this->redis->eval(
+        $result = $this->redis->eval(
             <<<'LUA'
 if redis.call('HGET', KEYS[1], 'state') ~= 'queued' then
   return 0
@@ -163,6 +163,8 @@ LUA,
             ['stream:run:'.$runId],
             [$incarnation, (string) self::RUN_TTL_SECONDS],
         );
+
+        return 1 === (int) $result;
     }
 
     public function markFinished(string $runId): void

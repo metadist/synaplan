@@ -48,8 +48,10 @@ func ConfigFrom(getenv func(string) string, prefix string) Config {
 		}
 	}
 	return Config{
-		Listen:   "127.0.0.1:8097",
-		Upstream: first(getenv("SYNAPLAN_PHP_UPSTREAM"), "http://127.0.0.1"),
+		Listen: "127.0.0.1:8097",
+		// 9080 is the loopback PHP listener. Port 80 is Caddy, which sends
+		// these same routes back here when the relay is on.
+		Upstream: first(getenv("SYNAPLAN_PHP_UPSTREAM"), "http://127.0.0.1:9080"),
 		Secret:   getenv("SYNAPLAN_RELAY_SECRET"),
 		Attach:   getenv("SYNAPLAN_ATTACH_SECRET"),
 		Prefix:   prefix,
@@ -146,9 +148,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.hold(w, r, resp)
 		return
 	}
-	copyHeaders(w.Header(), resp.Header)
-	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
+	copyUpstream(w, resp)
 }
 
 func (s *Server) hold(w http.ResponseWriter, r *http.Request, resp *http.Response) {
@@ -175,10 +175,10 @@ func (s *Server) hold(w http.ResponseWriter, r *http.Request, resp *http.Respons
 		return
 	}
 	if s.redis == nil {
-		writeRaw(w, raw.Terminal)
+		writeRaw(w, resp.Header, raw.Terminal)
 		return
 	}
-	s.copy(r.Context(), w, raw.RunID, raw.FromSeq, Directive{
+	s.copy(r.Context(), w, resp.Header, raw.RunID, raw.FromSeq, Directive{
 		SSEIDs:    raw.SSEIDs,
 		Terminal:  raw.Terminal,
 		Idle:      raw.IdleTimeoutSec,
@@ -186,10 +186,8 @@ func (s *Server) hold(w http.ResponseWriter, r *http.Request, resp *http.Respons
 	})
 }
 
-func (s *Server) copy(ctx context.Context, w http.ResponseWriter, runID string, fromSeq int64, d Directive) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("X-Accel-Buffering", "no")
+func (s *Server) copy(ctx context.Context, w http.ResponseWriter, upstream http.Header, runID string, fromSeq int64, d Directive) {
+	applyStreamHeaders(w, upstream)
 	w.WriteHeader(http.StatusOK)
 	flusher, _ := w.(http.Flusher)
 	flush := func(text string) {
@@ -282,10 +280,47 @@ func writeBusy(w http.ResponseWriter, path string) {
 	_, _ = io.WriteString(w, `{"error":"server_busy","retryAfter":5}`)
 }
 
-func writeRaw(w http.ResponseWriter, frame string) {
-	w.Header().Set("Content-Type", "text/event-stream")
+func writeRaw(w http.ResponseWriter, upstream http.Header, frame string) {
+	applyStreamHeaders(w, upstream)
 	w.WriteHeader(http.StatusOK)
 	_, _ = io.WriteString(w, frame)
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+// copyUpstream writes PHP's response. An event stream is flushed per chunk
+// so a small frame is not held until the answer ends.
+func copyUpstream(w http.ResponseWriter, resp *http.Response) {
+	copyHeaders(w.Header(), resp.Header)
+	w.WriteHeader(resp.StatusCode)
+	if !strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+		_, _ = io.Copy(w, resp.Body)
+		return
+	}
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 1024)
+	for {
+		n, err := resp.Body.Read(buf)
+		if n > 0 {
+			_, _ = w.Write(buf[:n])
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if err != nil {
+			return
+		}
+	}
+}
+
+func applyStreamHeaders(w http.ResponseWriter, upstream http.Header) {
+	if upstream != nil {
+		copyHeaders(w.Header(), upstream)
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
 }
 
 func copyHeaders(dst, src http.Header) {

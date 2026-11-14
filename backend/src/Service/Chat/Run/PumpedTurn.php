@@ -60,7 +60,10 @@ final readonly class PumpedTurn
                 'runId' => $runId,
                 'token' => $token,
                 'fromSeq' => 0,
-                'sseIds' => true,
+                // The attach log coalesces text and numbers those entries.
+                // These frames are the raw wire. A cursor from one cannot
+                // resume the other, so a dropped client rebuilds from zero.
+                'sseIds' => false,
                 'contentType' => 'text/event-stream',
                 'headers' => [],
                 'terminal' => PumpFrames::LOST_PUMP,
@@ -73,7 +76,18 @@ final readonly class PumpedTurn
             ]);
         }
 
-        $tail = new RunStreamTail($this->frames);
+        $redis = $this->redis;
+        $tail = new RunStreamTail($this->frames, static function (string $id) use ($redis): bool {
+            $state = $redis->runState($id);
+            if ('queued' === $state['state']) {
+                return time() <= $state['deadline'];
+            }
+            if ('running' === $state['state']) {
+                return $redis->heartbeatAlive($state['incarnation']);
+            }
+
+            return false;
+        });
 
         return new StreamedResponse(
             static function () use ($tail, $runId): void {

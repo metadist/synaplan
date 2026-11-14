@@ -135,8 +135,22 @@ const runStarted: StreamStatusHandler<StreamTurn> = (payload, turn) =>
 
 /** A replay from the start replaces the accumulated text. The smoother keeps what is already painted until the replay catches up. */
 const streamRebuild: StreamStatusHandler<StreamTurn> = (_payload, turn) => {
+  const message = turn.message()
+  if (message) {
+    // A finished thinking block from an earlier continuation stays. The
+    // block this turn was still writing is dropped, so the replay does not
+    // append it a second time.
+    message.parts = message.parts.filter((part) => part.type !== 'thinking' || !part.isStreaming)
+  }
   turn.text.content = ''
   turn.text.thinkOpen = false
+  if (isMemberTurn(turn)) {
+    turn.voice.suppressReplay()
+  }
+}
+
+function isMemberTurn(turn: StreamTurn): turn is MemberTurn {
+  return 'voice' in turn
 }
 
 export const contentHandlers: StreamHandlers<StreamTurn> = {

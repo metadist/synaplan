@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Command;
 
 use App\Service\Chat\Run\PumpChatRunner;
+use App\Service\Chat\Run\PumpHeartbeat;
 use App\Service\Chat\Run\StreamJobGuard;
 use App\Service\Chat\Run\StreamRedis;
 use Psr\Log\LoggerInterface;
@@ -29,6 +30,7 @@ final class StreamPumpCommand extends Command
     public function __construct(
         private readonly StreamRedis $redis,
         private readonly PumpChatRunner $runner,
+        private readonly PumpHeartbeat $heartbeat,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
@@ -72,7 +74,12 @@ final class StreamPumpCommand extends Command
                 continue;
             }
             if ('chat_stream' === ($body['channel'] ?? null)) {
-                $this->runner->run($body, $incarnation);
+                $beat = $this->heartbeat->start($incarnation, $serverId);
+                try {
+                    $this->runner->run($body, $incarnation);
+                } finally {
+                    $this->heartbeat->stop($beat);
+                }
             }
         }
 

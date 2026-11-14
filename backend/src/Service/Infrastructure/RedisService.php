@@ -734,6 +734,15 @@ LUA;
         return $this->connectionFailure;
     }
 
+    /**
+     * The stored key, including the application prefix. A forked heartbeat
+     * writes this exact key through its own connection.
+     */
+    public function absoluteKey(string $key): string
+    {
+        return $this->prefix($key);
+    }
+
     private function prefix(string $key): string
     {
         return $this->keyPrefix.$key;

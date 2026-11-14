@@ -509,38 +509,64 @@ async function resumeAttachedStream(
   lastSeq: () => number,
   onUpdate: (data: StreamUpdatePayload) => void,
   noteId: (seq: number) => void,
-  isStopped: () => boolean
+  isStopped: () => boolean,
+  signal: AbortSignal
 ): Promise<boolean> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    if (isStopped()) return false
+    if (signal.aborted || isStopped()) return false
     onUpdate({ status: 'reconnecting' })
-    await new Promise((resolve) => setTimeout(resolve, reconnectDelayMs(attempt)))
-    if (isStopped()) return false
+    await waitForReconnect(reconnectDelayMs(attempt), signal)
+    if (signal.aborted || isStopped()) return false
     const plan = resumeFrom(sawId(), lastSeq())
     if (plan.rebuild) onUpdate({ status: 'stream_rebuild' })
 
-    const authInit = sseTokenFetchInit()
-    const params = new URLSearchParams({ runId, from: String(plan.from) })
-    const load = () =>
-      fetch(`${getApiBaseUrl()}/api/v1/messages/stream/attach?${params}`, {
-        method: 'GET',
-        credentials: authInit.credentials,
-        headers: {
-          ...((authInit.headers as Record<string, string> | undefined) ?? {}),
-          Accept: 'text/event-stream',
-        },
-      })
-    let response = await load()
-    if (response.status === 401) {
-      const refreshed = await refreshAccessToken()
-      if (refreshed && !isStopped()) response = await load()
+    try {
+      const authInit = sseTokenFetchInit()
+      const params = new URLSearchParams({ runId, from: String(plan.from) })
+      const load = () =>
+        fetch(`${getApiBaseUrl()}/api/v1/messages/stream/attach?${params}`, {
+          method: 'GET',
+          credentials: authInit.credentials,
+          headers: {
+            ...((authInit.headers as Record<string, string> | undefined) ?? {}),
+            Accept: 'text/event-stream',
+          },
+          signal,
+        })
+      let response = await load()
+      if (response.status === 401) {
+        const refreshed = await refreshAccessToken()
+        if (refreshed && !signal.aborted && !isStopped()) response = await load()
+      }
+      if (signal.aborted || isStopped()) return false
+      if (!response.ok || !response.body) continue
+      const terminal = await readSseBody(response.body, onUpdate, isStopped, noteId)
+      if (terminal) return true
+    } catch (error) {
+      if (
+        signal.aborted ||
+        isStopped() ||
+        (error instanceof DOMException && error.name === 'AbortError')
+      ) {
+        return false
+      }
     }
-    if (isStopped()) return false
-    if (!response.ok || !response.body) continue
-    const terminal = await readSseBody(response.body, onUpdate, isStopped, noteId)
-    if (terminal) return true
   }
   return false
+}
+
+function waitForReconnect(delayMs: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, delayMs)
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(timer)
+        resolve()
+      },
+      { once: true }
+    )
+  })
 }
 
 function openStreamPost(
@@ -636,7 +662,18 @@ function openStreamPost(
       // a crashed worker. A turn that already has a run id is re-attached
       // before that drop is shown.
       if (!terminalReceived && !isStopped) {
-        if (runId && (await resumeAttachedStream(runId, () => sawId, () => lastSeq, observe, noteId, () => isStopped))) {
+        if (
+          runId &&
+          (await resumeAttachedStream(
+            runId,
+            () => sawId,
+            () => lastSeq,
+            observe,
+            noteId,
+            () => isStopped,
+            controller.signal
+          ))
+        ) {
           return
         }
         console.error('❌ Stream ended without completion event')
@@ -646,7 +683,18 @@ function openStreamPost(
       if (isStopped || (error instanceof DOMException && error.name === 'AbortError')) {
         return
       }
-      if (runId && (await resumeAttachedStream(runId, () => sawId, () => lastSeq, observe, noteId, () => isStopped))) {
+      if (
+        runId &&
+        (await resumeAttachedStream(
+          runId,
+          () => sawId,
+          () => lastSeq,
+          observe,
+          noteId,
+          () => isStopped,
+          controller.signal
+        ))
+      ) {
         return
       }
       console.error('🚫 Stream setup error:', error)

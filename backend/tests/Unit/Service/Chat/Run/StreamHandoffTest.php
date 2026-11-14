@@ -96,6 +96,31 @@ final class StreamHandoffTest extends TestCase
         self::assertSame('0-2', $frames[1]->id());
     }
 
+    public function testSilenceIsFatalOnlyWhenThePumpIsGone(): void
+    {
+        self::assertFalse(RunStreamTail::quietIsFatal(59.0, 60, false));
+        self::assertTrue(RunStreamTail::quietIsFatal(60.0, 60, false));
+        self::assertFalse(RunStreamTail::quietIsFatal(120.0, 60, true));
+    }
+
+    public function testAGoneClientDoesNotGetASyntheticFailure(): void
+    {
+        $written = '';
+        $checks = 0;
+        (new RunStreamTail(new MemoryRunStream(), static fn (string $runId): bool => true))->follow(
+            'run-1',
+            0,
+            static function (string $bytes) use (&$written): void {
+                $written .= $bytes;
+            },
+            static function () use (&$checks): bool {
+                return ++$checks > 1;
+            },
+        );
+
+        self::assertSame('', $written);
+    }
+
     public function testTheTailStopsAtTheTerminalFrame(): void
     {
         $stream = new MemoryRunStream();

@@ -859,11 +859,9 @@ run_pump_role() {
     local env="${APP_ENV:-prod}"
 
     runtime_log "Starting stream pump."
-    while true; do
-        php bin/console --env="$env" app:stream-pump --no-interaction || true
-        runtime_log "Stream pump exited; starting again."
-        sleep 1
-    done
+    # PHP is pid 1 of this role so SIGTERM reaches the drain handler.
+    # The service restart policy brings the process back.
+    exec php bin/console --env="$env" app:stream-pump --no-interaction
 }
 
 # Every role starts the capacity watchdog beside its main process and restarts

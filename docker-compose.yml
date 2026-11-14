@@ -807,6 +807,7 @@ services:
       DATABASE_WRITE_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       DATABASE_READ_URL: mysql://synaplan_user:synaplan_password@db:3306/synaplan?serverVersion=mariadb-12.2.2&charset=utf8mb4
       REDIS_DSN: ${REDIS_DSN:-redis://redis:6379}
+      MAILER_DSN: smtp://mailhog:1025
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-}
       COMPOSE_PROFILES: ${COMPOSE_PROFILES:-}
       QDRANT_URL: http://qdrant:6333
