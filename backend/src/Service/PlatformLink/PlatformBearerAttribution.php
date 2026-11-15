@@ -160,12 +160,12 @@ final readonly class PlatformBearerAttribution
         if (!$row instanceof ExternalIdentity) {
             return;
         }
-        // The insert commits before this read. A disable or revoke can land
-        // in between; a current read sees that, and an off row is not turned
-        // back on, resumed or audited. The insert already stores a new link
-        // as active, so this only repeats that for the winner.
+        // The lock is held through the resume and the audit entry. A disable
+        // that commits first is visible here, and one that arrives second
+        // waits until this transaction ends, so it pauses the watches this
+        // resume just started instead of racing it.
         $this->entityManager->wrapInTransaction(function () use ($user, $instance, $externalId): void {
-            $current = $this->identities->current($instance->getClient(), $instance->getInstanceId(), $externalId);
+            $current = $this->identities->lock($instance->getClient(), $instance->getInstanceId(), $externalId);
             if (!$current instanceof ExternalIdentity || $current->isOff()) {
                 return;
             }

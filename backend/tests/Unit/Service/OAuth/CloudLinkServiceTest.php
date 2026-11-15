@@ -25,8 +25,9 @@ final class CloudLinkServiceTest extends TestCase
         $winner = $this->identity(9, ExternalIdentity::MODE_SSO);
         $identities = $this->createMock(ExternalIdentityRepository::class);
         $identities->method('findOneByTriple')->willReturn(null);
-        $identities->method('upsert')->willReturn($winner);
-        $identities->expects(self::once())->method('current')->willReturn($winner);
+        $identities->expects(self::once())->method('insertIfAbsent')->willReturn(null);
+        $identities->expects(self::never())->method('upsert');
+        $identities->expects(self::once())->method('lock')->willReturn($winner);
         $tokens = $this->createMock(OAuthTokenRepository::class);
         $tokens->expects(self::never())->method('revokeForAccount');
         $effects = $this->createMock(LifecycleEffect::class);
@@ -41,8 +42,13 @@ final class CloudLinkServiceTest extends TestCase
         );
         $entityManager->expects(self::never())->method('flush');
 
-        $this->expectException(CloudLinkRefused::class);
-        $this->service($identities, $tokens, $effects, $audit, $mail, $entityManager)->link(4, $this->instance(), 'ext-1', '127.0.0.1');
+        try {
+            $this->service($identities, $tokens, $effects, $audit, $mail, $entityManager)->link(4, $this->instance(), 'ext-1', '127.0.0.1');
+            self::fail('A managed account that won the insert must be refused.');
+        } catch (CloudLinkRefused) {
+            self::assertSame(9, $winner->getUserId());
+            self::assertSame(ExternalIdentity::MODE_SSO, $winner->getMode());
+        }
     }
 
     public function testAConcurrentLinkMovesOnlyThroughTheTransfer(): void
@@ -51,8 +57,9 @@ final class CloudLinkServiceTest extends TestCase
         $winner->setApiKeyId(3);
         $identities = $this->createMock(ExternalIdentityRepository::class);
         $identities->method('findOneByTriple')->willReturn(null);
-        $identities->method('upsert')->willReturn($winner);
-        $identities->expects(self::once())->method('current')->willReturn($winner);
+        $identities->expects(self::once())->method('insertIfAbsent')->willReturn(null);
+        $identities->expects(self::never())->method('upsert');
+        $identities->expects(self::once())->method('lock')->willReturn($winner);
         $tokens = $this->createMock(OAuthTokenRepository::class);
         $tokens->expects(self::once())->method('revokeForAccount')->with('oidc-cloud', 9, 'ext-1');
         $keys = $this->createMock(ApiKeyRepository::class);

@@ -8,6 +8,7 @@ use App\Entity\ExternalIdentity;
 use App\Repository\ExternalIdentityRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception\LockWaitTimeoutException;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -154,6 +155,49 @@ final class ExternalIdentityRepositoryTest extends KernelTestCase
         }
     }
 
+    public function testLockIsHeldUntilTheWritingTransactionEnds(): void
+    {
+        [$source, $instanceId, $externalId] = $this->triple();
+        $other = $this->otherConnection();
+        $seen = time();
+        $other->insert('BEXTERNALIDENTITIES', [
+            'BUSERID' => 41,
+            'BSOURCE' => $source,
+            'BINSTANCEID' => $instanceId,
+            'BEXTERNALID' => $externalId,
+            'BAPIKEYID' => null,
+            'BMODE' => ExternalIdentity::MODE_LINK,
+            'BSTATUS' => ExternalIdentity::STATUS_ACTIVE,
+            'BCREATED' => $seen,
+            'BLASTSEEN' => $seen,
+        ], [
+            'BAPIKEYID' => ParameterType::NULL,
+            'BCREATED' => ParameterType::INTEGER,
+            'BLASTSEEN' => ParameterType::INTEGER,
+        ]);
+
+        try {
+            $this->entityManager()->wrapInTransaction(function () use ($other, $source, $instanceId, $externalId): void {
+                $locked = $this->repository()->lock($source, $instanceId, $externalId);
+                self::assertInstanceOf(ExternalIdentity::class, $locked);
+                self::assertSame(41, $locked->getUserId());
+
+                $waiting = false;
+                try {
+                    $other->executeQuery(
+                        'SELECT BID FROM BEXTERNALIDENTITIES WHERE BSOURCE = :source AND BINSTANCEID = :instanceId AND BEXTERNALID = :externalId FOR UPDATE',
+                        ['source' => $source, 'instanceId' => $instanceId, 'externalId' => $externalId],
+                    )->fetchOne();
+                } catch (LockWaitTimeoutException) {
+                    $waiting = true;
+                }
+                self::assertTrue($waiting, 'The other connection acquired the row while this transaction holds it.');
+            });
+        } finally {
+            $other->close();
+        }
+    }
+
     private function repository(): ExternalIdentityRepository
     {
         $repository = static::getContainer()->get(ExternalIdentityRepository::class);
@@ -189,6 +233,14 @@ final class ExternalIdentityRepositoryTest extends KernelTestCase
         );
 
         return $repository;
+    }
+
+    private function entityManager(): EntityManagerInterface
+    {
+        $entityManager = static::getContainer()->get(EntityManagerInterface::class);
+        self::assertInstanceOf(EntityManagerInterface::class, $entityManager);
+
+        return $entityManager;
     }
 
     private function otherConnection(): Connection

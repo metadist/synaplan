@@ -48,41 +48,17 @@ final readonly class CloudLinkService
     {
         $externalId = trim($externalId);
         $existing = $this->identities->findOneByTriple($instance->getClient(), $instance->getInstanceId(), $externalId);
-        $previousOwner = $existing instanceof ExternalIdentity ? $existing->getUserId() : null;
         if ($existing instanceof ExternalIdentity && in_array($existing->getMode(), [ExternalIdentity::MODE_PROVISION, ExternalIdentity::MODE_SSO], true)) {
             throw new CloudLinkRefused('This cloud account cannot be linked.');
         }
-        if ($existing instanceof ExternalIdentity && null !== $previousOwner && $previousOwner !== $userId) {
-            $this->detachPreviousOwner($instance, $existing, $previousOwner, $externalId);
-        }
 
-        $this->identities->upsert($userId, $instance->getClient(), $externalId, $instance->getInstanceId(), null, ExternalIdentity::MODE_LINK);
-        // The lookup above can miss a row another request commits before the
-        // insert. Lock that winner and apply the same rules: a managed account
-        // is refused, and another person's link moves only through the transfer.
+        // Insert only when the triple is absent. A row that appears between
+        // the lookup and this insert keeps its owner and mode; upsert would
+        // re-own it before the check below could refuse a managed account.
+        $this->identities->insertIfAbsent($userId, $instance->getClient(), $externalId, $instance->getInstanceId(), null, ExternalIdentity::MODE_LINK);
         /** @var array{ExternalIdentity, int|null} $linked */
-        $linked = $this->entityManager->wrapInTransaction(function () use ($userId, $instance, $externalId, $previousOwner): array {
-            $identity = $this->identities->current($instance->getClient(), $instance->getInstanceId(), $externalId);
-            if (!$identity instanceof ExternalIdentity) {
-                throw new \RuntimeException(sprintf('Cloud account "%s" was linked but could not be read back.', $externalId));
-            }
-            if (in_array($identity->getMode(), [ExternalIdentity::MODE_PROVISION, ExternalIdentity::MODE_SSO], true)) {
-                throw new CloudLinkRefused('This cloud account cannot be linked.');
-            }
-            $owner = $identity->getUserId();
-            if ($owner !== $userId) {
-                $this->detachPreviousOwner($instance, $identity, $owner, $externalId);
-                $identity->setUserId($userId);
-                $previousOwner = $owner;
-            }
-            if (null !== $previousOwner && $previousOwner !== $userId) {
-                $identity->setApiKeyId(null);
-            }
-            $identity->setStatus(ExternalIdentity::STATUS_ACTIVE);
-            $identity->setRevokedAt(null);
-            $this->entityManager->flush();
-
-            return [$identity, $previousOwner];
+        $linked = $this->entityManager->wrapInTransaction(function () use ($userId, $instance, $externalId): array {
+            return $this->claimLocked($userId, $instance, $externalId);
         });
         [$identity, $previousOwner] = $linked;
 
@@ -154,6 +130,38 @@ final readonly class CloudLinkService
             'host' => $instance->getHost(),
             'external_id' => $externalId,
         ], $ip);
+    }
+
+    /**
+     * @return array{ExternalIdentity, int|null}
+     *
+     * @throws CloudLinkRefused
+     */
+    private function claimLocked(int $userId, PlatformInstance $instance, string $externalId): array
+    {
+        $identity = $this->identities->lock($instance->getClient(), $instance->getInstanceId(), $externalId);
+        if (!$identity instanceof ExternalIdentity) {
+            throw new \RuntimeException(sprintf('Cloud account "%s" was linked but could not be read back.', $externalId));
+        }
+        if (in_array($identity->getMode(), [ExternalIdentity::MODE_PROVISION, ExternalIdentity::MODE_SSO], true)) {
+            throw new CloudLinkRefused('This cloud account cannot be linked.');
+        }
+
+        $previousOwner = null;
+        $owner = $identity->getUserId();
+        if ($owner !== $userId) {
+            $this->detachPreviousOwner($instance, $identity, $owner, $externalId);
+            $identity->setUserId($userId);
+            $identity->setApiKeyId(null);
+            $previousOwner = $owner;
+        }
+        $identity->setMode(ExternalIdentity::MODE_LINK);
+        $identity->touchLastSeen();
+        $identity->setStatus(ExternalIdentity::STATUS_ACTIVE);
+        $identity->setRevokedAt(null);
+        $this->entityManager->flush();
+
+        return [$identity, $previousOwner];
     }
 
     private function detachPreviousOwner(PlatformInstance $instance, ExternalIdentity $identity, int $previousOwner, string $externalId): void

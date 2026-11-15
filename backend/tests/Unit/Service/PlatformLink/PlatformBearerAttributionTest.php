@@ -75,7 +75,7 @@ final class PlatformBearerAttributionTest extends TestCase
         $identities->method('findForUserOnInstance')->willReturn([]);
         $identities->method('findOneByTriple')->willReturn(null);
         $identities->expects(self::once())->method('insertIfAbsent')->willReturn($row);
-        $identities->expects(self::once())->method('current')->willReturn($row);
+        $identities->expects(self::once())->method('lock')->willReturn($row);
         $effects = $this->createMock(LifecycleEffect::class);
         $effects->expects(self::once())->method('onResumed')->with($row);
         $audit = $this->createMock(AuditLogWriter::class);
@@ -117,7 +117,7 @@ final class PlatformBearerAttributionTest extends TestCase
         $identities->method('findForUserOnInstance')->willReturn([]);
         $identities->method('findOneByTriple')->willReturn(null);
         $identities->method('insertIfAbsent')->willReturn($row);
-        $identities->expects(self::once())->method('current')->willReturn($row);
+        $identities->expects(self::once())->method('lock')->willReturn($row);
         $effects = $this->createMock(LifecycleEffect::class);
         $effects->expects(self::never())->method('onResumed');
         $audit = $this->createMock(AuditLogWriter::class);

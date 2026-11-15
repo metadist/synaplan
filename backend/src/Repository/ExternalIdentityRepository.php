@@ -8,9 +8,11 @@ use App\Entity\ExternalIdentity;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Exception as DbalException;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\DBAL\ParameterType;
+use Doctrine\ORM\Query;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -186,14 +188,54 @@ class ExternalIdentityRepository extends ServiceEntityRepository
     }
 
     /**
-     * The latest committed row for this triple.
+     * The row locked for this transaction, so a transfer or a resume validates
+     * the same version it then updates.
      *
-     * Read on a new connection. This transaction may already have a REPEATABLE
-     * READ snapshot from the lookup that missed the row, and on MariaDB a
-     * locking read of a row committed after that snapshot raises
-     * "Record has changed since last read" instead of returning it. The new
-     * connection has no snapshot, so the request that lost the insert sees
-     * the winner. The entity is registered here so a later flush updates it.
+     * The caller is already inside the writing transaction; the lock is held
+     * until that transaction ends. A plain read on another connection is only
+     * how a stale REPEATABLE READ snapshot finds a row it cannot lock yet.
+     * MariaDB raises "Record has changed since last read" for a locking read
+     * of such a row. The id is recovered from a new connection, then locked
+     * here by primary key.
+     */
+    public function lock(string $source, string $instanceId, string $externalId): ?ExternalIdentity
+    {
+        if (!$this->getEntityManager()->getConnection()->isTransactionActive()) {
+            throw new \LogicException('An external identity can be locked only inside a transaction.');
+        }
+
+        try {
+            return $this->lockByTriple($source, $instanceId, $externalId);
+        } catch (DbalException $e) {
+            if (!$this->changedSinceRead($e)) {
+                throw $e;
+            }
+        }
+
+        $recovered = $this->current($source, $instanceId, $externalId);
+        $id = $recovered?->getId();
+        if (!$recovered instanceof ExternalIdentity || null === $id) {
+            return null;
+        }
+
+        try {
+            $locked = $this->getEntityManager()->find(ExternalIdentity::class, $id, LockMode::PESSIMISTIC_WRITE);
+        } catch (DbalException $e) {
+            if (!$this->changedSinceRead($e)) {
+                throw $e;
+            }
+
+            return null;
+        }
+
+        return $locked instanceof ExternalIdentity ? $locked : null;
+    }
+
+    /**
+     * The latest committed row for this triple, with no lock.
+     *
+     * This is how a snapshot that missed the insert learns the winner's id.
+     * Mutation uses {@see lock()} so the writing transaction holds the row.
      */
     public function current(string $source, string $instanceId, string $externalId): ?ExternalIdentity
     {
@@ -225,6 +267,37 @@ class ExternalIdentityRepository extends ServiceEntityRepository
         }
 
         return is_array($row) ? $row : null;
+    }
+
+    private function lockByTriple(string $source, string $instanceId, string $externalId): ?ExternalIdentity
+    {
+        $query = $this->createQueryBuilder('e')
+            ->where('e.source = :source')
+            ->andWhere('e.instanceId = :instanceId')
+            ->andWhere('e.externalId = :externalId')
+            ->setParameter('source', $source)
+            ->setParameter('instanceId', $instanceId)
+            ->setParameter('externalId', $externalId)
+            ->setMaxResults(1)
+            ->getQuery();
+        $query->setLockMode(LockMode::PESSIMISTIC_WRITE);
+        $query->setHint(Query::HINT_REFRESH, true);
+        $row = $query->getOneOrNullResult();
+
+        return $row instanceof ExternalIdentity ? $row : null;
+    }
+
+    private function changedSinceRead(DbalException $exception): bool
+    {
+        $current = $exception;
+        while ($current instanceof \Throwable) {
+            if (str_contains($current->getMessage(), '1020') || str_contains($current->getMessage(), 'Record has changed since last read')) {
+                return true;
+            }
+            $current = $current->getPrevious();
+        }
+
+        return false;
     }
 
     /**
