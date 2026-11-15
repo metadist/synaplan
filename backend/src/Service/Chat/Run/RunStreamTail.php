@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Chat\Run;
 
 use App\Service\Realtime\SseOutput;
+use App\Service\Realtime\SseWriter;
 
 /**
  * Copies a run's frames to the PHP response that is still holding the client.
@@ -14,7 +15,7 @@ use App\Service\Realtime\SseOutput;
  */
 final class RunStreamTail
 {
-    private const POLL_MICROSECONDS = 50000;
+    private const POLL_MILLISECONDS = 500;
 
     private const KEEPALIVE_SECONDS = 15;
 
@@ -39,7 +40,7 @@ final class RunStreamTail
     public function copy(string $runId, int $idleSeconds = 60): void
     {
         SseOutput::begin(false);
-        set_time_limit(0);
+        SseWriter::disableTimeLimit();
         // A reader has nothing to finish after the browser leaves. The pump
         // keeps generating for whoever attaches next.
         ignore_user_abort(false);
@@ -64,7 +65,7 @@ final class RunStreamTail
             if (null !== $disconnected && $disconnected()) {
                 return;
             }
-            $frames = $this->stream->after($runId, $after);
+            $frames = $this->stream->after($runId, $after, self::POLL_MILLISECONDS);
             $now = microtime(true);
             if ([] === $frames) {
                 $quietFor = $now - ($sawFrame ? $lastFrameAt : $started);
@@ -75,8 +76,6 @@ final class RunStreamTail
                     $write(": keep-alive\n\n");
                     $lastKeepalive = $now;
                 }
-                usleep(self::POLL_MICROSECONDS);
-
                 continue;
             }
 

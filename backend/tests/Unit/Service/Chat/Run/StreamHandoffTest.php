@@ -11,7 +11,9 @@ use App\Service\Chat\Run\PumpFrames;
 use App\Service\Chat\Run\RunReapDecision;
 use App\Service\Chat\Run\RunStreamFrameSink;
 use App\Service\Chat\Run\RunStreamTail;
+use App\Service\Chat\Run\StreamByteBudget;
 use App\Service\Chat\Run\StreamJobGuard;
+use App\Service\Chat\Run\StreamPumpConfig;
 use App\Service\Chat\Stream\AttachToken;
 use App\Service\Chat\Stream\RelayProof;
 use App\Service\Chat\Stream\StreamCaller;
@@ -94,6 +96,25 @@ final class StreamHandoffTest extends TestCase
         self::assertSame(1, $frames[0]->seq);
         self::assertSame('terminal', $frames[1]->kind);
         self::assertSame('0-2', $frames[1]->id());
+    }
+
+    public function testTheRunLogStopsAtTheByteCapAndKeepsOneGap(): void
+    {
+        self::assertSame(StreamByteBudget::KEEP, StreamByteBudget::decide(0, 4, 10, false));
+        self::assertSame(StreamByteBudget::GAP, StreamByteBudget::decide(6, 5, 10, false));
+        self::assertSame(StreamByteBudget::DROP, StreamByteBudget::decide(6, 5, 10, true));
+
+        $stream = new MemoryRunStream(10);
+        $stream->append('run-1', 1, 'frame', '123456');
+        $stream->append('run-1', 2, 'frame', '12345');
+        $stream->append('run-1', 3, 'terminal', 'done');
+        $frames = $stream->after('run-1', 0);
+
+        self::assertCount(2, $frames);
+        self::assertSame('frame', $frames[0]->kind);
+        self::assertSame('gap', $frames[1]->kind);
+        self::assertSame(PumpFrames::LOG_CAPPED, $frames[1]->frame);
+        self::assertSame(StreamPumpConfig::DEFAULT_MAX_BYTES, (new StreamPumpConfig())->maxBytes());
     }
 
     public function testSilenceIsFatalOnlyWhenThePumpIsGone(): void

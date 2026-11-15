@@ -21,7 +21,10 @@ final class PumpHeartbeat
     ) {
     }
 
-    public function start(string $incarnation, string $serverId): ?int
+    /**
+     * @param \Closure(): void $pause the pump command's cadence; the child is not a web request
+     */
+    public function start(string $incarnation, string $serverId, \Closure $pause): ?int
     {
         if (!function_exists('pcntl_fork') || !function_exists('posix_kill') || !function_exists('pcntl_signal')) {
             return null;
@@ -37,7 +40,7 @@ final class PumpHeartbeat
             return null;
         }
         if (0 === $pid) {
-            $this->child($dsn, $incarnationKey, $aliveKey, $serverId);
+            $this->child($dsn, $incarnationKey, $aliveKey, $serverId, $pause);
         }
 
         return $pid;
@@ -53,7 +56,10 @@ final class PumpHeartbeat
         pcntl_waitpid($pid, $status);
     }
 
-    private function child(string $dsn, string $incarnationKey, string $aliveKey, string $serverId): never
+    /**
+     * @param \Closure(): void $pause
+     */
+    private function child(string $dsn, string $incarnationKey, string $aliveKey, string $serverId, \Closure $pause): never
     {
         pcntl_async_signals(true);
         pcntl_signal(SIGTERM, static function (): void {
@@ -67,7 +73,7 @@ final class PumpHeartbeat
             } catch (\Throwable) {
                 // A missed beat expires. The parent still owns the turn.
             }
-            sleep(2);
+            $pause();
         }
     }
 }

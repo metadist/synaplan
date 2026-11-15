@@ -10,6 +10,8 @@ use App\Service\Chat\Stream\ChatStreamOrchestrator;
 use App\Service\Realtime\SseWriter;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\DependencyInjection\ServicesResetter;
 
 /**
  * Runs one web-chat turn inside the pump process.
@@ -27,6 +29,8 @@ final readonly class PumpChatRunner
         private StreamRedis $redis,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
+        #[Autowire(service: 'services_resetter')]
+        private ServicesResetter $servicesResetter,
     ) {
     }
 
@@ -69,8 +73,12 @@ final readonly class PumpChatRunner
             ]);
             $this->redis->appendFrame($runId, $this->nextSeq($runId), 'terminal', PumpFrames::DID_NOT_START);
         } finally {
-            $this->redis->markFinished($runId);
-            $this->entityManager->clear();
+            try {
+                $this->redis->markFinished($runId);
+            } finally {
+                $this->entityManager->clear();
+                $this->servicesResetter->reset();
+            }
         }
     }
 

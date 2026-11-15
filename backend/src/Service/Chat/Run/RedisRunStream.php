@@ -19,8 +19,8 @@ final class RedisRunStream implements RunStream
         $this->redis->appendFrame($runId, $seq, $kind, $frame);
     }
 
-    public function after(string $runId, int $afterSeq): array
+    public function after(string $runId, int $afterSeq, int $blockMs = 0): array
     {
-        return $this->redis->framesAfter($runId, $afterSeq);
+        return $this->redis->framesAfter($runId, $afterSeq, $blockMs);
     }
 }

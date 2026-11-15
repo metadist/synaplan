@@ -26,8 +26,11 @@ final class StreamRedis
 
     private const JOBS = 'stream:jobs';
 
+    private ?int $cachedMaxBytes = null;
+
     public function __construct(
         private readonly RedisService $redis,
+        private readonly StreamPumpConfig $limits,
     ) {
     }
 
@@ -188,22 +191,59 @@ LUA,
         }
         $result = $this->redis->eval(
             <<<'LUA'
+local max = tonumber(ARGV[5])
+local used = tonumber(redis.call('HGET', KEYS[2], 'bytes') or '0')
+if redis.call('HGET', KEYS[2], 'gapped') == '1' then
+  return 0
+end
+local incoming = string.len(ARGV[3])
+if incoming < 1 then
+  return 0
+end
+if used + incoming > max then
+  redis.call('XADD', KEYS[1], ARGV[1], 'kind', 'gap', 'frame', ARGV[6])
+  redis.call('HSET', KEYS[2], 'gapped', '1')
+  redis.call('EXPIRE', KEYS[1], ARGV[4])
+  redis.call('EXPIRE', KEYS[2], ARGV[4])
+  return 0
+end
 redis.call('XADD', KEYS[1], ARGV[1], 'kind', ARGV[2], 'frame', ARGV[3])
+redis.call('HSET', KEYS[2], 'bytes', tostring(used + incoming))
 redis.call('EXPIRE', KEYS[1], ARGV[4])
+redis.call('EXPIRE', KEYS[2], ARGV[4])
 return 1
 LUA,
-            ['chatrun:'.$runId.':stream'],
-            ['0-'.$seq, $kind, $frame, (string) self::RUN_TTL_SECONDS],
+            ['chatrun:'.$runId.':stream', 'stream:run:'.$runId],
+            [
+                '0-'.$seq,
+                $kind,
+                $frame,
+                (string) self::RUN_TTL_SECONDS,
+                (string) $this->maxBytes(),
+                PumpFrames::LOG_CAPPED,
+            ],
         );
 
         return 1 === (int) $result;
     }
 
+    private function maxBytes(): int
+    {
+        return $this->cachedMaxBytes ??= $this->limits->maxBytes();
+    }
+
     /**
      * @return list<RunFrame>
      */
-    public function framesAfter(string $runId, int $afterSeq): array
+    public function framesAfter(string $runId, int $afterSeq, int $blockMs = 0): array
     {
+        if ($blockMs > 0) {
+            return self::frames($this->redis->readStream(
+                'chatrun:'.$runId.':stream',
+                '0-'.$afterSeq,
+                $blockMs,
+            ));
+        }
         $rows = $this->redis->eval(
             <<<'LUA'
 return redis.call('XRANGE', KEYS[1], '(' .. ARGV[1], '+')

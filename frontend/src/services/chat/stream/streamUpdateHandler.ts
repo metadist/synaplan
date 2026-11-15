@@ -7,7 +7,7 @@
 import type { StreamUpdatePayload } from '@/types/chatStream'
 import { autoResearchHandlers } from './handlers/autoResearch'
 import { guestCompletionHandlers, memberCompletionHandlers } from './handlers/completion'
-import { contentHandlers, memberContentHandlers } from './handlers/content'
+import { contentHandlers, memberContentHandlers, rememberStreamBaseline } from './handlers/content'
 import { continuationHandlers } from './handlers/continuation'
 import { guestHandlers } from './handlers/guest'
 import { memoryHandlers } from './handlers/memory'
@@ -44,6 +44,7 @@ const guestTurnHandlers: StreamHandlers<GuestTurn> = {
 }
 
 export function createMemberStreamHandler(turn: MemberTurn): StreamUpdateListener {
+  rememberStreamBaseline(turn)
   return dispatcher(turn, memberHandlers, {
     observe: traceTaskEvent,
     unknown: (data) => console.warn('⚠️ Unknown status:', data.status, data),
@@ -51,11 +52,21 @@ export function createMemberStreamHandler(turn: MemberTurn): StreamUpdateListene
 }
 
 export function createGuestStreamHandler(turn: GuestTurn): StreamUpdateListener {
+  rememberStreamBaseline(turn)
   return dispatcher(turn, guestTurnHandlers, {})
 }
 
 export function createContinueStreamHandler(turn: ContinueTurn): StreamUpdateListener {
+  const baselineText = turn.text.content
+  const baselineParts = turn.message.parts.map((part) => ({ ...part }))
   return (data) => {
+    if (data.status === 'stream_rebuild') {
+      turn.text.content = baselineText
+      turn.text.thinkOpen = false
+      turn.message.parts = baselineParts.map((part) => ({ ...part }))
+      turn.renderContent(baselineText)
+      return
+    }
     const handler = data.status === undefined ? undefined : continuationHandlers[data.status]
     handler?.(data, turn)
   }

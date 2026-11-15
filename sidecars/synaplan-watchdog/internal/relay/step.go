@@ -1,6 +1,4 @@
-// Package relay copies one run's frames to the client that is still connected.
-// PHP wrote the frame bytes. A terminal or a gap closes the client. Silence
-// closes it only when no pump is alive.
+// Package relay copies one run's frames. PHP wrote the bytes. A terminal, a gap, or a dead pump closes the client.
 package relay
 
 import "fmt"
@@ -31,8 +29,6 @@ type State struct {
 	SinceKeepMs int
 }
 
-// Step advances one frame, or one stretch of silence when frame is nil.
-// The returned text is written as-is. done means the client is closed.
 func Step(st *State, frame *Frame, advancedMs int, d Directive, alive bool) (string, bool) {
 	if frame != nil {
 		st.SilentMs = 0

@@ -56,8 +56,6 @@ func ConfigFrom(getenv func(string) string, prefix string) Config {
 	}
 }
 
-// Server forwards a long route to PHP, and copies the run stream when PHP
-// answers with an attach directive.
 type Server struct {
 	cfg   Config
 	php   *http.Client
@@ -66,12 +64,10 @@ type Server struct {
 	busy  int
 }
 
-// New builds the relay. Without Redis the copy path cannot read frames.
 func New(cfg Config) *Server {
-	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: 60 * time.Second, IdleConnTimeout: 30 * time.Second}
 	s := &Server{
 		cfg: cfg,
-		php: &http.Client{Transport: transport, Timeout: 0, CheckRedirect: func(*http.Request, []*http.Request) error {
+		php: &http.Client{Transport: upstreamTransport(), Timeout: 0, CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		}},
 	}
@@ -137,7 +133,16 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.hold(w, r, resp)
 		return
 	}
+	if resp.StatusCode == http.StatusServiceUnavailable && strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/plain") {
+		copyHeaders(w.Header(), resp.Header)
+		writeBusy(w, r.URL.Path)
+		return
+	}
 	copyUpstream(w, resp)
+}
+
+func upstreamTransport() *http.Transport {
+	return &http.Transport{Proxy: nil, IdleConnTimeout: 30 * time.Second}
 }
 
 func (s *Server) hold(w http.ResponseWriter, r *http.Request, resp *http.Response) {
@@ -267,7 +272,6 @@ func writeRaw(w http.ResponseWriter, upstream http.Header, frame string) {
 	}
 }
 
-// An event stream is flushed per chunk so one frame is not held until the answer ends.
 func copyUpstream(w http.ResponseWriter, resp *http.Response) {
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)

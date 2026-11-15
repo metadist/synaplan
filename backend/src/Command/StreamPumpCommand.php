@@ -74,7 +74,9 @@ final class StreamPumpCommand extends Command
                 continue;
             }
             if ('chat_stream' === ($body['channel'] ?? null)) {
-                $beat = $this->heartbeat->start($incarnation, $serverId);
+                $beat = $this->heartbeat->start($incarnation, $serverId, static function (): void {
+                    sleep(2);
+                });
                 try {
                     $this->runner->run($body, $incarnation);
                 } finally {

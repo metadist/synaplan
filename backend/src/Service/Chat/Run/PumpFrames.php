@@ -15,4 +15,10 @@ final class PumpFrames
     public const DID_NOT_START = "data: {\"status\":\"error\",\"error\":\"The answer did not start. Try again in a moment.\",\"errorReason\":\"upstream_unavailable\"}\n\n";
 
     public const LOST_PUMP = "data: {\"status\":\"error\",\"error\":\"The answer stopped because the server restarted. Try again.\",\"errorReason\":\"upstream_unavailable\"}\n\n";
+
+    /**
+     * The log hit its byte cap. The sentence is the transport drop the client
+     * already recovers by loading the stored answer.
+     */
+    public const LOG_CAPPED = "data: {\"status\":\"error\",\"error\":\"Connection interrupted\"}\n\n";
 }

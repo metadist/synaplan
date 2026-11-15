@@ -15,6 +15,53 @@ func TestDefaultUpstreamIsTheLoopbackPHPListener(t *testing.T) {
 	}
 }
 
+func TestUpstreamHeaderWaitIsNotCapped(t *testing.T) {
+	if upstreamTransport().ResponseHeaderTimeout != 0 {
+		t.Fatal("response header timeout is set")
+	}
+}
+
+func TestPlainTextPoolRefusalBecomesBusyJSON(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("X-From-Php", "yes")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = io.WriteString(w, "no worker free")
+	}))
+	defer upstream.Close()
+
+	server := New(Config{Upstream: upstream.URL, Slots: 4})
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil))
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if rec.Header().Get("Retry-After") != "5" || rec.Header().Get("X-From-Php") != "yes" {
+		t.Fatalf("headers = %v", rec.Header())
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"server_busy"`) {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+}
+
+func TestApplication503PassesThrough(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = io.WriteString(w, `{"error":"signup_paused"}`)
+	}))
+	defer upstream.Close()
+
+	server := New(Config{Upstream: upstream.URL, Slots: 4})
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/api/v1/messages/stream", nil))
+
+	if rec.Body.String() != `{"error":"signup_paused"}` {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+}
+
 func TestCopyFlushesAnEventStreamAndKeepsUpstreamHeaders(t *testing.T) {
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
