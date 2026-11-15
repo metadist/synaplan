@@ -175,6 +175,13 @@ flowchart LR
   the run, so a client that reloads can re-attach. The event names are an
   external contract: the web chat, the widget, the desktop and the mobile
   apps read them. A new event is a `feat:` with frontend work.
+- **Pump.** When `RUNTIME.STREAM_PUMP` is `all` and the percent selects the
+  turn, a signed-in web chat is queued and the request only copies frames.
+  The `pump` role runs the same orchestrator and writes those frames to
+  `chatrun:{id}:stream`. The switch is off until an operator turns it on.
+  Guests, widgets, incognito turns and the gateways stay in the request.
+  `SYNAPLAN_RELAY=1` sends the long routes to the watchdog, which copies
+  the same frames and checks the attach token.
 - **Stop.** `CancelledTurns` flags a turn the caller owns and stores the
   partial answer the client sends.
 ## Two worker pools

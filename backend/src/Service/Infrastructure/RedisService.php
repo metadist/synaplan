@@ -734,6 +734,36 @@ LUA;
         return $this->connectionFailure;
     }
 
+    /**
+     * The stored key, including the application prefix. A forked heartbeat
+     * writes this exact key through its own connection.
+     */
+    public function absoluteKey(string $key): string
+    {
+        return $this->prefix($key);
+    }
+
+    /**
+     * Entries of one stream with an id greater than $afterId.
+     * Waits up to $blockMs when the stream is quiet. Empty when Redis is down.
+     *
+     * @return list<array<mixed>>
+     */
+    public function readStream(string $key, string $afterId, int $blockMs): array
+    {
+        $client = $this->client();
+        if (null === $client) {
+            return [];
+        }
+        try {
+            return RedisStreamReader::entries($client->xread(32, max(1, $blockMs), [$this->prefix($key)], $afterId));
+        } catch (\Throwable $e) {
+            $this->logCommandFailure('XREAD', $key, $e);
+
+            return [];
+        }
+    }
+
     private function prefix(string $key): string
     {
         return $this->keyPrefix.$key;
