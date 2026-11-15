@@ -31,9 +31,6 @@ final class ProvidedWordBody
      */
     private const MIN_COVERAGE = 0.5;
 
-    /** A trailing instruction longer than this is body text, not a command. */
-    private const MAX_INSTRUCTION_CHARS = 240;
-
     private function __construct()
     {
     }
@@ -103,44 +100,47 @@ final class ProvidedWordBody
 
     private static function asksToShorten(string $text): bool
     {
-        if (1 === preg_match(
-            '/\b(summar(?:y|ize|ise)|kurzfassung|zusammenfass\w*|kuerze|kürze|shorten|condense|abstract)\b/iu',
-            $text,
-        )) {
+        foreach (preg_split('/\R/u', $text) ?: [] as $line) {
+            if (self::isShortenCommand($line)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * A command is its own line. A sentence that merely mentions an abstract
+     * or a summary is the document, not a request to shorten it.
+     */
+    private static function isShortenCommand(string $line): bool
+    {
+        $line = trim($line);
+        if ('' === $line) {
+            return false;
+        }
+        if (1 === preg_match('/^(?:please\s+|bitte\s+)?(?:summarize|summarise|shorten|condense|kürze|kuerze|zusammenfassen)\b/iu', $line)) {
             return true;
         }
 
-        return 1 === preg_match('/\bfasse?\b.{0,120}\bzusammen\b/ius', $text);
+        return 1 === preg_match('/^(?:please\s+|bitte\s+)?fasse?\b.{0,160}\bzusammen\b/iu', $line);
     }
 
     private static function trailingInstructionAsksToShorten(string $markdown): bool
     {
-        $paragraph = self::lastParagraph($markdown);
-        if ('' === $paragraph || mb_strlen($paragraph) > self::MAX_INSTRUCTION_CHARS) {
-            return false;
-        }
-        if (1 === preg_match('/^(#{1,6}[ \t]|[-*+][ \t]|\d+\.[ \t]|\|)/', $paragraph)) {
-            return false;
-        }
-
-        return self::asksToShorten($paragraph);
+        return self::isShortenCommand(self::lastNonEmptyLine($markdown));
     }
 
-    private static function lastParagraph(string $markdown): string
+    private static function lastNonEmptyLine(string $markdown): string
     {
-        $lines = preg_split('/\R/u', rtrim($markdown)) ?: [];
-        $tail = [];
+        $lines = preg_split('/\R/u', $markdown) ?: [];
         for ($i = count($lines) - 1; $i >= 0; --$i) {
-            if ('' === trim($lines[$i])) {
-                if ([] !== $tail) {
-                    break;
-                }
-                continue;
+            if ('' !== trim($lines[$i])) {
+                return trim($lines[$i]);
             }
-            $tail[] = trim($lines[$i]);
         }
 
-        return implode(' ', array_reverse($tail));
+        return '';
     }
 
     private static function shouldReplace(WordModel $current, WordModel $parsed): bool
@@ -298,23 +298,28 @@ final class ProvidedWordBody
 
     private static function stripInline(string $text): string
     {
+        $links = [];
         $text = preg_replace_callback(
             '/\[([^\]]+)\]\(([^)]*)\)/',
-            static function (array $match): string {
-                $label = trim($match[1]);
+            static function (array $match) use (&$links): string {
+                $label = self::stripEmphasis(trim($match[1]));
                 $url = trim($match[2]);
-                if ('' === $url || $label === $url) {
-                    return $label;
-                }
+                $token = "\x00".count($links)."\x00";
+                $links[$token] = '' === $url || $label === $url ? $label : $label.' ('.$url.')';
 
-                return $label.' ('.$url.')';
+                return $token;
             },
             $text,
         ) ?? $text;
+
+        return trim(strtr(self::stripEmphasis($text), $links));
+    }
+
+    private static function stripEmphasis(string $text): string
+    {
         $text = preg_replace('/\*\*(.+?)\*\*/', '$1', $text) ?? $text;
         $text = preg_replace('/__(.+?)__/', '$1', $text) ?? $text;
-        $text = str_replace('`', '', $text);
 
-        return trim($text);
+        return str_replace('`', '', $text);
     }
 }

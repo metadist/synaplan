@@ -10,6 +10,7 @@ use App\Service\Document\Persist\DocumentTextProjector;
 use App\Service\Document\ProvidedWordBody;
 use App\Service\Document\Render\DocxRenderer;
 use App\Service\Document\Tool\DocumentSession;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ProvidedWordBodyTest extends TestCase
@@ -176,18 +177,55 @@ final class ProvidedWordBodyTest extends TestCase
     {
         $session = $this->titleOnlySession();
         $body = "# Booking\n\n".str_repeat('Reserve the room before leaving. ', 12)
-            ."\n\nSee [Book hotel](https://example.com/booking) today.\n";
+            ."\n\nSee [Book hotel](https://example.com/booking) and [**Report**](https://example.com/reports/__draft__/latest) today.\n";
 
         self::assertTrue(ProvidedWordBody::restore($session, $body));
 
         $text = (new DocumentTextProjector())->project($session->model);
         self::assertStringContainsString('Book hotel (https://example.com/booking)', $text);
+        self::assertStringContainsString('Report (https://example.com/reports/__draft__/latest)', $text);
 
         $path = sys_get_temp_dir().'/provided-word-link-'.uniqid('', true).'.docx';
         (new DocxRenderer())->render($session->model, $path);
         $xml = $this->documentXml($path);
         @unlink($path);
         self::assertStringContainsString('https://example.com/booking', $xml);
+        self::assertStringContainsString('https://example.com/reports/__draft__/latest', $xml);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function trailingCommandProvider(): iterable
+    {
+        yield 'after long prose' => ['Summarize this into a one-paragraph Word document.'];
+        yield 'after a table' => ["| A | B |\n| --- | --- |\n| 1 | 2 |\nSummarize this into a one-paragraph Word document."];
+        yield 'after a list' => ["- one item\nSummarize this into a one-paragraph Word document."];
+    }
+
+    #[DataProvider('trailingCommandProvider')]
+    public function testACommandOnTheFinalLineStopsRecovery(string $tail): void
+    {
+        $session = $this->titleOnlySession();
+        $body = "# Report\n\n".str_repeat('Keep the full report in the file. ', 12)."\n".$tail;
+
+        self::assertFalse(ProvidedWordBody::restore($session, $body));
+        $word = $session->word();
+        self::assertInstanceOf(WordModel::class, $word);
+        self::assertCount(1, $word->blocks);
+    }
+
+    public function testAFinalSentenceAboutAnAbstractStaysInTheDocument(): void
+    {
+        $session = $this->titleOnlySession();
+        $body = "# Report\n\n".str_repeat('Keep the full report in the file. ', 12)
+            ."\nThe abstract is available on the project website.";
+
+        self::assertTrue(ProvidedWordBody::restore($session, $body));
+        self::assertStringContainsString(
+            'The abstract is available on the project website.',
+            (new DocumentTextProjector())->project($session->model),
+        );
     }
 
     private function titleOnlySession(): DocumentSession
