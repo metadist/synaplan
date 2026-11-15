@@ -75,6 +75,7 @@ final class PlatformBearerAttributionTest extends TestCase
         $identities->method('findForUserOnInstance')->willReturn([]);
         $identities->method('findOneByTriple')->willReturn(null);
         $identities->expects(self::once())->method('insertIfAbsent')->willReturn($row);
+        $identities->expects(self::once())->method('current')->willReturn($row);
         $effects = $this->createMock(LifecycleEffect::class);
         $effects->expects(self::once())->method('onResumed')->with($row);
         $audit = $this->createMock(AuditLogWriter::class);
@@ -91,6 +92,9 @@ final class PlatformBearerAttributionTest extends TestCase
             ],
         );
         $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work(),
+        );
         $entityManager->expects(self::once())->method('flush');
 
         $this->attribution($identities, $entityManager, $effects, $audit)->attribute($this->user(4), [
@@ -99,6 +103,37 @@ final class PlatformBearerAttributionTest extends TestCase
         ]);
 
         self::assertSame(ExternalIdentity::STATUS_ACTIVE, $row->getStatus());
+    }
+
+    public function testAnOffRowIsNotTurnedBackOn(): void
+    {
+        $row = new ExternalIdentity();
+        $row->setUserId(4);
+        $row->setStatus(ExternalIdentity::STATUS_REVOKED);
+        $id = new \ReflectionProperty(ExternalIdentity::class, 'id');
+        $id->setValue($row, 91);
+
+        $identities = $this->createMock(ExternalIdentityRepository::class);
+        $identities->method('findForUserOnInstance')->willReturn([]);
+        $identities->method('findOneByTriple')->willReturn(null);
+        $identities->method('insertIfAbsent')->willReturn($row);
+        $identities->expects(self::once())->method('current')->willReturn($row);
+        $effects = $this->createMock(LifecycleEffect::class);
+        $effects->expects(self::never())->method('onResumed');
+        $audit = $this->createMock(AuditLogWriter::class);
+        $audit->expects(self::never())->method('record');
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('wrapInTransaction')->willReturnCallback(
+            static fn (callable $work): mixed => $work(),
+        );
+        $entityManager->expects(self::never())->method('flush');
+
+        $this->attribution($identities, $entityManager, $effects, $audit)->attribute($this->user(4), [
+            'azp' => 'synaplan-opencloud',
+            'sub' => 'person-1',
+        ]);
+
+        self::assertSame(ExternalIdentity::STATUS_REVOKED, $row->getStatus());
     }
 
     private function attribution(

@@ -160,14 +160,24 @@ final readonly class PlatformBearerAttribution
         if (!$row instanceof ExternalIdentity) {
             return;
         }
-        $row->setStatus(ExternalIdentity::STATUS_ACTIVE);
-        $this->entityManager->flush();
-        $this->effects->onResumed($row);
-        $this->audit->record((int) $user->getId(), 'platform_link.bound', 'platform_link', (string) $row->getId(), [
-            'client' => $instance->getClient(),
-            'host' => $instance->getHost(),
-            'external_id' => $externalId,
-            'mode' => ExternalIdentity::MODE_SSO,
-        ]);
+        // The insert commits before this read. A disable or revoke can land
+        // in between; a current read sees that, and an off row is not turned
+        // back on, resumed or audited. The insert already stores a new link
+        // as active, so this only repeats that for the winner.
+        $this->entityManager->wrapInTransaction(function () use ($user, $instance, $externalId): void {
+            $current = $this->identities->current($instance->getClient(), $instance->getInstanceId(), $externalId);
+            if (!$current instanceof ExternalIdentity || $current->isOff()) {
+                return;
+            }
+            $current->setStatus(ExternalIdentity::STATUS_ACTIVE);
+            $this->entityManager->flush();
+            $this->effects->onResumed($current);
+            $this->audit->record((int) $user->getId(), 'platform_link.bound', 'platform_link', (string) $current->getId(), [
+                'client' => $instance->getClient(),
+                'host' => $instance->getHost(),
+                'external_id' => $externalId,
+                'mode' => ExternalIdentity::MODE_SSO,
+            ]);
+        });
     }
 }

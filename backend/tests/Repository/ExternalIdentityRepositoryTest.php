@@ -7,6 +7,7 @@ namespace App\Tests\Repository;
 use App\Entity\ExternalIdentity;
 use App\Repository\ExternalIdentityRepository;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\ParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
@@ -69,20 +70,27 @@ final class ExternalIdentityRepositoryTest extends KernelTestCase
         self::assertSame(1, $this->countTriples($source, $instanceId, $externalId));
     }
 
-    public function testALostInsertAdoptsAnOlderRowWithoutChangingItsStatus(): void
+    public function testALostInsertDoesNotTakeAnotherUsersOlderRow(): void
     {
         [$source, $instanceId, $externalId] = $this->triple();
         $created = $this->repository()->upsert(41, $source, $externalId, $instanceId, 9, ExternalIdentity::MODE_SSO);
-        $this->stamp($created, time() - 120, 41, ExternalIdentity::MODE_SSO, ExternalIdentity::STATUS_REVOKED, 9);
-        $before = time();
+        $seen = time() - 120;
+        $this->stamp($created, $seen, 41, ExternalIdentity::MODE_SSO, ExternalIdentity::STATUS_REVOKED, 9);
 
-        $adopted = $this->repositoryThatMissesTheFirstLookup()->upsert(42, $source, $externalId, $instanceId);
+        $kept = $this->repositoryThatMissesTheFirstLookup()->upsert(
+            42,
+            $source,
+            $externalId,
+            $instanceId,
+            55,
+            ExternalIdentity::MODE_LINK,
+        );
 
-        self::assertSame(42, $adopted->getUserId());
-        self::assertSame(ExternalIdentity::MODE_SSO, $adopted->getMode());
-        self::assertSame(9, $adopted->getApiKeyId());
-        self::assertSame(ExternalIdentity::STATUS_REVOKED, $adopted->getStatus());
-        self::assertGreaterThanOrEqual($before, $adopted->getLastSeen());
+        self::assertSame(41, $kept->getUserId());
+        self::assertSame(ExternalIdentity::MODE_SSO, $kept->getMode());
+        self::assertSame(9, $kept->getApiKeyId());
+        self::assertSame(ExternalIdentity::STATUS_REVOKED, $kept->getStatus());
+        self::assertSame($seen, $kept->getLastSeen());
         self::assertSame(1, $this->countTriples($source, $instanceId, $externalId));
     }
 
@@ -104,6 +112,46 @@ final class ExternalIdentityRepositoryTest extends KernelTestCase
         self::assertSame(ExternalIdentity::STATUS_REVOKED, $stored->getStatus());
         self::assertSame($seen, $stored->getLastSeen());
         self::assertSame(1, $this->countTriples($source, $instanceId, $externalId));
+    }
+
+    public function testARepeatableReadSnapshotStillReadsTheRowAnotherConnectionCommitted(): void
+    {
+        [$source, $instanceId, $externalId] = $this->triple();
+        $seen = time() - 30;
+        self::assertNull($this->repository()->findOneByTriple($source, $instanceId, $externalId));
+
+        $other = $this->otherConnection();
+        try {
+            $other->insert('BEXTERNALIDENTITIES', [
+                'BUSERID' => 41,
+                'BSOURCE' => $source,
+                'BINSTANCEID' => $instanceId,
+                'BEXTERNALID' => $externalId,
+                'BAPIKEYID' => 9,
+                'BMODE' => ExternalIdentity::MODE_SSO,
+                'BSTATUS' => ExternalIdentity::STATUS_REVOKED,
+                'BCREATED' => $seen,
+                'BLASTSEEN' => $seen,
+            ], [
+                'BUSERID' => ParameterType::INTEGER,
+                'BAPIKEYID' => ParameterType::INTEGER,
+                'BCREATED' => ParameterType::INTEGER,
+                'BLASTSEEN' => ParameterType::INTEGER,
+            ]);
+
+            $kept = $this->repository()->upsert(42, $source, $externalId, $instanceId, 55, ExternalIdentity::MODE_LINK);
+
+            self::assertSame(41, $kept->getUserId());
+            self::assertSame(ExternalIdentity::MODE_SSO, $kept->getMode());
+            self::assertSame(9, $kept->getApiKeyId());
+            self::assertSame(ExternalIdentity::STATUS_REVOKED, $kept->getStatus());
+            self::assertSame($seen, $kept->getLastSeen());
+        } finally {
+            // The committed insert outlives this test's transaction. Deleting it
+            // from here waits on the transaction's index lock, so the unique
+            // key is left for the database to drop with the test schema.
+            $other->close();
+        }
     }
 
     private function repository(): ExternalIdentityRepository
@@ -141,6 +189,26 @@ final class ExternalIdentityRepositoryTest extends KernelTestCase
         );
 
         return $repository;
+    }
+
+    private function otherConnection(): Connection
+    {
+        $connection = static::getContainer()->get(Connection::class);
+        self::assertInstanceOf(Connection::class, $connection);
+        $params = $connection->getParams();
+        $other = DriverManager::getConnection([
+            'driver' => is_string($params['driver'] ?? null) ? $params['driver'] : 'pdo_mysql',
+            'host' => $params['host'] ?? 'db',
+            'port' => $params['port'] ?? 3306,
+            'user' => $params['user'] ?? '',
+            'password' => $params['password'] ?? '',
+            'dbname' => $params['dbname'] ?? '',
+            'charset' => 'utf8mb4',
+        ]);
+        self::assertInstanceOf(Connection::class, $other);
+        $other->executeStatement('SET innodb_lock_wait_timeout = 5');
+
+        return $other;
     }
 
     /** @return array{string, string, string} */

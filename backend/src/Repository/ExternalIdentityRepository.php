@@ -6,6 +6,8 @@ namespace App\Repository;
 
 use App\Entity\ExternalIdentity;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\DBAL\LockMode;
 use Doctrine\DBAL\ParameterType;
@@ -102,9 +104,10 @@ class ExternalIdentityRepository extends ServiceEntityRepository
      * owner's key, while the new owner would not see the link at all.
      *
      * A row that appears between the lookup and the insert is a lost race.
-     * That row is adopted only when this observation is strictly newer than
-     * its `lastSeen`. An equal or newer stored timestamp keeps the owner,
-     * the mode, the key and the status that are already written.
+     * The winner is returned unchanged: owner, mode, key, status and
+     * `lastSeen` stay as the first writer left them. A later call that can
+     * already see the row is the intentional update, and that path still
+     * re-owns. Freshness is not a licence for the loser to take the row.
      */
     public function upsert(
         int $userId,
@@ -125,16 +128,12 @@ class ExternalIdentityRepository extends ServiceEntityRepository
         try {
             $this->insertRow($userId, $source, $externalId, $instanceId, $apiKeyId, $mode, $now);
         } catch (UniqueConstraintViolationException) {
-            $identity = $this->adoptIfFresher(
-                $this->requireByTriple($source, $instanceId, $externalId),
-                $userId,
-                $apiKeyId,
-                $mode,
-                $now,
-            );
-            $this->getEntityManager()->flush();
+            $winner = $this->current($source, $instanceId, $externalId);
+            if ($winner instanceof ExternalIdentity) {
+                return $winner;
+            }
 
-            return $identity;
+            throw new \RuntimeException(sprintf('External identity "%s" / "%s" / "%s" was written but could not be read back.', $source, $instanceId, $externalId));
         }
 
         $created = $this->requireByTriple($source, $instanceId, $externalId);
@@ -187,44 +186,130 @@ class ExternalIdentityRepository extends ServiceEntityRepository
     }
 
     /**
-     * The unique key already holds a row. Replace its owner only when
-     * `$lastSeen` is strictly newer than the stored one, so a same-second
-     * burst cannot clobber the first writer and an older observation cannot
-     * move `lastSeen` backwards.
+     * The latest committed row for this triple.
+     *
+     * Read on a new connection. This transaction may already have a REPEATABLE
+     * READ snapshot from the lookup that missed the row, and on MariaDB a
+     * locking read of a row committed after that snapshot raises
+     * "Record has changed since last read" instead of returning it. The new
+     * connection has no snapshot, so the request that lost the insert sees
+     * the winner. The entity is registered here so a later flush updates it.
      */
-    private function adoptIfFresher(
-        ExternalIdentity $identity,
-        int $userId,
-        ?int $apiKeyId,
-        ?string $mode,
-        int $lastSeen,
-    ): ExternalIdentity {
-        $statement = $this->getEntityManager()->getConnection()->prepare(
-            <<<'SQL'
-                UPDATE BEXTERNALIDENTITIES
-                SET BUSERID = :userId,
-                    BLASTSEEN = :lastSeen,
-                    BAPIKEYID = CASE WHEN :setKey = 1 THEN :apiKeyId ELSE BAPIKEYID END,
-                    BMODE = CASE WHEN :setMode = 1 THEN :mode ELSE BMODE END
-                WHERE BSOURCE = :source
-                  AND BINSTANCEID = :instanceId
-                  AND BEXTERNALID = :externalId
-                  AND BLASTSEEN < :lastSeen
-                SQL,
-        );
-        $statement->bindValue('userId', $userId, ParameterType::INTEGER);
-        $statement->bindValue('lastSeen', $lastSeen, ParameterType::INTEGER);
-        $statement->bindValue('setKey', null === $apiKeyId ? 0 : 1, ParameterType::INTEGER);
-        $statement->bindValue('apiKeyId', $apiKeyId, null === $apiKeyId ? ParameterType::NULL : ParameterType::INTEGER);
-        $statement->bindValue('setMode', null === $mode ? 0 : 1, ParameterType::INTEGER);
-        $statement->bindValue('mode', $mode, null === $mode ? ParameterType::NULL : ParameterType::STRING);
-        $statement->bindValue('source', $identity->getSource());
-        $statement->bindValue('instanceId', $identity->getInstanceId());
-        $statement->bindValue('externalId', $identity->getExternalId());
-        $statement->executeStatement();
-        $this->getEntityManager()->refresh($identity);
+    public function current(string $source, string $instanceId, string $externalId): ?ExternalIdentity
+    {
+        $row = $this->fetchCurrent($source, $instanceId, $externalId);
+        if (is_array($row)) {
+            return $this->manageCurrent($row);
+        }
+
+        // The winner may be an uncommitted insert of this transaction. A new
+        // connection cannot see that, and this transaction can.
+        return $this->findOneByTriple($source, $instanceId, $externalId);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchCurrent(string $source, string $instanceId, string $externalId): ?array
+    {
+        $fresh = $this->freshConnection();
+        try {
+            $row = $fresh->fetchAssociative(
+                'SELECT BID, BUSERID, BSOURCE, BINSTANCEID, BEXTERNALID, BAPIKEYID, BMODE, BSTATUS, BREVOKEDAT, BCREATED, BLASTSEEN, BREADSCOPE
+                 FROM BEXTERNALIDENTITIES
+                 WHERE BSOURCE = :source AND BINSTANCEID = :instanceId AND BEXTERNALID = :externalId',
+                ['source' => $source, 'instanceId' => $instanceId, 'externalId' => $externalId],
+            );
+        } finally {
+            $fresh->close();
+        }
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function manageCurrent(array $row): ExternalIdentity
+    {
+        $id = (int) $row['BID'];
+        $known = $this->getEntityManager()->getUnitOfWork()->tryGetById(['id' => $id], ExternalIdentity::class);
+        $identity = $known instanceof ExternalIdentity ? $known : new ExternalIdentity();
+        $this->applyRow($identity, $row);
+        $original = $this->originalData($identity);
+        $unitOfWork = $this->getEntityManager()->getUnitOfWork();
+        if ($known instanceof ExternalIdentity) {
+            $unitOfWork->setOriginalEntityData($identity, $original);
+
+            return $identity;
+        }
+
+        $unitOfWork->registerManaged($identity, ['id' => $id], $original);
 
         return $identity;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function applyRow(ExternalIdentity $identity, array $row): void
+    {
+        $this->write($identity, 'id', (int) $row['BID']);
+        $identity->setUserId((int) $row['BUSERID']);
+        $identity->setSource((string) $row['BSOURCE']);
+        $identity->setInstanceId((string) $row['BINSTANCEID']);
+        $identity->setExternalId((string) $row['BEXTERNALID']);
+        $identity->setApiKeyId(null === $row['BAPIKEYID'] ? null : (int) $row['BAPIKEYID']);
+        $identity->setMode(null === $row['BMODE'] ? null : (string) $row['BMODE']);
+        $identity->setStatus((string) $row['BSTATUS']);
+        $identity->setRevokedAt(null === $row['BREVOKEDAT'] ? null : (int) $row['BREVOKEDAT']);
+        $this->write($identity, 'created', (int) $row['BCREATED']);
+        $identity->setLastSeen((int) $row['BLASTSEEN']);
+        $this->write($identity, 'readScope', null === $row['BREADSCOPE'] ? null : (string) $row['BREADSCOPE']);
+    }
+
+    private function write(ExternalIdentity $identity, string $property, mixed $value): void
+    {
+        $field = new \ReflectionProperty(ExternalIdentity::class, $property);
+        $field->setValue($identity, $value);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function originalData(ExternalIdentity $identity): array
+    {
+        $readScope = new \ReflectionProperty(ExternalIdentity::class, 'readScope');
+
+        return [
+            'id' => $identity->getId(),
+            'userId' => $identity->getUserId(),
+            'source' => $identity->getSource(),
+            'instanceId' => $identity->getInstanceId(),
+            'externalId' => $identity->getExternalId(),
+            'apiKeyId' => $identity->getApiKeyId(),
+            'mode' => $identity->getMode(),
+            'status' => $identity->getStatus(),
+            'revokedAt' => $identity->getRevokedAt(),
+            'created' => $identity->getCreated(),
+            'lastSeen' => $identity->getLastSeen(),
+            'readScope' => $readScope->getValue($identity),
+        ];
+    }
+
+    private function freshConnection(): Connection
+    {
+        $params = $this->getEntityManager()->getConnection()->getParams();
+
+        return DriverManager::getConnection([
+            'driver' => is_string($params['driver'] ?? null) ? $params['driver'] : 'pdo_mysql',
+            'host' => $params['host'] ?? 'db',
+            'port' => $params['port'] ?? 3306,
+            'user' => $params['user'] ?? '',
+            'password' => $params['password'] ?? '',
+            'dbname' => $params['dbname'] ?? '',
+            'charset' => 'utf8mb4',
+        ]);
     }
 
     private function insertRow(
