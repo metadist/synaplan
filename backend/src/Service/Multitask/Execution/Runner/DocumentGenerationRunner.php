@@ -71,6 +71,12 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             return NodeResult::failed('no prompt for document_generation');
         }
 
+        // Recovery compares the Word file with this text only. Format rules and
+        // assistant instructions are appended afterwards for the model; they
+        // are not part of the document, and neither is attachment text the
+        // chat assembler adds when it builds the turn.
+        $documentBody = $prompt;
+
         // A format named in the ORIGINAL request ("als Excel") wins even when
         // the planner's prompt no longer mentions it. Appending the directive
         // keeps the envelope consistent; GeneratedDocumentStore enforces the
@@ -114,7 +120,10 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             'language' => $language,
         ];
 
-        $options = ['disable_memories' => true];
+        $options = [
+            'disable_memories' => true,
+            'document_body' => $documentBody,
+        ];
         $upstreamImages = $this->upstreamImagePaths($node, $context, $inputs);
         if ([] !== $upstreamImages) {
             // Hand the pictures produced by an upstream node to the officemaker

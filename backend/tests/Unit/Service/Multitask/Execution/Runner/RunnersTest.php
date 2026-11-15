@@ -1614,6 +1614,47 @@ final class RunnersTest extends TestCase
         self::assertStringContainsString('file envelope only', (string) $text);
     }
 
+    public function testDocumentGenerationBoundsRecoveryToThePlan(): void
+    {
+        $handler = $this->createMock(ChatHandler::class);
+        $text = null;
+        $options = null;
+        $handler->method('handle')->willReturnCallback(function ($msg, $thread, $classification, $progress, $opts) use (&$text, &$options): array {
+            $text = $msg->getText();
+            $options = $opts;
+
+            return ['metadata' => ['generated_file' => ['filename' => 'document.docx', 'path' => '01/document.docx']]];
+        });
+        $plan = "Create a Word document containing the following German text:\n# Reiseplan\n\n".str_repeat('Flug nach Rio und weiter nach Nova Odessa. ', 8);
+        $profile = new RuntimeProfile(
+            promptId: 1,
+            promptTopic: 'agent:monitor',
+            systemPrompt: 'Daily report template: weekday and count.',
+            modelIds: [],
+            ragScopes: [],
+            toolFlags: [],
+            skillAllow: null,
+            skillDeny: null,
+            parameters: [],
+            agentId: 4,
+        );
+
+        $result = (new DocumentGenerationRunner($handler, $this->createMock(LoggerInterface::class), $this->createMock(UnreadSourceGuard::class)))->run(
+            new TaskNode('n1', Capability::DocumentGeneration, [], ['prompt' => $plan]),
+            new NodeContext($this->message('put the plan into a Word document'), [], 1, [
+                'language' => 'en',
+                'runtime_profile' => $profile,
+            ]),
+        );
+
+        self::assertTrue($result->isSuccessful());
+        self::assertSame($plan, $options['document_body'] ?? null);
+        self::assertStringContainsString('The file MUST be a .docx file', (string) $text);
+        self::assertStringContainsString('file envelope only', (string) $text);
+        self::assertStringNotContainsString('The file MUST', (string) $options['document_body']);
+        self::assertStringNotContainsString('file envelope only', (string) $options['document_body']);
+    }
+
     /**
      * #1382: the picture an upstream image node just rendered must reach the
      * officemaker prompt, otherwise the document node can only guess a marker.

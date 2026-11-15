@@ -57,7 +57,7 @@ final readonly class ChatReplyGenerator
         if ($capture) {
             $this->transcripts->enable();
         }
-        $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $turn->message, $aiOptions, $progressCallback, !empty($options['incognito']));
+        $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $turn->message, $this->withDocumentBody($aiOptions, $turn), $progressCallback, !empty($options['incognito']));
         if (null !== $documentEdit) {
             $this->transcripts->seal();
 
@@ -162,7 +162,7 @@ final readonly class ChatReplyGenerator
         if ($capture) {
             $this->transcripts->enable();
         }
-        $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $message, $aiOptions, $progressCallback, $incognito);
+        $documentEdit = $this->documents->tryToolsEdit($turn->topic(), $model->modelId, $messages, $message, $this->withDocumentBody($aiOptions, $turn), $progressCallback, $incognito);
         if (null !== $documentEdit) {
             $metadata = self::chosenModelMetadata($model, $documentEdit->usage, $documentEdit->facadeMetered, $documentEdit->facadeChargedCost, $documentEdit->facadePriceKnown);
             $this->documents->applyEditResult($documentEdit, $message, $metadata);
@@ -281,6 +281,25 @@ final readonly class ChatReplyGenerator
         ]);
 
         throw new ProviderException('The AI model returned an empty response. Please try again or select a different model.', $provider, ['model' => $model]);
+    }
+
+    /**
+     * The document step stored the plan before format rules and assistant
+     * instructions were appended. Recovery reads that string; the provider
+     * options stay free of it.
+     *
+     * @param array<string, mixed> $aiOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function withDocumentBody(array $aiOptions, ChatTurn $turn): array
+    {
+        $body = $turn->options['document_body'] ?? null;
+        if (is_string($body) && '' !== trim($body)) {
+            $aiOptions['document_body'] = $body;
+        }
+
+        return $aiOptions;
     }
 
     /**

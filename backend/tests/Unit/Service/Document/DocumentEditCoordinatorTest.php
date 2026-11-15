@@ -135,10 +135,10 @@ final class DocumentEditCoordinatorTest extends TestCase
         $result = $coordinator->run(
             [
                 ['role' => 'system', 'content' => 'tools'],
-                ['role' => 'user', 'content' => $prompt],
+                ['role' => 'user', 'content' => $prompt."\n\n\n---\n\n\nUser provided 1 file(s):\n\nHuge reference material that must stay out of the document."],
             ],
             $message,
-            [],
+            ['document_body' => $prompt],
         );
 
         self::assertNotNull($result);
@@ -148,6 +148,7 @@ final class DocumentEditCoordinatorTest extends TestCase
         self::assertStringContainsString('Flug nach Rio de Janeiro am 12.', $text);
         self::assertStringContainsString('Landung am internationalen Flughafen', $text);
         self::assertStringNotContainsString('**', $text);
+        self::assertStringNotContainsString('Huge reference', $text);
     }
 
     private function coordinator(DocumentToolsConfig $config): DocumentEditCoordinator

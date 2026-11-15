@@ -15,8 +15,9 @@ use App\Service\Document\Tool\DocumentSession;
  *
  * Document tools insert one block per call. A model that stops after the
  * heading still counts as a successful edit, and the file is saved from that
- * heading alone — the body that was sitting in the user message never reaches
- * the page. This restores that body before the file is written. An edit of an
+ * heading alone. The caller passes the plan itself — not the assembled chat
+ * turn — so attachment text and generation rules are not copied into the
+ * file and cannot make a finished document look incomplete. An edit of an
  * existing file is left alone, and so is a request to shorten the text.
  */
 final class ProvidedWordBody
@@ -30,20 +31,20 @@ final class ProvidedWordBody
      */
     private const MIN_COVERAGE = 0.5;
 
+    /** A trailing instruction longer than this is body text, not a command. */
+    private const MAX_INSTRUCTION_CHARS = 240;
+
     private function __construct()
     {
     }
 
-    /**
-     * @param list<array<string, mixed>> $messages
-     */
-    public static function restore(DocumentSession $session, array $messages): bool
+    public static function restore(DocumentSession $session, string $documentBody): bool
     {
         if (null !== $session->fileId || null === $session->word()) {
             return false;
         }
 
-        $markdown = self::markdownFromMessages($messages);
+        $markdown = self::markdownFromBody($documentBody);
         if (null === $markdown) {
             return false;
         }
@@ -58,47 +59,88 @@ final class ProvidedWordBody
         return true;
     }
 
-    /**
-     * @param list<array<string, mixed>> $messages
-     */
-    private static function markdownFromMessages(array $messages): ?string
+    private static function markdownFromBody(string $text): ?string
     {
-        $text = null;
-        foreach ($messages as $message) {
-            if ('user' !== ($message['role'] ?? null)) {
-                continue;
-            }
-            $flat = self::flatten($message['content'] ?? null);
-            if ('' !== trim($flat)) {
-                $text = $flat;
-            }
-        }
-        if (null === $text) {
-            return null;
-        }
-
-        $text = self::unwrapChannelEnvelope($text);
+        $text = self::unwrapChannelEnvelope(self::stripTurnScaffolding($text));
         if (1 !== preg_match('/^#{1,6}[ \t]+\S/m', $text, $match, PREG_OFFSET_CAPTURE)) {
             return null;
         }
 
         $offset = $match[0][1];
         $preamble = substr($text, 0, $offset);
-        if (self::asksToShorten($preamble)) {
+        $markdown = trim(substr($text, $offset));
+        if ('' === $markdown || self::asksToShorten($preamble) || self::trailingInstructionAsksToShorten($markdown)) {
             return null;
         }
 
-        $markdown = trim(substr($text, $offset));
-
-        return '' === $markdown ? null : $markdown;
+        return $markdown;
     }
 
-    private static function asksToShorten(string $preamble): bool
+    /**
+     * Format rules, assistant instructions and the assembler's attachment
+     * block are appended after the plan. They are not document content.
+     */
+    private static function stripTurnScaffolding(string $text): string
     {
-        return 1 === preg_match(
+        $previous = null;
+        while ($previous !== $text) {
+            $previous = $text;
+            $text = preg_replace(
+                '/\n+The file MUST be a \.[a-z0-9]+ file \(the user explicitly asked for this format\)\.\s*$/i',
+                '',
+                $text,
+            ) ?? $text;
+            $text = preg_replace(
+                '/\n+Follow these assistant instructions for the file content\. Still answer with the file envelope only\.\n.*\z/s',
+                '',
+                $text,
+            ) ?? $text;
+            $text = preg_replace('/\n+---\s*\n+User provided\b.*\z/s', '', $text) ?? $text;
+        }
+
+        return $text;
+    }
+
+    private static function asksToShorten(string $text): bool
+    {
+        if (1 === preg_match(
             '/\b(summar(?:y|ize|ise)|kurzfassung|zusammenfass\w*|kuerze|kürze|shorten|condense|abstract)\b/iu',
-            $preamble,
-        );
+            $text,
+        )) {
+            return true;
+        }
+
+        return 1 === preg_match('/\bfasse?\b.{0,120}\bzusammen\b/ius', $text);
+    }
+
+    private static function trailingInstructionAsksToShorten(string $markdown): bool
+    {
+        $paragraph = self::lastParagraph($markdown);
+        if ('' === $paragraph || mb_strlen($paragraph) > self::MAX_INSTRUCTION_CHARS) {
+            return false;
+        }
+        if (1 === preg_match('/^(#{1,6}[ \t]|[-*+][ \t]|\d+\.[ \t]|\|)/', $paragraph)) {
+            return false;
+        }
+
+        return self::asksToShorten($paragraph);
+    }
+
+    private static function lastParagraph(string $markdown): string
+    {
+        $lines = preg_split('/\R/u', rtrim($markdown)) ?: [];
+        $tail = [];
+        for ($i = count($lines) - 1; $i >= 0; --$i) {
+            if ('' === trim($lines[$i])) {
+                if ([] !== $tail) {
+                    break;
+                }
+                continue;
+            }
+            $tail[] = trim($lines[$i]);
+        }
+
+        return implode(' ', array_reverse($tail));
     }
 
     private static function shouldReplace(WordModel $current, WordModel $parsed): bool
@@ -119,27 +161,6 @@ final class ProvidedWordBody
         $collapsed = preg_replace('/\s+/u', '', $text) ?? $text;
 
         return mb_strlen($collapsed);
-    }
-
-    private static function flatten(mixed $content): string
-    {
-        if (is_string($content)) {
-            return $content;
-        }
-        if (!is_array($content)) {
-            return '';
-        }
-
-        $parts = [];
-        foreach ($content as $part) {
-            if (is_string($part)) {
-                $parts[] = $part;
-            } elseif (is_array($part) && is_string($part['text'] ?? null)) {
-                $parts[] = $part['text'];
-            }
-        }
-
-        return implode("\n", $parts);
     }
 
     /**
@@ -261,18 +282,35 @@ final class ProvidedWordBody
      */
     private static function tableCells(string $line): array
     {
-        $trimmed = trim($line, " \t|");
-        $cells = explode('|', $trimmed);
+        $trimmed = trim($line);
+        if (str_starts_with($trimmed, '|')) {
+            $trimmed = substr($trimmed, 1);
+        }
+        if (str_ends_with($trimmed, '|')) {
+            $trimmed = substr($trimmed, 0, -1);
+        }
 
         return array_map(
             static fn (string $cell): string => self::stripInline(trim($cell)),
-            $cells,
+            explode('|', $trimmed),
         );
     }
 
     private static function stripInline(string $text): string
     {
-        $text = preg_replace('/\[([^\]]+)\]\([^)]*\)/', '$1', $text) ?? $text;
+        $text = preg_replace_callback(
+            '/\[([^\]]+)\]\(([^)]*)\)/',
+            static function (array $match): string {
+                $label = trim($match[1]);
+                $url = trim($match[2]);
+                if ('' === $url || $label === $url) {
+                    return $label;
+                }
+
+                return $label.' ('.$url.')';
+            },
+            $text,
+        ) ?? $text;
         $text = preg_replace('/\*\*(.+?)\*\*/', '$1', $text) ?? $text;
         $text = preg_replace('/__(.+?)__/', '$1', $text) ?? $text;
         $text = str_replace('`', '', $text);

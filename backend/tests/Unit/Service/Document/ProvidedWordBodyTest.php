@@ -91,13 +91,103 @@ final class ProvidedWordBodyTest extends TestCase
             'BTEXT' => "Create a Word document containing the following text:\n".self::PLAN,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
 
-        self::assertTrue(ProvidedWordBody::restore($session, [
-            ['role' => 'user', 'content' => $envelope],
-        ]));
+        self::assertTrue(ProvidedWordBody::restore($session, $envelope));
         self::assertStringContainsString(
             'Überblick',
             (new DocumentTextProjector())->project($session->model),
         );
+    }
+
+    public function testScaffoldingAfterThePlanIsNotCopiedIntoTheFile(): void
+    {
+        $session = $this->titleOnlySession();
+        $noise = self::PLAN
+            ."\n\nThe file MUST be a .docx file (the user explicitly asked for this format)."
+            ."\n\nFollow these assistant instructions for the file content. Still answer with the file envelope only.\nBe brief."
+            ."\n\n\n---\n\n\nUser provided 1 file(s):\n\n# Attachment\n\nHuge reference material that must stay out of the document.";
+
+        self::assertTrue(ProvidedWordBody::restore($session, $this->request($noise)));
+
+        $text = (new DocumentTextProjector())->project($session->model);
+        self::assertStringContainsString('Überblick', $text);
+        self::assertStringNotContainsString('The file MUST', $text);
+        self::assertStringNotContainsString('file envelope only', $text);
+        self::assertStringNotContainsString('Huge reference', $text);
+    }
+
+    public function testAFinishedPlanIsNotReplacedBecauseAReferenceIsLonger(): void
+    {
+        $session = $this->titleOnlySession();
+        self::assertTrue(ProvidedWordBody::restore($session, $this->request(self::PLAN)));
+        $kept = (new DocumentTextProjector())->project($session->model);
+
+        $polluted = $this->request(self::PLAN)
+            ."\n\n\n---\n\n\nUser provided 1 file(s):\n\n".str_repeat('Huge reference material. ', 80);
+
+        self::assertFalse(ProvidedWordBody::restore($session, $polluted));
+        self::assertSame($kept, (new DocumentTextProjector())->project($session->model));
+    }
+
+    public function testAShorteningInstructionAfterThePlanIsKept(): void
+    {
+        $session = $this->titleOnlySession();
+        $prompt = self::PLAN."\n\nSummarize this into a one-paragraph Word document.";
+
+        self::assertFalse(ProvidedWordBody::restore($session, $this->request($prompt)));
+        $word = $session->word();
+        self::assertInstanceOf(WordModel::class, $word);
+        self::assertCount(1, $word->blocks);
+    }
+
+    public function testASeparatedGermanSummaryInstructionIsKept(): void
+    {
+        $session = $this->titleOnlySession();
+        $prompt = "Fasse den folgenden Plan zusammen und erstelle ein Word-Dokument.\n".self::PLAN;
+
+        self::assertFalse(ProvidedWordBody::restore($session, $this->request($prompt)));
+        $word = $session->word();
+        self::assertInstanceOf(WordModel::class, $word);
+        self::assertCount(1, $word->blocks);
+    }
+
+    public function testEmptyEdgeCellsKeepTheirColumn(): void
+    {
+        $session = $this->titleOnlySession();
+        $table = "# Hotels\n\n".str_repeat('A note about the stay that pads the body. ', 12)."\n\n"
+            ."| | Travel note | |\n| --- | --- | --- |\n| | Pack light | |\n";
+
+        self::assertTrue(ProvidedWordBody::restore($session, $table));
+
+        $rows = null;
+        $word = $session->word();
+        self::assertInstanceOf(WordModel::class, $word);
+        foreach ($word->blocks as $block) {
+            if (WordBlock::TYPE_TABLE === $block->type) {
+                $rows = $block->payload['rows'];
+            }
+        }
+        self::assertSame([
+            ['', 'Travel note', ''],
+            ['', 'Pack light', ''],
+        ], $rows);
+    }
+
+    public function testMarkdownLinksKeepTheirDestination(): void
+    {
+        $session = $this->titleOnlySession();
+        $body = "# Booking\n\n".str_repeat('Reserve the room before leaving. ', 12)
+            ."\n\nSee [Book hotel](https://example.com/booking) today.\n";
+
+        self::assertTrue(ProvidedWordBody::restore($session, $body));
+
+        $text = (new DocumentTextProjector())->project($session->model);
+        self::assertStringContainsString('Book hotel (https://example.com/booking)', $text);
+
+        $path = sys_get_temp_dir().'/provided-word-link-'.uniqid('', true).'.docx';
+        (new DocxRenderer())->render($session->model, $path);
+        $xml = $this->documentXml($path);
+        @unlink($path);
+        self::assertStringContainsString('https://example.com/booking', $xml);
     }
 
     private function titleOnlySession(): DocumentSession
@@ -113,15 +203,9 @@ final class ProvidedWordBodyTest extends TestCase
         return $session;
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function request(string $prompt): array
+    private function request(string $prompt): string
     {
-        return [
-            ['role' => 'system', 'content' => 'tools'],
-            ['role' => 'user', 'content' => "Create a Word document (DOCX) containing the following German text:\n".$prompt],
-        ];
+        return "Create a Word document (DOCX) containing the following German text:\n".$prompt;
     }
 
     private function documentXml(string $path): string

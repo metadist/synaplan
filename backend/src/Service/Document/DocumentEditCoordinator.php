@@ -98,7 +98,7 @@ final readonly class DocumentEditCoordinator
             return new DocumentEditResult($loopResult->content, null, $session->operations, $loopResult->usage, null, $fidelityLossy, $loopResult->facadeMetered, $loopResult->facadeChargedCost, $loopResult->facadePriceKnown);
         }
 
-        if (ProvidedWordBody::restore($session, $messages)) {
+        if (ProvidedWordBody::restore($session, $this->documentBody($options, $message))) {
             $this->logger->info(
                 'DocumentEditCoordinator: tool loop kept only part of the provided text; the Word file uses the full text from the request',
             );
@@ -118,6 +118,22 @@ final readonly class DocumentEditCoordinator
         }
 
         return new DocumentEditResult($content, $file, $session->operations, $loopResult->usage, $version, $fidelityLossy, $loopResult->facadeMetered, $loopResult->facadeChargedCost, $loopResult->facadePriceKnown);
+    }
+
+    /**
+     * The plan the file should contain, without attachment text or the
+     * generation rules appended for the model.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function documentBody(array $options, Message $message): string
+    {
+        $bounded = $options['document_body'] ?? null;
+        if (is_string($bounded) && '' !== trim($bounded)) {
+            return $bounded;
+        }
+
+        return $message->getText();
     }
 
     /**
