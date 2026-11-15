@@ -12,7 +12,7 @@ use App\Mcp\McpServerFactory;
 use App\Repository\DesktopDeviceRepository;
 use App\Service\Http\ClientAddress;
 use GuzzleHttp\Psr7\ServerRequest;
-use Mcp\Server;
+use Mcp\Server\Server;
 use Mcp\Server\Transport\Http\Middleware\DnsRebindingProtectionMiddleware;
 use Mcp\Server\Transport\Http\Middleware\ProtocolVersionMiddleware;
 use Mcp\Server\Transport\StreamableHttpTransport;
