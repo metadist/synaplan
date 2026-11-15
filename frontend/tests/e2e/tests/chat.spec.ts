@@ -85,9 +85,15 @@ test.describe('@ci Chat — file-only send', () => {
       .locator(selectors.chat.messageContainer)
       .filter({ has: page.getByTestId('message-user') })
       .last()
-    await expect(userRow).toContainText('vision-1x1.png')
+    const thumb = userRow.getByTestId('img-composer-media')
+    await expect(thumb).toBeVisible()
+    await expect(thumb).toHaveAttribute('alt', 'vision-1x1.png')
     await expect(userRow).not.toContainText('Please review the attached file')
     await expect(userRow).not.toContainText('Bitte prüfe die angehängte Datei')
+
+    await userRow.getByTestId('btn-composer-media').click()
+    const lightbox = page.getByTestId('modal-composer-media')
+    await expect(lightbox).toContainText('vision-1x1.png')
   })
 })
 

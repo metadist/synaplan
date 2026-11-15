@@ -13,5 +13,5 @@ interface RunStream
      *
      * @return list<RunFrame>
      */
-    public function after(string $runId, int $afterSeq): array;
+    public function after(string $runId, int $afterSeq, int $blockMs = 0): array;
 }

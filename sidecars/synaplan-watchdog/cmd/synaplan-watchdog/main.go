@@ -1,5 +1,5 @@
 // Command synaplan-watchdog reports this server's capacity.
-// It does not relay client connections.
+// When SYNAPLAN_RELAY=1 it also holds the long-lived AI streams.
 package main
 
 import (
@@ -16,6 +16,7 @@ import (
 	"github.com/metadist/synaplan-watchdog/internal/config"
 	"github.com/metadist/synaplan-watchdog/internal/host"
 	"github.com/metadist/synaplan-watchdog/internal/httpapi"
+	"github.com/metadist/synaplan-watchdog/internal/relay"
 	"github.com/metadist/synaplan-watchdog/internal/scrape"
 	"github.com/metadist/synaplan-watchdog/internal/store"
 )
@@ -49,6 +50,15 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
+
+	if relay.Enabled(os.Getenv) {
+		relayServer := relay.New(relay.ConfigFrom(os.Getenv, cfg.KeyPrefix))
+		go func() {
+			if err := relayServer.ListenAndServe(ctx); err != nil {
+				log.Printf("watchdog: relay: %v", err)
+			}
+		}()
+	}
 
 	errCh := make(chan error, 1)
 	go func() {

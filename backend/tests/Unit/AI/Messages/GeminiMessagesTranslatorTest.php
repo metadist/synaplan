@@ -56,6 +56,27 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertArrayNotHasKey('output_config', $payload);
     }
 
+    public function testHydrogenKeepsExtraHighAndDropsSampling(): void
+    {
+        $t = new GeminiMessagesTranslator(new MockHttpClient());
+        $payload = $t->toGeminiRequest([
+            'model' => 'gemini-4-hydrogen',
+            'max_tokens' => 65536,
+            'temperature' => 1.5,
+            'top_p' => 0.1,
+            'top_k' => 1,
+            'output_config' => ['effort' => 'xhigh'],
+            'messages' => [['role' => 'user', 'content' => 'hello']],
+        ]);
+
+        $this->assertSame(65536, $payload['generationConfig']['maxOutputTokens']);
+        $this->assertSame(['thinkingLevel' => 'xhigh'], $payload['generationConfig']['thinkingConfig']);
+        $this->assertArrayNotHasKey('temperature', $payload['generationConfig']);
+        $this->assertArrayNotHasKey('topP', $payload['generationConfig']);
+        $this->assertArrayNotHasKey('topK', $payload['generationConfig']);
+        $this->assertArrayNotHasKey('thinkingBudget', $payload['generationConfig']['thinkingConfig']);
+    }
+
     public function testGemini4SkipsThoughtPartsAndMapsContinuationStopReason(): void
     {
         $t = new GeminiMessagesTranslator(new MockHttpClient());

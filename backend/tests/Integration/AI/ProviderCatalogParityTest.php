@@ -373,6 +373,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             foreach ($ladder->rules as $rule) {
                 $ids = match ($rule->match) {
                     ReasoningMatch::Any => ['any-model'],
+                    ReasoningMatch::Exact => $rule->patterns,
                     ReasoningMatch::Prefix => array_map(static fn (string $p): string => $p.'-2026', $rule->patterns),
                     ReasoningMatch::Contains => array_map(static fn (string $p): string => 'vendor/'.$p.'-thinking', $rule->patterns),
                 };
@@ -415,6 +416,9 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['xai', 'grok-4.3', ['none', 'low', 'medium', 'high']],
         ['xai', 'grok-4.5', null],
         ['google', 'gemini-3.8-flash', ['low', 'medium', 'high']],
+        ['google', 'gemini-4-hydrogen', ['low', 'medium', 'high', 'xhigh']],
+        ['google', 'gemini-4-carbon', ['low', 'medium', 'high']],
+        ['google', 'gemini-4-hydrogen-cyber', ['low', 'medium', 'high']],
         ['anthropic', 'claude-sonnet-5-5-20260601', ['low', 'medium', 'high', 'xhigh', 'max']],
         ['anthropic', 'claude-opus-4-6', ['low', 'medium', 'high']],
         ['anthropic', 'claude-opus-4-7', ['low', 'medium', 'high']],

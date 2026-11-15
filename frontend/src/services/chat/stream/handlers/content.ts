@@ -4,6 +4,7 @@
  * the task cards are the live surface for media and links; the answer text
  * still accumulates, because the reply node has no card of its own (#1057).
  */
+import type { Part } from '@/stores/history'
 import { consumeVisibleAnswer } from '@/utils/processingTimeline'
 import { pushMediaPart } from '@/utils/mediaParts'
 import { normalizeMediaUrl } from '@/utils/urlHelper'
@@ -15,6 +16,17 @@ import {
 } from '@/utils/voiceReply'
 import { appendReasoning, applyDocsToMessage, linksPart } from '../messageUpdates'
 import type { MemberTurn, StreamHandlers, StreamStatusHandler, StreamTurn } from '../streamTurn'
+
+const streamBaselines = new WeakMap<StreamTurn, { text: string; parts: Part[] }>()
+
+/** Snapshot the bubble before this turn's events, so a rebuild can restore it. */
+export function rememberStreamBaseline(turn: StreamTurn): void {
+  const message = turn.message()
+  streamBaselines.set(turn, {
+    text: turn.text.content,
+    parts: message ? message.parts.map((part) => ({ ...part })) : [],
+  })
+}
 
 const MEDIA_TYPES = ['image', 'video', 'audio'] as const
 
@@ -133,8 +145,29 @@ const docsLoaded: StreamStatusHandler<StreamTurn> = (payload, turn) => {
 const runStarted: StreamStatusHandler<StreamTurn> = (payload, turn) =>
   turn.run.noteStarted(payload.runId)
 
+/** A replay from the start restores the bubble to the pre-turn baseline. */
+const streamRebuild: StreamStatusHandler<StreamTurn> = (_payload, turn) => {
+  const baseline = streamBaselines.get(turn)
+  const message = turn.message()
+  if (message) {
+    message.parts = baseline
+      ? baseline.parts.map((part) => ({ ...part }))
+      : message.parts.filter((part) => part.type !== 'thinking')
+  }
+  turn.text.content = baseline?.text ?? ''
+  turn.text.thinkOpen = false
+  if (isMemberTurn(turn)) {
+    turn.voice.suppressReplay()
+  }
+}
+
+function isMemberTurn(turn: StreamTurn): turn is MemberTurn {
+  return 'voice' in turn
+}
+
 export const contentHandlers: StreamHandlers<StreamTurn> = {
   run_started: runStarted,
+  stream_rebuild: streamRebuild,
   data,
   reasoning,
   file,

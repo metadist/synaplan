@@ -46,6 +46,12 @@ final readonly class StreamPumpConfigSeeder implements SeederInterface
                 'setting' => StreamPumpConfig::KEY_PERCENT,
                 'value' => '0',
             ],
+            [
+                'ownerId' => 0,
+                'group' => StreamPumpConfig::CONFIG_GROUP,
+                'setting' => StreamPumpConfig::KEY_MAX_BYTES,
+                'value' => (string) StreamPumpConfig::DEFAULT_MAX_BYTES,
+            ],
         ]);
     }
 }

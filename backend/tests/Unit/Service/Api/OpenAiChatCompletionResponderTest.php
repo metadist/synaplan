@@ -151,4 +151,37 @@ final class OpenAiChatCompletionResponderTest extends TestCase
         self::assertSame([], $chunk['choices']);
         self::assertSame(18, $chunk['usage']['total_tokens']);
     }
+
+    public function testToolCallDeltaPreservesThoughtSignatureOnFirstChunk(): void
+    {
+        $announced = [];
+        $first = OpenAiChatCompletionResponder::toolCallDeltaChunk(
+            'chatcmpl-fixed',
+            1700000000,
+            'gemini-4-hydrogen',
+            [
+                'type' => 'tool_call_delta',
+                'index' => 0,
+                'id' => 'call_test_1',
+                'name' => 'get_weather',
+                'arguments' => '{"city":"',
+                'thought_signature' => 'sig-hydrogen-1',
+            ],
+            $announced,
+        );
+        $second = OpenAiChatCompletionResponder::toolCallDeltaChunk(
+            'chatcmpl-fixed',
+            1700000000,
+            'gemini-4-hydrogen',
+            [
+                'type' => 'tool_call_delta',
+                'index' => 0,
+                'arguments' => 'Berlin"}',
+            ],
+            $announced,
+        );
+
+        self::assertSame('sig-hydrogen-1', $first['choices'][0]['delta']['tool_calls'][0]['thought_signature'] ?? null);
+        self::assertArrayNotHasKey('thought_signature', $second['choices'][0]['delta']['tool_calls'][0]);
+    }
 }

@@ -411,113 +411,118 @@
         class="max-w-[70rem] mx-auto w-full px-4 mb-2"
         :streaming="isStreaming"
       />
-      <ChatInput
-        v-if="!needsProviderSetup && canComposeSharedChat"
-        ref="chatInputRef"
-        :is-streaming="isStreaming"
-        :send-locked="!assistantThreadReady || freeApiStore.busy"
-        :is-guest-mode="isGuestMode"
-        :banner-visible="
-          showPendingPurchaseBanner ||
-          (isGuestMode && guestStore.shouldShowBanner) ||
-          Boolean(pinnedAgentId)
-        "
-        :quote="quoting.pendingQuote.value"
-        :before-send="freeApiStartsOnSend ? freeApiStart.readyForSend : undefined"
-        @budget-blocked="showLimitOrPaywall"
-        @send="handleSendMessage"
-        @stop="handleUserStop"
-        @guest-feature-gate="handleGuestFeatureGate"
-        @clear-quote="quoting.clearPendingQuote"
-      >
-        <!-- The shared chat stays selected during incognito, so its files must
+      <div v-if="!needsProviderSetup && canComposeSharedChat" class="relative">
+        <ScrollToBottomButton :visible="showJumpToBottom && !liveStage" @jump="jumpToBottom" />
+        <ChatInput
+          ref="chatInputRef"
+          :is-streaming="isStreaming"
+          :send-locked="!assistantThreadReady || freeApiStore.busy"
+          :is-guest-mode="isGuestMode"
+          :banner-visible="
+            showPendingPurchaseBanner ||
+            (isGuestMode && guestStore.shouldShowBanner) ||
+            Boolean(pinnedAgentId)
+          "
+          :quote="quoting.pendingQuote.value"
+          :before-send="freeApiStartsOnSend ? freeApiStart.readyForSend : undefined"
+          @budget-blocked="showLimitOrPaywall"
+          @send="handleSendMessage"
+          @stop="handleUserStop"
+          @guest-feature-gate="handleGuestFeatureGate"
+          @clear-quote="quoting.clearPendingQuote"
+        >
+          <!-- The shared chat stays selected during incognito, so its files must
              not become attachable or deletable from this session. -->
-        <template #beside-plus>
-          <ConversationFilesBar
-            v-if="!incognitoStore.active"
-            :files="conversationFiles"
-            :can-attach="canComposeSharedChat"
-            :can-delete="canComposeSharedChat && !isGuestMode"
-            @attach="attachConversationFile"
-            @preview="previewConversationFile"
-            @remove="removeConversationFile"
-          />
-        </template>
-        <!-- Native onboarding: a signed-out store purchase waiting to be
+          <template #beside-plus>
+            <ConversationFilesBar
+              v-if="!incognitoStore.active"
+              :files="conversationFiles"
+              :can-attach="canComposeSharedChat"
+              :can-delete="canComposeSharedChat && !isGuestMode"
+              @attach="attachConversationFile"
+              @preview="previewConversationFile"
+              @remove="removeConversationFile"
+            />
+          </template>
+          <!-- Native onboarding: a signed-out store purchase waiting to be
              linked to an account outranks the guest quota banner. -->
-        <template #banner>
-          <PendingPurchaseBanner
-            v-if="showPendingPurchaseBanner"
-            :visible="showPendingPurchaseBanner"
-            @dismiss="pendingPurchaseBannerDismissed = true"
-          />
-          <GuestBanner
-            v-else-if="isGuestMode"
-            :visible="guestStore.shouldShowBanner"
-            :remaining="guestStore.remainingMessages"
-            :max-messages="guestStore.maxMessages"
-            @dismiss="guestStore.dismissBanner()"
-          />
-          <div
-            v-else-if="incognitoStore.active"
-            class="mb-2 rounded-lg surface-chip px-4 py-2.5 text-xs txt-secondary"
-            data-testid="banner-incognito"
-          >
-            <div class="flex items-start gap-2">
-              <Icon icon="mdi:incognito" class="mt-0.5 w-4 h-4 shrink-0 txt-brand" />
-              <p>
-                <strong class="txt-primary">{{ $t('incognito.bannerTitle') }}</strong>
-                — {{ $t('incognito.bannerText') }}
+          <template #banner>
+            <PendingPurchaseBanner
+              v-if="showPendingPurchaseBanner"
+              :visible="showPendingPurchaseBanner"
+              @dismiss="pendingPurchaseBannerDismissed = true"
+            />
+            <GuestBanner
+              v-else-if="isGuestMode"
+              :visible="guestStore.shouldShowBanner"
+              :remaining="guestStore.remainingMessages"
+              :max-messages="guestStore.maxMessages"
+              @dismiss="guestStore.dismissBanner()"
+            />
+            <div
+              v-else-if="incognitoStore.active"
+              class="mb-2 rounded-lg surface-chip px-4 py-2.5 text-xs txt-secondary"
+              data-testid="banner-incognito"
+            >
+              <div class="flex items-start gap-2">
+                <Icon icon="mdi:incognito" class="mt-0.5 w-4 h-4 shrink-0 txt-brand" />
+                <p>
+                  <strong class="txt-primary">{{ $t('incognito.bannerTitle') }}</strong>
+                  — {{ $t('incognito.bannerText') }}
+                </p>
+              </div>
+              <label
+                v-if="!incognitoHasMessages"
+                class="mt-2 flex cursor-pointer items-start gap-2"
+              >
+                <input
+                  type="checkbox"
+                  class="mt-0.5 h-4 w-4 shrink-0"
+                  :checked="incognitoStore.useSavedContext"
+                  data-testid="check-incognito-saved-context"
+                  @change="onIncognitoSavedContext"
+                />
+                <span>
+                  <span class="font-medium txt-primary">{{ $t('incognito.useSaved') }}</span>
+                  <span class="mt-0.5 block">
+                    {{
+                      incognitoStore.useSavedContext
+                        ? $t('incognito.useSavedOn')
+                        : $t('incognito.useSavedOff')
+                    }}
+                  </span>
+                </span>
+              </label>
+              <p v-else class="mt-2" data-testid="text-incognito-saved-context">
+                {{
+                  incognitoStore.useSavedContext
+                    ? $t('incognito.lockedOn')
+                    : $t('incognito.lockedOff')
+                }}
               </p>
             </div>
-            <label v-if="!incognitoHasMessages" class="mt-2 flex cursor-pointer items-start gap-2">
-              <input
-                type="checkbox"
-                class="mt-0.5 h-4 w-4 shrink-0"
-                :checked="incognitoStore.useSavedContext"
-                data-testid="check-incognito-saved-context"
-                @change="onIncognitoSavedContext"
-              />
-              <span>
-                <span class="font-medium txt-primary">{{ $t('incognito.useSaved') }}</span>
-                <span class="mt-0.5 block">
-                  {{
-                    incognitoStore.useSavedContext
-                      ? $t('incognito.useSavedOn')
-                      : $t('incognito.useSavedOff')
-                  }}
-                </span>
-              </span>
-            </label>
-            <p v-else class="mt-2" data-testid="text-incognito-saved-context">
-              {{
-                incognitoStore.useSavedContext
-                  ? $t('incognito.lockedOn')
-                  : $t('incognito.lockedOff')
-              }}
-            </p>
-          </div>
-          <div
-            v-else-if="pinnedAgentId && pinnedAssistantName"
-            class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
-            data-testid="banner-pinned-assistant"
-          >
-            <Icon icon="mdi:robot-outline" class="w-4 h-4 txt-brand flex-shrink-0" />
-            <span class="txt-primary">
-              {{ $t('assistants.talkingTo', { name: pinnedAssistantName }) }}
-            </span>
-            <button
-              type="button"
-              class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
-              data-testid="btn-pinned-assistant-stop"
-              @click="stopPinnedAssistant"
+            <div
+              v-else-if="pinnedAgentId && pinnedAssistantName"
+              class="flex items-center justify-center gap-2 px-4 py-2 mb-2 rounded-lg surface-chip text-xs txt-secondary"
+              data-testid="banner-pinned-assistant"
             >
-              <XMarkIcon class="h-5 w-5" aria-hidden="true" />
-              {{ $t('assistants.useDefaultModel') }}
-            </button>
-          </div>
-        </template>
-      </ChatInput>
+              <Icon icon="mdi:robot-outline" class="w-4 h-4 txt-brand flex-shrink-0" />
+              <span class="txt-primary">
+                {{ $t('assistants.talkingTo', { name: pinnedAssistantName }) }}
+              </span>
+              <button
+                type="button"
+                class="btn-secondary inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium"
+                data-testid="btn-pinned-assistant-stop"
+                @click="stopPinnedAssistant"
+              >
+                <XMarkIcon class="h-5 w-5" aria-hidden="true" />
+                {{ $t('assistants.useDefaultModel') }}
+              </button>
+            </div>
+          </template>
+        </ChatInput>
+      </div>
 
       <!--
         Phase 3e: backgrounded memory extraction status pill.
@@ -665,6 +670,7 @@ import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
+import ScrollToBottomButton from '@/components/chat/ScrollToBottomButton.vue'
 import ChatAccessErrorBanner from '@/components/ChatAccessErrorBanner.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
@@ -680,6 +686,7 @@ import FreeApiChatBanner from '@/components/freeapi/FreeApiChatBanner.vue'
 import { useFreeApiStore } from '@/stores/freeApi'
 import { useFreeApiStartOnSend } from '@/composables/useFreeApiStartOnSend'
 import LocalAiDownloadCard from '@/components/setup/LocalAiDownloadCard.vue'
+import { useJumpToBottom } from '@/composables/useJumpToBottom'
 import { useMessageQuoting } from '@/composables/useMessageQuoting'
 import { useExtractedMemoryPoll } from '@/composables/useExtractedMemoryPoll'
 import {
@@ -888,6 +895,12 @@ const autoScroll = ref(true)
 // following the bottom instead (so the freshest text stays visible). Reset to
 // pin mode whenever a new message is sent.
 let stickToBottom = false
+const { showJumpToBottom, jumpToBottom: startJump, noteScroll } = useJumpToBottom(chatContainer)
+const jumpToBottom = () => {
+  if (!startJump()) return
+  autoScroll.value = true
+  stickToBottom = true
+}
 // Tracks the scrollTop value we last set programmatically so handleScroll can
 // tell our own scroll adjustments apart from genuine user scrolling.
 let expectedScrollTop = 0
@@ -2417,9 +2430,19 @@ const handleDrop = async (event: DragEvent) => {
 }
 
 const handleScroll = async () => {
-  if (!chatContainer.value || programmaticMessageScroll) return
+  if (!chatContainer.value) return
 
   const { scrollTop, scrollHeight, clientHeight } = chatContainer.value
+  const jump = noteScroll(scrollTop, scrollHeight, clientHeight)
+  if (jump === 'arrived') {
+    expectedScrollTop = scrollTop
+    autoScroll.value = true
+    stickToBottom = true
+    return
+  }
+  if (jump === 'consume') return
+
+  if (programmaticMessageScroll) return
 
   // Distinguish our own programmatic scrolls (including the pinned position
   // that is NOT at the bottom) from real user scrolling. Only the latter may

@@ -119,7 +119,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     {
         $model = \is_string($requestBody['model'] ?? null) ? $requestBody['model'] : '';
         $gemini4 = Gemini4Models::usesThinkingLevel($model);
-        $thinkingLevel = $gemini4 ? Gemini4Models::thinkingLevelFromMessagesRequest($requestBody) : null;
+        $thinkingLevel = $gemini4 ? Gemini4Models::thinkingLevelFromMessagesRequest($requestBody, $model) : null;
 
         foreach (self::STRIP_KEYS as $key) {
             unset($requestBody[$key]);

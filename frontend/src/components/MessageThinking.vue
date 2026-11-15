@@ -38,13 +38,16 @@
       </svg>
     </button>
 
+    <!--
+      Leave is instant. The enter fade lasts 300ms, and max-height cannot
+      shrink from none, so a leave transition keeps the open height and clips
+      the answer underneath until the box snaps shut.
+    -->
     <Transition
+      :duration="{ enter: 300, leave: 0 }"
       enter-active-class="transition-all duration-200 ease-out"
       enter-from-class="opacity-0 max-h-0"
       enter-to-class="opacity-100"
-      leave-active-class="transition-all duration-150 ease-in"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0 max-h-0"
     >
       <div
         v-if="isExpanded"

@@ -145,6 +145,10 @@ final class OpenAiChatCompletionResponder
         }
 
         $delta['function'] = $function;
+        $sig = $chunk['thought_signature'] ?? $chunk['thoughtSignature'] ?? null;
+        if (is_string($sig) && '' !== $sig) {
+            $delta['thought_signature'] = $sig;
+        }
 
         return self::chunk($id, $created, $model, ['tool_calls' => [$delta]], null);
     }

@@ -1,3 +1,5 @@
+> **Archived 2026-11-13.** The public steps are on `main`: IC1–IC8, the identity guide, the chart, and the account-door card. IC0 was already in the product. PC1 and PC2 are merged. Still open: PC3, which waits for D5, and the owner decisions D8 and D9.
+
 # Status — IAM consolidation
 
 Plan: [`00_master_plan.md`](./00_master_plan.md). A walk, a count and a CI
@@ -23,8 +25,8 @@ run are entries here, not chat messages.
 | ---- | ------------ | ----- |
 | IC0 | | already in the product — the legacy integration route requires a signed-in account |
 | IC1 | [#3027](https://github.com/metadist/synaplan/pull/3027) | merged |
-| PC1 | [#45](https://github.com/metadist/synaplan-platform/pull/45) | in review — trust only the edge hop, and the edge writes the client address |
-| PC2 | [#3095](https://github.com/metadist/synaplan/pull/3095) | in review — `SIGNUP_REQUIRE_CLOUDFLARE`, public default off |
+| PC1 | [#45](https://github.com/metadist/synaplan-platform/pull/45) | merged — trust only the edge hop, and the edge writes the client address |
+| PC2 | [#3095](https://github.com/metadist/synaplan/pull/3095) | merged — `SIGNUP_REQUIRE_CLOUDFLARE`, public default off |
 | IC2+IC3 | [#3030](https://github.com/metadist/synaplan/pull/3030) | merged |
 | IC4 | [#3074](https://github.com/metadist/synaplan/pull/3074) | merged |
 | IC5+IC5b | [#3079](https://github.com/metadist/synaplan/pull/3079) | merged — the level is the highest grant, and People shows where it comes from |

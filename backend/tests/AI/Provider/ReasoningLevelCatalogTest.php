@@ -46,6 +46,18 @@ final class ReasoningLevelCatalogTest extends TestCase
             ReasoningLevelCatalog::levels('Google', 'gemini-2.5-pro', ['reasoning']),
         );
         self::assertSame(
+            ['low', 'medium', 'high', 'xhigh'],
+            ReasoningLevelCatalog::levels('Google', 'gemini-4-hydrogen', ['reasoning']),
+        );
+        self::assertSame(
+            ['low', 'medium', 'high'],
+            ReasoningLevelCatalog::levels('Google', 'gemini-4-carbon', ['reasoning']),
+        );
+        self::assertSame(
+            ['low', 'medium', 'high'],
+            ReasoningLevelCatalog::levels('Google', 'gemini-4-hydrogen-cyber', ['reasoning']),
+        );
+        self::assertSame(
             ['low', 'medium', 'high'],
             ReasoningLevelCatalog::levels('Anthropic', 'claude-opus-5-5', ['reasoning']),
         );

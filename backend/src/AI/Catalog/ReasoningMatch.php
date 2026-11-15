@@ -11,5 +11,7 @@ enum ReasoningMatch: string
 {
     case Prefix = 'prefix';
     case Contains = 'contains';
+    /** The whole model id, so a longer suffixed id does not inherit the rule. */
+    case Exact = 'exact';
     case Any = 'any';
 }

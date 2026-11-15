@@ -147,6 +147,7 @@ function each(statuses: string[], handler: ProgressHandler): StreamHandlers<Stre
 
 export const progressHandlers: StreamHandlers<StreamTurn> = {
   busy: labelOnly('busy'),
+  reconnecting: labelOnly('reconnecting'),
   started: labelOnly('started'),
   preprocessing: withMessage('preprocessing'),
   analyzing: withMessage('analyzing'),

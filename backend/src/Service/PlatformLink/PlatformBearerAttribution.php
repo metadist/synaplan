@@ -146,15 +146,38 @@ final readonly class PlatformBearerAttribution
         if ($existing instanceof ExternalIdentity) {
             return;
         }
-        $row = $this->identities->upsert((int) $user->getId(), $instance->getClient(), $externalId, $instance->getInstanceId(), null, ExternalIdentity::MODE_SSO);
-        $row->setStatus(ExternalIdentity::STATUS_ACTIVE);
-        $this->entityManager->flush();
-        $this->effects->onResumed($row);
-        $this->audit->record((int) $user->getId(), 'platform_link.bound', 'platform_link', (string) $row->getId(), [
-            'client' => $instance->getClient(),
-            'host' => $instance->getHost(),
-            'external_id' => $externalId,
-            'mode' => ExternalIdentity::MODE_SSO,
-        ]);
+        // Another first-use request of this same person may have inserted the
+        // row after the lookup above. That request owns the resume and the
+        // audit entry; this one continues with the row that won.
+        $row = $this->identities->insertIfAbsent(
+            (int) $user->getId(),
+            $instance->getClient(),
+            $externalId,
+            $instance->getInstanceId(),
+            null,
+            ExternalIdentity::MODE_SSO,
+        );
+        if (!$row instanceof ExternalIdentity) {
+            return;
+        }
+        // The lock is held through the resume and the audit entry. A disable
+        // that commits first is visible here, and one that arrives second
+        // waits until this transaction ends, so it pauses the watches this
+        // resume just started instead of racing it.
+        $this->entityManager->wrapInTransaction(function () use ($user, $instance, $externalId): void {
+            $current = $this->identities->lock($instance->getClient(), $instance->getInstanceId(), $externalId);
+            if (!$current instanceof ExternalIdentity || $current->isOff()) {
+                return;
+            }
+            $current->setStatus(ExternalIdentity::STATUS_ACTIVE);
+            $this->entityManager->flush();
+            $this->effects->onResumed($current);
+            $this->audit->record((int) $user->getId(), 'platform_link.bound', 'platform_link', (string) $current->getId(), [
+                'client' => $instance->getClient(),
+                'host' => $instance->getHost(),
+                'external_id' => $externalId,
+                'mode' => ExternalIdentity::MODE_SSO,
+            ]);
+        });
     }
 }

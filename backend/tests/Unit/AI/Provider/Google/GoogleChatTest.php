@@ -243,6 +243,81 @@ final class GoogleChatTest extends TestCase
         self::assertArrayNotHasKey('thoughtSignature', $replayedPart['functionCall']);
     }
 
+    public function testHydrogenSendsExtraHighAndDropsSampling(): void
+    {
+        $chat = $this->chat([self::json([
+            'candidates' => [['content' => ['parts' => [['text' => 'Visible.']]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 10, 'candidatesTokenCount' => 4, 'thoughtsTokenCount' => 6],
+        ])]);
+
+        $chat->chat([['role' => 'user', 'content' => 'Hi']], [
+            'model' => 'gemini-4-hydrogen',
+            'temperature' => 1.8,
+            'top_p' => 1.5,
+            'top_k' => 100,
+            'thinking_budget' => 0,
+            'reasoning_effort' => 'xhigh',
+        ]);
+
+        $request = $this->requests()[0];
+        $config = $request['body']['generationConfig'];
+        self::assertSame(65536, $config['maxOutputTokens']);
+        self::assertSame(['thinkingLevel' => 'xhigh'], $config['thinkingConfig']);
+        self::assertArrayNotHasKey('temperature', $config);
+        self::assertArrayNotHasKey('topP', $config);
+        self::assertArrayNotHasKey('topK', $config);
+        self::assertArrayNotHasKey('thinkingBudget', $config['thinkingConfig']);
+        self::assertStringEndsWith('/models/gemini-4-hydrogen:generateContent', $request['url']);
+        self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
+    }
+
+    public function testHydrogenClampsMaxEffortAndLeavesMinimalUnsent(): void
+    {
+        $chat = $this->chat([
+            self::json([
+                'candidates' => [['content' => ['parts' => [['text' => 'Visible.']]], 'finishReason' => 'STOP']],
+                'usageMetadata' => ['promptTokenCount' => 1, 'candidatesTokenCount' => 1],
+            ]),
+            self::json([
+                'candidates' => [['content' => ['parts' => [['text' => 'Visible.']]], 'finishReason' => 'STOP']],
+                'usageMetadata' => ['promptTokenCount' => 1, 'candidatesTokenCount' => 1],
+            ]),
+        ]);
+
+        $chat->chat([['role' => 'user', 'content' => 'Hi']], [
+            'model' => 'models/gemini-4-hydrogen',
+            'reasoning_effort' => 'max',
+        ]);
+        $chat->chat([['role' => 'user', 'content' => 'Hi']], [
+            'model' => 'gemini-4-hydrogen',
+            'reasoning_effort' => 'minimal',
+        ]);
+
+        $requests = $this->requests();
+        self::assertSame(['thinkingLevel' => 'xhigh'], $requests[0]['body']['generationConfig']['thinkingConfig']);
+        self::assertArrayNotHasKey('thinkingConfig', $requests[1]['body']['generationConfig']);
+    }
+
+    public function testAPermissiveHydrogenCyberIdDoesNotTakeTheGemini4Path(): void
+    {
+        $chunk = static fn (array $data): string => 'data: '.json_encode($data)."\r\n\r\n";
+        $chat = $this->chat([new MockResponse([
+            $chunk(['candidates' => [['content' => ['parts' => [['text' => 'Done.']]], 'finishReason' => 'STOP']]]),
+        ])]);
+
+        $chat->chatStream([['role' => 'user', 'content' => 'Hi']], static function (mixed $event): void {
+        }, [
+            'model' => 'gemini-4-hydrogen-cyber',
+            'temperature' => 0.2,
+            'reasoning_effort' => 'xhigh',
+        ]);
+
+        $config = $this->requests()[0]['body']['generationConfig'];
+        self::assertArrayNotHasKey('thinkingLevel', $config['thinkingConfig'] ?? []);
+        self::assertSame(0.2, $config['temperature']);
+        self::assertEqualsWithDelta(120, (float) $this->requests()[0]['timeout'], 0.001);
+    }
+
     /**
      * @param list<MockResponse> $responses
      */

@@ -24,7 +24,7 @@ x-app-environment: &app-environment
   # (together with the image pin below and umbrel-app.yml) to the version whose
   # image was just published. Do not edit by hand —
   # scripts/set-release-version.mjs owns these three lines.
-  APP_VERSION: "5.8.0"
+  APP_VERSION: "5.8.1"
 
   # umbrelOS serves apps over plain HTTP on the device's .local domain. Synaplan
   # derives the auth cookies' Secure flag from this scheme, so the session
@@ -90,7 +90,7 @@ x-app-environment: &app-environment
 # then hands over to Caddy/FrankenPHP, which binds port 80 inside the container.
 # Tag and digest are maintained by CI together with APP_VERSION above —
 # scripts/set-release-version.mjs owns this line.
-x-app-image: &app-image ghcr.io/metadist/synaplan:5.8.0@sha256:e38533778bca748d955ac500f68eedd1acbba3df65f34ed0f24c53d8214932fd
+x-app-image: &app-image ghcr.io/metadist/synaplan:5.8.1@sha256:af87b0d4d1e39d521ff10b331da904cb0b0fd814058c84a81e0b47955da5aefd
 
 # Uploaded and generated files. The web role writes them, the worker reads them
 # back while processing a job, so all three app roles share the directory.
@@ -175,7 +175,7 @@ services:
     restart: on-failure
 
   db:
-    image: mariadb:13.0.2@sha256:f4054da26e3a9dd6c8b5cc97363e544408b15c0fb369d7359c25dc04826eb6e1
+    image: mariadb:13.0.2@sha256:54f493ea0d60b621a5bff84e5b20100f8b86b6efa6b79158e04756c5194a5e4d
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
     environment:
       MARIADB_DATABASE: synaplan
@@ -196,7 +196,7 @@ services:
     restart: on-failure
 
   redis:
-    image: redis:8.10-alpine@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80
+    image: redis:8.10-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     user: "1000:1000"
     volumes:

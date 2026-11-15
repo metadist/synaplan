@@ -63,6 +63,7 @@
       <!-- Sits on the photo, so the ink is white on black rather than icon-ghost,
            which would inherit the composer color and disappear on a light image. -->
       <button
+        v-if="removable"
         type="button"
         class="absolute right-1 top-1 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/70 text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white disabled:cursor-not-allowed disabled:opacity-40"
         :aria-label="t('files.removeFile')"
@@ -73,7 +74,7 @@
         <XMarkIcon class="h-4 w-4" />
       </button>
     </div>
-    <p class="truncate text-xs txt-secondary" :title="name">{{ name }}</p>
+    <p v-if="showCaption" class="truncate text-xs txt-secondary" :title="name">{{ name }}</p>
 
     <Teleport to="body">
       <div
@@ -112,6 +113,7 @@
             data-testid="media-composer-video-large"
           />
           <p class="max-w-full break-all text-center text-sm text-white">{{ name }}</p>
+          <slot name="lightbox" />
         </div>
       </div>
     </Teleport>
@@ -124,13 +126,23 @@ import { useI18n } from 'vue-i18n'
 import { FilmIcon, PhotoIcon, PlayIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { useMediaSrc } from '@/services/api/mediaAuth'
 
-const props = defineProps<{
-  name: string
-  kind: 'image' | 'video'
-  /** Blob URL while the file is still local, or the download path after upload. */
-  src: string
-  processing?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    name: string
+    kind: 'image' | 'video'
+    /** Blob URL while the file is still local, or the download path after upload. */
+    src: string
+    processing?: boolean
+    /** Composer rows can be removed. A sent message keeps the picture. */
+    removable?: boolean
+    /** The filename stays in the large view. Sent messages hide it on the thumb. */
+    showCaption?: boolean
+  }>(),
+  {
+    removable: true,
+    showCaption: true,
+  }
+)
 
 const emit = defineEmits<{ remove: [] }>()
 

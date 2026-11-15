@@ -20,6 +20,20 @@ describe('member error handler', () => {
     expect(turn.message()?.errorReason).toBeUndefined()
   })
 
+  it('says the answer is still being written after the reconnect tries are used up', () => {
+    const turn = fakeMemberTurn(
+      assistantMessage({ parts: [{ type: 'text', content: 'Half an answer' }] })
+    )
+
+    memberErrorHandler(
+      { status: 'error', code: 'reconnect_exhausted', error: 'Connection interrupted' },
+      turn
+    )
+
+    expect(turn.outcome.showError).toHaveBeenCalledWith('chatError.reconnectingFailed', 12000)
+    expect(turn.history.recoverInterruptedTurn).toHaveBeenCalledWith(42)
+  })
+
   it('removes the empty answer of a chat that is gone', () => {
     const turn = fakeMemberTurn()
 

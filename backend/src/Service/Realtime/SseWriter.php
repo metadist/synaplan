@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Realtime;
 
 use App\Service\Chat\Run\ChatRunRecorder;
+use App\Service\Chat\Run\StreamFrameSink;
 
 /**
  * Writes the server-sent events of one chat turn.
@@ -34,8 +35,10 @@ final class SseWriter
     /**
      * @param bool $captureMode skip flushing so a test can read the frames from an output buffer (#2282)
      */
-    public function __construct(private readonly bool $captureMode = false)
-    {
+    public function __construct(
+        private readonly bool $captureMode = false,
+        private readonly ?StreamFrameSink $sink = null,
+    ) {
     }
 
     /**
@@ -47,8 +50,13 @@ final class SseWriter
     public function open(): void
     {
         SseOutput::begin($this->captureMode);
-        set_time_limit(0);
+        self::disableTimeLimit();
         ignore_user_abort(true);
+    }
+
+    public static function disableTimeLimit(): void
+    {
+        set_time_limit(0);
     }
 
     public function attachRun(?ChatRunRecorder $run): void
@@ -81,7 +89,14 @@ final class SseWriter
             return;
         }
 
-        echo 'data: '.json_encode($event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
+        $bytes = 'data: '.json_encode(null !== $this->sink ? $recorded : $event, JSON_INVALID_UTF8_SUBSTITUTE)."\n\n";
+        if (null !== $this->sink) {
+            $this->sink->write($bytes);
+
+            return;
+        }
+
+        echo $bytes;
 
         if ($this->captureMode) {
             return;

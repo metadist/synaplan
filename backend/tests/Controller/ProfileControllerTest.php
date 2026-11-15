@@ -578,13 +578,40 @@ class ProfileControllerTest extends WebTestCase
 
     public function testBackwardCompatibleTimezoneAliasIsStored(): void
     {
+        $alias = $this->backwardCompatibleTimezone();
+        if (null === $alias) {
+            $this->markTestSkipped('This PHP build lists no backward-compatible timezone links.');
+        }
+
         $this->putProfile([
-            'timezone' => 'Asia/Calcutta',
+            'timezone' => $alias,
         ]);
 
         $this->assertResponseIsSuccessful();
         $this->em->refresh($this->user);
-        $this->assertSame('Asia/Calcutta', $this->user->getUserDetails()['timezone']);
+        $this->assertSame($alias, $this->user->getUserDetails()['timezone']);
+    }
+
+    /**
+     * Prefer Asia/Calcutta when this PHP still lists it. GitHub's PHP build
+     * follows system tzdata, which drops that legacy link without tzdata-legacy.
+     */
+    private function backwardCompatibleTimezone(): ?string
+    {
+        $preferred = 'Asia/Calcutta';
+        $withLinks = array_fill_keys(\DateTimeZone::listIdentifiers(\DateTimeZone::ALL_WITH_BC), true);
+        if (isset($withLinks[$preferred])) {
+            return $preferred;
+        }
+
+        $canonical = array_fill_keys(\DateTimeZone::listIdentifiers(), true);
+        foreach (array_keys($withLinks) as $identifier) {
+            if (!isset($canonical[$identifier])) {
+                return $identifier;
+            }
+        }
+
+        return null;
     }
 
     public function testFractionalHourTimezoneIsStored(): void

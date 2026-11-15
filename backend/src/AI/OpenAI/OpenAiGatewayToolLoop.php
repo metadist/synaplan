@@ -8,6 +8,7 @@ use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\Tools\CodeExecutionTool;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\WebSearchTool;
+use App\AI\Provider\Google\GoogleThoughtSignature;
 use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\Entity\ComputeRun;
@@ -338,13 +339,18 @@ final readonly class OpenAiGatewayToolLoop
             $fn = is_array($call['function'] ?? null) ? $call['function'] : [];
             $arguments = (string) ($fn['arguments'] ?? '{}');
             $mid = (int) max(1, (int) ceil(strlen($arguments) / 2));
-            $callback([
+            $first = [
                 'type' => 'tool_call_delta',
                 'index' => $index,
                 'id' => $call['id'] ?? null,
                 'name' => $fn['name'] ?? null,
                 'arguments' => substr($arguments, 0, $mid),
-            ]);
+            ];
+            $sig = GoogleThoughtSignature::fromToolCall($call);
+            if (null !== $sig) {
+                $first['thought_signature'] = $sig;
+            }
+            $callback($first);
             $callback([
                 'type' => 'tool_call_delta',
                 'index' => $index,

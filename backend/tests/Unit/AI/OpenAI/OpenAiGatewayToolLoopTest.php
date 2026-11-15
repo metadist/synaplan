@@ -381,6 +381,48 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         }
     }
 
+    public function testStreamClientToolDeltaPreservesThoughtSignature(): void
+    {
+        $facade = $this->createMock(AiFacade::class);
+        $facade->method('chatStream')->willReturn([
+            'content' => '',
+            'provider' => 'google',
+            'model' => 'gemini-4-hydrogen',
+            'finish_reason' => 'tool_calls',
+            'tool_calls' => [[
+                'id' => 'call_weather_1',
+                'type' => 'function',
+                'function' => ['name' => 'get_weather', 'arguments' => '{"city":"Berlin"}'],
+                'thought_signature' => 'sig-hydrogen-stream',
+            ]],
+            'usage' => ['prompt_tokens' => 4, 'completion_tokens' => 6, 'total_tokens' => 10],
+        ]);
+
+        $loop = $this->loop($this->unavailableSearch(), mcpEnabled: false, facade: $facade);
+        $deltas = [];
+        $loop->stream(
+            $this->user(),
+            [['role' => 'user', 'content' => 'Weather?']],
+            static function (mixed $chunk) use (&$deltas): void {
+                if (is_array($chunk) && 'tool_call_delta' === ($chunk['type'] ?? '')) {
+                    $deltas[] = $chunk;
+                }
+            },
+            [
+                'model' => 'gemini-4-hydrogen',
+                'provider' => 'google',
+                'tools' => [[
+                    'type' => 'function',
+                    'function' => ['name' => 'get_weather'],
+                ]],
+            ],
+        );
+
+        self::assertCount(2, $deltas);
+        self::assertSame('sig-hydrogen-stream', $deltas[0]['thought_signature'] ?? null);
+        self::assertArrayNotHasKey('thought_signature', $deltas[1]);
+    }
+
     private function loop(
         WebSearchTool $search,
         bool $mcpEnabled,
