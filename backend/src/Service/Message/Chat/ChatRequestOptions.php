@@ -82,6 +82,9 @@ final readonly class ChatRequestOptions
             'temperature' => self::DEFAULT_TEMPERATURE,
             'modelFeatures' => $model->features(),
         ], $options);
+        // The document step uses this to restore a dropped Word body. It is
+        // not a sampling parameter, and a provider must not receive it.
+        unset($aiOptions['document_body']);
         $aiOptions = $this->withDocumentSchema($aiOptions, $turn, $routingTools);
 
         // Clamp max_tokens to min(requested, plan_limit, model_max).

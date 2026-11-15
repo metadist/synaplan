@@ -71,15 +71,7 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             return NodeResult::failed('no prompt for document_generation');
         }
 
-        // A format named in the ORIGINAL request ("als Excel") wins even when
-        // the planner's prompt no longer mentions it. Appending the directive
-        // keeps the envelope consistent; GeneratedDocumentStore enforces the
-        // same rule deterministically as a backstop (#2051).
-        $namedFormat = FileGenerationEnvelope::requestedFormat((string) $context->message->getText());
-        if (null !== $namedFormat) {
-            $prompt .= "\n\nThe file MUST be a .{$namedFormat} file (the user explicitly asked for this format).";
-        }
-        $prompt = $this->withAssistantInstructions($prompt, $context);
+        [$prompt, $documentBody] = $this->promptFor($prompt, $context);
 
         $language = is_string($context->classification['language'] ?? null)
             ? $context->classification['language']
@@ -114,7 +106,10 @@ final readonly class DocumentGenerationRunner implements TaskRunner
             'language' => $language,
         ];
 
-        $options = ['disable_memories' => true];
+        $options = [
+            'disable_memories' => true,
+            'document_body' => $documentBody,
+        ];
         $upstreamImages = $this->upstreamImagePaths($node, $context, $inputs);
         if ([] !== $upstreamImages) {
             // Hand the pictures produced by an upstream node to the officemaker
@@ -284,6 +279,25 @@ final readonly class DocumentGenerationRunner implements TaskRunner
         }
 
         return ltrim($relative, '/');
+    }
+
+    /**
+     * Format rules and assistant instructions are for the model only.
+     * Recovery copies `$documentBody`, the plan before those additions.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function promptFor(string $prompt, NodeContext $context): array
+    {
+        $documentBody = $prompt;
+        // A format named in the original request ("als Excel") wins even when
+        // the planner's prompt no longer mentions it (#2051).
+        $namedFormat = FileGenerationEnvelope::requestedFormat((string) $context->message->getText());
+        if (null !== $namedFormat) {
+            $prompt .= "\n\nThe file MUST be a .{$namedFormat} file (the user explicitly asked for this format).";
+        }
+
+        return [$this->withAssistantInstructions($prompt, $context), $documentBody];
     }
 
     /**
