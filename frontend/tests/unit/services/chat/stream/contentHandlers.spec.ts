@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { contentHandlers, memberContentHandlers } from '@/services/chat/stream/handlers/content'
+import {
+  contentHandlers,
+  memberContentHandlers,
+  rememberStreamBaseline,
+} from '@/services/chat/stream/handlers/content'
 import { assistantMessage, fakeMemberTurn, fakeTurn } from './fakeTurn'
 
 const runningPlan = { active: true, replyNode: 'n3', cards: [] }
@@ -123,6 +127,21 @@ describe('content handlers', () => {
 
     expect(turn.message()?.voiceReplyFailed).toBe('provider_error')
     expect(stop).toHaveBeenCalled()
+  })
+
+  it('drops reasoning this turn already folded when the stream is rebuilt', () => {
+    const message = assistantMessage({
+      parts: [{ type: 'thinking', content: 'kept from before' }],
+    })
+    const turn = fakeTurn(message)
+    rememberStreamBaseline(turn)
+    message.parts.push({ type: 'thinking', content: 'this turn', isStreaming: false })
+    turn.text.content = 'Visible'
+
+    contentHandlers.stream_rebuild({ status: 'stream_rebuild' }, turn)
+
+    expect(message.parts).toEqual([{ type: 'thinking', content: 'kept from before' }])
+    expect(turn.text.content).toBe('')
   })
 
   it('records the run behind the turn and the documentation it cites', () => {

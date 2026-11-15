@@ -350,3 +350,13 @@ Two ways to continue, one per mode:
   holds a stream; every stream ends in a terminal frame.
 - The architect's scaling question answered with production numbers
   (AU35).
+
+## Landed on the S5 branch (2026-11-14)
+
+Signed-in web chat can run in the pump. `RUNTIME.STREAM_PUMP` stays `off`
+and the percent stays `0`, so a normal boot is the in-request stream.
+Guests, widgets, incognito turns and both gateways stay in the request.
+`SYNAPLAN_RELAY` stays off; the watchdog copies frames only when that
+switch is on and the running image contains the relay. Turning the pump
+on for existing installs, which AU32 does after the soak, is not in this
+branch.

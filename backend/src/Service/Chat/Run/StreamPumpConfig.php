@@ -15,6 +15,8 @@ final class StreamPumpConfig
     public const CONFIG_GROUP = 'RUNTIME';
     public const KEY_MODE = 'STREAM_PUMP';
     public const KEY_PERCENT = 'STREAM_PUMP_PERCENT';
+    public const KEY_MAX_BYTES = 'RUN_STREAM_MAX_BYTES';
+    public const DEFAULT_MAX_BYTES = 16777216;
 
     private static ?StreamPumpMode $modeOverride = null;
     private static ?int $percentOverride = null;
@@ -65,6 +67,28 @@ final class StreamPumpConfig
         }
 
         return max(0, min(100, (int) $raw));
+    }
+
+    /**
+     * How large `chatrun:{id}:stream` may grow. A missing or unusable value
+     * is 16 MiB, so an install that has not been seeded still caps the log.
+     */
+    public function maxBytes(): int
+    {
+        if (null === $this->config) {
+            return self::DEFAULT_MAX_BYTES;
+        }
+        try {
+            $raw = $this->config->getValue(0, self::CONFIG_GROUP, self::KEY_MAX_BYTES);
+        } catch (\Throwable) {
+            return self::DEFAULT_MAX_BYTES;
+        }
+        if (!is_string($raw) || !ctype_digit($raw)) {
+            return self::DEFAULT_MAX_BYTES;
+        }
+        $max = (int) $raw;
+
+        return $max > 0 ? $max : self::DEFAULT_MAX_BYTES;
     }
 
     /**

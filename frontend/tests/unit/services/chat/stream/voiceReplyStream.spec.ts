@@ -32,6 +32,49 @@ describe('VoiceReplyStream', () => {
     expect(audio.streamText).toHaveBeenCalledWith('Done.', undefined, 'en')
   })
 
+  it('does not speak a replay of text it has already said', () => {
+    const audio = streamer()
+    const voice = new VoiceReplyStream(() => audio as unknown as AudioStreamer, vi.fn(), 'en')
+
+    voice.feed('Hello. ')
+    voice.suppressReplay()
+    voice.feed('Hello. ')
+    voice.feed('Again.')
+
+    expect(audio.streamText.mock.calls).toEqual([
+      ['Hello. ', undefined, 'en'],
+      ['Again.', undefined, 'en'],
+    ])
+  })
+
+  it('speaks an unfinished prefix once the replay completes the sentence', () => {
+    const audio = streamer()
+    const voice = new VoiceReplyStream(() => audio as unknown as AudioStreamer, vi.fn(), 'en')
+
+    voice.feed('Hello')
+    voice.suppressReplay()
+    voice.feed('Hello world.')
+
+    expect(audio.streamText.mock.calls).toEqual([['Hello world.', undefined, 'en']])
+  })
+
+  it('does not repeat a spoken sentence when a second rebuild arrives early', () => {
+    const audio = streamer()
+    const voice = new VoiceReplyStream(() => audio as unknown as AudioStreamer, vi.fn(), 'en')
+
+    voice.feed('Hello. ')
+    voice.suppressReplay()
+    voice.feed('Hel')
+    voice.suppressReplay()
+    voice.feed('Hello. ')
+    voice.feed('Again.')
+
+    expect(audio.streamText.mock.calls).toEqual([
+      ['Hello. ', undefined, 'en'],
+      ['Again.', undefined, 'en'],
+    ])
+  })
+
   it('speaks the rest at the end and marks the stream complete', () => {
     const audio = streamer()
     const voice = new VoiceReplyStream(() => audio as unknown as AudioStreamer, vi.fn(), 'en')

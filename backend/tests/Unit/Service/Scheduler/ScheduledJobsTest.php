@@ -22,6 +22,7 @@ final class ScheduledJobsTest extends TestCase
                 'app:process-mail-handlers',
                 'app:process-emails',
                 'app:cloud-watches:sweep',
+                'app:runs:reap',
             ],
             'tasks' => [
                 'app:saved-tasks:tick',

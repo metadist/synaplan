@@ -859,8 +859,8 @@ assert_not_contains "chmod -R 775 /var/www/backend/var /var/www/backend/public/u
     "the entrypoint no longer chmods the whole var tree on every start"
 
 echo "Case 13: every role restarts the watchdog, and off means no process"
-assert_eq 3 "$(grep -c '^[[:space:]]*start_watchdog$' "$ENTRYPOINT")" \
-    "the entrypoint starts the watchdog for the web, worker and scheduler roles"
+assert_eq 4 "$(grep -c '^[[:space:]]*start_watchdog$' "$ENTRYPOINT")" \
+    "the entrypoint starts the watchdog for the web, worker, scheduler and pump roles"
 
 WATCHDOG_LOG="$TMP_DIR/watchdog.log"
 cat > "$TMP_DIR/bin/synaplan-watchdog" <<'EOF'
