@@ -2,7 +2,8 @@ import type { StreamUpdatePayload } from '@/types/chatStream'
 import { reconnectDelayMs, resumeFrom } from '@/services/chat/stream/reconnect'
 import { hasSessionHint } from '@/services/sessionHint'
 import { fetchWithBusyRetry, isBusyRefusal } from './busyRetry'
-import { getApiBaseUrl, readSseBody, refreshAccessToken, sseTokenFetchInit } from './chatApi'
+import { readSseBody, refreshAccessToken, sseTokenFetchInit } from './chatApi'
+import { getApiBaseUrl } from './httpClient'
 
 export interface StreamPostRun {
   onUpdate: (data: StreamUpdatePayload) => void
