@@ -52,81 +52,113 @@ final class Version20261115140000 extends AbstractMigration
 
     public function getDescription(): string
     {
-        return 'Raise Mistral Large 4 (BIDs 387/388) to the published $0.70 / $2.10 rate '
-            .'with matching BJSON fingerprints (#2957).';
+        return 'Raise Mistral Large 4 (BIDs 387/388) to the published $0.70 / $2.10 rate, '
+            .'restore a Scaleway row a price sync wrote in euros, and refresh BJSON fingerprints (#2957).';
     }
 
     public function up(Schema $schema): void
     {
         foreach ($this->correctedRows() as $model) {
-            if (!$this->isStillThePreviousCatalogRow($model)) {
+            $read = $this->previousCatalogRow($model);
+            if (null === $read) {
                 continue;
             }
 
-            $json = $model['json'];
-            $json['__catalog_fingerprint'] = $this->fingerprint($model);
+            $this->queueCatalogUpdate($model, $read);
+        }
 
-            // BSELECTABLE / BACTIVE / BISDEFAULT / BSHOWWHENFREE stay out of the SET
-            // clause: they are operator-owned, so an admin's visibility choice survives
-            // this correction exactly as it survives a re-seed. Every other
-            // catalog-owned column IS written, because the fingerprint hashes all of
-            // them — repairing only the price would leave the row mismatched again.
-            $this->addSql(<<<'SQL'
-                UPDATE BMODELS
-                   SET BSERVICE = :service,
-                       BNAME = :name,
-                       BTAG = :tag,
-                       BPROVID = :providerId,
-                       BPRICEIN = :priceIn,
-                       BINUNIT = :inUnit,
-                       BPRICEOUT = :priceOut,
-                       BOUTUNIT = :outUnit,
-                       BQUALITY = :quality,
-                       BRATING = :rating,
-                       BJSON = :json
-                 WHERE BID = :id
-                   AND BPROVID = :providerId
-                   AND ABS(BPRICEIN - :oldPriceIn) < 0.000001
-                   AND ABS(BPRICEOUT - :oldPriceOut) < 0.000001
-                SQL, [
-                'service' => $model['service'],
-                'name' => $model['name'],
-                'tag' => $model['tag'],
-                'providerId' => $model['providerId'],
-                'priceIn' => $model['priceIn'],
-                'inUnit' => $model['inUnit'],
-                'priceOut' => $model['priceOut'],
-                'outUnit' => $model['outUnit'],
-                'quality' => $model['quality'],
-                'rating' => $model['rating'],
-                'json' => json_encode($json, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR),
-                'id' => $model['id'],
-                'oldPriceIn' => self::OLD_PRICE_IN,
-                'oldPriceOut' => self::OLD_PRICE_OUT,
-            ]);
+        $synced = $this->syncedEuroScalewayRow();
+        if (null !== $synced) {
+            $this->queueCatalogUpdate($this->scalewayCatalogRow(), $synced);
         }
     }
 
     /**
-     * Mirrors ModelSeeder::decideAction(): the row's catalog-owned columns hash
-     * to the previous catalog snapshot, and an admin has not edited them since
-     * they were seeded (stored fingerprint, when present, equals that hash).
+     * The UPDATE matches every catalog-owned column of the row that was read.
+     * addSql runs after up() returns, so a price-only WHERE would still
+     * overwrite a rename or JSON edit that landed in between.
+     *
+     * BSELECTABLE / BACTIVE / BISDEFAULT / BSHOWWHENFREE stay out of both
+     * clauses: they are operator-owned.
      *
      * @param array<string, mixed> $model corrected catalog row
+     * @param array<string, mixed> $read  raw BMODELS row
      */
-    private function isStillThePreviousCatalogRow(array $model): bool
+    private function queueCatalogUpdate(array $model, array $read): void
     {
-        $row = $this->connection->fetchAssociative(
-            'SELECT BSERVICE, BNAME, BTAG, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON FROM BMODELS WHERE BID = :id',
-            ['id' => $model['id']],
-        );
-        if (false === $row) {
-            return false;
+        $json = $model['json'];
+        $json['__catalog_fingerprint'] = $this->fingerprint($model);
+
+        $this->addSql(<<<'SQL'
+            UPDATE BMODELS
+               SET BSERVICE = :service,
+                   BNAME = :name,
+                   BTAG = :tag,
+                   BPROVID = :providerId,
+                   BPRICEIN = :priceIn,
+                   BINUNIT = :inUnit,
+                   BPRICEOUT = :priceOut,
+                   BOUTUNIT = :outUnit,
+                   BQUALITY = :quality,
+                   BRATING = :rating,
+                   BJSON = :json
+             WHERE BID = :id
+               AND BSERVICE = :prevService
+               AND BNAME = :prevName
+               AND BTAG = :prevTag
+               AND BPROVID = :prevProviderId
+               AND BINUNIT = :prevInUnit
+               AND BOUTUNIT = :prevOutUnit
+               AND ABS(BPRICEIN - :prevPriceIn) < 0.000001
+               AND ABS(BPRICEOUT - :prevPriceOut) < 0.000001
+               AND ABS(BQUALITY - :prevQuality) < 0.000001
+               AND ABS(BRATING - :prevRating) < 0.000001
+               AND BJSON = :prevJson
+            SQL, [
+            'service' => $model['service'],
+            'name' => $model['name'],
+            'tag' => $model['tag'],
+            'providerId' => $model['providerId'],
+            'priceIn' => $model['priceIn'],
+            'inUnit' => $model['inUnit'],
+            'priceOut' => $model['priceOut'],
+            'outUnit' => $model['outUnit'],
+            'quality' => $model['quality'],
+            'rating' => $model['rating'],
+            'json' => json_encode($json, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE | \JSON_THROW_ON_ERROR),
+            'id' => $model['id'],
+            'prevService' => (string) $read['BSERVICE'],
+            'prevName' => (string) $read['BNAME'],
+            'prevTag' => (string) $read['BTAG'],
+            'prevProviderId' => (string) $read['BPROVID'],
+            'prevInUnit' => (string) $read['BINUNIT'],
+            'prevOutUnit' => (string) $read['BOUTUNIT'],
+            'prevPriceIn' => (float) $read['BPRICEIN'],
+            'prevPriceOut' => (float) $read['BPRICEOUT'],
+            'prevQuality' => (float) $read['BQUALITY'],
+            'prevRating' => (float) $read['BRATING'],
+            'prevJson' => (string) $read['BJSON'],
+        ]);
+    }
+
+    /**
+     * The row's catalog-owned columns hash to the previous catalog snapshot,
+     * and an admin has not edited them since they were seeded.
+     *
+     * @param array<string, mixed> $model corrected catalog row
+     *
+     * @return array<string, mixed>|null raw BMODELS row when it may be updated
+     */
+    private function previousCatalogRow(array $model): ?array
+    {
+        $row = $this->readCatalogRow((int) $model['id']);
+        if (null === $row) {
+            return null;
         }
 
         $json = json_decode((string) $row['BJSON'], true);
         if (!is_array($json)) {
-            return false;
+            return null;
         }
         $stored = $json['__catalog_fingerprint'] ?? null;
         unset($json['__catalog_fingerprint']);
@@ -145,7 +177,7 @@ final class Version20261115140000 extends AbstractMigration
             'json' => $json,
         ]);
         if (is_string($stored) && $stored !== $current) {
-            return false;
+            return null;
         }
 
         $previous = $model;
@@ -154,7 +186,130 @@ final class Version20261115140000 extends AbstractMigration
         $previous['json']['cache_read_price_per_1M'] = 0.068;
         $previous['json']['description'] = self::PREVIOUS_DESCRIPTIONS[(int) $model['id']];
 
-        return $current === $this->fingerprint($previous);
+        return $current === $this->fingerprint($previous) ? $row : null;
+    }
+
+    /**
+     * A price sync that copied Scaleway's euro list into the USD columns.
+     * An admin price, or a row whose other catalog fields were edited, is left
+     * alone. The catalog price itself did not move, so the seeder would
+     * otherwise keep the synced rate.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function syncedEuroScalewayRow(): ?array
+    {
+        $row = $this->readCatalogRow(426);
+        if (null === $row) {
+            return null;
+        }
+        if (abs((float) $row['BPRICEIN'] - 0.40) >= 0.000001 || abs((float) $row['BPRICEOUT'] - 0.80) >= 0.000001) {
+            return null;
+        }
+
+        $json = json_decode((string) $row['BJSON'], true);
+        if (!is_array($json) || 'litellm' !== ($json['__price_owner'] ?? null)) {
+            return null;
+        }
+        if (abs((float) ($json['cache_read_price_per_1M'] ?? -1) - 0.08) >= 0.000001) {
+            return null;
+        }
+
+        $snapshot = $json['__catalog_price_at_sync'] ?? null;
+        if (!is_array($snapshot)
+            || abs((float) ($snapshot['priceIn'] ?? -1) - 0.4466) >= 0.000001
+            || abs((float) ($snapshot['priceOut'] ?? -1) - 0.8932) >= 0.000001
+            || abs((float) ($snapshot['cache_read_price_per_1M'] ?? -1) - 0.0893) >= 0.000001
+        ) {
+            return null;
+        }
+
+        $catalog = $this->scalewayCatalogRow();
+        $live = [
+            'service' => (string) $row['BSERVICE'],
+            'name' => (string) $row['BNAME'],
+            'tag' => (string) $row['BTAG'],
+            'providerId' => (string) $row['BPROVID'],
+            'quality' => (float) $row['BQUALITY'],
+            'rating' => (float) $row['BRATING'],
+            'json' => $json,
+        ];
+
+        return $this->fingerprint($this->withoutPrice($live)) === $this->fingerprint($this->withoutPrice($catalog))
+            ? $row
+            : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function readCatalogRow(int $id): ?array
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT BSERVICE, BNAME, BTAG, BPROVID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BQUALITY, BRATING, BJSON FROM BMODELS WHERE BID = :id',
+            ['id' => $id],
+        );
+
+        return false === $row ? null : $row;
+    }
+
+    /**
+     * Price columns and the keys a price sync writes are ignored, so a pure
+     * price write still matches the catalog.
+     *
+     * @param array<string, mixed> $row
+     *
+     * @return array<string, mixed>
+     */
+    private function withoutPrice(array $row): array
+    {
+        $copy = $row;
+        $copy['priceIn'] = 0.0;
+        $copy['priceOut'] = 0.0;
+        $copy['inUnit'] = '';
+        $copy['outUnit'] = '';
+
+        $json = is_array($copy['json'] ?? null) ? $copy['json'] : [];
+        unset(
+            $json['__catalog_fingerprint'],
+            $json['__price_owner'],
+            $json['__catalog_price_at_sync'],
+            $json['pricePinned'],
+            $json['pricing_mode'],
+            $json['cache_read_price_per_1M'],
+            $json['mode_prices'],
+        );
+        $copy['json'] = $json;
+
+        return $copy;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function scalewayCatalogRow(): array
+    {
+        return [
+            'id' => 426,
+            'service' => 'Scaleway',
+            'name' => 'DeepSeek V4 Flash',
+            'tag' => 'chat',
+            'providerId' => 'deepseek-v4-flash-0731',
+            'priceIn' => 0.4466,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.8932,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'DeepSeek V4 Flash (0731) on Scaleway (Paris). Preview. Chat and code, no images. Cached input is €0.08 per million.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'deepseek-v4-flash-0731'],
+                'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 0.0893,
+                'meta' => ['context_window' => '262144', 'max_output' => '32768', 'host' => 'api.scaleway.ai', 'jurisdiction' => 'FR', 'preview' => true],
+            ],
+        ];
     }
 
     public function down(Schema $schema): void
