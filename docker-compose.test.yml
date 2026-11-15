@@ -103,7 +103,7 @@ services:
 
   # MariaDB Test Database
   db_test:
-    image: mariadb:13.0.2@sha256:f4054da26e3a9dd6c8b5cc97363e544408b15c0fb369d7359c25dc04826eb6e1
+    image: mariadb:13.0.2@sha256:54f493ea0d60b621a5bff84e5b20100f8b86b6efa6b79158e04756c5194a5e4d
     container_name: synaplan-db-test
     command: --max-allowed-packet=256M --innodb-buffer-pool-size=256M
     environment:
@@ -137,7 +137,7 @@ services:
       - synaplan-test-network
 
   redis_test:
-    image: redis:8.10-alpine@sha256:71885d8cc6e42f2bc0aa2eb853bfc4be200b5108a46ac50e117ae1df0531fb80
+    image: redis:8.10-alpine@sha256:7958cfbb9d152f87dadfbc89f1b0b15938f0b81ff8982feb327476f4911935c3
     container_name: synaplan-redis-test
     restart: "no"
     networks:
@@ -175,7 +175,7 @@ services:
   # Ollama API stub (deterministic responses for OllamaProvider integration tests).
   # Same pattern as whatsapp-stub: pinned node:22-alpine + bind mount so CI `docker compose pull` retries cover it.
   ollama-stub:
-    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
+    image: node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
     container_name: synaplan-ollama-stub
     user: node
     working_dir: /app
@@ -195,7 +195,7 @@ services:
   # Uses node:22-alpine directly instead of a Dockerfile build so that
   # `docker compose pull` (with retry) covers this image too.
   whatsapp-stub:
-    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
+    image: node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
     container_name: synaplan-whatsapp-stub
     user: node
     working_dir: /app
@@ -213,7 +213,7 @@ services:
       - synaplan-test-network
 
   telegram-stub:
-    image: node:26-alpine@sha256:8996bb5821d62a8fd9bb27c1cb07462f3fdce6e47d640c6a881ead0b064ce216
+    image: node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
     container_name: synaplan-telegram-stub-test
     user: node
     working_dir: /app
@@ -256,7 +256,7 @@ services:
 
   # Keycloak OIDC Identity Provider (optional - activated with --profile oidc)
   keycloak_test:
-    image: quay.io/keycloak/keycloak:26.8@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
+    image: quay.io/keycloak/keycloak:26.8@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     container_name: synaplan-keycloak-test
     depends_on:
       keycloak_certs:
@@ -289,7 +289,7 @@ services:
       - synaplan-test-network
 
   keycloak_setup:
-    image: quay.io/keycloak/keycloak:26.8@sha256:723b1d6e254c0fc96d5cffec860c7e0744d6a3277822b865bb538cf891575e41
+    image: quay.io/keycloak/keycloak:26.8@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
     container_name: synaplan-keycloak-setup-test
     depends_on:
       keycloak_test:
