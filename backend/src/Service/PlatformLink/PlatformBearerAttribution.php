@@ -146,7 +146,20 @@ final readonly class PlatformBearerAttribution
         if ($existing instanceof ExternalIdentity) {
             return;
         }
-        $row = $this->identities->upsert((int) $user->getId(), $instance->getClient(), $externalId, $instance->getInstanceId(), null, ExternalIdentity::MODE_SSO);
+        // Another first-use request of this same person may have inserted the
+        // row after the lookup above. That request owns the resume and the
+        // audit entry; this one continues with the row that won.
+        $row = $this->identities->insertIfAbsent(
+            (int) $user->getId(),
+            $instance->getClient(),
+            $externalId,
+            $instance->getInstanceId(),
+            null,
+            ExternalIdentity::MODE_SSO,
+        );
+        if (!$row instanceof ExternalIdentity) {
+            return;
+        }
         $row->setStatus(ExternalIdentity::STATUS_ACTIVE);
         $this->entityManager->flush();
         $this->effects->onResumed($row);
