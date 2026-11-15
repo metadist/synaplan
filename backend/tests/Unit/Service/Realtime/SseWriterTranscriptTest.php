@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Realtime;
 
 use App\Service\Chat\Run\ChatRunRecorder;
+use App\Service\Chat\Run\StreamFrameSink;
 use App\Service\Realtime\SseWriter;
 use PHPUnit\Framework\TestCase;
 
@@ -34,5 +35,26 @@ final class SseWriterTranscriptTest extends TestCase
         self::assertArrayNotHasKey('providerMessages', $recorded);
         self::assertStringContainsString('providerMessages', $frame);
         self::assertStringContainsString('Hello', $frame);
+    }
+
+    public function testTheRunStreamStoresTheFrameWithoutTheTranscript(): void
+    {
+        $sink = new class implements StreamFrameSink {
+            public string $stored = '';
+
+            public function write(string $bytes): void
+            {
+                $this->stored .= $bytes;
+            }
+        };
+
+        $writer = new SseWriter(false, $sink);
+        $writer->send('complete', [
+            'messageId' => 7,
+            'providerMessages' => ['messages' => [['role' => 'you', 'text' => 'Hello']]],
+        ]);
+
+        self::assertStringNotContainsString('providerMessages', $sink->stored);
+        self::assertStringContainsString('"messageId":7', $sink->stored);
     }
 }

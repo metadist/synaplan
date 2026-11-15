@@ -148,7 +148,8 @@
             class="border-t border-gray-200 dark:border-gray-700 mb-3 -mx-4"
           ></div>
 
-          <ProcessingTimeline :steps="visibleTimelineSteps" :model="timelineModel">
+          <StreamReconnectNote v-if="processingStatus === 'reconnecting'" />
+          <ProcessingTimeline v-else :steps="visibleTimelineSteps" :model="timelineModel">
             <template #active-extra="{ step }">
               <ul
                 v-if="step.key === 'file' && documentStepList.length > 0"
@@ -1129,6 +1130,7 @@ import type { AIModel } from '@/types/ai-models'
 import type { RagSourceRef } from '@/stores/history'
 import { useNotification } from '@/composables/useNotification'
 import MessageDocumentChip from '@/components/chat/MessageDocumentChip.vue'
+import StreamReconnectNote from '@/components/chat/StreamReconnectNote.vue'
 import MessageFileGroup from '@/components/chat/MessageFileGroup.vue'
 import MessageMediaStrip from '@/components/chat/MessageMediaStrip.vue'
 import {

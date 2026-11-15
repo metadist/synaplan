@@ -140,6 +140,7 @@ final readonly class ChatStreamOrchestrator
             $turn->caller->runOwnerKey(),
             is_numeric($turn->chatId) ? (int) $turn->chatId : null,
             (string) $turn->trackId,
+            $turn->assignedRunId,
         );
         $sse->attachRun($run);
         if (null !== $run) {

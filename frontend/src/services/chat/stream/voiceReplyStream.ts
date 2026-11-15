@@ -28,6 +28,16 @@ export class VoiceReplyStream {
     return this.heard
   }
 
+  /**
+   * The same answer is about to be fed again from the start. `spokenLength`
+   * stays where it is: it is the prefix already given to the audio streamer,
+   * and a later rebuild must not move that mark backwards.
+   */
+  suppressReplay(): void {
+    this.heard = ''
+    this.insideThink = false
+  }
+
   feed(chunk: string): void {
     const streamer = this.streamer()
     if (!streamer) return

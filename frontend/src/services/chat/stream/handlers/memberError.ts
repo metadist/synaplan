@@ -219,6 +219,11 @@ export const memberErrorHandler: StreamStatusHandler<MemberTurn> = (data, turn) 
 
   // Refusals before the turn started carry a transport code, not a sentence.
   if (data.code === 'server_busy') return endAsBusy(turn)
+  if (data.code === 'reconnect_exhausted') {
+    turn.outcome.showError(turn.t('chatError.reconnectingFailed'), 12000)
+    finishedOnTransportDrop(turn)
+    return
+  }
   if (data.code === 'auth_required') return endAsFailure(data, turn.t('chatError.busyAuth'), turn)
   if (data.code === 'rate_limited') return endAsFailure(data, turn.t('chatError.busyLimit'), turn)
   if (data.code === 'server_error') return endAsFailure(data, turn.t('chatError.busyServer'), turn)
