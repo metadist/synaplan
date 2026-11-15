@@ -148,13 +148,7 @@
             class="border-t border-gray-200 dark:border-gray-700 mb-3 -mx-4"
           ></div>
 
-          <p
-            v-if="processingStatus === 'reconnecting'"
-            class="text-sm txt-secondary"
-            data-testid="stream-reconnecting"
-          >
-            {{ t('processing.reconnectingDesc') }}
-          </p>
+          <StreamReconnectNote v-if="processingStatus === 'reconnecting'" />
           <ProcessingTimeline v-else :steps="visibleTimelineSteps" :model="timelineModel">
             <template #active-extra="{ step }">
               <ul
@@ -1136,6 +1130,7 @@ import type { AIModel } from '@/types/ai-models'
 import type { RagSourceRef } from '@/stores/history'
 import { useNotification } from '@/composables/useNotification'
 import MessageDocumentChip from '@/components/chat/MessageDocumentChip.vue'
+import StreamReconnectNote from '@/components/chat/StreamReconnectNote.vue'
 import MessageFileGroup from '@/components/chat/MessageFileGroup.vue'
 import MessageMediaStrip from '@/components/chat/MessageMediaStrip.vue'
 import {

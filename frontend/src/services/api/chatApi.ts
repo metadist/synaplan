@@ -21,8 +21,7 @@ export {
   type ConversationFileRow,
 } from './conversationFileSchema'
 import type { StreamUpdatePayload } from '@/types/chatStream'
-import { fetchWithBusyRetry, isBusyRefusal } from './busyRetry'
-import { reconnectDelayMs, resumeFrom } from '@/services/chat/stream/reconnect'
+import { runStreamPost } from './streamPost'
 
 /**
  * Map a recorder MIME type to an audio file extension the backend accepts and
@@ -63,7 +62,7 @@ export const audioRecordingFilename = (mimeType: string | undefined): string => 
  * `/auth/token` value is then handed to `EventSource` via the `?token=` query
  * param (EventSource can't set headers).
  */
-function sseTokenFetchInit(): RequestInit {
+export function sseTokenFetchInit(): RequestInit {
   if (isNativeApp()) {
     const token = getNativeAccessToken()
     return {
@@ -141,7 +140,7 @@ export function getInFlightRefresh(): Promise<boolean> | null {
   return tokenRefreshPromise
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+export async function refreshAccessToken(): Promise<boolean> {
   if (!hasSessionHint()) {
     return false
   }
@@ -436,7 +435,7 @@ export interface IncognitoHistoryEntry {
  * connection, so the caller would retry the turn and then append a bogus
  * "Connection interrupted" on top of the real error the user needs to read.
  */
-async function readSseBody(
+export async function readSseBody(
   body: ReadableStream<Uint8Array>,
   onUpdate: (data: StreamUpdatePayload) => void,
   isStopped: () => boolean,
@@ -503,208 +502,30 @@ async function readSseBody(
   return terminalReceived
 }
 
-async function resumeAttachedStream(
-  runId: string,
-  sawId: () => boolean,
-  lastSeq: () => number,
-  onUpdate: (data: StreamUpdatePayload) => void,
-  noteId: (seq: number) => void,
-  isStopped: () => boolean,
-  signal: AbortSignal
-): Promise<boolean> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (signal.aborted || isStopped()) return false
-    onUpdate({ status: 'reconnecting' })
-    await waitForReconnect(reconnectDelayMs(attempt), signal)
-    if (signal.aborted || isStopped()) return false
-    const plan = resumeFrom(sawId(), lastSeq())
-    if (plan.rebuild) onUpdate({ status: 'stream_rebuild' })
-
-    try {
-      const authInit = sseTokenFetchInit()
-      const params = new URLSearchParams({ runId, from: String(plan.from) })
-      const load = () =>
-        fetch(`${getApiBaseUrl()}/api/v1/messages/stream/attach?${params}`, {
-          method: 'GET',
-          credentials: authInit.credentials,
-          headers: {
-            ...((authInit.headers as Record<string, string> | undefined) ?? {}),
-            Accept: 'text/event-stream',
-          },
-          signal,
-        })
-      let response = await load()
-      if (response.status === 401) {
-        const refreshed = await refreshAccessToken()
-        if (refreshed && !signal.aborted && !isStopped()) response = await load()
-      }
-      if (signal.aborted || isStopped()) return false
-      if (!response.ok || !response.body) continue
-      const terminal = await readSseBody(response.body, onUpdate, isStopped, noteId)
-      if (terminal) return true
-    } catch (error) {
-      if (
-        signal.aborted ||
-        isStopped() ||
-        (error instanceof DOMException && error.name === 'AbortError')
-      ) {
-        return false
-      }
-    }
-  }
-  return false
-}
-
-function waitForReconnect(delayMs: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, delayMs)
-    signal.addEventListener(
-      'abort',
-      () => {
-        clearTimeout(timer)
-        resolve()
-      },
-      { once: true }
-    )
-  })
-}
-
 function openStreamPost(
   body: Record<string, string | IncognitoHistoryEntry[]>,
   onUpdate: (data: StreamUpdatePayload) => void
 ): () => void {
   const controller = new AbortController()
   let isStopped = false
-
   const authInit = sseTokenFetchInit()
-  const doFetch = () =>
-    fetch(`${getApiBaseUrl()}/api/v1/messages/stream`, {
-      method: 'POST',
-      credentials: authInit.credentials,
-      headers: {
-        ...(authInit.headers ?? {}),
-        'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    })
-
-  const onBusy = () => {
-    if (!isStopped) onUpdate({ status: 'busy' })
-  }
-  ;(async () => {
-    let runId = ''
-    let lastSeq = 0
-    let sawId = false
-    const observe = (data: StreamUpdatePayload) => {
-      if (data.status === 'run_started' && typeof data.runId === 'string' && data.runId !== '') {
-        runId = data.runId
-      }
-      onUpdate(data)
-    }
-    const noteId = (seq: number) => {
-      lastSeq = seq
-      sawId = true
-    }
-    const giveUp = () => {
-      if (isStopped) return
-      onUpdate(
-        runId
-          ? { status: 'error', code: 'reconnect_exhausted', error: 'Connection interrupted' }
-          : { status: 'error', error: 'Connection interrupted' }
-      )
-    }
-    try {
-      // A full stream pool refuses before PHP starts (503 + server_busy):
-      // retried here; the turn only sees `busy`, then a plain error.
-      let response = await fetchWithBusyRetry(doFetch, { onBusy })
-
-      // Expired access cookie: refresh once, then retry. Mirrors the 401
-      // handling the old EventSource path did via /auth/token.
-      if (response.status === 401) {
-        const refreshed = await refreshAccessToken()
-        if (refreshed && !isStopped) {
-          response = await fetchWithBusyRetry(doFetch, { onBusy })
-        }
-      }
-
-      if (isStopped) return
-
-      if (!response.ok) {
-        console.error(`🚫 Stream connection failed (HTTP ${response.status})`)
-        if (await isBusyRefusal(response)) {
-          onUpdate({ status: 'error', code: 'server_busy' })
-          return
-        }
-        onUpdate(
-          response.status === 401 && !hasSessionHint()
-            ? {
-                status: 'error',
-                code: 'auth_required',
-                error: 'Authentication required. Please log in again to continue.',
-                message: 'Your session has expired. Please refresh the page and log in again.',
-              }
-            : { status: 'error', code: response.status === 429 ? 'rate_limited' : 'server_error' }
-        )
-        return
-      }
-
-      if (!response.body) {
-        onUpdate({ status: 'error', error: 'Streaming not supported by this browser' })
-        return
-      }
-
-      const terminalReceived = await readSseBody(response.body, observe, () => isStopped, noteId)
-
-      // Stream closed without a terminal event: the backend always ends a
-      // turn with 'complete' or 'error', so this is a dropped connection or
-      // a crashed worker. A turn that already has a run id is re-attached
-      // before that drop is shown.
-      if (!terminalReceived && !isStopped) {
-        if (
-          runId &&
-          (await resumeAttachedStream(
-            runId,
-            () => sawId,
-            () => lastSeq,
-            observe,
-            noteId,
-            () => isStopped,
-            controller.signal
-          ))
-        ) {
-          return
-        }
-        console.error('❌ Stream ended without completion event')
-        giveUp()
-      }
-    } catch (error) {
-      if (isStopped || (error instanceof DOMException && error.name === 'AbortError')) {
-        return
-      }
-      if (
-        runId &&
-        (await resumeAttachedStream(
-          runId,
-          () => sawId,
-          () => lastSeq,
-          observe,
-          noteId,
-          () => isStopped,
-          controller.signal
-        ))
-      ) {
-        return
-      }
-      console.error('🚫 Stream setup error:', error)
-      if (!runId) {
-        onUpdate({ status: 'error', error: 'Failed to connect' })
-        return
-      }
-      giveUp()
-    }
-  })()
+  void runStreamPost({
+    onUpdate,
+    signal: controller.signal,
+    isStopped: () => isStopped,
+    doFetch: () =>
+      fetch(`${getApiBaseUrl()}/api/v1/messages/stream`, {
+        method: 'POST',
+        credentials: authInit.credentials,
+        headers: {
+          ...(authInit.headers ?? {}),
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      }),
+  })
 
   return () => {
     isStopped = true
