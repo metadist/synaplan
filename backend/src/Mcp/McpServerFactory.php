@@ -45,11 +45,11 @@ use App\Service\Tool\ToolSource;
 use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
-use Mcp\Exception\ResourceNotFoundException;
-use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
-use Mcp\Server;
 use Mcp\Server\Builder;
+use Mcp\Server\Exception\ResourceNotFoundException;
+use Mcp\Server\Exception\ToolCallException;
+use Mcp\Server\Server;
 use Mcp\Server\Session\Psr16SessionStore;
 use Mcp\Server\Session\SessionStoreInterface;
 use Psr\Cache\CacheItemPoolInterface;
@@ -58,7 +58,7 @@ use Symfony\Component\Cache\Psr16Cache;
 use Symfony\Contracts\Service\Attribute\Required;
 
 /**
- * Builds a per-request MCP {@see Server} exposing a curated, user-scoped set of
+ * Builds a per-request MCP server exposing a curated, user-scoped set of
  * Synaplan capabilities as MCP tools.
  *
  * Design notes:

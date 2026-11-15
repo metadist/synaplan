@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
-use Mcp\Exception\ToolCallException;
 use Mcp\Schema\ToolAnnotations;
 use Mcp\Server\Builder;
+use Mcp\Server\Exception\ToolCallException;
 
 /**
  * The public MCP tool catalog (names, descriptions, schemas).
