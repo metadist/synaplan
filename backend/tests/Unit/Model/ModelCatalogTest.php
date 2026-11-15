@@ -217,28 +217,24 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * #2859: LiteLLM still carries Mistral's pre-discount list rate for Mistral
-     * Large 4 (in 1.36 / cached 0.14 / out 4.18) while the official page bills
-     * the launch rate the catalog holds (0.68 / 0.068 / 2.09). Both rows share
-     * the providerId, so one entry must silence chat (387) and vision (388).
+     * #2957: LiteLLM stores Scaleway's euro list for DeepSeek V4 Flash 0731
+     * (in 0.40 / cached 0.08 / out 0.80) as US dollars. The catalog keeps the
+     * USD conversion. One entry covers the single chat row.
      */
-    public function testMistralLarge4DeviationPinsLiteLLMsListRate(): void
+    public function testScalewayDeepseekFlashDeviationPinsEuroRatesAsDollars(): void
     {
-        $entry = ModelCatalog::litellmDeviations()['mistral:mistral-large-4'] ?? null;
+        $entry = ModelCatalog::litellmDeviations()['scaleway:deepseek-v4-flash-0731'] ?? null;
 
-        $this->assertNotNull($entry, 'LITELLM_DEVIATIONS must record the verified Mistral Large 4 error');
-        $this->assertSame(1.36, $entry['litellm_in']);
-        $this->assertSame(4.18, $entry['litellm_out']);
-        $this->assertSame(0.14, $entry['litellm_cache_read']);
-        $this->assertSame('https://docs.mistral.ai/inference/pricing', $entry['source']);
-        $this->assertSame('2026-11-01', $entry['verifiedOn']);
+        $this->assertNotNull($entry, 'LITELLM_DEVIATIONS must record the verified Scaleway euro-as-dollar error');
+        $this->assertSame(0.40, $entry['litellm_in']);
+        $this->assertSame(0.80, $entry['litellm_out']);
+        $this->assertSame(0.08, $entry['litellm_cache_read']);
+        $this->assertSame('https://www.scaleway.com/en/pricing/model-as-a-service/', $entry['source']);
+        $this->assertSame('2026-11-15', $entry['verifiedOn']);
         $this->assertNotSame('', trim($entry['reason']));
-
-        // The key covers the providerId, and the drift log names both BIDs —
-        // a dropped or added mistral-large-4 row must make this claim fail.
         $this->assertSame(
-            [387, 388],
-            array_map(static fn (array $row): int => $row['id'], ModelCatalog::find('mistral:mistral-large-4')),
+            [426],
+            array_map(static fn (array $row): int => $row['id'], ModelCatalog::find('scaleway:deepseek-v4-flash-0731')),
         );
     }
 
@@ -585,11 +581,10 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * Mistral Large 4 is a public-preview id. `mistral-large-latest` still
-     * resolves to Large 3, and the catalog price is the launch discount
-     * ($0.68 / $2.09), not the $1.36 / $4.18 list.
+     * Mistral Large 4 is a pinned id. `mistral-large-latest` still resolves to
+     * Large 3, and the catalog price is the published GA rate ($0.70 / $2.10).
      */
-    public function testMistralLarge4IsPinnedToThePreviewIdAndLaunchPrice(): void
+    public function testMistralLarge4IsPinnedToItsOwnIdAndPublishedPrice(): void
     {
         $rows = ModelCatalog::find('mistral:mistral-large-4');
 
@@ -604,9 +599,9 @@ class ModelCatalogTest extends TestCase
             $this->assertSame('Mistral', $row['service']);
             $this->assertSame('mistral-large-4', $row['providerId']);
             $this->assertSame('mistral-large-4', $row['json']['params']['model'] ?? null);
-            $this->assertEqualsWithDelta(0.68, (float) $row['priceIn'], 1e-9);
-            $this->assertEqualsWithDelta(2.09, (float) $row['priceOut'], 1e-9);
-            $this->assertEqualsWithDelta(0.068, (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertEqualsWithDelta(0.70, (float) $row['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(2.10, (float) $row['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.07, (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
         }
 
         $chat = ModelCatalog::find('mistral:mistral-large-4:chat')[0];
@@ -682,7 +677,7 @@ class ModelCatalogTest extends TestCase
             'gemini-3-flash-preview' => ['google:gemini-3-flash-preview', 0.05],
             'mistral-medium-3.5' => ['mistral:mistral-medium-latest', 0.15],
             'mistral-large-3' => ['mistral:mistral-large-latest', 0.05],
-            'mistral-large-4' => ['mistral:mistral-large-4', 0.068],
+            'mistral-large-4' => ['mistral:mistral-large-4', 0.07],
             'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
             'gemini-4-argon' => ['google:gemini-4-argon', 0.10],
             'gemini-4-carbon' => ['google:gemini-4-carbon', 0.10],

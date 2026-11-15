@@ -1141,6 +1141,33 @@ class SyncModelPricesCommandTest extends TestCase
         $this->assertStringContainsString('missing long-context tier (LiteLLM has above_Nk, catalog none)', $this->commandTester->getDisplay());
     }
 
+    public function testFullyRetiredModelDoesNotFlagAMissingLongContextTier(): void
+    {
+        $model = $this->createModelMock('Google', 'gemini-2.5-pro', 1.25, 10.0, id: 61);
+
+        $this->mockLiteLLMResponse([
+            'gemini-2.5-pro' => [
+                'litellm_provider' => 'vertex_ai-language-models',
+                'mode' => 'chat',
+                'input_cost_per_token' => 0.00000125,
+                'output_cost_per_token' => 0.00001,
+                'input_cost_per_token_above_200k_tokens' => 0.0000025,
+                'output_cost_per_token_above_200k_tokens' => 0.000015,
+            ],
+        ]);
+
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('findAll')->willReturn([$model]);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findCurrentPrice')->willReturn(null);
+
+        $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
+
+        $this->assertSame(Command::SUCCESS, $this->commandTester->getStatusCode());
+        $this->assertStringNotContainsString('missing long-context tier', $this->commandTester->getDisplay());
+        $this->assertTrue(ModelCatalog::isFullyRetired('gemini-2.5-pro'));
+    }
+
     public function testCatalogTierWithoutLiteLLMTierIsNotDrift(): void
     {
         $model = $this->createModelMock('OpenAI', 'gpt-5.4', 2.5, 15.0, id: 250, json: [
