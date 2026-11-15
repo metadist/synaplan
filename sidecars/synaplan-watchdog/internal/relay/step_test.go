@@ -15,11 +15,11 @@ func TestStepCopiesAFrameAndClosesOnTerminal(t *testing.T) {
 	}
 }
 
-func TestStepClosesAGapWithTheDirectiveTerminal(t *testing.T) {
+func TestStepClosesAGapWithTheGapPayload(t *testing.T) {
 	st := &State{}
-	d := Directive{SSEIDs: true, Terminal: "data: gap\n\n", Idle: 60, KeepAlive: 15}
-	body, done := Step(st, &Frame{Seq: 2, Kind: KindGap, Body: "ignored"}, 0, d, true)
-	if !done || body != "data: gap\n\n" {
+	d := Directive{SSEIDs: true, Terminal: "data: lost\n\n", Idle: 60, KeepAlive: 15}
+	body, done := Step(st, &Frame{Seq: 2, Kind: KindGap, Body: "data: capped\n\n"}, 0, d, true)
+	if !done || body != "data: capped\n\n" {
 		t.Fatalf("gap = %q done=%v", body, done)
 	}
 }

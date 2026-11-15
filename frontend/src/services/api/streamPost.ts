@@ -103,6 +103,7 @@ async function resumeAttachedStream(
   isStopped: () => boolean,
   signal: AbortSignal
 ): Promise<boolean> {
+  if (runId === '') return false
   for (let attempt = 0; attempt < 3; attempt++) {
     if (signal.aborted || isStopped()) return false
     onUpdate({ status: 'reconnecting' })

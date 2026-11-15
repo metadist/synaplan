@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Chat\Run;
 
 use App\Service\Infrastructure\RedisService;
+use Symfony\Contracts\Service\ResetInterface;
 
 /**
  * The pump's Redis keys: the job stream, one expiring body, the run
@@ -14,7 +15,7 @@ use App\Service\Infrastructure\RedisService;
  * prefix. A body that expired is claimed as a miss; the caller writes the
  * terminal frame.
  */
-final class StreamRedis
+final class StreamRedis implements ResetInterface
 {
     public const JOB_TTL_SECONDS = 120;
 
@@ -32,6 +33,11 @@ final class StreamRedis
         private readonly RedisService $redis,
         private readonly StreamPumpConfig $limits,
     ) {
+    }
+
+    public function reset(): void
+    {
+        $this->cachedMaxBytes = null;
     }
 
     /**

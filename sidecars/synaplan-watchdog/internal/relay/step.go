@@ -38,6 +38,9 @@ func Step(st *State, frame *Frame, advancedMs int, d Directive, alive bool) (str
 			body = fmt.Sprintf("id: %d\n%s", frame.Seq, frame.Body)
 		}
 		if frame.Kind == KindGap {
+			if frame.Body != "" {
+				return frame.Body, true
+			}
 			return d.Terminal, true
 		}
 		return body, frame.Kind == KindTerminal
