@@ -14,6 +14,7 @@ use App\Service\Iam\AuditLogWriter;
 use App\Service\PlatformLink\Exception\PlatformSsoException;
 use App\Service\PlatformLink\LifecycleEffect;
 use App\Service\PlatformLink\PlatformLifecycleService;
+use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * The link between a person and one cloud account, kept in step with that
@@ -31,6 +32,7 @@ final readonly class CloudLinkService
         private AuditLogWriter $audit,
         private PlatformLifecycleService $lifecycle,
         private CloudGrantMailer $mail,
+        private EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -46,24 +48,19 @@ final readonly class CloudLinkService
     {
         $externalId = trim($externalId);
         $existing = $this->identities->findOneByTriple($instance->getClient(), $instance->getInstanceId(), $externalId);
-        $previousOwner = $existing instanceof ExternalIdentity ? $existing->getUserId() : null;
         if ($existing instanceof ExternalIdentity && in_array($existing->getMode(), [ExternalIdentity::MODE_PROVISION, ExternalIdentity::MODE_SSO], true)) {
             throw new CloudLinkRefused('This cloud account cannot be linked.');
         }
-        if ($existing instanceof ExternalIdentity && null !== $previousOwner && $previousOwner !== $userId) {
-            $this->tokens->revokeForAccount($instance->getInstanceId(), $previousOwner, $externalId);
-            $this->releaseKey($existing);
-            $existing->setReadScope(['mode' => 'watched', 'folders' => []]);
-            $this->effects->onDeleted($existing);
-        }
 
-        $identity = $this->identities->upsert($userId, $instance->getClient(), $externalId, $instance->getInstanceId(), null, ExternalIdentity::MODE_LINK);
-        if (null !== $previousOwner && $previousOwner !== $userId) {
-            $identity->setApiKeyId(null);
-        }
-        $identity->setStatus(ExternalIdentity::STATUS_ACTIVE);
-        $identity->setRevokedAt(null);
-        $this->identities->save($identity);
+        // Insert only when the triple is absent. A row that appears between
+        // the lookup and this insert keeps its owner and mode; upsert would
+        // re-own it before the check below could refuse a managed account.
+        $this->identities->insertIfAbsent($userId, $instance->getClient(), $externalId, $instance->getInstanceId(), null, ExternalIdentity::MODE_LINK);
+        /** @var array{ExternalIdentity, int|null} $linked */
+        $linked = $this->entityManager->wrapInTransaction(function () use ($userId, $instance, $externalId): array {
+            return $this->claimLocked($userId, $instance, $externalId);
+        });
+        [$identity, $previousOwner] = $linked;
 
         $moved = null !== $previousOwner && $previousOwner !== $userId;
         if ($moved) {
@@ -133,6 +130,46 @@ final readonly class CloudLinkService
             'host' => $instance->getHost(),
             'external_id' => $externalId,
         ], $ip);
+    }
+
+    /**
+     * @return array{ExternalIdentity, int|null}
+     *
+     * @throws CloudLinkRefused
+     */
+    private function claimLocked(int $userId, PlatformInstance $instance, string $externalId): array
+    {
+        $identity = $this->identities->lock($instance->getClient(), $instance->getInstanceId(), $externalId);
+        if (!$identity instanceof ExternalIdentity) {
+            throw new \RuntimeException(sprintf('Cloud account "%s" was linked but could not be read back.', $externalId));
+        }
+        if (in_array($identity->getMode(), [ExternalIdentity::MODE_PROVISION, ExternalIdentity::MODE_SSO], true)) {
+            throw new CloudLinkRefused('This cloud account cannot be linked.');
+        }
+
+        $previousOwner = null;
+        $owner = $identity->getUserId();
+        if ($owner !== $userId) {
+            $this->detachPreviousOwner($instance, $identity, $owner, $externalId);
+            $identity->setUserId($userId);
+            $identity->setApiKeyId(null);
+            $previousOwner = $owner;
+        }
+        $identity->setMode(ExternalIdentity::MODE_LINK);
+        $identity->touchLastSeen();
+        $identity->setStatus(ExternalIdentity::STATUS_ACTIVE);
+        $identity->setRevokedAt(null);
+        $this->entityManager->flush();
+
+        return [$identity, $previousOwner];
+    }
+
+    private function detachPreviousOwner(PlatformInstance $instance, ExternalIdentity $identity, int $previousOwner, string $externalId): void
+    {
+        $this->tokens->revokeForAccount($instance->getInstanceId(), $previousOwner, $externalId);
+        $this->releaseKey($identity);
+        $identity->setReadScope(['mode' => 'watched', 'folders' => []]);
+        $this->effects->onDeleted($identity);
     }
 
     private function releaseKey(ExternalIdentity $identity): void
