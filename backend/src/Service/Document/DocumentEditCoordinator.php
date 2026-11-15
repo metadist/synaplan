@@ -98,6 +98,12 @@ final readonly class DocumentEditCoordinator
             return new DocumentEditResult($loopResult->content, null, $session->operations, $loopResult->usage, null, $fidelityLossy, $loopResult->facadeMetered, $loopResult->facadeChargedCost, $loopResult->facadePriceKnown);
         }
 
+        if (ProvidedWordBody::restore($session, $messages)) {
+            $this->logger->info(
+                'DocumentEditCoordinator: tool loop kept only part of the provided text; the Word file uses the full text from the request',
+            );
+        }
+
         $wasExisting = null !== $session->fileId;
         $file = $this->persistSession($session, $message, $ephemeral);
         $summary = $this->summarize($session);

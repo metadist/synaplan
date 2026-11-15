@@ -48,6 +48,17 @@ final class DocumentTextProjector
                 $parts[] = str_repeat('#', $level).' '.((string) ($block->payload['text'] ?? ''));
             } elseif (WordBlock::TYPE_PARAGRAPH === $block->type) {
                 $parts[] = (string) ($block->payload['text'] ?? '');
+            } elseif (WordBlock::TYPE_TABLE === $block->type) {
+                $rows = $block->payload['rows'] ?? [];
+                if (!is_array($rows)) {
+                    continue;
+                }
+                foreach ($rows as $row) {
+                    if (!is_array($row)) {
+                        continue;
+                    }
+                    $parts[] = implode(' | ', array_map(static fn (mixed $cell): string => (string) $cell, $row));
+                }
             }
         }
 

@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Document;
 
+use App\Entity\DocumentRevision;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Repository\FileRepository;
 use App\Service\Document\ChatToolLoop;
+use App\Service\Document\ChatToolLoopResult;
 use App\Service\Document\DocumentEditCoordinator;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\Document\Import\DocumentImporter;
+use App\Service\Document\Model\DeckModel;
+use App\Service\Document\Model\SpreadsheetModel;
+use App\Service\Document\Model\WordBlock;
+use App\Service\Document\Model\WordModel;
 use App\Service\Document\Persist\DocumentRevisionService;
 use App\Service\Document\Persist\DocumentTextProjector;
 use App\Service\Document\Render\DocumentRenderer;
 use App\Service\Document\Serializer\DocumentModelSerializer;
+use App\Service\Document\Tool\DocumentSession;
+use App\Service\Document\Tool\DocumentToolResult;
 use App\Service\File\UserUploadPathBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -49,6 +57,97 @@ final class DocumentEditCoordinatorTest extends TestCase
         $model->expects(self::any())->method('hasFeature')->with('tool_use')->willReturn(true);
 
         self::assertFalse($coordinator->shouldRun('officemaker', $model, $message));
+    }
+
+    /**
+     * The live failure: tools inserted the German title and stopped. The
+     * request already held the whole plan, and that plan has to be the file.
+     */
+    public function testRunWritesTheProvidedBodyWhenToolsKeptOnlyTheTitle(): void
+    {
+        $plan = <<<'MD'
+            # Reiseplan: Rio de Janeiro – Nova Odessa – Copacabana
+
+            ## Überblick
+
+            - **Start:** Flug nach Rio de Janeiro am 12.
+            - **Transport:** Mietwagen von Rio nach Nova Odessa und zurück
+            - **Rückfahrt:** Ein Sightseeing-Stopp
+            - **Abschluss:** 2–3 Nächte in einem Luxushotel an der Copacabana
+
+            Die Dauer des Aufenthalts in Nova Odessa ist hier nicht festgelegt.
+
+            ## Tag 1 (der 12.): Ankunft in Rio
+
+            - Landung am internationalen Flughafen Rio de Janeiro–Galeão (GIG).
+            MD;
+        $prompt = "Create a Word document (DOCX) containing the following German text:\n".$plan;
+
+        $captured = null;
+        $renderer = $this->createMock(DocumentRenderer::class);
+        $renderer->expects(self::once())->method('render')->willReturnCallback(function (SpreadsheetModel|WordModel|DeckModel $model, string $path) use (&$captured): string {
+            self::assertInstanceOf(WordModel::class, $model);
+            $captured = $model;
+            if (!is_dir(dirname($path))) {
+                mkdir(dirname($path), 0775, true);
+            }
+            file_put_contents($path, 'docx');
+
+            return 'docx';
+        });
+
+        $loop = $this->createMock(ChatToolLoop::class);
+        $loop->expects(self::once())->method('run')->willReturnCallback(function (array $messages, DocumentSession $session, array $options = [], ?int $userId = null, ?callable $onStep = null): ChatToolLoopResult {
+            unset($messages, $options, $userId, $onStep);
+            $word = $session->word();
+            self::assertInstanceOf(WordModel::class, $word);
+            $word->blocks[] = new WordBlock('only-title', WordBlock::TYPE_HEADING, [
+                'text' => 'Reiseplan: Rio de Janeiro – Nova Odessa – Copacabana',
+                'level' => 1,
+            ]);
+            $session->record(DocumentToolResult::ok('Inserted only-title', 'processing.documentStepInsertBlock'));
+
+            return new ChatToolLoopResult('short summary', $session);
+        });
+
+        $revisions = $this->createMock(DocumentRevisionService::class);
+        $revisions->expects(self::once())->method('append')->willReturn((new DocumentRevision())->setVersion(1));
+
+        $coordinator = new DocumentEditCoordinator(
+            $this->createStub(DocumentToolsConfig::class),
+            $loop,
+            $revisions,
+            $this->createStub(DocumentImporter::class),
+            $this->createStub(DocumentModelSerializer::class),
+            $renderer,
+            new DocumentTextProjector(),
+            $this->createStub(FileRepository::class),
+            new UserUploadPathBuilder(),
+            $this->createStub(EntityManagerInterface::class),
+            new NullLogger(),
+            sys_get_temp_dir(),
+        );
+
+        $message = new Message();
+        $message->setUserId(2);
+        $message->setText($prompt);
+
+        $result = $coordinator->run(
+            [
+                ['role' => 'system', 'content' => 'tools'],
+                ['role' => 'user', 'content' => $prompt],
+            ],
+            $message,
+            [],
+        );
+
+        self::assertNotNull($result);
+        self::assertInstanceOf(WordModel::class, $captured);
+        $text = (new DocumentTextProjector())->project($captured);
+        self::assertStringContainsString('Überblick', $text);
+        self::assertStringContainsString('Flug nach Rio de Janeiro am 12.', $text);
+        self::assertStringContainsString('Landung am internationalen Flughafen', $text);
+        self::assertStringNotContainsString('**', $text);
     }
 
     private function coordinator(DocumentToolsConfig $config): DocumentEditCoordinator

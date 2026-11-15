@@ -1730,6 +1730,8 @@ PROMPT;
 This turn uses document tools (set_cells, add_sheet, add_chart, insert_block,
 add_slide, merge_documents, and the other listed tools). Call those tools to
 create or edit the file. Do NOT return a BFILEPATH / BFILETEXT JSON envelope.
+When the user message already contains the document text, copy every section
+into the file. A heading alone is not the document.
 After the tools finish, write a short plain-language summary of what you changed.
 PROMPT;
     }
