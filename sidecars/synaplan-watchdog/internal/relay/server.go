@@ -18,7 +18,6 @@ import (
 
 const attachType = "application/vnd.synaplan.attach+json"
 
-// Enabled is true when SYNAPLAN_RELAY is on.
 func Enabled(getenv func(string) string) bool {
 	switch strings.ToLower(strings.TrimSpace(getenv("SYNAPLAN_RELAY"))) {
 	case "1", "true", "yes", "on":
@@ -28,7 +27,6 @@ func Enabled(getenv func(string) string) bool {
 	}
 }
 
-// Config is the relay's boot settings.
 type Config struct {
 	Listen   string
 	Upstream string
@@ -39,7 +37,6 @@ type Config struct {
 	Slots    int
 }
 
-// ConfigFrom reads the relay environment. The listener is loopback only.
 func ConfigFrom(getenv func(string) string, prefix string) Config {
 	slots := 320
 	if raw := getenv("WATCHDOG_STREAM_SLOTS"); raw != "" {
@@ -49,8 +46,7 @@ func ConfigFrom(getenv func(string) string, prefix string) Config {
 	}
 	return Config{
 		Listen: "127.0.0.1:8097",
-		// 9080 is the loopback PHP listener. Port 80 is Caddy, which sends
-		// these same routes back here when the relay is on.
+		// 9080 is loopback PHP. Port 80 is Caddy, which sends these routes back here.
 		Upstream: first(getenv("SYNAPLAN_PHP_UPSTREAM"), "http://127.0.0.1:9080"),
 		Secret:   getenv("SYNAPLAN_RELAY_SECRET"),
 		Attach:   getenv("SYNAPLAN_ATTACH_SECRET"),
@@ -60,8 +56,8 @@ func ConfigFrom(getenv func(string) string, prefix string) Config {
 	}
 }
 
-// Server forwards long routes to PHP and, when PHP hands back an attach
-// directive, copies the run stream itself.
+// Server forwards a long route to PHP, and copies the run stream when PHP
+// answers with an attach directive.
 type Server struct {
 	cfg   Config
 	php   *http.Client
@@ -70,14 +66,9 @@ type Server struct {
 	busy  int
 }
 
-// New builds the relay. A missing Redis URL leaves the copy path unable to
-// read frames; pass-through still works.
+// New builds the relay. Without Redis the copy path cannot read frames.
 func New(cfg Config) *Server {
-	transport := &http.Transport{
-		Proxy:                 nil,
-		ResponseHeaderTimeout: 60 * time.Second,
-		IdleConnTimeout:       30 * time.Second,
-	}
+	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: 60 * time.Second, IdleConnTimeout: 30 * time.Second}
 	s := &Server{
 		cfg: cfg,
 		php: &http.Client{Transport: transport, Timeout: 0, CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -92,7 +83,6 @@ func New(cfg Config) *Server {
 	return s
 }
 
-// ListenAndServe accepts only on loopback and stops when ctx is cancelled.
 func (s *Server) ListenAndServe(ctx context.Context) error {
 	ln, err := net.Listen("tcp", s.cfg.Listen)
 	if err != nil {
@@ -120,7 +110,6 @@ func (s *Server) ListenAndServe(ctx context.Context) error {
 	}
 }
 
-// ServeHTTP is one long route.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !s.takeSlot() {
 		writeBusy(w, r.URL.Path)
@@ -153,10 +142,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) hold(w http.ResponseWriter, r *http.Request, resp *http.Response) {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
-	if err != nil {
-		http.Error(w, "bad directive", http.StatusBadGateway)
-		return
-	}
 	var raw struct {
 		RunID          string `json:"runId"`
 		Token          string `json:"token"`
@@ -165,7 +150,7 @@ func (s *Server) hold(w http.ResponseWriter, r *http.Request, resp *http.Respons
 		Terminal       string `json:"terminal"`
 		IdleTimeoutSec int    `json:"idleTimeoutSec"`
 	}
-	if err := json.Unmarshal(body, &raw); err != nil || raw.RunID == "" || s.cfg.Attach == "" {
+	if err != nil || json.Unmarshal(body, &raw) != nil || raw.RunID == "" || s.cfg.Attach == "" {
 		http.Error(w, "bad directive", http.StatusBadGateway)
 		return
 	}
@@ -178,12 +163,7 @@ func (s *Server) hold(w http.ResponseWriter, r *http.Request, resp *http.Respons
 		writeRaw(w, resp.Header, raw.Terminal)
 		return
 	}
-	s.copy(r.Context(), w, resp.Header, raw.RunID, raw.FromSeq, Directive{
-		SSEIDs:    raw.SSEIDs,
-		Terminal:  raw.Terminal,
-		Idle:      raw.IdleTimeoutSec,
-		KeepAlive: 15,
-	})
+	s.copy(r.Context(), w, resp.Header, raw.RunID, raw.FromSeq, Directive{SSEIDs: raw.SSEIDs, Terminal: raw.Terminal, Idle: raw.IdleTimeoutSec, KeepAlive: 15})
 }
 
 func (s *Server) copy(ctx context.Context, w http.ResponseWriter, upstream http.Header, runID string, fromSeq int64, d Directive) {
@@ -269,15 +249,13 @@ func writeBusy(w http.ResponseWriter, path string) {
 	w.Header().Set("Retry-After", "5")
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusServiceUnavailable)
+	body := `{"error":"server_busy","retryAfter":5}`
 	if strings.HasPrefix(path, "/v1/messages") {
-		_, _ = io.WriteString(w, `{"type":"error","error":{"type":"overloaded_error","message":"Synaplan is busy. Retry in a few seconds."}}`)
-		return
+		body = `{"type":"error","error":{"type":"overloaded_error","message":"Synaplan is busy. Retry in a few seconds."}}`
+	} else if strings.HasPrefix(path, "/v1/") {
+		body = `{"error":{"message":"Synaplan is busy. Retry in a few seconds.","type":"server_error","code":"server_busy"}}`
 	}
-	if strings.HasPrefix(path, "/v1/") {
-		_, _ = io.WriteString(w, `{"error":{"message":"Synaplan is busy. Retry in a few seconds.","type":"server_error","code":"server_busy"}}`)
-		return
-	}
-	_, _ = io.WriteString(w, `{"error":"server_busy","retryAfter":5}`)
+	_, _ = io.WriteString(w, body)
 }
 
 func writeRaw(w http.ResponseWriter, upstream http.Header, frame string) {
@@ -289,8 +267,7 @@ func writeRaw(w http.ResponseWriter, upstream http.Header, frame string) {
 	}
 }
 
-// copyUpstream writes PHP's response. An event stream is flushed per chunk
-// so a small frame is not held until the answer ends.
+// An event stream is flushed per chunk so one frame is not held until the answer ends.
 func copyUpstream(w http.ResponseWriter, resp *http.Response) {
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
@@ -325,16 +302,12 @@ func applyStreamHeaders(w http.ResponseWriter, upstream http.Header) {
 
 func copyHeaders(dst, src http.Header) {
 	hop := map[string]bool{
-		"Connection": true, "Keep-Alive": true, "Proxy-Authenticate": true,
-		"Proxy-Authorization": true, "Te": true, "Trailers": true,
-		"Transfer-Encoding": true, "Upgrade": true, "Content-Length": true,
+		"Connection": true, "Keep-Alive": true, "Proxy-Authenticate": true, "Proxy-Authorization": true,
+		"Te": true, "Trailers": true, "Transfer-Encoding": true, "Upgrade": true, "Content-Length": true,
 	}
 	for name, values := range src {
-		if hop[name] {
-			continue
-		}
-		for _, value := range values {
-			dst.Add(name, value)
+		if !hop[name] {
+			dst[name] = append(dst[name], values...)
 		}
 	}
 }

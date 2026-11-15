@@ -1,7 +1,5 @@
-// Package token is the attach token from the stream contract.
-//
-// token = base64url(runId, ownerKey, fromSeq, exp) + "." + base64url(HMAC-SHA256).
-// PHP signs the same bytes.
+// Package token is the attach token PHP signs:
+// base64url(runId, ownerKey, fromSeq, exp) + "." + base64url(HMAC-SHA256).
 package token
 
 import (
@@ -48,33 +46,14 @@ func Peek(token string) (runID, ownerKey string, fromSeq, exp int64, err error) 
 }
 
 // Verify checks the signature, the expiry, and that the cursor was not widened.
-func Verify(secret, token, runID, ownerKey string, fromSeq int64, now int64) error {
-	parts := strings.Split(token, ".")
-	if len(parts) != 2 {
+func Verify(secret, raw, runID, ownerKey string, fromSeq int64, now int64) error {
+	gotRun, gotOwner, seq, exp, err := Peek(raw)
+	if err != nil || gotRun != runID || gotOwner != ownerKey || seq != fromSeq || now > exp {
 		return ErrInvalid
 	}
-	raw, err := b64dec(parts[0])
-	if err != nil {
-		return ErrInvalid
-	}
-	got, err := b64dec(parts[1])
-	if err != nil {
-		return ErrInvalid
-	}
-	fields := strings.Split(string(raw), "\n")
-	if len(fields) != 4 || fields[0] != runID || fields[1] != ownerKey {
-		return ErrInvalid
-	}
-	seq, err := strconv.ParseInt(fields[2], 10, 64)
-	if err != nil || seq != fromSeq {
-		return ErrInvalid
-	}
-	exp, err := strconv.ParseInt(fields[3], 10, 64)
-	if err != nil || now > exp {
-		return ErrInvalid
-	}
-	want := mac(secret, string(raw))
-	if !hmac.Equal(got, want) {
+	macPart := strings.Split(raw, ".")
+	got, err := b64dec(macPart[1])
+	if err != nil || !hmac.Equal(got, mac(secret, payload(runID, ownerKey, seq, exp))) {
 		return ErrInvalid
 	}
 	return nil
