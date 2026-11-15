@@ -766,7 +766,7 @@ class SyncModelPricesCommand extends Command
                     obsolete: $obsolete,
                 );
             }
-        } elseif ($this->litellmHasContextTier($litellmModel)) {
+        } elseif ($this->litellmHasContextTier($litellmModel) && !ModelCatalog::isFullyRetired($model->getProviderId())) {
             $drift[] = sprintf(
                 '%s — missing long-context tier (LiteLLM has above_Nk, catalog none)%s',
                 $label,

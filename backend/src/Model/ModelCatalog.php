@@ -613,16 +613,17 @@ class ModelCatalog
      * }>
      */
     private const LITELLM_DEVIATIONS = [
-        // #2859: LiteLLM lists Mistral's pre-discount list rate for Mistral Large 4
-        // (in 1.36 / cached 0.14 / out 4.18); the official page still bills the
-        // launch rate the catalog holds (0.68 / 0.068 / 2.09), read 2026-11-01.
-        'mistral:mistral-large-4' => [
-            'litellm_in' => 1.36,
-            'litellm_out' => 4.18,
-            'litellm_cache_read' => 0.14,
-            'source' => 'https://docs.mistral.ai/inference/pricing',
-            'verifiedOn' => '2026-11-01',
-            'reason' => "LiteLLM lists Mistral's pre-discount list rate (\$1.36 / \$4.18, cached \$0.14) while the official page lists the launch rate the catalog holds; correction to BerriAI/litellm not filed yet — retires only when LiteLLM fully moves to the launch rate (docs/PRICING_MAINTENANCE.md, Known LiteLLM deviations).",
+        // #2957: LiteLLM copies Scaleway's euro list for DeepSeek V4 Flash 0731
+        // (in 0.40 / cached 0.08 / out 0.80) into its USD fields. The official
+        // page bills euros; the catalog holds the USD conversion at the ECB
+        // rate of 2026-11-06 (1 EUR = 1.1165 USD), read 2026-11-15.
+        'scaleway:deepseek-v4-flash-0731' => [
+            'litellm_in' => 0.40,
+            'litellm_out' => 0.80,
+            'litellm_cache_read' => 0.08,
+            'source' => 'https://www.scaleway.com/en/pricing/model-as-a-service/',
+            'verifiedOn' => '2026-11-15',
+            'reason' => "LiteLLM stores Scaleway's euro list (€0.40 in / €0.80 out, cached €0.08 per 1M) as US dollars. The catalog keeps the USD conversion at the ECB rate of 2026-11-06 (1 EUR = 1.1165). Upstream correction to BerriAI/litellm not filed yet.",
         ],
     ];
 
@@ -985,6 +986,29 @@ class ModelCatalog
     public static function isRetired(int $bid): bool
     {
         return isset(self::RETIREMENTS[$bid]);
+    }
+
+    /**
+     * True when this provider id is still in the catalog and every row is inactive.
+     *
+     * A fully retired id no longer sells a long-context tier: the tier leaves
+     * {@see CONTEXT_PRICING} with the last live row. LiteLLM may still publish
+     * one, and that is not a price we bill.
+     */
+    public static function isFullyRetired(string $providerId): bool
+    {
+        $seen = false;
+        foreach (self::all() as $row) {
+            if ((string) ($row['providerId'] ?? '') !== $providerId) {
+                continue;
+            }
+            $seen = true;
+            if (1 === (int) ($row['active'] ?? 0)) {
+                return false;
+            }
+        }
+
+        return $seen;
     }
 
     /**
@@ -4824,15 +4848,12 @@ class ModelCatalog
             ],
         ],
         [
-            // Public preview, pinned id (not mistral-large-latest, which still
-            // resolves to Large 3 / mistral-large-2512). Alias: mistral-large-4-0.
-            // Prices are the launch-discount rate the API bills
-            // (billing_model_name mistral-large-4-0-launch-discount), not the
-            // struck-through list ($1.36 / $0.14 cached / $4.18). Re-check
-            // when that discount ends.
-            // https://docs.mistral.ai/inference/pricing (2026-10-07).
-            // Cached input bills at exactly 10% of input ($0.068); the
-            // pricing page rounds it to $0.07.
+            // Pinned id (not mistral-large-latest, which still resolves to
+            // Large 3 / mistral-large-2512). Alias: mistral-large-4-0.
+            // GA list rate, read 2026-11-15: $0.70 in / $0.07 cached / $2.10 out.
+            // https://docs.mistral.ai/inference/pricing
+            // https://docs.mistral.ai/models/mistral-large-4-0
+            // The October launch discount is no longer what either page publishes.
             // Context is the live /v1/models max_context_length. The model card
             // says "1M"; the API enforces 524288.
             'id' => 387,
@@ -4842,17 +4863,17 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'mistral-large-4',
-            'priceIn' => 0.68,
+            'priceIn' => 0.70,
             'inUnit' => 'per1M',
-            'priceOut' => 2.09,
+            'priceOut' => 2.10,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 3,
             'json' => [
-                'description' => 'Mistral Large 4 - open-weight multimodal flagship with reasoning and tool use. 512K context. OpenAI-compatible chat endpoint. Public preview, launch pricing.',
+                'description' => 'Mistral Large 4 - open-weight multimodal flagship with reasoning and tool use. 512K context. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 131072,
                 'params' => ['model' => 'mistral-large-4'],
-                'cache_read_price_per_1M' => 0.068,
+                'cache_read_price_per_1M' => 0.07,
                 'meta' => ['family' => 'mistral', 'jurisdiction' => 'EU', 'context_window' => '524288', 'max_output' => '131072'],
                 'features' => ['vision', 'reasoning', 'tool_use'],
             ],
@@ -4865,18 +4886,18 @@ class ModelCatalog
             'selectable' => 1,
             'active' => 1,
             'providerId' => 'mistral-large-4',
-            'priceIn' => 0.68,
+            'priceIn' => 0.70,
             'inUnit' => 'per1M',
-            'priceOut' => 2.09,
+            'priceOut' => 2.10,
             'outUnit' => 'per1M',
             'quality' => 10,
             'rating' => 2,
             'json' => [
-                'description' => 'Mistral Large 4 vision - describe images and extract text via the chat endpoint. Same model as the chat row. Public preview, launch pricing.',
+                'description' => 'Mistral Large 4 vision - describe images and extract text via the chat endpoint. Same model as the chat row.',
                 'prompt' => 'Describe the image in detail. Extract any text you see.',
                 'max_tokens' => 8192,
                 'params' => ['model' => 'mistral-large-4'],
-                'cache_read_price_per_1M' => 0.068,
+                'cache_read_price_per_1M' => 0.07,
                 'features' => ['vision', 'ocr', 'multilingual'],
                 'meta' => ['supports_images' => true],
             ],
@@ -7059,6 +7080,9 @@ class ModelCatalog
             ],
         ],
         [
+            // Euro list (€0.40 / €0.80, cached €0.08) converted at the ECB rate
+            // in the section comment. LiteLLM stores those euros as dollars;
+            // LITELLM_DEVIATIONS pins that pair (#2957).
             'id' => 426,
             'service' => 'Scaleway',
             'name' => 'DeepSeek V4 Flash',
