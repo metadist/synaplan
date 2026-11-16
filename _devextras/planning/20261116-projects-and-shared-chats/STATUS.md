@@ -7,7 +7,7 @@ to them.
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
-| PJ1 | in review | #3141 | corpus and runner; today's numbers are open, see 2026-11-16 below |
+| PJ1 | in review | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
 | PJ2–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
 
 ---
@@ -59,10 +59,47 @@ five-minute access cookie runs out; sorting and planning cost is read from
 uploaded files are deleted with the chat; a research run nobody waits for
 is cancelled; an unknown argument ends the run before anything is sent.
 
-**Open — the exit of PJ1:** today's numbers per group need one run with
-`--live` on an evaluation account whose Chat model is a real one. It spends
-that account's budget (40 turns, six of them research), so it waits for the
-owner's word on account and stack. The table goes here, with the command.
+**Today's numbers, 2026-11-16.** One run with `--live` on the local
+development stack at `main` plus this branch, signed in as the seeded admin
+account, whose Chat, Sort and Analyze model is Claude Sonnet 5.5. All 40
+turns ended with an answer; none failed and none stayed without a terminal
+result.
+
+| Group | Turns | Answered | Cost total | Cost median | First token median / p95 (s) | Total median / p95 (s) | Recall | Backed statements |
+| ----- | ----- | -------- | ---------- | ----------- | ---------------------------- | ---------------------- | ------ | ----------------- |
+| simple | 10 | 10 | 0.3047 | 0.0301 | 2.56 / 3.67 | 3.64 / 5.47 | 100.0 % | n/a |
+| files | 8 | 8 | 0.0417 | 0.0036 | 3.18 / 4.11 | 3.88 / 4.49 | 100.0 % | n/a |
+| search | 8 | 8 | 0.3385 | 0.0389 | 4.99 / 5.72 | 7.09 / 10.25 | 100.0 % | n/a |
+| multi_step | 8 | 8 | 0.5419 | 0.0187 | 2.45 / 4.13 | 11.51 / 86.74 | 100.0 % | 30.8 % of 13 |
+| research | 6 | 6 | 0.2721 | 0.0435 | 4.49 / 6.20 | 6.71 / 8.61 | 100.0 % | n/a |
+
+Commands, from `backend/`, password in `CHAT_LOOP_EVAL_PASSWORD`:
+
+```bash
+php tests/Eval/ChatLoop/run.php --base-url=http://localhost --email=<account> --group=<simple|files|search|multi_step> --live
+php tests/Eval/ChatLoop/run.php --base-url=http://localhost --email=<account> --only=research-0N --live --turn-timeout=1500
+```
+
+The research turns ran one at a time with a look at the cost ledger before
+each. The runner counted 1.4989 for the 40 turns; the ledger shows 1.5767
+for the account over the same time, because calls after the turn (memory
+extraction) are not in the turn's `complete` event.
+
+What the numbers say about today:
+
+- **G1 compares against the `simple` row**: 0.0301 per turn, first token
+  after 2.56 s, done after 3.64 s.
+- **No research turn was handed to a research run.** All six were answered
+  as an ordinary search turn in six to nine seconds, so the group has no
+  backed statements today. Three `multi_step` turns did hand over (54 to
+  93 s) and their fact-check backed 30.8 % of 13 statements.
+- **A `files` turn costs about a tenth of a `simple` turn.** Not examined
+  yet; it is to be understood before G1 is judged, since it may mean the
+  two groups take different paths or count different calls.
+
+Not run: the 150-message scripted chat (G6) and a run on staging. Local
+numbers are one machine and one run; the gate run for G1–G7 repeats this on
+staging.
 
 ---
 
