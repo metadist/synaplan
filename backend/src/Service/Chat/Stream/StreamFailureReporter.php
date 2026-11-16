@@ -113,7 +113,7 @@ final readonly class StreamFailureReporter
             'provider' => $provider,
             'model' => $intended['name'] ?? 'unknown',
             'model_id' => $intended['id'],
-            'topic' => 'ERROR',
+            'topic' => Message::FAILED_TOPIC,
             'originalTopic' => $originalTopic,
             'originalMediaType' => $originalMediaType,
             'language' => $errorLang,
@@ -167,7 +167,7 @@ final readonly class StreamFailureReporter
             'provider' => $intended['provider'] ?? $fallbackProvider,
             'model' => $intended['name'] ?? 'unknown',
             'model_id' => $intended['id'],
-            'topic' => 'ERROR',
+            'topic' => Message::FAILED_TOPIC,
             'trackId' => $turn->trackId,
             ...$errorView->toSseFields(),
         ];
@@ -226,7 +226,7 @@ final readonly class StreamFailureReporter
             'provider' => $displayProvider,
             'model' => $displayModel,
             'model_id' => $intendedModelId,
-            'topic' => 'ERROR',
+            'topic' => Message::FAILED_TOPIC,
             'originalTopic' => $originalTopic,
             'originalMediaType' => $originalMediaType,
             'language' => $errorLang,
@@ -251,7 +251,7 @@ final readonly class StreamFailureReporter
         ]);
         $sse->send('error', [
             'error' => $errorView->userText,
-            'topic' => 'ERROR',
+            'topic' => Message::FAILED_TOPIC,
             'trackId' => $turn->trackId,
             'language' => $errorLang,
             ...$errorView->toSseFields(),
@@ -270,7 +270,7 @@ final readonly class StreamFailureReporter
         }
 
         if ($turn->incognito) {
-            $incoming->setTopic('ERROR');
+            $incoming->setTopic(Message::FAILED_TOPIC);
             $incoming->setStatus('error');
 
             return null;
@@ -289,7 +289,7 @@ final readonly class StreamFailureReporter
             $intended = $state->intendedChat;
             $this->recordErrorModel($outgoing, $intended['provider'] ?? $provider, $intended['name'] ?? 'unknown', $intended['id'] ?? null, $view);
 
-            $incoming->setTopic('ERROR');
+            $incoming->setTopic(Message::FAILED_TOPIC);
             $incoming->setStatus('error');
             $this->em->flush();
 
@@ -312,7 +312,7 @@ final readonly class StreamFailureReporter
         $outgoing->setDateTime(date('YmdHis'));
         $outgoing->setMessageType('WEB');
         $outgoing->setFile(0);
-        $outgoing->setTopic('ERROR');
+        $outgoing->setTopic(Message::FAILED_TOPIC);
         $outgoing->setLanguage($language);
         $outgoing->setText($text);
         $outgoing->setDirection('OUT');
@@ -334,7 +334,7 @@ final readonly class StreamFailureReporter
     private function markIncomingFailed(StreamTurnRequest $turn, StreamTurnState $state): void
     {
         $incoming = $state->incoming();
-        $incoming->setTopic('ERROR');
+        $incoming->setTopic(Message::FAILED_TOPIC);
         $incoming->setStatus('error');
 
         if (!$turn->incognito) {

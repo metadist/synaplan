@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Repository;
 
+use App\Entity\Message;
 use App\Entity\MessageDigest;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
@@ -290,8 +291,8 @@ class MessageDigestRepository extends ServiceEntityRepository
 
     /**
      * Active message ids and digest ids for this user among the candidates.
-     * One query, so a Qdrant hit whose row is inactive or gone can be dropped
-     * before it reaches a prompt.
+     * One query, so a Qdrant hit whose row is inactive or gone, or whose
+     * message is a failed turn, can be dropped before it reaches a prompt.
      *
      * @param list<int> $messageIds
      * @param list<int> $digestIds
@@ -309,22 +310,26 @@ class MessageDigestRepository extends ServiceEntityRepository
             return ['message_ids' => [], 'digest_ids' => []];
         }
 
-        $params = ['userId' => $userId];
+        $params = ['userId' => $userId, 'failedTopic' => Message::FAILED_TOPIC];
         $types = [];
         $clauses = [];
         if ([] !== $messageIds) {
-            $clauses[] = 'BMESSAGEID IN (:messageIds)';
+            $clauses[] = 'd.BMESSAGEID IN (:messageIds)';
             $params['messageIds'] = $messageIds;
             $types['messageIds'] = ArrayParameterType::INTEGER;
         }
         if ([] !== $digestIds) {
-            $clauses[] = 'BID IN (:digestIds)';
+            $clauses[] = 'd.BID IN (:digestIds)';
             $params['digestIds'] = $digestIds;
             $types['digestIds'] = ArrayParameterType::INTEGER;
         }
 
         $rows = $this->getEntityManager()->getConnection()->executeQuery(
-            'SELECT BID, BMESSAGEID FROM BMESSAGEDIGESTS WHERE BUSERID = :userId AND BACTIVE = 1 AND ('.implode(' OR ', $clauses).')',
+            'SELECT d.BID, d.BMESSAGEID FROM BMESSAGEDIGESTS d
+             LEFT JOIN BMESSAGES m ON m.BID = d.BMESSAGEID
+             WHERE d.BUSERID = :userId AND d.BACTIVE = 1
+               AND (m.BID IS NULL OR m.BTOPIC <> :failedTopic)
+               AND ('.implode(' OR ', $clauses).')',
             $params,
             $types,
         )->fetchAllNumeric();

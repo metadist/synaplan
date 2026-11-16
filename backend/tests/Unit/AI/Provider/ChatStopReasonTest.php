@@ -42,6 +42,12 @@ final class ChatStopReasonTest extends TestCase
         self::assertArrayNotHasKey('tool_calls', $result);
     }
 
+    public function testARefusalKeepsTheProvidersName(): void
+    {
+        self::assertSame('refusal', ChatStopReason::apply(['content' => ''], [], 'refusal')['finish_reason']);
+        self::assertSame('SAFETY', ChatStopReason::apply(['content' => ''], [], 'SAFETY')['finish_reason']);
+    }
+
     public function testAFinishedAnswerGainsNoFinishReason(): void
     {
         $result = ChatStopReason::apply(['content' => 'Paris.'], [], 'end_turn');

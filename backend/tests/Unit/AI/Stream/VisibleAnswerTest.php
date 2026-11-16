@@ -66,6 +66,16 @@ final class VisibleAnswerTest extends TestCase
         self::assertTrue(VisibleAnswer::failedBecauseOutputWasCut('', 'length'));
     }
 
+    public function testRecognisesEveryProvidersSafetyStop(): void
+    {
+        foreach (['refusal', 'content_filter', 'SAFETY', 'PROHIBITED_CONTENT'] as $finishReason) {
+            self::assertTrue(VisibleAnswer::wasRefused($finishReason), $finishReason);
+        }
+        foreach ([null, 'stop', 'end_turn', 'length', 'tool_calls'] as $finishReason) {
+            self::assertFalse(VisibleAnswer::wasRefused($finishReason), (string) $finishReason);
+        }
+    }
+
     public function testRecognisesLocalThinkingModels(): void
     {
         self::assertTrue(VisibleAnswer::modelHidesAnswerBehindThinking('qwen3.8:27b'));

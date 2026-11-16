@@ -23,6 +23,9 @@ class Message
     /** The language code of a message whose language is not known. */
     public const UNKNOWN_LANGUAGE = 'NN';
 
+    /** The topic of a failed turn: its question and the error reply both carry it. */
+    public const FAILED_TOPIC = 'ERROR';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'bigint')]

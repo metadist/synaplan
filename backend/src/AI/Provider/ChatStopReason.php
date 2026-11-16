@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\AI\Provider;
 
+use App\AI\Stream\VisibleAnswer;
+
 /**
  * Attaches the finish the rest of the pipeline reads.
  *
  * A turn the model cut off (`max_tokens` / `MAX_TOKENS`) becomes
  * `finish_reason` `length`, which is how a translation can refuse a
- * partial document. Real tool calls stay `tool_calls`.
+ * partial document. Real tool calls stay `tool_calls`. A refusal keeps the
+ * provider's own name, so the chat can say the request was declined.
  */
 final class ChatStopReason
 {
@@ -32,6 +35,8 @@ final class ChatStopReason
             $result['finish_reason'] = 'length';
         } elseif ('tool_use' === $stopReason) {
             $result['finish_reason'] = 'tool_calls';
+        } elseif (\is_string($stopReason) && VisibleAnswer::wasRefused($stopReason)) {
+            $result['finish_reason'] = $stopReason;
         }
 
         return $result;
