@@ -646,6 +646,43 @@ class MessageRepositoryTest extends KernelTestCase
     }
 
     /**
+     * A failed turn is never digested: its question and the error reply would
+     * come back as a memory of something the model never answered.
+     */
+    public function testFindDigestCandidatesLeavesFailedTurnsOut(): void
+    {
+        $answered = $this->createTestMessage('weisst Du, wer ich bin?', 100);
+        $failedQuestion = $this->createTestMessage('du kennst meinen namen', 101);
+        $failedReply = $this->createCustomTestMessage('Bei der Beantwortung dieser Anfrage ist etwas schiefgelaufen.', 102, 'OUT', 'complete');
+        $failedQuestion->setTopic(Message::FAILED_TOPIC);
+        $failedReply->setTopic(Message::FAILED_TOPIC);
+        $this->em->flush();
+
+        $hits = $this->repository->findDigestCandidates($this->testUser->getId(), 0, 1_000, 50);
+
+        $ids = array_map(static fn (Message $m): int => (int) $m->getId(), $hits);
+        $this->assertContains($answered->getId(), $ids);
+        $this->assertNotContains($failedQuestion->getId(), $ids);
+        $this->assertNotContains($failedReply->getId(), $ids);
+    }
+
+    /**
+     * A young failed turn will never become a candidate, so it must not hold
+     * the digest cursor back the way a young answered turn does.
+     */
+    public function testAYoungFailedTurnDoesNotHoldTheDigestCursor(): void
+    {
+        $failed = $this->createTestMessage('du kennst meinen namen', 5_000);
+        $failed->setTopic(Message::FAILED_TOPIC);
+        $this->em->flush();
+
+        $this->assertNull($this->repository->lowestSkippedDigestCandidateId($this->testUser->getId(), 0, 1_000));
+
+        $answered = $this->createTestMessage('weisst Du, wer ich bin?', 5_001);
+        $this->assertSame($answered->getId(), $this->repository->lowestSkippedDigestCandidateId($this->testUser->getId(), 0, 1_000));
+    }
+
+    /**
      * Helper to create test message.
      */
     private function createTestMessage(string $text, int $timestamp): Message

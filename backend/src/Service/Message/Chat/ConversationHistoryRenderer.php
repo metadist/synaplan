@@ -23,9 +23,6 @@ use App\Service\Message\GeneratedMediaTextRenderer;
  */
 final readonly class ConversationHistoryRenderer
 {
-    /** The topic a failed turn's question and its error reply are stored with. */
-    private const FAILED_TURN_TOPIC = 'ERROR';
-
     public function __construct(
         private ConversationFileCatalog $conversationFileCatalog,
     ) {
@@ -140,7 +137,7 @@ final readonly class ConversationHistoryRenderer
      */
     public function isFailedTurn(Message $msg): bool
     {
-        return self::FAILED_TURN_TOPIC === $msg->getTopic();
+        return Message::FAILED_TOPIC === $msg->getTopic();
     }
 
     /**

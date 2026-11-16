@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Repository;
 
+use App\Entity\Message;
 use App\Entity\MessageDigest;
 use App\Repository\MessageDigestIdCollisionException;
 use App\Repository\MessageDigestRepository;
@@ -37,14 +38,43 @@ class MessageDigestRepositoryTest extends KernelTestCase
 
     protected function tearDown(): void
     {
-        $stmt = $this->em->getConnection()->prepare(
-            'DELETE FROM BMESSAGEDIGESTS WHERE BUSERID = :userA OR BUSERID = :userB',
-        );
-        $stmt->bindValue('userA', $this->userA);
-        $stmt->bindValue('userB', $this->userB);
-        $stmt->executeStatement();
+        foreach (['BMESSAGEDIGESTS', 'BMESSAGES'] as $table) {
+            $stmt = $this->em->getConnection()->prepare(
+                'DELETE FROM '.$table.' WHERE BUSERID = :userA OR BUSERID = :userB',
+            );
+            $stmt->bindValue('userA', $this->userA);
+            $stmt->bindValue('userB', $this->userB);
+            $stmt->executeStatement();
+        }
 
         parent::tearDown();
+    }
+
+    /**
+     * A digest of a failed turn never reaches a prompt, whether it is found
+     * by message id or by digest id. A digest whose message row is gone is
+     * still confirmed, as before.
+     */
+    public function testADigestOfAFailedTurnIsNotConfirmed(): void
+    {
+        $answered = $this->message('weisst Du, wer ich bin?', 'general');
+        $failed = $this->message('du kennst meinen namen', Message::FAILED_TOPIC);
+        $orphan = random_int(800_000_000, 890_000_000);
+        $answeredDigest = random_int(8_600_000_000_000, 8_700_000_000_000);
+        $failedDigest = $answeredDigest + 1;
+        $orphanDigest = $answeredDigest + 2;
+        $this->insertRow($answeredDigest, $this->userA, $answered, 'identity question');
+        $this->insertRow($failedDigest, $this->userA, $failed, 'name question');
+        $this->insertRow($orphanDigest, $this->userA, $orphan, 'deleted message');
+
+        $matches = $this->repository->findActiveMatches(
+            $this->userA,
+            [$answered, $failed, $orphan],
+            [$answeredDigest, $failedDigest, $orphanDigest],
+        );
+
+        self::assertEqualsCanonicalizing([$answered, $orphan], $matches['message_ids']);
+        self::assertEqualsCanonicalizing([$answeredDigest, $orphanDigest], $matches['digest_ids']);
     }
 
     public function testExistingUserMessageRowIsUpdatedAndItsIdReturned(): void
@@ -119,6 +149,24 @@ class MessageDigestRepositoryTest extends KernelTestCase
         self::assertSame(5, $calls);
         self::assertSame('victim title', $this->titleOf($collidingId));
         self::assertSame(0, $this->countFor($this->userB, $attackerMessage));
+    }
+
+    private function message(string $text, string $topic): int
+    {
+        $message = (new Message())
+            ->setUserId($this->userA)
+            ->setTrackingId(1_700_000_000)
+            ->setUnixTimestamp(1_700_000_000)
+            ->setDateTime('20231114221320')
+            ->setMessageType('WEB')
+            ->setText($text)
+            ->setTopic($topic)
+            ->setDirection('IN')
+            ->setStatus('complete');
+        $this->em->persist($message);
+        $this->em->flush();
+
+        return (int) $message->getId();
     }
 
     private function digest(int $userId, int $messageId, string $title): MessageDigest
