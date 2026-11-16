@@ -493,7 +493,7 @@ services:
   # the network. It runs as root so it can read the mode-0600 key; it does
   # not run the application.
   tls-proxy:
-    image: caddy:2.11.9-alpine@sha256:0bbb055bda6793c999bde78b1b5ce3e89f829fb031af2cf50056ea1246559fee
+    image: caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0
     profiles: [local-tls]
     user: "0:0"
     ports:
@@ -674,7 +674,7 @@ services:
     networks: [internal]
 
   qdrant:
-    image: qdrant/qdrant:v1.20.0@sha256:9bfc89f9914fc14876a88c05270685921a55b8877b254a98bcc1cc2f0a424cd2
+    image: qdrant/qdrant:v1.20.1@sha256:d18c8e5061be3eaea2f53fbee1f0bf0382dc59cbb9b7112e41ffcc937ec14220
     volumes:
       - ./data/qdrant:/qdrant/storage
     healthcheck:
