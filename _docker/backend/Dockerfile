@@ -40,7 +40,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /synaplan-wa
 # Prebuilt c2patool 0.28 binaries link against glibc 2.38, while the bookworm
 # base image ships glibc 2.36. Compile 0.28.4 on bookworm so the binary matches
 # the runtime libc on both amd64 and arm64.
-FROM rust:1.99-bookworm@sha256:e6f2cff35d0f309acf8433b4f05878ed77092602c5065cc81801177da0bb3a9c AS c2patool
+FROM rust:1.100-bookworm@sha256:ade39a710ef85f3506cffcfec3e8a24ba090badef1dff2fb798f71d878833fea AS c2patool
 ARG C2PATOOL_VERSION=0.28.4
 ARG C2PATOOL_SHA256=2ed01103cdcb65184dfcaa6f522beac4c715291b51a44e503b572fa9b5255aba
 WORKDIR /src
