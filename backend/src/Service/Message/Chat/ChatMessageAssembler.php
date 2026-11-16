@@ -123,8 +123,12 @@ final readonly class ChatMessageAssembler
 
         // Earlier turns as plain role/content messages.
         foreach ($thread as $msg) {
+            if ($this->history->isFailedTurn($msg)) {
+                continue;
+            }
+
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-            $content = $this->history->humanizeFileMarkers($msg->getText());
+            $content = $this->history->replayedText($msg);
 
             // See streaming(): keep generated media visible so the
             // model does not deny it exists on a later turn (#1596).
@@ -189,9 +193,12 @@ final readonly class ChatMessageAssembler
             if ($msg === $currentMessage || (null !== $msg->getId() && $msg->getId() === $currentMessage->getId())) {
                 continue;
             }
+            if ($this->history->isFailedTurn($msg)) {
+                continue;
+            }
 
             $role = 'IN' === $msg->getDirection() ? 'user' : 'assistant';
-            $content = $this->history->humanizeFileMarkers($msg->getText());
+            $content = $this->history->replayedText($msg);
 
             // Include the extracted file text, legacy single file and attached files alike.
             $allFilesText = $msg->getAllFilesText(); // Combines legacy + file texts

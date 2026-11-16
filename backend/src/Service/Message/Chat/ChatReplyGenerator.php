@@ -205,6 +205,7 @@ final readonly class ChatReplyGenerator
             $this->logger->warning('ChatHandler: Provider returned no visible streaming content', [
                 'provider' => $provider,
                 'model' => $modelName,
+                'finish_reason' => $reply->finishReason,
                 'user_id' => $turn->message->getUserId(),
             ]);
 
@@ -257,10 +258,21 @@ final readonly class ChatReplyGenerator
     /**
      * A thinking model that ran out of room must not be stored as a finished
      * reply. The step would show Done and the chat would say the answer was
-     * never saved (#2264).
+     * never saved (#2264). A refused answer is never stored either, however
+     * much of it streamed: the person is told the request was declined.
      */
     private function rejectCutOffAnswer(string $content, ?string $finishReason, string $provider, string $model): void
     {
+        if (null !== $finishReason && VisibleAnswer::wasRefused($finishReason)) {
+            $this->logger->warning('ChatHandler: provider refused the answer', [
+                'provider' => $provider,
+                'model' => $model,
+                'finish_reason' => $finishReason,
+            ]);
+
+            throw ProviderException::contentBlocked($provider, $finishReason);
+        }
+
         if (!VisibleAnswer::isUnusable($content, $finishReason)) {
             return;
         }
@@ -278,6 +290,7 @@ final readonly class ChatReplyGenerator
         $this->logger->warning('ChatHandler: Provider returned no visible streaming content', [
             'provider' => $provider,
             'model' => $model,
+            'finish_reason' => $finishReason,
         ]);
 
         throw new ProviderException('The AI model returned an empty response. Please try again or select a different model.', $provider, ['model' => $model]);
