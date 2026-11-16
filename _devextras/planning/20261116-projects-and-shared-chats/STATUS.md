@@ -8,7 +8,58 @@ to them.
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
 | PJ1 | in review | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
-| PJ2–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
+| PJ2 | in progress | — | spike; hand-over time measured, two-hour run open, see 2026-11-16 below |
+| PJ3–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
+
+---
+
+## 2026-11-16 — spike: a chat turn as run units (PJ2)
+
+**Ordered:** the owner said "start PJ2 now" on 2026-11-16, before #3141 was
+merged. The branch is cut from `test/chat-loop-corpus`, because the script
+uses PJ1's client.
+
+**What was measured.** Variant 1, every turn queued, exists as a switch:
+`RUNTIME.STREAM_PUMP=all` with `STREAM_PUMP_PERCENT=100` sends the web
+chat's turn to the `pump` container, and the request copies the frames
+from Redis. Variant 2 hands over at the first tool call; the time it adds
+is the same hand-over, so one measurement answers both.
+
+The ten `simple` turns of the corpus, three passes per mode, modes
+alternating, one turn at a time, local development stack, the seeded demo
+account on the test provider (no model cost, so only the path is timed):
+
+| Mode | Turns | Answered | First frame median / p95 (s) | First text median / p95 (s) | Total median / p95 (s) |
+| ---- | ----- | -------- | ---------------------------- | --------------------------- | ---------------------- |
+| In the request (today) | 30 | 30 | 0.082 / 0.112 | 0.112 / 0.160 | 1.706 / 1.825 |
+| Queued for the pump | 30 | 30 | 0.114 / 0.198 | 0.135 / 0.233 | 1.617 / 1.731 |
+
+```bash
+docker compose up -d pump
+docker compose exec -T -e CHAT_LOOP_EVAL_PASSWORD backend \
+  php -- --email=<account> --label=request < _devextras/planning/20261116-projects-and-shared-chats/spike/turn-latency.php
+```
+
+What it says:
+
+- **The hand-over costs about 0.03 s at the median and 0.09 s at p95**
+  with an idle pump. Against today's first token of a `simple` turn on a
+  real model (2.56 s) that is about 1 % and 3 %. G1's limit is 10 %.
+- **No model call is added by queueing**, so the cost of a simple turn
+  does not change.
+- **§0 #21 holds, and not for speed.** At rest both variants are inside
+  G1. "First call in the request" keeps a simple turn independent of the
+  pump: with the pump down or full it still answers. That, not the 0.03 s,
+  is the reason to keep it.
+
+Limits of this measurement: one machine, an idle pump, one turn at a time.
+The total is lower when queued because the two containers do not run with
+the same settings, so the totals are not compared. A run with 8 and 16
+turns at once ended in the demo account's limit of 100 messages an hour
+before it measured anything; it is open.
+
+**Open:** the two-hour run with forced compactions (G7); the load run; the
+list for AU26 and AH8.
 
 ---
 
