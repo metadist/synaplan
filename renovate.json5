@@ -17,12 +17,16 @@
   ],
   "enabled": true,
   "timezone": "Europe/Berlin",
-  // npm 12 refuses the Tailwind oxide wasm tarball during --package-lock-only
-  // (npm/cli#9800), so lock file maintenance fails renovate/artifacts. Keep
-  // Renovate on npm 11. 11.18+ still accepts the --before flag that
-  // minimumReleaseAge passes through.
+  // npm 12 refuses registry tarballs of packages that declare
+  // bundleDependencies during --package-lock-only (npm/cli#9800).
+  // @tailwindcss/oxide-wasm32-wasi is in the frontend tree, so lock file
+  // maintenance never rewrites frontend/package-lock.json. 11.18+ still
+  // accepts the --before flag that minimumReleaseAge passes through.
+  // The allowedVersions rule at the bottom of packageRules is what keeps
+  // this range here: #2801 rewrote ">=11.18.0 <12" into "<13". Widen both
+  // in the same commit once a released npm contains the #9800 fix.
   "constraints": {
-    "npm": "<13"
+    "npm": ">=11.18.0 <12"
   },
   "prHourlyLimit": 2,
   // Make the implicit Renovate default (10) explicit. Grouping already collapses
@@ -151,12 +155,22 @@
       "matchUpdateTypes": ["major"],
       "automerge": false,
       "labels": ["dependencies", "breaking"]
+    },
+    {
+      // Stands alone on purpose. allowedVersions and matchUpdateTypes cannot
+      // share a rule, and every group rule above sets matchUpdateTypes.
+      // matchDepTypes keeps this off any future package that is itself named npm.
+      "description": "npm tool constraint stays on 11 while --package-lock-only rejects bundled registry tarballs",
+      "matchManagers": ["renovate-config"],
+      "matchDepTypes": ["tool-constraint"],
+      "matchPackageNames": ["npm"],
+      "allowedVersions": ">=11.18.0 <12"
     }
     // PLANNED (not enabled yet): auto-merge dev/QA tooling once we trust the
     // stability gate. Dev-only deps are fully covered by CI; runtime deps, the
     // PHP Framework and all majors would stay manual. Requires branch protection
     // (required status checks) + platformAutomerge before switching on. Enable by
-    // uncommenting and adding a comma after the "Major updates" rule above:
+    // uncommenting and adding a comma after the npm tool-constraint rule above:
     // {
     //   "description": "Auto-merge dev/QA tooling once the stability gate and CI both pass",
     //   "matchDepTypes": ["devDependencies", "require-dev"],
