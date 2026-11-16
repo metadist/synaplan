@@ -1786,7 +1786,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-04-29T20:41:02+00:00"
+            "time": "2026-04-29T20:41:02+00:00",
+            "published-time": "2026-04-29T20:41:48+00:00"
         },
         {
             "name": "doctrine/common",
@@ -2117,26 +2118,27 @@
                 "issues": "https://github.com/doctrine/deprecations/issues",
                 "source": "https://github.com/doctrine/deprecations/tree/1.1.6"
             },
-            "time": "2026-02-07T07:09:04+00:00"
+            "time": "2026-02-07T07:09:04+00:00",
+            "published-time": "2026-02-07T07:10:09+00:00"
         },
         {
             "name": "doctrine/doctrine-bundle",
-            "version": "3.3.4",
+            "version": "3.4.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/doctrine/DoctrineBundle.git",
-                "reference": "7b914210c91fe3cf357877555d7cac0db4e78d16"
+                "reference": "65d212e9792ae00753e5bd93fe0449eea149804f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/doctrine/DoctrineBundle/zipball/7b914210c91fe3cf357877555d7cac0db4e78d16",
-                "reference": "7b914210c91fe3cf357877555d7cac0db4e78d16",
+                "url": "https://api.github.com/repos/doctrine/DoctrineBundle/zipball/65d212e9792ae00753e5bd93fe0449eea149804f",
+                "reference": "65d212e9792ae00753e5bd93fe0449eea149804f",
                 "shasum": ""
             },
             "require": {
                 "doctrine/dbal": "^4.0",
                 "doctrine/deprecations": "^1.0",
-                "doctrine/persistence": "^4",
+                "doctrine/persistence": "^4.2",
                 "doctrine/sql-formatter": "^1.0.1",
                 "ext-mbstring": "*",
                 "php": "^8.4",
@@ -2144,12 +2146,12 @@
                 "symfony/config": "^6.4 || ^7.0 || ^8.0",
                 "symfony/console": "^6.4 || ^7.0 || ^8.0",
                 "symfony/dependency-injection": "^6.4 || ^7.0 || ^8.0",
-                "symfony/doctrine-bridge": "^6.4.3 || ^7.0.3 || ^8.0",
+                "symfony/doctrine-bridge": "^6.4.47 || ^7.4.20 || ^8.1.9",
                 "symfony/framework-bundle": "^6.4 || ^7.0 || ^8.0",
                 "symfony/service-contracts": "^3"
             },
             "conflict": {
-                "doctrine/orm": "<3.0 || >=4.0",
+                "doctrine/orm": "<3.4.4 || >=3.7.0 <3.7.5 || >=4.0",
                 "twig/twig": "<3.0.4 || >=5"
             },
             "require-dev": {
@@ -2180,6 +2182,8 @@
             "suggest": {
                 "doctrine/orm": "The Doctrine ORM integration is optional in the bundle.",
                 "ext-pdo": "*",
+                "symfony/expression-language": "To use expressions with the #[MapEntity] attribute.",
+                "symfony/security-bundle": "To use the current_user(), is_granted() and other security functions in #[MapEntity] expressions.",
                 "symfony/web-profiler-bundle": "To use the data collector."
             },
             "type": "symfony-bundle",
@@ -2220,7 +2224,7 @@
             ],
             "support": {
                 "issues": "https://github.com/doctrine/DoctrineBundle/issues",
-                "source": "https://github.com/doctrine/DoctrineBundle/tree/3.3.4"
+                "source": "https://github.com/doctrine/DoctrineBundle/tree/3.4.1"
             },
             "funding": [
                 {
@@ -2236,7 +2240,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-29T07:41:10+00:00"
+            "time": "2026-11-12T21:32:20+00:00",
+            "published-time": "2026-11-12T21:46:16+00:00"
         },
         {
             "name": "doctrine/doctrine-fixtures-bundle",
@@ -2505,7 +2510,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-01-29T07:11:08+00:00"
+            "time": "2026-01-29T07:11:08+00:00",
+            "published-time": "2026-01-29T07:11:33+00:00"
         },
         {
             "name": "doctrine/inflector",
@@ -2739,7 +2745,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-01T06:59:29+00:00"
+            "time": "2026-10-01T06:59:29+00:00",
+            "published-time": "2026-10-01T07:01:28+00:00"
         },
         {
             "name": "doctrine/migrations",
@@ -3026,7 +3033,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-03T14:15:35+00:00"
+            "time": "2026-10-03T14:15:35+00:00",
+            "published-time": "2026-10-13T09:53:23+00:00"
         },
         {
             "name": "doctrine/sql-formatter",
@@ -3081,7 +3089,8 @@
                 "issues": "https://github.com/doctrine/sql-formatter/issues",
                 "source": "https://github.com/doctrine/sql-formatter/tree/1.5.4"
             },
-            "time": "2026-02-08T16:21:46+00:00"
+            "time": "2026-02-08T16:21:46+00:00",
+            "published-time": "2026-02-08T16:22:50+00:00"
         },
         {
             "name": "egulias/email-validator",
@@ -8784,7 +8793,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-11-04T08:39:20+00:00"
+            "time": "2026-11-04T08:39:20+00:00",
+            "published-time": "2026-11-04T11:31:48+00:00"
         },
         {
             "name": "symfony/console",
@@ -8965,7 +8975,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-11-01T19:30:44+00:00"
+            "time": "2026-11-01T19:30:44+00:00",
+            "published-time": "2026-11-04T11:32:05+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",
@@ -9142,7 +9153,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-18T14:56:39+00:00"
+            "time": "2026-10-18T14:56:39+00:00",
+            "published-time": "2026-10-28T18:25:28+00:00"
         },
         {
             "name": "symfony/doctrine-messenger",
@@ -11406,7 +11418,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-10-28T09:35:49+00:00"
+            "time": "2026-10-28T09:35:49+00:00",
+            "published-time": "2026-10-28T10:07:45+00:00"
         },
         {
             "name": "symfony/polyfill-php84",
@@ -11647,7 +11660,8 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2026-09-25T15:46:47+00:00"
+            "time": "2026-09-25T15:46:47+00:00",
+            "published-time": "2026-09-30T10:23:43+00:00"
         },
         {
             "name": "symfony/polyfill-time",
