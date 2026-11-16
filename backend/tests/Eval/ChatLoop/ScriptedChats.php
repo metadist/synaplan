@@ -46,7 +46,11 @@ final class ScriptedChats
             }
             $expect = [];
             foreach (\is_array($probe['expect'] ?? null) ? $probe['expect'] : [] as $assertion) {
-                $expect[] = array_values(array_filter(\is_array($assertion) ? $assertion : [], '\is_string'));
+                $needles = array_values(array_filter(\is_array($assertion) ? $assertion : [], static fn (mixed $needle): bool => \is_string($needle) && '' !== trim($needle)));
+                // An assertion without a needle would count as met.
+                if ([] !== $needles) {
+                    $expect[] = $needles;
+                }
             }
             $turns[] = new CorpusTurn($probe['id'], self::GROUP, 'en', $probe['text'], false, [], $expect);
         }

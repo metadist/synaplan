@@ -20,6 +20,13 @@ final class CorpusRunnerTest extends TestCase
     private array $requests = [];
     /** @var list<array<string, mixed>> */
     private array $inputs = [];
+    /** @var list<string> */
+    private array $sentCookies = [];
+    /** The cookie every request must carry; null when a test follows it itself. */
+    private ?string $cookie = 'Cookie: BEARER=abc';
+    private int $deleteStatus = 200;
+    /** @var list<int> statuses for the next chat creations; 200 once empty */
+    private array $chatStatuses = [];
 
     public function testTheRunFailsWhenATurnHasNoTerminalResult(): void
     {
@@ -101,6 +108,97 @@ final class CorpusRunnerTest extends TestCase
 
         self::assertFalse($outcome->hasTerminalResult());
         self::assertStringContainsString('still working', (string) $outcome->reason);
+        self::assertContains('POST /api/v1/research/rr_1/cancel', $this->requests);
+    }
+
+    public function testARunThatMovedOnBeforeTheReplyIsReadAgain(): void
+    {
+        $runner = $this->runner([
+            '/api/v1/messages/stream' => [$this->stream(['status' => 'complete', 'researchRunId' => 'rr_1'])],
+            '/api/v1/research/rr_1' => [
+                $this->json(['status' => 'waiting_plan']),
+                $this->json(['status' => 'complete', 'report' => ['markdown' => 'Done.']]),
+            ],
+            '/api/v1/research/rr_1/input' => [new MockResponse('{"error":"not waiting"}', ['http_code' => 409])],
+        ]);
+
+        $outcome = $runner->run([$this->turn('raced')])[0];
+
+        self::assertSame(TurnOutcome::STATE_ANSWERED, $outcome->state);
+        self::assertNotContains('POST /api/v1/research/rr_1/cancel', $this->requests);
+    }
+
+    public function testAnExpiredAccessCookieIsRefreshedAndTheRequestRepeated(): void
+    {
+        $runner = $this->runner([
+            '/api/v1/messages/stream' => [
+                new MockResponse('{"error":"expired"}', ['http_code' => 401]),
+                $this->stream(['status' => 'data', 'chunk' => 'Hi.'], ['status' => 'complete']),
+            ],
+            '/api/v1/auth/refresh' => [new MockResponse('{"success":true}', ['response_headers' => ['set-cookie: BEARER=fresh; path=/; HttpOnly']])],
+        ]);
+        $this->cookie = null;
+
+        $outcome = $runner->run([$this->turn('late')])[0];
+
+        self::assertSame(TurnOutcome::STATE_ANSWERED, $outcome->state);
+        self::assertSame(
+            ['POST /api/v1/chats', 'POST /api/v1/messages/stream', 'POST /api/v1/auth/refresh', 'POST /api/v1/messages/stream', 'DELETE /api/v1/chats/7'],
+            \array_slice($this->requests, 1),
+        );
+        self::assertSame(['Cookie: BEARER=abc', 'Cookie: BEARER=abc', 'Cookie: BEARER=abc', 'Cookie: BEARER=fresh', 'Cookie: BEARER=fresh'], $this->sentCookies);
+    }
+
+    public function testTheUploadsOfATurnAreDeletedWithItsChat(): void
+    {
+        $runner = $this->runner([
+            '/api/v1/messages/upload-file' => [$this->json(['success' => true, 'file_id' => 41])],
+            '/api/v1/messages/stream' => [$this->stream(['status' => 'data', 'chunk' => 'Read.'], ['status' => 'complete'])],
+        ]);
+
+        $runner->run([new CorpusTurn('with-file', 'files', 'en', 'Question', false, ['measurements.txt'], [])]);
+
+        self::assertSame(
+            ['POST /api/v1/chats', 'POST /api/v1/messages/upload-file', 'POST /api/v1/messages/stream', 'DELETE /api/v1/files/41', 'DELETE /api/v1/chats/7'],
+            \array_slice($this->requests, 1),
+        );
+        self::assertSame([], $runner->leftovers());
+    }
+
+    public function testWhatCouldNotBeDeletedIsNamed(): void
+    {
+        $this->deleteStatus = 500;
+        $runner = $this->runner(['/api/v1/messages/stream' => [$this->stream(['status' => 'complete'])]]);
+
+        $outcomes = $runner->run([$this->turn('kept')]);
+
+        self::assertSame(TurnOutcome::STATE_ANSWERED, $outcomes[0]->state);
+        self::assertCount(1, $runner->leftovers());
+        self::assertStringStartsWith('chat 7: ', $runner->leftovers()[0]);
+    }
+
+    public function testARunThatIsNotLiveStopsAtTheFirstChargedTurn(): void
+    {
+        $runner = $this->runner(
+            ['/api/v1/messages/stream' => [$this->stream(['status' => 'complete', 'usage_extra' => [['cost' => '0.004', 'kind' => 'PLAN']]])]],
+            live: false,
+        );
+
+        $outcomes = $runner->run([$this->turn('planned'), $this->turn('never-sent')]);
+
+        self::assertCount(1, $outcomes);
+        self::assertSame('planned', $runner->spendStop());
+    }
+
+    public function testAChatThatCannotBeOpenedCostsOneTurnAndNotTheRun(): void
+    {
+        $this->chatStatuses = [503];
+        $runner = $this->runner(['/api/v1/messages/stream' => [$this->stream(['status' => 'data', 'chunk' => 'Yes.'], ['status' => 'complete'])]]);
+
+        $outcomes = $runner->run([$this->turn('no-chat'), $this->turn('fine')]);
+
+        self::assertSame(['none', 'answered'], array_map(static fn (TurnOutcome $o): string => $o->state, $outcomes));
+        self::assertStringContainsString('HTTP 503', (string) $outcomes[0]->reason);
     }
 
     public function testAScriptedChatUsesOneChatAndStopsAtTheFirstTurnWithoutAResult(): void
@@ -129,6 +227,31 @@ final class CorpusRunnerTest extends TestCase
         new StackClient(new MockHttpClient(), 'https://user:secret@staging.example.com');
     }
 
+    public function testAnOriginWithAPathIsRefused(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        new StackClient(new MockHttpClient(), 'https://staging.example.com/api');
+    }
+
+    public function testSigningOutRevokesTheSessionAndDropsTheCookies(): void
+    {
+        $paths = [];
+        $http = new MockHttpClient(static function (string $method, string $url) use (&$paths): MockResponse {
+            $paths[] = (string) parse_url($url, PHP_URL_PATH);
+
+            return new MockResponse('{}', ['response_headers' => ['set-cookie: BEARER=abc; path=/']]);
+        });
+        $stack = new StackClient($http, self::ORIGIN);
+        $stack->signIn('eval@example.com', 'not-a-real-password');
+
+        $stack->signOut();
+        $stack->signOut();
+
+        self::assertSame(['/api/v1/auth/login', '/api/v1/auth/logout'], $paths);
+        $this->expectExceptionMessage('Not signed in');
+        $stack->createChat('x');
+    }
+
     public function testNothingIsSentBeforeSigningIn(): void
     {
         $http = new MockHttpClient(function (): MockResponse {
@@ -143,7 +266,7 @@ final class CorpusRunnerTest extends TestCase
     /**
      * @param array<string, list<MockResponse>> $responses path => responses in the order they are asked for
      */
-    private function runner(array $responses, ?\Closure $clock = null, ?\Closure $sleep = null): CorpusRunner
+    private function runner(array $responses, ?\Closure $clock = null, ?\Closure $sleep = null, bool $live = true): CorpusRunner
     {
         $responses['/api/v1/auth/login'] = [new MockResponse('{}', ['response_headers' => ['set-cookie: BEARER=abc; path=/; HttpOnly']])];
         $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$responses): MockResponse {
@@ -151,16 +274,26 @@ final class CorpusRunnerTest extends TestCase
             $this->requests[] = $method.' '.$path;
             self::assertStringStartsWith(self::ORIGIN, $url);
             if ('/api/v1/auth/login' !== $path) {
-                self::assertContains('Cookie: BEARER=abc', $options['headers']);
+                $sent = array_values(array_filter($options['headers'], static fn (string $header): bool => str_starts_with($header, 'Cookie: ')));
+                self::assertCount(1, $sent);
+                $this->sentCookies[] = $sent[0];
+                if (null !== $this->cookie) {
+                    self::assertSame($this->cookie, $sent[0]);
+                }
             }
             if (str_ends_with($path, '/input')) {
                 $this->inputs[] = json_decode((string) $options['body'], true);
             }
             if ('POST' === $method && '/api/v1/chats' === $path) {
-                return $this->json(['chat' => ['id' => 7]]);
+                $status = array_shift($this->chatStatuses) ?? 200;
+
+                return 200 === $status ? $this->json(['chat' => ['id' => 7]]) : new MockResponse('{}', ['http_code' => $status]);
             }
             if ('DELETE' === $method) {
-                return $this->json(['success' => true]);
+                return new MockResponse('{"success":true}', ['http_code' => $this->deleteStatus]);
+            }
+            if (str_ends_with($path, '/cancel')) {
+                return $this->json(['status' => 'stopped']);
             }
 
             return array_shift($responses[$path]) ?? self::fail('Unexpected request '.$method.' '.$path);
@@ -168,7 +301,7 @@ final class CorpusRunnerTest extends TestCase
         $stack = new StackClient($http, self::ORIGIN);
         $stack->signIn('eval@example.com', 'not-a-real-password');
 
-        return new CorpusRunner($stack, 60.0, 0.0, $clock, $sleep ?? static function (float $seconds): void {});
+        return new CorpusRunner($stack, 60.0, 0.0, $clock, $sleep ?? static function (float $seconds): void {}, live: $live);
     }
 
     /**

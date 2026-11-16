@@ -7,6 +7,9 @@ namespace App\Tests\Eval\ChatLoop;
 /**
  * Reads the events of one turn as the web client gets them and measures it.
  *
+ * A turn the planner split into steps streams its text as `task_chunk`
+ * events into cards; the card of the plan's reply step is then the answer.
+ *
  * Terminal means the server said how the turn ended: a `complete` event, an
  * error event, or the end of the research run the turn handed over to. A
  * stream that just closes is not terminal.
@@ -20,6 +23,9 @@ final class TurnMeter
     private ?string $reason = null;
     private ?float $firstTokenAt = null;
     private string $text = '';
+    private ?string $replyNode = null;
+    /** @var array<string, string> step id => the text of its card */
+    private array $cards = [];
     private float $cost = 0.0;
     private bool $priceKnown = true;
     private int $tokens = 0;
@@ -54,6 +60,9 @@ final class TurnMeter
             $this->complete($event);
 
             return;
+        }
+        if (\in_array($status, ['plan', 'plan_discarded', 'task_chunk', 'task_update'], true)) {
+            $this->planEvent($status, \is_array($event['metadata'] ?? null) ? $event['metadata'] : [], $now);
         }
         if (\in_array($status, self::FAILED_STATUSES, true)) {
             $this->state = TurnOutcome::STATE_FAILED;
@@ -106,6 +115,8 @@ final class TurnMeter
 
     public function outcome(float $endedAt): TurnOutcome
     {
+        $text = $this->answer();
+
         return new TurnOutcome(
             $this->turn->id,
             $this->turn->group,
@@ -116,8 +127,8 @@ final class TurnMeter
             $this->cost,
             $this->priceKnown,
             $this->tokens,
-            TurnOutcome::STATE_ANSWERED === $this->state ? $this->recall() : null,
-            $this->text,
+            TurnOutcome::STATE_ANSWERED === $this->state ? $this->recall($text) : null,
+            $text,
             $this->stages,
             $this->researchRunId,
             $this->statements,
@@ -140,7 +151,7 @@ final class TurnMeter
     private function complete(array $event): void
     {
         $this->addUsage($event['usage'] ?? null);
-        foreach (\is_array($event['usageExtra'] ?? null) ? $event['usageExtra'] : [] as $extra) {
+        foreach (\is_array($event['usage_extra'] ?? null) ? $event['usage_extra'] : [] as $extra) {
             $this->addUsage($extra);
         }
 
@@ -160,6 +171,58 @@ final class TurnMeter
         $this->state = TurnOutcome::STATE_ANSWERED;
     }
 
+    /**
+     * @param array<mixed> $metadata
+     */
+    private function planEvent(string $status, array $metadata, float $now): void
+    {
+        if ('plan' === $status) {
+            $this->replyNode = \is_string($metadata['reply_node'] ?? null) && '' !== $metadata['reply_node'] ? $metadata['reply_node'] : null;
+            $this->cards = [];
+
+            return;
+        }
+        if ('plan_discarded' === $status) {
+            // The plan failed as a whole; the answer follows as `data`.
+            $this->replyNode = null;
+            $this->cards = [];
+
+            return;
+        }
+        $node = $metadata['node_id'] ?? null;
+        if (!\is_string($node) || '' === $node) {
+            return;
+        }
+        $chunk = $metadata['chunk'] ?? null;
+        if ('task_chunk' === $status && \is_string($chunk) && '' !== $chunk) {
+            $this->firstTokenAt ??= $now;
+            $this->cards[$node] = ($this->cards[$node] ?? '').$chunk;
+
+            return;
+        }
+        // A settled step carries the whole body of its card.
+        $settled = $metadata['text'] ?? null;
+        if ('task_update' === $status && \is_string($settled) && '' !== trim($settled)) {
+            $this->cards[$node] = $settled;
+        }
+    }
+
+    /**
+     * What the person reads as the answer: the bubble, else the card of the
+     * plan's reply step, else every card.
+     */
+    private function answer(): string
+    {
+        if ('' !== trim($this->text) || [] === $this->cards) {
+            return $this->text;
+        }
+        if (null !== $this->replyNode && '' !== trim($this->cards[$this->replyNode] ?? '')) {
+            return $this->cards[$this->replyNode];
+        }
+
+        return implode("\n\n", $this->cards);
+    }
+
     private function addUsage(mixed $usage): void
     {
         if (!\is_array($usage)) {
@@ -176,7 +239,7 @@ final class TurnMeter
         }
     }
 
-    private function recall(): ?float
+    private function recall(string $text): ?float
     {
         if ([] === $this->turn->expect) {
             return null;
@@ -184,7 +247,7 @@ final class TurnMeter
         $met = 0;
         foreach ($this->turn->expect as $assertion) {
             foreach ($assertion as $needle) {
-                if (false === mb_stripos($this->text, $needle)) {
+                if (false === mb_stripos($text, $needle)) {
                     continue 2;
                 }
             }

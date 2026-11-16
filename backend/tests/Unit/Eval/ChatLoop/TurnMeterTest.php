@@ -26,7 +26,7 @@ final class TurnMeterTest extends TestCase
         $meter->event([
             'status' => 'complete',
             'usage' => ['cost' => '0.0120', 'totalTokens' => 900],
-            'usageExtra' => [['cost' => '0.0030', 'totalTokens' => 100], ['cost' => null, 'totalTokens' => 40]],
+            'usage_extra' => [['cost' => '0.0030', 'totalTokens' => 100], ['cost' => null, 'totalTokens' => 40]],
         ], 101.0);
 
         $outcome = $meter->outcome(101.5);
@@ -39,6 +39,48 @@ final class TurnMeterTest extends TestCase
         self::assertTrue($outcome->priceKnown);
         self::assertSame(0.5, $outcome->recall);
         self::assertSame(['classifying', 'searching'], $outcome->stages);
+    }
+
+    public function testATurnSplitIntoStepsIsReadFromTheCardOfItsReplyStep(): void
+    {
+        $meter = new TurnMeter($this->turn([['78']]), 0.0);
+        $meter->event(['status' => 'plan', 'metadata' => ['reply_node' => 'n2', 'plan' => [['node_id' => 'n1'], ['node_id' => 'n2']]]], 0.1);
+        $meter->event(['status' => 'task_chunk', 'metadata' => ['node_id' => 'n1', 'chunk' => 'Found: the hob is 78 cm wide.']], 0.4);
+        $meter->event(['status' => 'task_chunk', 'metadata' => ['node_id' => 'n2', 'chunk' => 'The cut-out is ']], 0.6);
+        $meter->event(['status' => 'task_chunk', 'metadata' => ['node_id' => 'n2', 'chunk' => '78 cm.']], 0.7);
+        $meter->event(['status' => 'complete'], 0.8);
+
+        $outcome = $meter->outcome(0.9);
+
+        self::assertSame('The cut-out is 78 cm.', $outcome->text);
+        self::assertEqualsWithDelta(0.4, $outcome->firstTokenSeconds, 0.0001);
+        self::assertSame(1.0, $outcome->recall);
+    }
+
+    public function testAFactOnlyInASearchCardIsNotInTheAnswer(): void
+    {
+        $meter = new TurnMeter($this->turn([['78']]), 0.0);
+        $meter->event(['status' => 'plan', 'metadata' => ['reply_node' => 'n2']], 0.1);
+        $meter->event(['status' => 'task_update', 'metadata' => ['node_id' => 'n1', 'state' => 'done', 'text' => 'Result: 78 cm']], 0.2);
+        $meter->event(['status' => 'task_update', 'metadata' => ['node_id' => 'n2', 'state' => 'done', 'text' => 'I could not find the width.']], 0.3);
+        $meter->event(['status' => 'complete'], 0.4);
+
+        $outcome = $meter->outcome(0.5);
+
+        self::assertSame('I could not find the width.', $outcome->text);
+        self::assertSame(0.0, $outcome->recall);
+    }
+
+    public function testADiscardedPlanIsAnsweredInTheBubble(): void
+    {
+        $meter = new TurnMeter($this->turn(), 0.0);
+        $meter->event(['status' => 'plan', 'metadata' => ['reply_node' => 'n1']], 0.1);
+        $meter->event(['status' => 'task_chunk', 'metadata' => ['node_id' => 'n1', 'chunk' => 'Half a card']], 0.2);
+        $meter->event(['status' => 'plan_discarded'], 0.3);
+        $meter->event(['status' => 'data', 'chunk' => 'The answer.'], 0.4);
+        $meter->event(['status' => 'complete'], 0.5);
+
+        self::assertSame('The answer.', $meter->outcome(0.6)->text);
     }
 
     public function testAStreamThatJustClosesHasNoTerminalResult(): void
@@ -158,6 +200,29 @@ final class TurnMeterTest extends TestCase
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('--live');
         SpendGuard::check(['CHAT' => 379, 'SORT' => -1], false);
+    }
+
+    public function testAModelThatReadsAnAttachedFileNeedsTheLiveSwitch(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('VECTORIZE (model 12)');
+        SpendGuard::check(['CHAT' => -1, 'VECTORIZE' => 12], false);
+    }
+
+    public function testTheLongChatAlsoNeedsFreePictureModels(): void
+    {
+        SpendGuard::check(['CHAT' => -1, 'PIC2PIC' => 348], false);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('PIC2PIC (model 348)');
+        SpendGuard::check(['CHAT' => -1, 'PIC2PIC' => 348], false, SpendGuard::SCRIPT);
+    }
+
+    public function testAnAnswerWithoutTheChatModelIsNotTakenAsFree(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('did not say which model');
+        SpendGuard::check([], false);
     }
 
     /**

@@ -26,7 +26,7 @@ question and gold facts from `tests/Eval/research/corpus-hard.json`, so G2
 scores the same words as row 21.
 
 **How it measures:** it signs in like the web client and sends each turn
-through `POST /api/v1/messages/stream`. Cost is `usage` and `usageExtra` of
+through `POST /api/v1/messages/stream`. Cost is `usage` and `usage_extra` of
 the `complete` event plus `cost.spent` of the research run a turn hands over
 to; time to first token is the first non-empty `data` chunk; backed
 statements are the research run's own `check` counts, and `--answers`
@@ -36,17 +36,28 @@ no terminal result.
 **Deviation from the brief:** the two stubs are data only. Planting a tool
 stub needs the loop of PJ5; PJ6 wires them.
 
-**Walked on the dev stack** (test provider, no paid call), 2026-11-16:
+**Walked on the dev stack** (demo account, test models), 2026-11-16:
 
 ```bash
 docker compose exec -T -e CHAT_LOOP_EVAL_PASSWORD backend \
   php tests/Eval/ChatLoop/run.php --base-url=http://localhost \
-  --email=demo@synaplan.com --only=simple-01,simple-02,files-03
+  --email=demo@synaplan.com --only=simple-01,simple-02
 ```
 
-Three turns answered, the attached file was read (`files-03` recall 100 %),
-the chats were deleted. The test provider has no price and echoes; these
-are not today's numbers.
+Both turns answered at no cost, the chats were deleted, the session was
+signed out. The test provider has no price and echoes; these are not
+today's numbers. With `files-03` added the run stops with exit 1 after that
+turn: the planner split it into steps and the instance's planning model, a
+real one on this stack, charged 0.0025. The account's own defaults do not
+show that model, so the runner stops a run without `--live` at the first
+charged turn. The chat and the uploaded file were removed (files and chats
+of the account counted before and after).
+
+**Review of the runner, 2026-11-16:** the session is refreshed after the
+five-minute access cookie runs out; sorting and planning cost is read from
+`usage_extra`; a planned turn's answer is read from its reply card;
+uploaded files are deleted with the chat; a research run nobody waits for
+is cancelled; an unknown argument ends the run before anything is sent.
 
 **Open — the exit of PJ1:** today's numbers per group need one run with
 `--live` on an evaluation account whose Chat model is a real one. It spends

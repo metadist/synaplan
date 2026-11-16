@@ -16,8 +16,10 @@ runner, not against memory.
 ## Run
 
 The runner signs in like the web client and sends every turn through
-`POST /api/v1/messages/stream`, each in a chat of its own that it deletes
-afterwards. It needs an account on the stack and that account's password in
+`POST /api/v1/messages/stream`, each in a chat of its own. Afterwards it
+deletes the chat and the files it attached, stops a research run it no
+longer waits for, and signs out. What it could not remove it names on
+stderr. It needs an account on the stack and that account's password in
 `CHAT_LOOP_EVAL_PASSWORD`.
 
 ```bash
@@ -29,22 +31,35 @@ docker compose exec -T -e CHAT_LOOP_EVAL_PASSWORD backend \
 | Option | Meaning |
 | ------ | ------- |
 | `--base-url` | Origin of the stack. Plain HTTP is accepted for this machine only. |
-| `--email` | The evaluation account. Use one made for this; its chats, usage and files are real rows. |
+| `--email` | The evaluation account. Use one made for this: its usage rows stay, and a run that breaks off can leave chats named "chat-loop eval …". The report prints `--email=<account>`, not the address. |
 | `--group`, `--only` | One group, or a comma-separated list of turn ids |
-| `--script` | Run a conversation from `scripted/` in one chat instead of the corpus, for example `long-chat-150` |
-| `--live` | Required when the account answers with models that cost money. Without it the run refuses to start. |
+| `--script` | Run a conversation from `scripted/` in one chat instead of the corpus, for example `long-chat-150`. Not together with `--group` or `--only`. |
+| `--live` | Required when the account does not answer with the built-in test models. Without it the run refuses to start, and stops at the first turn the account was charged for. |
 | `--turn-timeout` | Seconds the runner waits for one turn (default 1800). It is the runner's patience, not a limit of the product. |
 | `--report`, `--answers` | Where to write the Markdown report and the answers for `app:research:citations` |
-| `--keep-chats` | Leave the chats in the account |
+| `--keep-chats` | Leave the chats and their files in the account |
+
+An argument the runner does not know ends it before anything is sent, so a
+mistyped `--group` cannot turn into a run of the whole corpus.
 
 The run exits with 1 when a turn has no terminal result: the stream closed
 without `complete` or an error, or a research run was still working at the
 timeout. The numbers of such a run do not count.
 
+**Spending.** Without `--live` the runner reads the account's default models
+and refuses to start unless sorting, chat, memories, file reading and (for
+`--script`) picture models are the built-in test models. It cannot read the
+instance's planning, tool and summary models, and a search provider is not a
+model; so a run without `--live` also stops at the first turn with a cost
+above zero and exits with 1.
+
 **What is measured.** Cost is what the account was charged, from the `usage`
-and `usageExtra` of the `complete` event plus the research run's `cost.spent`.
-Time to first token is the first non-empty `data` chunk. Recall is the share
-of a turn's `expect` assertions found word for word in the answer. Backed
+and `usage_extra` of the `complete` event plus the research run's `cost.spent`.
+Time to first token is the first non-empty `data` chunk; the clock starts when
+the turn is sent, after its files are uploaded. The answer is the
+bubble; for a turn the planner split into steps it is the card of the plan's
+reply step (`task_chunk`, `task_update`). Recall is the share of a turn's
+`expect` assertions found word for word in that answer. Backed
 statements come from the research run's own fact-check; to judge the
 citations of every answer with models, pass the `--answers` file to
 `bin/console app:research:citations`.
