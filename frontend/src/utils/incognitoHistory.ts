@@ -7,15 +7,16 @@ import type { Message } from '@/stores/history'
  * placeholder is still streaming). The backend caps the payload at ~30
  * entries / 15k chars, so no client-side cap is needed.
  *
- * A failed turn is left out, as the backend leaves it out of a stored chat:
- * the answer that carries an error reason and the question it failed on. The
- * model never answered it, and a question a provider refused is refused again
- * when it is replayed.
+ * What the backend leaves out of a stored chat is left out here too: an answer
+ * that "Again" replaced, and a failed turn — the answer that carries an error
+ * reason and the question it failed on. The model never answered that
+ * question, and a question a provider refused is refused again when it is
+ * replayed.
  */
 export function incognitoHistory(messages: Message[]): IncognitoHistoryEntry[] {
   const entries: IncognitoHistoryEntry[] = []
   for (const m of messages) {
-    if (m.isStreaming) continue
+    if (m.isStreaming || m.isSuperseded) continue
     if (m.role === 'assistant' && m.errorReason) {
       if (entries.at(-1)?.role === 'user') entries.pop()
       continue

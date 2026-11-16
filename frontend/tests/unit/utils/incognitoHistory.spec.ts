@@ -42,6 +42,39 @@ describe('incognitoHistory', () => {
     ])
   })
 
+  it('keeps the question with the answer of a successful retry', () => {
+    const history = incognitoHistory([
+      turn('user', 'du kennst meinen namen'),
+      turn('assistant', 'Der KI-Dienst hat diese Anfrage abgelehnt.', {
+        errorReason: 'content_filtered',
+        isSuperseded: true,
+      }),
+      turn('assistant', 'Nein, in dem, was mir vorliegt, steht kein Name.'),
+      turn('user', 'danke'),
+    ])
+
+    expect(history).toEqual([
+      { role: 'user', content: 'du kennst meinen namen' },
+      { role: 'assistant', content: 'Nein, in dem, was mir vorliegt, steht kein Name.' },
+    ])
+  })
+
+  it('leaves the turn out when the retry failed too', () => {
+    const history = incognitoHistory([
+      turn('user', 'du kennst meinen namen'),
+      turn('assistant', 'Der KI-Dienst hat diese Anfrage abgelehnt.', {
+        errorReason: 'content_filtered',
+        isSuperseded: true,
+      }),
+      turn('assistant', 'Der KI-Dienst hat diese Anfrage abgelehnt.', {
+        errorReason: 'content_filtered',
+      }),
+      turn('user', 'danke'),
+    ])
+
+    expect(history).toEqual([])
+  })
+
   it('keeps the answer before a failed turn whose question had no text', () => {
     const history = incognitoHistory([
       turn('user', 'weisst Du, wer ich bin?'),
