@@ -7,7 +7,7 @@ to them.
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
-| PJ1 | in review | — | corpus and runner; today's numbers are open, see 2026-11-16 below |
+| PJ1 | in review | #3141 | corpus and runner; today's numbers are open, see 2026-11-16 below |
 | PJ2–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
 
 ---
