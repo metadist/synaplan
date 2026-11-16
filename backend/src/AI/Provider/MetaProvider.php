@@ -613,9 +613,6 @@ class MetaProvider extends AbstractChatCompletionsCloudProvider implements Image
         }
 
         $bytesPerSecond = $fmt['rate'] * $fmt['channels'] * ($fmt['bits'] / 8);
-        if ($bytesPerSecond <= 0) {
-            return 0.0;
-        }
 
         return $fmt['dataBytes'] / $bytesPerSecond;
     }
