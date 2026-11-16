@@ -1,0 +1,38 @@
+{
+  "id": "stub-search-same",
+  "kind": "tool_stub",
+  "description": "Gate G5. Every web_search call returns the same three results, whatever the query. A run on it must end in a wrap-up with reason \"circling\" after exactly one nudge, with an answer.",
+  "turn": {
+    "language": "en",
+    "text": "Find five different independent tests of 80 cm induction hobs published this year and compare their winners."
+  },
+  "stub": {
+    "tool": "web_search",
+    "behaviour": "same_result",
+    "result": {
+      "results": [
+        {
+          "title": "Induction hobs: what to look for",
+          "url": "https://example.org/hobs/guide",
+          "snippet": "A general buying guide for induction hobs. It names no test and no winner."
+        },
+        {
+          "title": "Hob sizes explained",
+          "url": "https://example.org/hobs/sizes",
+          "snippet": "60, 80 and 90 cm hobs and the cut-outs they need."
+        },
+        {
+          "title": "How induction works",
+          "url": "https://example.org/hobs/induction",
+          "snippet": "Induction heats the pan, not the glass."
+        }
+      ]
+    }
+  },
+  "expect": {
+    "status": "completed",
+    "wrapup": "circling",
+    "nudges": 1,
+    "answer": true
+  }
+}

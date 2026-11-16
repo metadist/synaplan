@@ -6,8 +6,52 @@ to them.
 
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
-| PJ0 | draft | — | plan written 2026-11-16; §0 partly decided, see below |
-| PJ1–PJ28 | not started | — | plan only until the owner orders row 46 |
+| PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
+| PJ1 | in review | — | corpus and runner; today's numbers are open, see 2026-11-16 below |
+| PJ2–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
+
+---
+
+## 2026-11-16 — corpus and runner (PJ1)
+
+**Ordered:** the owner asked for the first steps on 2026-11-16. PJ1 needs no
+☐ row and touches no product code.
+
+**What is there:** `backend/tests/Eval/ChatLoop/` — `corpus.json` (40 turns:
+10 simple, 8 search, 8 files, 8 multi-step, 6 research; all five locales),
+four synthetic documents, three scripted chats (150 messages with a picture
+at message 5 and a fact at message 10; a search that always returns the
+same; a tool that always fails), and `run.php`. The research turns take
+question and gold facts from `tests/Eval/research/corpus-hard.json`, so G2
+scores the same words as row 21.
+
+**How it measures:** it signs in like the web client and sends each turn
+through `POST /api/v1/messages/stream`. Cost is `usage` and `usageExtra` of
+the `complete` event plus `cost.spent` of the research run a turn hands over
+to; time to first token is the first non-empty `data` chunk; backed
+statements are the research run's own `check` counts, and `--answers`
+writes a file for `app:research:citations`. The run exits 1 when a turn has
+no terminal result.
+
+**Deviation from the brief:** the two stubs are data only. Planting a tool
+stub needs the loop of PJ5; PJ6 wires them.
+
+**Walked on the dev stack** (test provider, no paid call), 2026-11-16:
+
+```bash
+docker compose exec -T -e CHAT_LOOP_EVAL_PASSWORD backend \
+  php tests/Eval/ChatLoop/run.php --base-url=http://localhost \
+  --email=demo@synaplan.com --only=simple-01,simple-02,files-03
+```
+
+Three turns answered, the attached file was read (`files-03` recall 100 %),
+the chats were deleted. The test provider has no price and echoes; these
+are not today's numbers.
+
+**Open — the exit of PJ1:** today's numbers per group need one run with
+`--live` on an evaluation account whose Chat model is a real one. It spends
+that account's budget (40 turns, six of them research), so it waits for the
+owner's word on account and stack. The table goes here, with the command.
 
 ---
 
