@@ -8,7 +8,7 @@ to them.
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
 | PJ1 | in review | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
-| PJ2 | in progress | — | spike; hand-over time measured, two-hour run open, see 2026-11-16 below |
+| PJ2 | in review | — | spike; §0 #21 holds; G7 prototype run did **not** pass, see 2026-11-16 below |
 | PJ3–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
 
 ---
@@ -58,8 +58,72 @@ the same settings, so the totals are not compared. A run with 8 and 16
 turns at once ended in the demo account's limit of 100 messages an hour
 before it measured anything; it is open.
 
-**Open:** the two-hour run with forced compactions (G7); the load run; the
-list for AU26 and AH8.
+**Two-hour run (G7 prototype).** `spike/long-run.php`, not product code: one
+process, `openai/gpt-oss-120b` straight at Groq, a 90-section document, a
+window of 8,000 tokens, compaction at 70 %, last 4 steps kept, 55 s pause
+per step, notes reloaded from a file each step. Task: read every section,
+then `finish(total_nordholz, top_section, code_word)`.
+
+| Measure | Result | G7 asks |
+| ------- | ------ | ------- |
+| Duration | 8,013 s (2 h 13 min) | two hours |
+| Cost | 0.1275 (cap was 0.50) | — |
+| Compactions | 22 | at least 3 |
+| Largest prompt | 4,623 of 8,000 tokens | below the window |
+| Sections read | 90 of 90 | all |
+| Duplicate reads | **32** | none |
+| Early `finish` rejected by the guard | 2 (at 84 and 87 sections) | — |
+| Code word | right | right |
+| Total (Nordholz) | **303,408, gold 326,390: wrong** | right |
+| Top section | **23, gold 77: wrong** | right |
+| Goal kept | **no** | yes |
+
+```bash
+docker compose exec -T backend php /tmp/long-run.php --label=paced --sections=90 \
+  --guard-finish=1 --pause=55 --max-cost=0.50   # copy spike/long-run.php there first
+```
+
+What it says. **The window held, the work did not.** The prompt never
+neared the window and nothing crashed, but the notes lost state:
+
+- **The notes grow until they hit their budget.** Every compaction kept one
+  `plan` item per section (up to 90). From compaction 10 on the summary call
+  ended at its 2,500-token output cap (13 of 22 compactions), so facts (amounts, suppliers) were
+  cut. That is where the wrong total and top section come from, and why 32
+  sections were read twice.
+- **The model quits.** In 18 steps it answered in text ("I'm unable to
+  complete the request") or announced an answer from partial data instead of
+  calling a tool. Left alone, the run ends there. Twice it called `finish`
+  before everything was read.
+- **So G7 is not met by this prototype,** and the prototype is the naive
+  version of §1.5. It is evidence for the contract, not against it.
+
+**What follows for the contract (§1.5) and the plans:**
+
+- `plan` is a short list of the few open steps, never one item per unit of
+  work; progress is a counter or a range ("sections 1–60 read"), not a list.
+- A running result (sum, maximum, section of the maximum) lives in `facts`
+  as one value that every step updates, not as raw rows to re-add.
+- Compaction output has its own budget and a size check; a summary that
+  hits the cap is a failed compaction (the existing wrap-up path), not a
+  silent cut.
+- The loop, not the model, decides "done": a `finish` is checked against the
+  goal (here: all sections read) and rejected with the missing part; a text
+  answer without a tool call is answered with a nudge, with a limit.
+- The loop keeps the ledger of tool calls it has made (`read_section(7)`
+  already done) and answers a repeat from it without a model round trip.
+
+**For AU26 and AH8 to expose:** per run, the compaction count and size of the
+notes after each compaction; a failed-compaction state and reason; duplicate
+tool calls (same name and arguments); text-only steps (nudges sent); the
+rejected `finish` count; peak prompt tokens against the window. AU26 shows
+them to the person, AH8 alerts on a failed compaction and on repeated nudges.
+This list is sent to those plans in this pull request.
+
+**Open:** the load run (8 and 16 turns at once, needs an account without the
+100-an-hour limit); a re-run of the long prototype with the changes above
+(the next run decides G7); the real run in the worker with lease and
+restart, which this prototype does not test.
 
 ---
 
