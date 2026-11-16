@@ -39,7 +39,7 @@ phone, nothing in the browser.
 3. The value of the cost limit and the token cap for unpriced models
    (#12, #14).
 4. Shared chats: does the AI answer every message (#36), one run per chat
-   with "Answer now" (#37), the sender-only check before an app is used
+   with queuing (#37), the sender-only check before an app is used
    (#45), writes always ask (#46), the sender's model (#67).
 5. Notion "Only these pages" after a spike (#49).
 6. Private chats first in a shared project (#55); the default of the

@@ -141,7 +141,7 @@ proposal and wait for a tick. **Ask** rows are ask-first by `AGENTS.md`.
 | 34 | It is the existing share (`BSHARES`, kind `conversation`) with a third level, "Can write" (`edit`). People and groups, not "everyone". "Can read" and "Can continue as a copy" stay. | Extend | ☐ |
 | 35 | Who wrote what: every message stores its author. Other people's messages show an avatar with initials and the name. The answer shows "Reply to {name}". Avatar colours come from a fixed set of tokens that meet AA in both themes. | Avatar + name | ☐ |
 | 36 | The AI answers every message. A message that starts with `@Name` of a member is for that person, and the AI stays quiet. | Always, except @member | ☐ |
-| 37 | One run per chat. A new message from the same person steers the run. A message from someone else appears at once; its answer starts when the run ends, or at once with "Answer now" (a second run that reads the chat, not the other run's unfinished work). | Queue + opt-in | ☐ |
+| 37 | One run per chat. A new message from the same person steers the run. A message from someone else appears at once; its answer is queued and starts when the current run ends. | Queue | ☐ |
 | 38 | Each person pays for their own messages. | Sender pays | Yes — owner |
 | 39 | The owner can pay instead: one amount for the chat. Only the others' usage counts against it, not the owner's. When it is used up, everyone pays for themselves again, automatically. The chat shows which mode is on and a bar. | As written | Yes — owner |
 | 40 | Members see the bar and a percentage. The amount is shown to the owner only. | Percent only | ☐ |

@@ -105,8 +105,8 @@ what it **must survive**.
    message shows his avatar and name on Ana's screen; hers on his.
 3. The answer to Ben's message is headed "Reply to Ben".
 4. Ana writes while that answer is still running. Her message appears at
-   once, marked "Waiting for the current answer". She can press "Answer
-   now".
+   once, marked "Waiting for the current answer", and its answer starts when
+   the current one finishes.
 
 - **Found:** share dialog; "Shared with me".
 - **Undo:** Ana lowers Ben to "Can view" or removes him; Ben leaves the

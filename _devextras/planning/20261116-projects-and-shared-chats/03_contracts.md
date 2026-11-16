@@ -140,13 +140,14 @@ for any of these.
 | `BCHATS` | `BPROJECTID` | bigint null, index | the project the chat is in |
 | `BCHATS` | `BPROJECTSHARED` | tinyint, default 0 | visible to the project's members |
 | `BCHATS` | `BMEMORYMODE` | varchar(20) null | `project` \| `project_personal`; null outside a project |
-| `BMESSAGES` | `BAUTHORID` | bigint null, index | who wrote an incoming message; for an answer, whose message it answers. Null means `BUSERID` (every existing row) |
+| `BMESSAGES` | `BAUTHORID` | bigint null, index | who wrote an incoming message (`BDIRECT = 'IN'`); null on answers (`'OUT'`). On an incoming row, null means `BUSERID` (every existing row) |
 | `BRUNS` (AH8) | `BNOTES` | mediumtext null | run notes, §1.5 |
 | `BRUNS` (AH8) | `BKIND` | value `chat` | no type change |
 
 `BMESSAGES.BUSERID` keeps its meaning: the account the chat lies under. In
 a shared chat that is the chat's owner for every row. Code that means "who
-wrote this" reads `BAUTHORID ?? BUSERID` through one method on `Message`.
+wrote this" reads `Message::authorId()`: `BAUTHORID ?? BUSERID` on incoming
+rows (`BDIRECT = 'IN'`), `null` on answers (`'OUT'`).
 
 ### 2.2 `BPROJECTS`
 
@@ -332,14 +333,14 @@ PayerResolver::resolve(chat, sender)
 - Allowed: the owner, and a subject with `edit` on the conversation
   (`AccessGate`). `StreamTurnPreparer::loadChat()` and `CancelledTurns` ask
   the gate instead of comparing user IDs.
-- A chat **counts as shared** when it has an `edit` share or one message
-  whose author is not the owner. This is one method; everything below asks
-  it.
+- A chat **counts as shared** when it has an `edit` share or one incoming
+  message whose author is not the owner. This is one method; everything
+  below asks it.
 - The turn runs as the sender: language, Chat model, rate limits, apps.
 - One active run per chat. A message from the run's starter becomes a hint
   (`POST /api/v1/runs/{uuid}/hint`). A message from someone else is stored
-  and shown at once; its run is `queued` behind the active one, or starts
-  at once when its author presses "Answer now" (§0 #37).
+  and shown at once; its run is `queued` behind the active one and starts
+  when the active run ends (§0 #37).
 - A message that starts with `@` and the display name of a member gets no
   answer (§0 #36).
 - Members' clients learn about new messages through the existing
@@ -403,8 +404,9 @@ card read-only.
 
 ### 6.5 What an answer records
 
-`BMESSAGEMETA` on the answer: `reply_to` is `BAUTHORID`; `apps_used` =
-`[{userId, app}]`; `paid_by`. The chip reads `apps_used`.
+`BMESSAGEMETA` on the answer: `reply_to` is the `authorId` of the incoming
+message it answers; `apps_used` = `[{userId, app}]`; `paid_by`. The chip
+reads `apps_used`.
 
 ### 6.6 Leaving and deleting
 
@@ -413,7 +415,9 @@ card read-only.
 - An account is deleted: its messages in other people's chats stay; the
   name is replaced by a neutral label. Its project memory entries are
   deleted.
-- Export of personal data includes messages where the person is the author.
+- Export of personal data includes incoming messages where
+  `Message::authorId()` is the person; answers have `authorId = null` and
+  stay with the chat under `BUSERID`.
 
 ## 7. Projects
 
@@ -564,8 +568,8 @@ regenerated in the same PR.
 | `GET /push/config` | PJ24 | `{enabled, relayUrl, keyId, publicKey}` |
 | `POST /push/devices` · `DELETE /push/devices/{id}` | PJ24 | `{relayDeviceId, platform, appId, keyId}` |
 
-The message list and the stream gain `authorId` on every message and
-`replyTo`, `appsUsed`, `paidBy` on answers.
+The message list and the stream gain `authorId` (`int | null`, `null` on
+answers) on every message and `replyTo`, `appsUsed`, `paidBy` on answers.
 
 ## 11. Configuration (`BCONFIG`)
 
