@@ -81,9 +81,11 @@ php tests/Eval/ChatLoop/run.php --base-url=http://localhost --email=<account> --
 ```
 
 The research turns ran one at a time with a look at the cost ledger before
-each. The runner counted 1.4989 for the 40 turns; the ledger shows 1.5767
-for the account over the same time, because calls after the turn (memory
-extraction) are not in the turn's `complete` event.
+each. The runner counted 1.4989 for the 40 turns, which is the provider
+cost plus the 10 % markup the turn reports. The ledger holds provider cost
+without markup and shows 1.5767 for the account over the same time: it also
+has the calls after the turn, which are not in the turn's `complete` event
+(message digest 0.1377, memory extraction 0.0360).
 
 What the numbers say about today:
 
@@ -93,9 +95,23 @@ What the numbers say about today:
   as an ordinary search turn in six to nine seconds, so the group has no
   backed statements today. Three `multi_step` turns did hand over (54 to
   93 s) and their fact-check backed 30.8 % of 13 statements.
-- **A `files` turn costs about a tenth of a `simple` turn.** Not examined
-  yet; it is to be understood before G1 is judged, since it may mean the
-  two groups take different paths or count different calls.
+- **Sorting is most of a `simple` turn.** From the ledger, per turn:
+  sorting 0.0223 (10,700 prompt tokens on the account's Sort model, Claude
+  Sonnet 5.5, none of them cached), the answer 0.0045 to 0.0072 (2,100
+  prompt tokens), and after the turn a message digest of 0.0081 and at
+  times a memory extraction of 0.0045. The sorter is 27 calls and 0.6030
+  of the run. The fast path that answers a short plain message without the
+  sorter exists and is off by default (`CLASSIFIER.FAST_PATH_ENABLED`),
+  because its heuristic sent media requests to chat.
+- **A `files` turn costs a tenth of that because it is not sorted.** An
+  attachment routes the turn before the sorter; the planner then runs on
+  `gpt-oss-120b` with a cached prompt for 0.0015, and the answer needs 500
+  to 2,600 prompt tokens. The two groups take different paths; the calls
+  are counted the same way.
+- **For G1 this means** the bar of 0.0301 is mostly the sorter on this
+  account's Sort model. A loop that replaces the sorter for a simple turn
+  is compared against it; an account with a cheaper Sort model has a lower
+  bar. The gate run on staging states the Sort model with the numbers.
 
 Not run: the 150-message scripted chat (G6) and a run on staging. Local
 numbers are one machine and one run; the gate run for G1–G7 repeats this on
