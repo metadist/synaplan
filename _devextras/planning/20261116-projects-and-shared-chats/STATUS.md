@@ -8,7 +8,7 @@ to them.
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
 | PJ1 | in review | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
-| PJ2 | in review | — | spike; §0 #21 holds; G7 prototype run did **not** pass, see 2026-11-16 below |
+| PJ2 | in review | #3142 | spike; §0 #21 holds, also under load; G7 prototype did **not** pass in two runs, see 2026-11-16 below |
 | PJ3–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
 
 ---
@@ -52,11 +52,35 @@ What it says:
   pump: with the pump down or full it still answers. That, not the 0.03 s,
   is the reason to keep it.
 
-Limits of this measurement: one machine, an idle pump, one turn at a time.
-The total is lower when queued because the two containers do not run with
-the same settings, so the totals are not compared. A run with 8 and 16
-turns at once ended in the demo account's limit of 100 messages an hour
-before it measured anything; it is open.
+**Under load** (8 and 16 turns started at once, the seeded demo account on
+the test provider, one `pump` container with its single consumer, 48
+messages in all):
+
+| Mode | At once | Answered | First text median / p95 (s) | Total median / p95 (s) |
+| ---- | ------- | -------- | --------------------------- | ---------------------- |
+| In the request | 8 | 8 | 0.26 / 0.27 | 1.74 / 1.79 |
+| In the request | 16 | 16 | 0.40 / 0.44 | 1.89 / 2.01 |
+| Queued for the pump | 8 | 8 | 5.94 / 10.16 | 7.38 / 11.67 |
+| Queued for the pump | 16 | 16 | 12.76 / 23.13 | 14.27 / 24.10 |
+
+```bash
+spike/turn-latency.php --only=<turn id>   # one turn per process, N processes at once
+```
+
+**Variant 1, every turn queued, fails G1 under load.** With one consumer
+the pump answers one turn after the other, so the 16th turn waits for 15.
+Idle, the cost was 3 %; at 16 at once it is a factor of 30 on the first
+text. A queue for every turn would need as many consumers as turns that can
+overlap, and a full or stopped pump would stop plain chat. Variant 2 keeps
+the simple turn in the request and queues only the turns that need a tool,
+where a wait of seconds is already normal. **§0 #21 is confirmed, now for
+speed under load as well as for independence from the pump.** The run layer
+for tool turns must run several consumers (AH8 sizes that).
+
+Limits of this measurement: one machine, one turn per process, the test
+provider (no model time), so a real model makes every turn longer and the
+queue longer still. The totals of the idle comparison are not compared: the
+two containers do not run with the same settings.
 
 **Two-hour run (G7 prototype).** `spike/long-run.php`, not product code: one
 process, `openai/gpt-oss-120b` straight at Groq, a 90-section document, a
@@ -120,9 +144,52 @@ rejected `finish` count; peak prompt tokens against the window. AU26 shows
 them to the person, AH8 alerts on a failed compaction and on repeated nudges.
 This list is sent to those plans in this pull request.
 
-**Open:** the load run (8 and 16 turns at once, needs an account without the
-100-an-hour limit); a re-run of the long prototype with the changes above
-(the next run decides G7); the real run in the worker with lease and
+**Second run, contract v2 (`--contract=2`).** The changes above, in the
+prototype: plan of at most 5 items, progress line, running values as facts,
+a summary budget of 1,200 tokens (hitting it is a failed compaction), a
+repeat call answered from the ledger. Same document, window and model.
+
+| Measure | v1 | v2 | G7 asks |
+| ------- | -- | -- | ------- |
+| Duration | 8,013 s | 7,880 s | two hours |
+| Cost | 0.1275 | 0.0536 | — |
+| Compactions | 22 | 8 | at least 3 |
+| Notes after a compaction | up to 8,800 chars, cap hit 13 times | about 380 chars, cap never hit | — |
+| Duplicate reads | 32 | **0** | none |
+| Sections read | 90 | 90 | all |
+| Early `finish` rejected | 2 | 7 | — |
+| Text-only steps | 18 | 23 | — |
+| Ended with | `finish` | **no `finish`: five nudges in a row, then "no tool call"** | `finish` |
+| Answer | wrong total, wrong top | **none** | right |
+
+```bash
+php /tmp/long-run-v2.php --label=v2 --contract=2 --sections=90 --guard-finish=1 \
+  --pause=65 --max-cost=0.50   # spike/long-run.php copied into the container
+```
+
+What it says. **Size and duplicates are fixed, correctness is not.**
+
+- The notes stay small and no section is read twice: the short plan, the
+  progress line and the budget work.
+- The model's running values are wrong. At compaction 8 the notes say
+  `total_nordholz=262838` and `top_section=3 (94483)` after 82 sections, the
+  gold top is section 77. A model that keeps a running sum and maximum in
+  its own summary drifts; the loop cannot trust them.
+- The run ended before it answered: after all 90 sections the model kept
+  announcing instead of calling `finish`, and the nudge limit of five ended
+  it. G7 is **not met**.
+
+**Consequence for §1.5.** The model must not be the only keeper of the
+running result. Two ways, to be decided in PJ with the run layer: a tool
+that holds named values (`note(name, value)` and `get(name)`, updated by the
+model from each result and read back verbatim, so a value is never rewritten
+by a summary), or a ledger the loop fills from structured tool results. And
+the end of a run must not rely on the model calling `finish`: when the work
+list is empty the loop asks once for the answer with `tool_choice` forced
+to `finish`, and a run that cannot produce it ends in the wrap-up path.
+Neither is tested yet; a third prototype run would test the first.
+
+**Open:** a third run with named values and a forced `finish` (decides G7); the real run in the worker with lease and
 restart, which this prototype does not test.
 
 ---

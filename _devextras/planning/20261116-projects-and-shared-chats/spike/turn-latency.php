@@ -23,11 +23,12 @@ use Symfony\Component\HttpClient\HttpClient;
 
 require '/var/www/backend/vendor/autoload.php';
 
-$options = getopt('', ['email:', 'label:', 'passes::', 'base-url::', 'group::']);
+$options = getopt('', ['email:', 'label:', 'passes::', 'base-url::', 'group::', 'only::']);
 $email = (string) ($options['email'] ?? '');
 $label = (string) ($options['label'] ?? '');
 $passes = max(1, (int) ($options['passes'] ?? 1));
 $group = (string) ($options['group'] ?? 'simple');
+$only = (string) ($options['only'] ?? '');
 $password = getenv('CHAT_LOOP_EVAL_PASSWORD');
 if ('' === $email || '' === $label || !is_string($password) || '' === $password) {
     fwrite(STDERR, "Needs --email, --label and CHAT_LOOP_EVAL_PASSWORD.\n");
@@ -36,7 +37,7 @@ if ('' === $email || '' === $label || !is_string($password) || '' === $password)
 
 $turns = array_values(array_filter(
     (new ChatLoopCorpus())->load(),
-    static fn ($turn): bool => $group === $turn->group,
+    static fn ($turn): bool => $group === $turn->group && ('' === $only || $only === $turn->id),
 ));
 
 $stack = new StackClient(HttpClient::create(), (string) ($options['base-url'] ?? 'http://localhost'));

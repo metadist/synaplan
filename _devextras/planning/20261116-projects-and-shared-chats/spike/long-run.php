@@ -38,7 +38,7 @@ const PRICE_OUT = 0.60;
 const SUPPLIERS = ['Nordholz', 'Kuestenbau', 'Alpenstahl', 'Weserwerk', 'Fichtner'];
 const CODE_WORD = 'FJORD-77';
 
-$o = getopt('', ['label::', 'sections::', 'window::', 'compact-at::', 'keep::', 'pause::', 'max-cost::', 'max-steps::', 'seed::', 'guard-finish::']);
+$o = getopt('', ['label::', 'sections::', 'window::', 'compact-at::', 'keep::', 'pause::', 'max-cost::', 'max-steps::', 'seed::', 'guard-finish::', 'contract::']);
 $label = (string) ($o['label'] ?? 'run');
 $sections = (int) ($o['sections'] ?? 90);
 $window = (int) ($o['window'] ?? 8000);
@@ -49,6 +49,9 @@ $maxCost = (float) ($o['max-cost'] ?? 1.00);
 $maxSteps = (int) ($o['max-steps'] ?? 260);
 $seed = (int) ($o['seed'] ?? 7);
 $guardFinish = (bool) (int) ($o['guard-finish'] ?? 0);
+// 1: the first prototype. 2: the changes the first run called for (short plan,
+// running values as facts, summary size check, repeat calls from the ledger).
+$contract = (int) ($o['contract'] ?? 1);
 $key = getenv('GROQ_API_KEY');
 if (!is_string($key) || '' === $key) {
     fwrite(STDERR, "No provider key in the environment. Nothing was sent.\n");
@@ -162,14 +165,19 @@ for ($i = 0; $i < $maxSteps; ++$i) {
         }
         $result = $call([
             'messages' => [
-                ['role' => 'system', 'content' => 'You compact the work of an agent into notes so it can continue with a small memory. Reply with one JSON object only: {"goal": string, "plan": [{"text": string, "state": "done|doing|open"}], "facts": [{"text": string, "ref": string}], "decisions": [string], "open": [string]}. Keep every exact figure, name and number the goal needs, and which sections were read. A ref names the section a fact came from. Do not copy page text.'],
+                ['role' => 'system', 'content' => 2 === $contract
+                    ? 'You compact the work of an agent into notes so it can continue with a small memory. Reply with one JSON object only: {"goal": string, "progress": string, "plan": [{"text": string, "state": "doing|open"}], "facts": [{"text": string, "ref": string}], "decisions": [string], "open": [string]}. Rules: the plan has at most 5 items and lists only what is still to do, never one item per section; progress is one short line such as "sections 1-37 read"; facts holds the running results the goal needs as single values (for example the sum so far of the amounts of one supplier, the highest amount so far with its section number, a code word), and you update each value, you do not list rows to add up again. Do not copy page text. Keep the whole object under 1500 characters.'
+                    : 'You compact the work of an agent into notes so it can continue with a small memory. Reply with one JSON object only: {"goal": string, "plan": [{"text": string, "state": "done|doing|open"}], "facts": [{"text": string, "ref": string}], "decisions": [string], "open": [string]}. Keep every exact figure, name and number the goal needs, and which sections were read. A ref names the section a fact came from. Do not copy page text.'],
                 ['role' => 'user', 'content' => "GOAL:\n$goal\n\nNOTES SO FAR:\n".json_encode($state['notes'], JSON_UNESCAPED_UNICODE)."\n\nTRANSCRIPT TO REPLACE:\n".json_encode($transcript, JSON_UNESCAPED_UNICODE)],
             ],
             'response_format' => ['type' => 'json_object'],
-            'max_completion_tokens' => 2500,
+            'max_completion_tokens' => 2 === $contract ? 1200 : 2500,
             'reasoning_effort' => 'low',
         ]);
         $notes = null === $result ? null : json_decode((string) ($result['message']['content'] ?? ''), true);
+        if (2 === $contract && null !== $result && $result['out'] >= 1200) {
+            $notes = null; // a summary that hits its budget is a failed compaction
+        }
         if (!\is_array($notes) || !isset($notes['goal'], $notes['facts']) || !\is_array($notes['facts'])) {
             $state['end'] = 'compaction failed';
             $emit(['event' => 'compaction_failed']);
@@ -225,6 +233,11 @@ for ($i = 0; $i < $maxSteps; ++$i) {
             if ('read_section' === $name && isset($doc[$n])) {
                 if (isset($state['read'][$n])) {
                     ++$state['dup'];
+                    if (2 === $contract) {
+                        $step[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'content' => 'already read; its figures are in your notes. Continue with the next unread section.'];
+                        $emit(['event' => 'repeat_answered', 'n' => $n]);
+                        continue;
+                    }
                 }
                 $state['read'][$n] = true;
                 $step[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'content' => $doc[$n]['text']];
@@ -255,6 +268,7 @@ $emit([
     'compactions' => $state['compactions'],
     'sections_read' => \count($state['read']),
     'duplicate_reads' => $state['dup'],
+    'contract' => $contract,
     'finish_rejected' => $state['rejected'],
     'complete_read' => \count($state['read']) === $sections,
     'goal_kept' => $goalKept,
