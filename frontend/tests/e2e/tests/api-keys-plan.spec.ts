@@ -1,4 +1,4 @@
-import { test, expect } from '../test-setup'
+import { test, expect, type Page } from '../test-setup'
 import { login } from '../helpers/auth'
 import { CREDENTIALS } from '../config/credentials'
 import { TIMEOUTS, getApiUrl } from '../config/config'
@@ -13,6 +13,13 @@ import { TIMEOUTS, getApiUrl } from '../config/config'
  *
  * Deterministic and provider-free (@ci); read-only.
  */
+async function expectApiAddresses(page: Page): Promise<void> {
+  await expect(page.getByTestId('section-api-usage')).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+  await expect(page.getByTestId('text-api-url-openai')).toHaveText(/\/v1$/)
+  await expect(page.getByTestId('text-api-url-chat')).toHaveText(/\/v1\/chat\/completions$/)
+  await expect(page.getByTestId('text-api-url-mcp')).toHaveText(/\/mcp$/)
+}
+
 test.describe('@ci API keys plan', () => {
   test('a free account is pointed to the plans instead of a key form', async ({
     page,
@@ -24,6 +31,7 @@ test.describe('@ci API keys plan', () => {
       ?.enabled
 
     await page.goto('/apps/api')
+    await expectApiAddresses(page)
 
     if (!billingEnabled) {
       await expect(page.getByTestId('section-create-key')).toBeVisible({
@@ -45,6 +53,7 @@ test.describe('@ci API keys plan', () => {
   test('a paid account keeps the key form', async ({ page }) => {
     await login(page, CREDENTIALS.getAdminCredentials())
     await page.goto('/apps/api')
+    await expectApiAddresses(page)
 
     await expect(page.getByTestId('section-create-key')).toBeVisible({
       timeout: TIMEOUTS.STANDARD,
