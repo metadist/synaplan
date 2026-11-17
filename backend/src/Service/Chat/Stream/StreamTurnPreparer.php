@@ -8,6 +8,7 @@ use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Service\Message\MessageForwardingService;
+use App\Service\Project\ProjectChatScope;
 use App\Service\Realtime\SseWriter;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -29,6 +30,7 @@ final readonly class StreamTurnPreparer
         private MessageForwardingService $messageForwardingService,
         private StreamMessageMeta $meta,
         private LoggerInterface $logger,
+        private ProjectChatScope $projects,
     ) {
     }
 
@@ -122,7 +124,7 @@ final readonly class StreamTurnPreparer
             $processingOptions['force_inline_media'] = true;
         }
 
-        return $this->withModelAndPrompt($processingOptions, $turn);
+        return $this->withProject($this->withModelAndPrompt($processingOptions, $turn), $turn, $state);
     }
 
     private function loadChat(SseWriter $sse, StreamTurnRequest $turn, StreamTurnState $state): bool
@@ -390,6 +392,32 @@ final readonly class StreamTurnPreparer
         $this->logger->info('StreamController: Scoping RAG to user-selected group', [
             'rag_group_key' => $ragGroupKey,
         ]);
+
+        return $processingOptions;
+    }
+
+    /**
+     * A chat in a project searches the project's folder and no other. The
+     * server sets the folder from the chat row, so a `ragGroupKey` in the
+     * request cannot widen or move it.
+     *
+     * @param array<string, mixed> $processingOptions
+     *
+     * @return array<string, mixed>
+     */
+    private function withProject(array $processingOptions, StreamTurnRequest $turn, StreamTurnState $state): array
+    {
+        if ($turn->caller->isWidget() || $turn->caller->isGuest()) {
+            return $processingOptions;
+        }
+        $project = $this->projects->forChat($state->chat);
+        if (null === $project) {
+            return $processingOptions;
+        }
+
+        $processingOptions['rag_group_key'] = $project->groupKey;
+        $processingOptions['project_instructions'] = $project->instructions;
+        $processingOptions['project_name'] = $project->name;
 
         return $processingOptions;
     }

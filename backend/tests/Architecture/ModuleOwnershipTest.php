@@ -55,6 +55,7 @@ final class ModuleOwnershipTest extends TestCase
         'opendesk_stt',
         'live_voice',
         'chat_artifacts',
+        'projects',
         'research',
         'freeapi',
         'capacity',
@@ -259,7 +260,7 @@ final class ModuleOwnershipTest extends TestCase
 
     public function testModuleIdsMatchThePlan(): void
     {
-        $this->assertCount(24, self::MODULE_IDS);
+        $this->assertCount(25, self::MODULE_IDS);
 
         $declared = array_keys($this->allModules());
         sort($declared);

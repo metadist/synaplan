@@ -225,6 +225,8 @@ parameters:
     env(SEARXNG_BASE_URL): ''
     # HTML/SVG chat preview. Empty = off. The dev compose defaults this to 1.
     env(CHAT_ARTIFACTS_ENABLED): ''
+    # Projects (sources and instructions). Empty = the admin row decides, off by default.
+    env(PROJECTS_ENABLED): ''
     # Research runs. Empty = off. Set to 1 to pin research on.
     env(RESEARCH_ENABLED): ''
     # Searchable state for cloud files. Empty = off. Set to 1 to pin it on.
@@ -1394,6 +1396,10 @@ services:
     App\Module\Sidecar\SearxngModule:
         arguments:
             $baseUrl: '%env(SEARXNG_BASE_URL)%'
+
+    App\Service\Project\ProjectsConfig:
+        arguments:
+            $envValue: '%env(PROJECTS_ENABLED)%'
 
     App\Service\Chat\ChatArtifactsConfig:
         arguments:

@@ -45,6 +45,7 @@ final class MinimalModuleEnvTest extends TestCase
         'opendesk_stt' => ['OPENDESK_STT_URL'],
         'live_voice' => ['LIVE_VOICE_GATEWAY_URL', 'LIVE_VOICE_GATEWAY_SECRET'],
         'chat_artifacts' => ['CHAT_ARTIFACTS_ENABLED'],
+        'projects' => ['PROJECTS_ENABLED'],
         'research' => ['RESEARCH_ENABLED'],
         'freeapi' => ['FREEAPI_BASE_URL'],
         'capacity' => ['SYNAPLAN_WATCHDOG'],

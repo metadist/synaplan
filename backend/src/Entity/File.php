@@ -45,6 +45,9 @@ class File
         'generated',
         'compute',
         'notion',
+        'project_file',
+        'project_link',
+        'project_text',
     ];
 
     /**

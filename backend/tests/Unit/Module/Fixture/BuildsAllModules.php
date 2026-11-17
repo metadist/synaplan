@@ -9,6 +9,7 @@ use App\AI\Credential\ProviderKeyStore;
 use App\Module\Channel\TelegramModule;
 use App\Module\Channel\WhatsappModule;
 use App\Module\Chat\ChatArtifactsModule;
+use App\Module\Chat\ProjectsModule;
 use App\Module\Chat\ResearchModule;
 use App\Module\CloudFiles\CloudFilesModule;
 use App\Module\Commerce\MobileIapModule;
@@ -44,6 +45,7 @@ use App\Service\Iap\AppleReceiptVerifierInterface;
 use App\Service\Iap\GooglePlayVerifierInterface;
 use App\Service\Iap\IapPricingService;
 use App\Service\Observability\CapacityService;
+use App\Service\Project\ProjectsConfig;
 use App\Service\Research\Run\ResearchConfig;
 use App\Service\Research\Run\ResearchQueueWait;
 use App\Service\Research\Run\ResearchStateStore;
@@ -98,6 +100,7 @@ trait BuildsAllModules
             new OpendeskSttModule($probe, '', '', '', ''),
             new LiveVoiceModule($probe, '', '', $this->createStub(ModelRepository::class), $keyStore),
             new ChatArtifactsModule($this->disabledArtifacts()),
+            new ProjectsModule($this->disabledProjects()),
             new ResearchModule(
                 $this->disabledResearch(),
                 $researchStore = $this->createStub(ResearchStateStore::class),
@@ -135,6 +138,14 @@ trait BuildsAllModules
     private function disabledArtifacts(): ChatArtifactsConfig
     {
         $config = $this->createStub(ChatArtifactsConfig::class);
+        $config->method('isEnabled')->willReturn(false);
+
+        return $config;
+    }
+
+    private function disabledProjects(): ProjectsConfig
+    {
+        $config = $this->createStub(ProjectsConfig::class);
         $config->method('isEnabled')->willReturn(false);
 
         return $config;

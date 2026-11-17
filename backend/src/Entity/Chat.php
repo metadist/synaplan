@@ -62,6 +62,17 @@ class Chat
     #[ORM\Column(name: 'BTAGS', type: 'string', length: 500, options: ['default' => '[]'])]
     private string $tags = '[]';
 
+    /** The project this chat belongs to; its knowledge folder is pinned for every turn. */
+    #[ORM\Column(name: 'BPROJECTID', type: 'bigint', nullable: true)]
+    private ?int $projectId = null;
+
+    #[ORM\Column(name: 'BPROJECTSHARED', type: 'boolean', options: ['default' => false])]
+    private bool $projectShared = false;
+
+    /** `project` or `project_personal`; null outside a project. */
+    #[ORM\Column(name: 'BMEMORYMODE', type: 'string', length: 20, nullable: true)]
+    private ?string $memoryMode = null;
+
     #[ORM\OneToMany(mappedBy: 'chat', targetEntity: Message::class)]
     private Collection $messages;
 
@@ -75,6 +86,32 @@ class Chat
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getProjectId(): ?int
+    {
+        return null === $this->projectId ? null : (int) $this->projectId;
+    }
+
+    public function setProjectId(?int $projectId): self
+    {
+        $this->projectId = $projectId;
+        if (null === $projectId) {
+            $this->projectShared = false;
+            $this->memoryMode = null;
+        }
+
+        return $this;
+    }
+
+    public function isProjectShared(): bool
+    {
+        return $this->projectShared;
+    }
+
+    public function getMemoryMode(): ?string
+    {
+        return $this->memoryMode;
     }
 
     public function getUserId(): int
