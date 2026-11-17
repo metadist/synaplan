@@ -7,9 +7,11 @@ namespace App\Service\Mcp\Notion;
 /**
  * Argument rules for Notion write tools, checked right before a call leaves.
  *
- * The allowed tools can still remove content through single arguments
- * (replacing a page, trashing a data source, dropping a column). Those
- * calls are refused. Background execution is switched off, because nothing
+ * The write tools can still remove content through single arguments
+ * (replacing a page, trashing a data source, dropping a column). Such a call
+ * is treated as destructive: the gate makes it ask for approval even when the
+ * tool is set to auto, and {@see McpClient::callTool()} refuses it unless a
+ * person approved it. Background execution is switched off, because nothing
  * polls Notion's async task afterwards and the answer would report a page
  * that does not exist yet.
  */
@@ -35,11 +37,12 @@ final class NotionWriteGuard
     }
 
     /**
-     * Why a Notion call must not run, or null when it may.
+     * What a Notion call would delete, or null when its arguments keep all
+     * content.
      *
      * @param array<string, mixed> $arguments
      */
-    public static function refusal(string $serverUrl, string $toolName, array $arguments): ?string
+    public static function contentDeletion(string $serverUrl, string $toolName, array $arguments): ?string
     {
         if (!NotionToolHints::isNotion($serverUrl)) {
             return null;
@@ -47,7 +50,7 @@ final class NotionWriteGuard
 
         $bare = NotionToolHints::bare($toolName);
         if (true === ($arguments['allow_deleting_content'] ?? false)) {
-            return sprintf('Notion %s was asked to delete page content. Nothing was sent and nothing was changed in Notion.', $bare);
+            return sprintf('Notion %s was asked to delete page content. Nothing is sent without your approval.', $bare);
         }
         if (NotionPageWrite::UPDATE_TOOL === $bare) {
             return self::pageRefusal($arguments);
@@ -70,7 +73,7 @@ final class NotionWriteGuard
         }
 
         return sprintf(
-            "Notion update-page only changes properties, edits text or adds text here. The command '%s' could remove page content, so nothing was sent and nothing was changed in Notion.",
+            "Notion update-page only changes properties, edits text or adds text here. The command '%s' could remove page content. Nothing is sent without your approval.",
             is_string($command) ? $command : '',
         );
     }
@@ -81,11 +84,11 @@ final class NotionWriteGuard
     private static function dataSourceRefusal(array $arguments): ?string
     {
         if (true === ($arguments['in_trash'] ?? false)) {
-            return 'Moving a Notion database to the trash is not allowed here. Nothing was sent and nothing was changed in Notion.';
+            return 'Moving a Notion database to the trash deletes it. Nothing is sent without your approval.';
         }
         $statements = $arguments['statements'] ?? null;
         if (is_string($statements) && 1 === preg_match('/\bDROP\s+COLUMN\b/i', $statements)) {
-            return 'Removing a database column would delete its values, so it is not allowed here. Nothing was sent and nothing was changed in Notion.';
+            return 'Removing a database column would delete its values. Nothing is sent without your approval.';
         }
 
         return null;

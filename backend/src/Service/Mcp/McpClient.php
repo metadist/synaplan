@@ -95,16 +95,20 @@ final readonly class McpClient
     /**
      * Call one tool and return its result block.
      *
+     * @param bool                 $contentDeletionApproved true only when a person approved this call
+     *                                                      and its arguments delete content
      * @param array<string, mixed> $arguments
      *
      * @return array{content: list<array<string, mixed>>, isError: bool}
      */
-    public function callTool(McpServerConfig $server, string $tool, array $arguments): array
+    public function callTool(McpServerConfig $server, string $tool, array $arguments, bool $contentDeletionApproved = false): array
     {
         $arguments = NotionWriteGuard::normalize($server->getUrl(), $tool, $arguments);
-        $refusal = NotionWriteGuard::refusal($server->getUrl(), $tool, $arguments);
-        if (null !== $refusal) {
-            throw new McpClientException($refusal);
+        // Last line of defence for every caller: arguments that delete content
+        // only leave after a person approved this exact call.
+        $deletion = NotionWriteGuard::contentDeletion($server->getUrl(), $tool, $arguments);
+        if (null !== $deletion && !$contentDeletionApproved) {
+            throw new McpClientException($deletion);
         }
 
         $result = $this->withSession(

@@ -1,8 +1,7 @@
 # MCP tool permissions: see every tool, choose auto, approve or block
 
-**Status:** Plan only, 2026-11-17. Nothing is built. §0 records what the
-owner decided in the session of 2026-11-17; rows marked ☐ wait for the
-owner. No step starts until the owner orders row 47.
+**Status:** 2026-11-17. §0 #1–#14 are decided by the owner. TP1 is in
+review; see [`STATUS.md`](./STATUS.md).
 **Owner:** product owner.
 **Roadmap:** row 47. Steps `TP0`–`TP6`, journeys `J-TP-1`–`J-TP-6`.
 **Binding:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) (U1–U12)
@@ -39,13 +38,20 @@ group).
 | 5 | Notion's fixed block list shrinks to the tools that **cannot work** through a tool call (`create-file-upload`, `create-attachment`, `download-attachment`: they need a file transfer outside the call). They show greyed out as "not available" with that reason. Every other Notion tool (calendar, agents and sessions, skills, memory, delete, move) follows the defaults of §0 #3. | ✅ owner 2026-11-17 |
 | 6 | **Existing connections switch to the new defaults.** No per-tool overrides are migrated from `BALLOWWRITE` / `BWRITEAUTO`. After the release the AI may write on connections where it asked or was refused before. | ✅ owner 2026-11-17 |
 | 7 | On a **shared** Notion connection only the owner (the admin) sets permissions. Members see the list read-only. For members writing stays impossible, as today (`McpClientToolSource::sharedReads()` publishes read tools only). | ✅ owner 2026-11-17 |
-| 8 | A call whose **arguments** delete content (Notion `update-page` with `replace_content`, any call with `allow_deleting_content: true`) is treated as a destructive call. Recommended: it always asks (Approve), even when the tool is set to Auto, and is refused when the tool is Block. Today `NotionWriteGuard` refuses it outright. | ☐ |
-| 9 | A tool on a **custom server without hints** (no `readOnlyHint`, no `destructiveHint`) counts as **write**, so Auto. The MCP spec assumes `destructiveHint: true` when it is missing. Recommended: keep `SideEffect::fromHints()` (write) in line with §0 #3, and show "no hints from the server" on the row so the person can tighten it. For Notion tools the list in `NotionToolHints` decides, unknown Notion tools without hints count as destructive. | ☐ |
-| 10 | The connection's choice **replaces the instance default** (`POLICY.write`, `POLICY.destructive` in `ToolsConfig`) for MCP tools. An admin restricts through the group policy, which still wins (most restrictive). Without this, the shipped instance default `POLICY.destructive = block` would block every destructive tool and contradict §0 #3. Recommended. | ☐ |
-| 11 | **"Always allow"** on an approval card for an MCP tool sets that tool to Auto on its connection (one model, visible and reversible on the Permissions tab). Today it lands in a per-assistant list in `ToolsConfig` that no page shows. Recommended. | ☐ |
-| 12 | The Notion app's switch **"The AI may change Notion"** (`PATCH /api/v1/apps/notion`) goes away. The Notion panel gets the same Permissions tab as every other connection. Recommended. | ☐ |
-| 13 | A **one-time notice** on each existing connection after the release: "The AI may now use write tools here without asking. Review permissions." Needed because §0 #6 changes behaviour silently otherwise (U3). Recommended. | ☐ |
-| 14 | `BALLOWWRITE` and `BWRITEAUTO` are **dropped** one release after TP2, once nothing reads them. Until then they are ignored. | ☐ |
+| 8 | A call whose **arguments** delete content (Notion `update-page` with `replace_content`, any call with `allow_deleting_content: true`) is treated as a destructive call. Recommended: it always asks (Approve), even when the tool is set to Auto, and is refused when the tool is Block. Today `NotionWriteGuard` refuses it outright. | ✅ owner 2026-11-17 |
+| 9 | A tool on a **custom server without hints** (no `readOnlyHint`, no `destructiveHint`) counts as **write**, so Auto. The MCP spec assumes `destructiveHint: true` when it is missing. Recommended: keep `SideEffect::fromHints()` (write) in line with §0 #3, and show "no hints from the server" on the row so the person can tighten it. For Notion tools the list in `NotionToolHints` decides, unknown Notion tools without hints count as destructive. | ✅ owner 2026-11-17 |
+| 10 | The connection's choice **replaces the instance default** (`POLICY.write`, `POLICY.destructive` in `ToolsConfig`) for MCP tools. An admin restricts through the group policy, which still wins (most restrictive). Without this, the shipped instance default `POLICY.destructive = block` would block every destructive tool and contradict §0 #3. Recommended. | ✅ owner 2026-11-17 |
+| 11 | **"Always allow"** on an approval card for an MCP tool sets that tool to Auto on its connection (one model, visible and reversible on the Permissions tab). Today it lands in a per-assistant list in `ToolsConfig` that no page shows. Recommended. | ✅ owner 2026-11-17 |
+| 12 | The Notion app's switch **"The AI may change Notion"** (`PATCH /api/v1/apps/notion`) goes away. The Notion panel gets the same Permissions tab as every other connection. Recommended. | ✅ owner 2026-11-17 |
+| 13 | A **one-time notice** on each existing connection after the release: "The AI may now use write tools here without asking. Review permissions." Needed because §0 #6 changes behaviour silently otherwise (U3). Recommended. | ✅ owner 2026-11-17 |
+| 14 | `BALLOWWRITE` and `BWRITEAUTO` are **dropped** one release after TP2, once nothing reads them. Until then they are ignored. | ✅ owner 2026-11-17 |
+
+### Decided while building TP1 (owner, 2026-11-17)
+
+| # | Decision |
+| - | -------- |
+| 15 | The instance flag `TOOLS.APPROVALS_ENABLED` off: a connection's Block still holds, a tool that must ask (Approve, or a call that deletes content) is **refused** with a message, Auto runs. A call a person approved earlier still runs, unless the tool was blocked since. |
+| 16 | A step that cannot pause for an approval (chat `mcp_fetch`) **refuses** a tool set to Approve instead of running it as Auto. |
 
 ## 1. Today (code map)
 

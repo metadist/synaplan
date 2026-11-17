@@ -50,11 +50,11 @@ final class McpActionRunnerTest extends TestCase
         ['name' => 'delete_page', 'description' => 'Delete a page', 'inputSchema' => [], 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => true]],
     ];
 
-    private function server(bool $enabled = true, bool $allowWrite = true): McpServerConfig
+    private function server(bool $enabled = true, string $toolPolicy = '{}'): McpServerConfig
     {
         $server = new McpServerConfig();
         $server->setUserId(self::USER_ID)->setName('Confluence')->setUrl('https://8.8.8.8/mcp')
-            ->setEnabled($enabled)->setAllowWrite($allowWrite);
+            ->setEnabled($enabled)->setToolPolicy($toolPolicy);
         (new \ReflectionProperty($server, 'id'))->setValue($server, 5);
 
         return $server;
@@ -188,22 +188,21 @@ final class McpActionRunnerTest extends TestCase
         self::assertStringContainsString('nothing was sent to Confluence and nothing was changed', (string) $result->error);
     }
 
-    public function testServerWithoutWriteOptInIsRefused(): void
+    public function testBlockedToolIsRefusedBeforeAnythingIsSent(): void
     {
-        $result = $this->runner(server: $this->server(allowWrite: false))
+        $result = $this->runner(server: $this->server(toolPolicy: '{"v":1,"tools":{"create_page":"block"}}'))
             ->run($this->node(), $this->context());
 
         self::assertFalse($result->isSuccessful());
-        self::assertStringContainsString('does not allow write actions', (string) $result->error);
+        self::assertStringContainsString('blocked in the permissions', (string) $result->error);
     }
 
-    public function testDestructiveToolIsRefused(): void
+    public function testDestructiveToolIsNotRefusedByTheRunnerItself(): void
     {
         $result = $this->runner()->run($this->node(tool: 'delete_page'), $this->context());
 
-        self::assertFalse($result->isSuccessful());
-        self::assertFalse($result->isReportableFailure());
-        self::assertStringContainsString('destructive', (string) $result->error);
+        self::assertStringNotContainsString('destructive', (string) $result->error);
+        self::assertStringNotContainsString('blocked', (string) $result->error);
     }
 
     public function testDisabledFlagsFailTheNode(): void
@@ -239,7 +238,7 @@ final class McpActionRunnerTest extends TestCase
         self::assertStringContainsString('not available', (string) $result->error);
     }
 
-    public function testDynamicSubCatalogAdvertisesOnlyDeclaredWriteToolsOfWriteEnabledServers(): void
+    public function testDynamicSubCatalogAdvertisesDeclaredWriteToolsThatAreNotBlocked(): void
     {
         $runner = $this->runner();
         $descriptor = $runner->describe()[0];
@@ -252,15 +251,15 @@ final class McpActionRunnerTest extends TestCase
         self::assertStringContainsString('server_id 5 "Confluence"', $note);
         self::assertStringContainsString('create_page(title, content)', $note);
         self::assertStringNotContainsString('search_pages', $note, 'read tools belong to mcp_fetch, not mcp_action');
-        self::assertStringNotContainsString('delete_page', $note, 'destructive tools must never be offered');
+        self::assertStringContainsString('delete_page', $note, 'destructive tools are offered; the gate asks before they run');
 
         // Topic without tool_mcp → invisible.
         self::assertNull(($descriptor->dynamicNote)(self::USER_ID, ['topic' => 'general', 'topic_metadata' => []]));
     }
 
-    public function testDynamicSubCatalogStaysInvisibleWithoutWriteEnabledServers(): void
+    public function testDynamicSubCatalogHidesBlockedTools(): void
     {
-        $runner = $this->runner(server: $this->server(allowWrite: false));
+        $runner = $this->runner(server: $this->server(toolPolicy: '{"v":1,"tools":{"delete_page":"block","create_page":"block"}}'));
         $descriptor = $runner->describe()[0];
 
         self::assertNotNull($descriptor->dynamicNote);

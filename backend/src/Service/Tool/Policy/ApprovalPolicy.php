@@ -13,11 +13,17 @@ use App\Service\Tool\ToolSource;
 
 /**
  * Resolves auto / approve / block. Most restrictive wins (block > approve > auto)
- * across the instance default, group policy, assistant definition and the MCP
- * hard block. Only afterwards may a resolved `approve` be loosened to `auto` —
- * by `allow_unattended` on an unattended write-class step, by the owner's
- * "always allow" list for the assistant, or by an MCP connection whose
- * `writeAuto` flag is on (interactive chat only). None of these can unblock.
+ * across the base outcome, group policy, assistant definition and the step.
+ *
+ * For an MCP tool the base outcome is the connection's own choice for that
+ * tool (McpToolPermissions), which replaces the instance default. Nothing
+ * loosens it afterwards: not the owner's "always allow" list, not an
+ * `allow_unattended` step. An unattended run only tightens it: a write or
+ * destructive tool that resolves to `auto` asks, unless the step allows
+ * unattended runs. Every other tool keeps the instance default, and a
+ * resolved `approve` may still loosen to `auto` by `allow_unattended` on an
+ * unattended write-class step or by the owner's "always allow" list.
+ * None of these can unblock.
  */
 final readonly class ApprovalPolicy
 {
@@ -31,6 +37,8 @@ final readonly class ApprovalPolicy
 
     /**
      * @param array<string, mixed>|null $assistantTools
+     * @param bool                      $escalateToApproval the call's arguments delete content, so it asks
+     *                                                      even when the tool is set to auto
      */
     public function decide(
         ToolDescriptor $tool,
@@ -40,23 +48,23 @@ final readonly class ApprovalPolicy
         bool $allowUnattended = false,
         ?string $assistantKey = null,
         ?PolicyOutcome $nodeOverride = null,
+        bool $escalateToApproval = false,
     ): PolicyOutcome {
         $class = $tool->sideEffect;
         $restrictions = [
             $this->groupPolicy->outcomeFor($actorId, $tool, $class),
             $this->assistantPolicy->outcomeFor($assistantTools, $tool, $class),
-            $this->hardBlock($tool, $class),
             $nodeOverride,
+            $escalateToApproval ? PolicyOutcome::Approve : null,
         ];
-        $resolved = $this->mostRestrictive([$this->baseOutcome($tool, $actorId, $class, $context), ...$restrictions]);
+        $connection = $this->connectionOutcome($tool);
+        $base = $connection ?? $this->baseOutcome($tool, $actorId, $class, $context);
+        $resolved = $this->mostRestrictive([$base, ...$restrictions]);
+        if (null !== $connection) {
+            return $this->unattendedTightened($resolved, $class, $context, $allowUnattended);
+        }
         if (PolicyOutcome::Approve !== $resolved || SideEffect::Write !== $class) {
             return $resolved;
-        }
-        // The connection's switch only skips the instance default. An admin
-        // group, assistant or step that asks for approval still asks.
-        if (PolicyContext::Interactive === $context && $this->mcpWritesWithoutAsking($tool)
-            && PolicyOutcome::Auto === $this->mostRestrictive($restrictions)) {
-            return PolicyOutcome::Auto;
         }
         if (PolicyContext::Unattended === $context && $allowUnattended) {
             return PolicyOutcome::Auto;
@@ -66,6 +74,21 @@ final readonly class ApprovalPolicy
         }
 
         return $resolved;
+    }
+
+    /**
+     * The connection's own choice for this MCP tool, or null when the tool
+     * does not come with one (not an MCP tool, or a descriptor built without
+     * a connection).
+     */
+    public function connectionOutcome(ToolDescriptor $tool): ?PolicyOutcome
+    {
+        if (ToolSource::Mcp !== $tool->source) {
+            return null;
+        }
+        $raw = $tool->meta[McpToolMeta::CONNECTION_OUTCOME] ?? null;
+
+        return is_string($raw) ? PolicyOutcome::tryFrom($raw) : null;
     }
 
     public function canAlwaysAllow(PolicyOutcome $resolved): bool
@@ -95,24 +118,14 @@ final readonly class ApprovalPolicy
         return PolicyOutcome::tryFrom($raw) ?? PolicyOutcome::Approve;
     }
 
-    private function hardBlock(ToolDescriptor $tool, SideEffect $class): ?PolicyOutcome
+    private function unattendedTightened(PolicyOutcome $resolved, SideEffect $class, PolicyContext $context, bool $allowUnattended): PolicyOutcome
     {
-        if (ToolSource::Mcp !== $tool->source) {
-            return null;
-        }
-        $allowWrite = (bool) ($tool->meta['allowWrite'] ?? false);
-        if (!$allowWrite && SideEffect::Read !== $class) {
-            return PolicyOutcome::Block;
+        if (PolicyContext::Unattended === $context && PolicyOutcome::Auto === $resolved
+            && SideEffect::Read !== $class && !$allowUnattended) {
+            return PolicyOutcome::Approve;
         }
 
-        return null;
-    }
-
-    private function mcpWritesWithoutAsking(ToolDescriptor $tool): bool
-    {
-        return ToolSource::Mcp === $tool->source
-            && true === ($tool->meta['allowWrite'] ?? false)
-            && true === ($tool->meta['writeAuto'] ?? false);
+        return $resolved;
     }
 
     private function isAlwaysAllowed(int $actorId, ?string $assistantKey, ToolDescriptor $tool): bool

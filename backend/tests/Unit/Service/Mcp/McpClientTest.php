@@ -126,6 +126,33 @@ final class McpClientTest extends TestCase
         self::assertSame(['query' => 'acme'], $body['params']['arguments']);
     }
 
+    public function testArgumentsThatDeleteNotionContentAreRefusedUnlessAPersonApprovedThem(): void
+    {
+        $captured = [];
+        $client = $this->client([], $captured);
+        $notion = $this->server('https://mcp.notion.com/mcp');
+        $arguments = ['page_id' => 'p1', 'command' => 'replace_content'];
+
+        try {
+            $client->callTool($notion, 'notion-update-page', $arguments);
+            self::fail('A deleting call must not leave without approval.');
+        } catch (McpClientException $e) {
+            self::assertStringContainsString('without your approval', $e->getMessage());
+        }
+        self::assertSame([], $captured, 'nothing was sent');
+
+        $sent = [];
+        $approved = $this->client([
+            self::rpc([], []),
+            new MockResponse('', ['http_code' => 202]),
+            self::rpc(['content' => [['type' => 'text', 'text' => 'done']], 'isError' => false]),
+        ], $sent);
+        $result = $approved->callTool($notion, 'notion-update-page', $arguments, contentDeletionApproved: true);
+
+        self::assertFalse($result['isError']);
+        self::assertSame('tools/call', json_decode((string) $sent[2]['options']['body'], true)['method']);
+    }
+
     public function testAuthHeaderIsDecryptedAndSent(): void
     {
         $captured = [];
