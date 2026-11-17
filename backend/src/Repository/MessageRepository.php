@@ -8,6 +8,7 @@ use App\Entity\MessageMeta;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\ParameterType;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MessageRepository extends ServiceEntityRepository
@@ -474,10 +475,8 @@ class MessageRepository extends ServiceEntityRepository
     }
 
     /**
-     * Keyset batch of messages eligible for the message-digest job: owned by
-     * the user, above the digest cursor, older than the quiet period, with
-     * some text to digest, and NOT part of a widget/guest chat (those belong
-     * to anonymous visitors, not the account owner's own history).
+     * Keyset batch of messages eligible for the message-digest job: the
+     * {@see digestCandidates()} rows older than the quiet period.
      *
      * @param int|null $liveChatId When set, the quiet cutoff applies only to this
      *                             chat; messages in other chats are indexable immediately
@@ -492,18 +491,7 @@ class MessageRepository extends ServiceEntityRepository
         ?int $sinceUnix = null,
         ?int $liveChatId = null,
     ): array {
-        $qb = $this->createQueryBuilder('m')
-            ->where('m.userId = :userId')
-            ->andWhere('m.id > :afterId')
-            ->andWhere("(m.text != '' OR m.fileText != '')")
-            ->andWhere(
-                'm.chatId IS NULL OR m.chatId NOT IN (
-                    SELECT c.id FROM App\Entity\Chat c WHERE c.source IN (:excludedSources)
-                )'
-            )
-            ->setParameter('userId', $userId)
-            ->setParameter('afterId', $afterId)
-            ->setParameter('excludedSources', ['widget', 'guest'])
+        $qb = $this->digestCandidates($userId, $afterId)
             ->orderBy('m.id', 'ASC')
             ->setMaxResults($limit);
 
@@ -547,19 +535,7 @@ class MessageRepository extends ServiceEntityRepository
         ?int $sinceUnix = null,
         ?int $liveChatId = null,
     ): ?int {
-        $qb = $this->createQueryBuilder('m')
-            ->select('MIN(m.id)')
-            ->where('m.userId = :userId')
-            ->andWhere('m.id > :afterId')
-            ->andWhere("(m.text != '' OR m.fileText != '')")
-            ->andWhere(
-                'm.chatId IS NULL OR m.chatId NOT IN (
-                    SELECT c.id FROM App\Entity\Chat c WHERE c.source IN (:excludedSources)
-                )'
-            )
-            ->setParameter('userId', $userId)
-            ->setParameter('afterId', $afterId)
-            ->setParameter('excludedSources', ['widget', 'guest']);
+        $qb = $this->digestCandidates($userId, $afterId)->select('MIN(m.id)');
 
         if (null !== $liveChatId && $liveChatId > 0) {
             $qb->andWhere('((m.chatId IS NULL OR m.chatId = :liveChatId) AND m.unixTimestamp >= :beforeUnix)')
@@ -578,6 +554,30 @@ class MessageRepository extends ServiceEntityRepository
         $value = $qb->getQuery()->getSingleScalarResult();
 
         return null === $value || '' === $value ? null : (int) $value;
+    }
+
+    /**
+     * The content and source predicates of a digest candidate: owned by the
+     * user, above the digest cursor, with some text to digest, not part of a
+     * failed turn, and NOT part of a widget/guest chat (those belong to
+     * anonymous visitors, not the account owner's own history).
+     */
+    private function digestCandidates(int $userId, int $afterId): QueryBuilder
+    {
+        return $this->createQueryBuilder('m')
+            ->where('m.userId = :userId')
+            ->andWhere('m.id > :afterId')
+            ->andWhere("(m.text != '' OR m.fileText != '')")
+            ->andWhere('m.topic != :failedTopic')
+            ->andWhere(
+                'm.chatId IS NULL OR m.chatId NOT IN (
+                    SELECT c.id FROM App\Entity\Chat c WHERE c.source IN (:excludedSources)
+                )'
+            )
+            ->setParameter('userId', $userId)
+            ->setParameter('afterId', $afterId)
+            ->setParameter('failedTopic', Message::FAILED_TOPIC)
+            ->setParameter('excludedSources', ['widget', 'guest']);
     }
 
     /**

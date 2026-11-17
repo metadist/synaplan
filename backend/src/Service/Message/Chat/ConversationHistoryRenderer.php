@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Message\Chat;
 
+use App\AI\Stream\VisibleAnswer;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\Model;
@@ -13,8 +14,9 @@ use App\Service\Message\GeneratedMediaTextRenderer;
 
 /**
  * How earlier turns of a thread appear to the model: file markers in
- * plain words, a note on the media an assistant turn delivered, and
- * which empty assistant turns are left out.
+ * plain words, answers without their reasoning block, a note on the media
+ * an assistant turn delivered, and which turns are left out (failed turns
+ * and empty answers).
  *
  * The message builders and the digest search share these rules, so a
  * message that is replayed verbatim is never also cited as a digest.
@@ -114,15 +116,44 @@ final readonly class ConversationHistoryRenderer
     }
 
     /**
+     * The text of an earlier turn as the model reads it.
+     *
+     * The web chat stores an answer's reasoning summary as a `<think>` block
+     * in front of it, for the reasoning panel. Replayed as the assistant's
+     * own words, Claude refuses the next turn (`stop_reason: refusal`, no
+     * output at all).
+     */
+    public function replayedText(Message $msg): string
+    {
+        $text = $this->humanizeFileMarkers($msg->getText());
+
+        return 'IN' === $msg->getDirection() ? $text : VisibleAnswer::withoutReasoning($text);
+    }
+
+    /**
+     * A turn that ended in an error: its question and the error reply. The
+     * model never answered it, and a question a provider refused is refused
+     * again when it is replayed.
+     */
+    public function isFailedTurn(Message $msg): bool
+    {
+        return Message::FAILED_TOPIC === $msg->getTopic();
+    }
+
+    /**
      * @param array<int, string> $mediaReferences
      */
-    private function isOmittedAssistantTurn(Message $msg, array $mediaReferences, bool $promptIncludesFileText): bool
+    private function isOmittedTurn(Message $msg, array $mediaReferences, bool $promptIncludesFileText): bool
     {
+        if ($this->isFailedTurn($msg)) {
+            return true;
+        }
+
         if ('IN' === $msg->getDirection()) {
             return false;
         }
 
-        $content = $this->humanizeFileMarkers($msg->getText());
+        $content = $this->replayedText($msg);
         $files = $promptIncludesFileText ? $msg->getAllFilesText() : '';
         if ('' !== $files) {
             $content .= "\n".$files;
@@ -139,10 +170,10 @@ final readonly class ConversationHistoryRenderer
     /**
      * Message ids replayed verbatim. `$thread` is already the history window
      * (message and character caps, and only the recent tail when a rolling
-     * summary replaced the older turns). Empty assistant turns are omitted by
-     * the same rule as the message builders: only the streaming builder adds
-     * file text, so `$promptIncludesFileText` must match the path. The current
-     * message is included.
+     * summary replaced the older turns). Failed turns and empty assistant
+     * turns are omitted by the same rule as the message builders: only the
+     * streaming builder adds file text, so `$promptIncludesFileText` must
+     * match the path. The current message is included.
      *
      * @param array<int, array{role: string, content: string}|Message> $thread
      *
@@ -162,7 +193,7 @@ final readonly class ConversationHistoryRenderer
             if (null === $id || $id === $currentId) {
                 continue;
             }
-            if ($this->isOmittedAssistantTurn($msg, $mediaReferences, $promptIncludesFileText)) {
+            if ($this->isOmittedTurn($msg, $mediaReferences, $promptIncludesFileText)) {
                 continue;
             }
             $ids[] = $id;
