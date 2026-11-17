@@ -145,6 +145,37 @@ final class McpToolPermissionController extends AbstractController
         return $this->json($this->listing($found[0], $user, false));
     }
 
+    #[Route('/tool-permissions/notice/dismiss', name: 'dismiss_notice', methods: ['POST'])]
+    #[OA\Post(
+        path: '/api/v1/mcp-servers/{id}/tool-permissions/notice/dismiss',
+        summary: 'Close the one-time notice that writes no longer ask first',
+        security: [['Bearer' => []]],
+        tags: ['MCP Servers'],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        responses: [
+            new OA\Response(response: 200, description: 'The updated list', content: new OA\JsonContent(ref: new Model(type: McpToolPermissionListResponse::class))),
+            new OA\Response(response: 401, description: 'Not authenticated'),
+            new OA\Response(response: 403, description: 'Shared connection: read only'),
+            new OA\Response(response: 404, description: 'Not found'),
+        ]
+    )]
+    public function dismissNotice(int $id, #[CurrentUser] ?User $user): JsonResponse
+    {
+        if (!$user) {
+            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
+        }
+        $found = $this->find($id, $user);
+        if (null === $found) {
+            return $this->json(['success' => false, 'error' => 'Server not found'], Response::HTTP_NOT_FOUND);
+        }
+        if ($found[1]) {
+            return $this->json(['success' => false, 'error' => 'This connection is shared with you'], Response::HTTP_FORBIDDEN);
+        }
+        $this->store->dismissNotice($found[0]);
+
+        return $this->json($this->listing($found[0], $user, false));
+    }
+
     /**
      * The owner's own connection, or the shared one the member may read.
      *
@@ -167,7 +198,7 @@ final class McpToolPermissionController extends AbstractController
     private function listing(McpServerConfig $server, User $user, bool $shared): array
     {
         if (!$this->clientConfig->isClientEnabled((int) $user->getId())) {
-            return ['success' => false, 'error' => 'The outbound MCP client is disabled', 'can_edit' => !$shared, 'tools' => []];
+            return ['success' => false, 'error' => 'The outbound MCP client is disabled', 'can_edit' => !$shared, 'notice' => false, 'tools' => []];
         }
         $tools = $this->registry->toolsFor($server);
         if ($shared) {
@@ -178,6 +209,7 @@ final class McpToolPermissionController extends AbstractController
             'success' => true,
             'error' => null,
             'can_edit' => !$shared,
+            'notice' => !$shared && $this->store->hasNotice($server),
             'tools' => $this->view->rows($server, (int) $user->getId(), $tools, $shared),
         ];
     }

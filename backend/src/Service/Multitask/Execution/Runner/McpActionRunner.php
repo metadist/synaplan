@@ -16,6 +16,7 @@ use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Mcp\Notion\NotionPageWrite;
 use App\Service\Mcp\Notion\NotionToolHints;
+use App\Service\Mcp\Permissions\McpPermissionsPath;
 use App\Service\Mcp\Permissions\McpToolPermissions;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
@@ -147,7 +148,7 @@ final readonly class McpActionRunner implements TaskRunner
             return NodeResult::failed(sprintf("the tool '%s' does not exist on this connection", $tool));
         }
         if ($this->isBlocked($server, $catalogTool)) {
-            return NodeResult::failed(sprintf("the tool '%s' is blocked in the permissions of this connection", $tool), $this->callMetadata($serverId, $server->getName(), $tool));
+            return NodeResult::failed(sprintf("the tool '%s' is blocked in the permissions of this connection. [Change permission](%s)", $tool, McpPermissionsPath::for($serverId, $server->getUrl())), $this->callMetadata($serverId, $server->getName(), $tool));
         }
 
         $sourceText = (string) $context->message->getText();

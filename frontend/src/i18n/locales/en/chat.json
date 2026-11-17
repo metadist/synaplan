@@ -1121,7 +1121,9 @@
       "executed": "Done",
       "failed": "Failed"
     },
-    "openTasks": "Open tasks"
+    "openTasks": "Open tasks",
+    "onConnection": "On {connection}",
+    "changePermission": "Change permission"
   },
   "knowledgeSources": {
     "title": "Sources",

@@ -477,7 +477,10 @@
       "loadFailed": "No se pudieron cargar las herramientas de esta conexión. No se cambió nada.",
       "retry": "Reintentar",
       "empty": "Esta conexión aún no ofrece herramientas. Comprueba que haya iniciado sesión y recarga.",
-      "clientOff": "Las llamadas MCP están desactivadas, así que aquí no hay nada que ajustar. Actívalas para gestionar los permisos."
+      "clientOff": "Las llamadas MCP están desactivadas, así que aquí no hay nada que ajustar. Actívalas para gestionar los permisos.",
+      "notice": "La IA ahora puede usar herramientas de escritura en esta conexión sin preguntar. Las herramientas destructivas siguen preguntando.",
+      "noticeReview": "Revisar permisos",
+      "noticeDismiss": "Entendido"
     }
   },
   "messagesGateway": {

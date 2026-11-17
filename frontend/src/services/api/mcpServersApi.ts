@@ -9,6 +9,7 @@ import {
   GetApiMcpToolPermissionsListResponseSchema,
   PutApiMcpToolPermissionsUpdateResponseSchema,
   PostApiMcpToolPermissionsSeenResponseSchema,
+  PostApiMcpToolPermissionsDismissNoticeResponseSchema,
 } from '@/generated/api-schemas'
 
 /**
@@ -142,6 +143,13 @@ export const mcpServersApi = {
     return httpClient(`/api/v1/mcp-servers/${id}/tool-permissions/seen`, {
       method: 'POST',
       schema: PostApiMcpToolPermissionsSeenResponseSchema,
+    })
+  },
+
+  async dismissToolNotice(id: number) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tool-permissions/notice/dismiss`, {
+      method: 'POST',
+      schema: PostApiMcpToolPermissionsDismissNoticeResponseSchema,
     })
   },
 

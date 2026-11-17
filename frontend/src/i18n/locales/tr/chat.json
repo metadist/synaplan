@@ -1062,7 +1062,9 @@
       "executed": "Tamamlandı",
       "failed": "Başarısız"
     },
-    "openTasks": "Görevleri aç"
+    "openTasks": "Görevleri aç",
+    "onConnection": "{connection} üzerinde",
+    "changePermission": "İzni değiştir"
   },
   "knowledgeSources": {
     "title": "Kaynaklar",

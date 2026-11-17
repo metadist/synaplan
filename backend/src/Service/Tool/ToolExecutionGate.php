@@ -7,6 +7,7 @@ namespace App\Service\Tool;
 use App\Entity\Approval;
 use App\Entity\User;
 use App\Service\Mcp\Notion\NotionWriteGuard;
+use App\Service\Mcp\Permissions\McpPermissionsPath;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\ApprovalPolicy;
 use App\Service\Tool\Policy\McpToolMeta;
@@ -23,8 +24,6 @@ final readonly class ToolExecutionGate
      * Applies even while the approvals flag is off — a step can only tighten.
      */
     public const NODE_BLOCK_REFUSAL = 'I cannot do that. This step is set to never run this tool.';
-
-    public const CANNOT_ASK_REFUSAL = 'I cannot do that here. This tool is set to ask first, and this step cannot ask. Run it in a chat turn that can show an approval card, or change the tool to Auto in the connection permissions.';
 
     public function __construct(
         private ToolsConfig $toolsConfig,
@@ -71,7 +70,6 @@ final readonly class ToolExecutionGate
         ?array $resolvedRequest = null,
         bool $alreadyApproved = false,
         ?string $forcedRefusal = null,
-        bool $canPause = true,
     ): array {
         $descriptor = $this->registry->get($userId, $toolName);
         if (null === $descriptor && null !== $forcedRefusal && '' !== $forcedRefusal) {
@@ -118,17 +116,6 @@ final readonly class ToolExecutionGate
         if ($requireApproval && PolicyOutcome::Auto === $outcome) {
             $outcome = PolicyOutcome::Approve;
         }
-        // A chat plan cannot be resumed after a pause. Opening an approval
-        // there would run the tool in the chat continuation and leave the step
-        // waiting. An MCP tool the person wants to confirm is refused instead
-        // of running unasked.
-        if (!$canPause && PolicyOutcome::Approve === $outcome) {
-            if (null !== $this->approvalPolicy->connectionOutcome($descriptor)) {
-                return $this->refused($descriptor, self::CANNOT_ASK_REFUSAL);
-            }
-            $outcome = PolicyOutcome::Auto;
-        }
-
         if (PolicyOutcome::Block === $outcome) {
             return $this->refused($descriptor, 'I cannot do that. An administrator has turned this off.');
         }
@@ -176,14 +163,29 @@ final readonly class ToolExecutionGate
         }
         $label = is_string($descriptor->meta['tool'] ?? null) ? $descriptor->meta['tool'] : $descriptor->title;
         if (PolicyOutcome::Block === $connection) {
-            return sprintf('I cannot do that. The tool "%s" is blocked in the permissions of this connection.', $label);
+            return sprintf('I cannot do that. The tool "%s" is blocked in the permissions of this connection.', $label).$this->permissionsHint($descriptor);
         }
         $asks = PolicyOutcome::Approve === $connection || $this->deletesContent($descriptor, $args);
         if ($asks && !$alreadyApproved && !$this->toolsConfig->isApprovalsEnabled($userId)) {
-            return sprintf('I cannot do that. The tool "%s" needs your approval and approvals are turned off on this instance.', $label);
+            return sprintf('I cannot do that. The tool "%s" needs your approval and approvals are turned off on this instance.', $label).$this->permissionsHint($descriptor);
         }
 
         return null;
+    }
+
+    /**
+     * A markdown link to the connection's permissions, so a refusal says where
+     * to change it. Empty when the descriptor does not name its connection.
+     */
+    private function permissionsHint(ToolDescriptor $descriptor): string
+    {
+        $serverId = $descriptor->meta['serverId'] ?? null;
+        $url = $descriptor->meta[McpToolMeta::SERVER_URL] ?? null;
+        if (!is_int($serverId) || $serverId <= 0 || !is_string($url)) {
+            return '';
+        }
+
+        return sprintf(' [Change permission](%s)', McpPermissionsPath::for($serverId, $url));
     }
 
     /**

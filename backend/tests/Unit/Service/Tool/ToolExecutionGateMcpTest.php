@@ -34,6 +34,7 @@ final class ToolExecutionGateMcpTest extends TestCase
 
         self::assertSame(PolicyOutcome::Block, $decision['outcome']);
         self::assertStringContainsString('blocked in the permissions of this connection', (string) $decision['refusal']);
+        self::assertStringEndsWith('[Change permission](/apps/notion?tab=permissions)', (string) $decision['refusal']);
     }
 
     public function testABlockHoldsWithApprovalsOffAndForACallThatWasApprovedEarlier(): void
@@ -69,18 +70,6 @@ final class ToolExecutionGateMcpTest extends TestCase
     public function testAnApprovedCallRunsEvenWithApprovalsOff(): void
     {
         self::assertSame(PolicyOutcome::Auto, $this->inspect('approve', approvalsOn: false, alreadyApproved: true)['outcome']);
-    }
-
-    public function testAStepThatCannotAskRefusesAnApproveInsteadOfRunningIt(): void
-    {
-        $approvals = $this->createMock(ApprovalService::class);
-        $approvals->expects(self::never())->method('request');
-
-        $decision = $this->inspect('approve', approvalsOn: true, approvals: $approvals, canPause: false);
-
-        self::assertSame(PolicyOutcome::Block, $decision['outcome']);
-        self::assertSame(ToolExecutionGate::CANNOT_ASK_REFUSAL, $decision['refusal']);
-        self::assertSame(PolicyOutcome::Auto, $this->inspect('auto', approvalsOn: true, canPause: false)['outcome']);
     }
 
     public function testArgumentsThatDeleteContentAskEvenForAnAutoTool(): void
@@ -133,7 +122,6 @@ final class ToolExecutionGateMcpTest extends TestCase
         bool $approvalsOn,
         bool $alreadyApproved = false,
         ?ApprovalService $approvals = null,
-        bool $canPause = true,
         string $tool = 'search',
         array $args = [],
         PolicyContext $context = PolicyContext::Interactive,
@@ -167,7 +155,6 @@ final class ToolExecutionGateMcpTest extends TestCase
             'chat:11',
             allowUnattended: $allowUnattended,
             alreadyApproved: $alreadyApproved,
-            canPause: $canPause,
         );
     }
 }

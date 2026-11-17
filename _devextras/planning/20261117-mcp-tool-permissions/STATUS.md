@@ -10,7 +10,8 @@ to them.
 | TP1 | in review | — | storage, resolution, gate, Notion classes; see below |
 | TP2 | in review | — | API, always allow; Notion PATCH stays until TP3 (see below) |
 | TP3 | in review | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
-| TP4–TP6 | not started | — | TP4 next |
+| TP4 | in review | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
+| TP5–TP6 | not started | — | TP5 next |
 
 ## TP1 notes
 
@@ -37,3 +38,16 @@ to them.
 - Deviation: the MCP page opens permissions from a per-row "Permissions" button (inline panel, deep link `?server=ID&tab=permissions`) instead of formal Overview/Permissions tabs, so `McpServersConfiguration.vue` does not grow. The Notion panel uses real tabs.
 - A member who only uses an organisation-shared Notion connection has no connection of their own and sees no permissions tab yet.
 - The one-time notice (decision #13) is TP4.
+
+## Found while testing TP3
+
+- Approve on a read tool (Notion search) in chat fails with the "this step cannot ask" refusal, because `mcp_fetch` cannot pause (§0 #16). The owner wants Approve to always ask first (§0 #17). Planned in TP4; until then Approve on read tools in chat does not work.
+
+## TP4 notes
+
+- Approve on a read tool in chat now opens the approval card (the gate no longer refuses for a step that "cannot ask"). Accept runs the tool and posts a one-sentence follow-up; reject does not run it.
+- Limitation: after approval the result arrives as a clipped follow-up message, not an AI-composed answer. A full resume of the AI answer is a larger follow-up.
+- The card shows Approve for a destructive MCP tool the owner set to ask (built-in destructive tools still hide it); Always allow stays hidden for destructive.
+- One-time notice: marker `notice` in `BTOOLPOLICY`, set by migration `Version20261117160000` on existing connections with writes off; closed via `POST /api/v1/mcp-servers/{id}/tool-permissions/notice/dismiss`. Shown on the Notion Overview (banner + badge on the Permissions tab) and above the permissions list.
+- Not covered: the model is not told which blocked tool it lacks; only runtime refusals link to Permissions.
+- Walked in the browser: notice, Review, Dismiss; Notion search on Approve, card, Approve ran the tool. Reject uses the existing flow and was not re-walked. E2E: 159 passed, 44 failed (same known local-only set as before, none in approval or permissions specs).

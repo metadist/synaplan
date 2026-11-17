@@ -3,7 +3,7 @@
 **Status:** 2026-11-17. §0 #1–#14 are decided by the owner. TP1 is in
 review; see [`STATUS.md`](./STATUS.md).
 **Owner:** product owner.
-**Roadmap:** row 47. Steps `TP0`–`TP6`, journeys `J-TP-1`–`J-TP-6`.
+**Roadmap:** row 47. Steps `TP0`–`TP6`, journeys `J-TP-1`–`J-TP-7`.
 **Binding:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) (U1–U12)
 and root [`AGENTS.md`](../../../AGENTS.md).
 **Code map taken on:** `main` @ `ac43ab7df` (2026-11-17).
@@ -51,7 +51,13 @@ group).
 | # | Decision |
 | - | -------- |
 | 15 | The instance flag `TOOLS.APPROVALS_ENABLED` off: a connection's Block still holds, a tool that must ask (Approve, or a call that deletes content) is **refused** with a message, Auto runs. A call a person approved earlier still runs, unless the tool was blocked since. |
-| 16 | A step that cannot pause for an approval (chat `mcp_fetch`) **refuses** a tool set to Approve instead of running it as Auto. |
+| 16 | A step that cannot pause for an approval **refuses** a tool set to Approve instead of running it as Auto. This is only the safe fallback for unattended runs. It no longer applies to chat `mcp_fetch` (see #17). |
+
+### Added after testing TP3 (owner, 2026-11-17)
+
+| # | Decision |
+| - | -------- |
+| 17 | **Approve means the person decides, in every chat turn.** When the AI wants to use a tool set to Approve, including a read tool through `mcp_fetch`, the chat shows the approval card first. The tool runs only after the person accepts. If the person declines, the tool does not run and the AI answers without it and says so. This holds for all MCP tools, read, write and destructive. Only a step that truly cannot pause (an unattended run) keeps the refusal of #16, and then the message links to the Permissions tab. |
 
 ## 1. Today (code map)
 
@@ -230,6 +236,8 @@ v Destructive tools  (7)                            [✋ Approve    v]
 
 ### 3.5 Chat
 
+- **Approve always asks (§0 #17).** The AI proposes the call, the card shows the tool and the connection, and nothing runs before the click. Accept runs it. Decline does not run it and the AI answers without it and says it was not allowed.
+
 - The approval card names the tool by title and the connection, and has
   **Change permission** (deep link, §3.1). "Always allow" sets the tool
   to Auto on its connection (§0 #11).
@@ -267,8 +275,8 @@ removed with the switch (§0 #12).
 | TP1 | Storage and resolution: migration for `BTOOLPOLICY`; entity accessors; `McpToolPermissions` service (override ?? default, categories, unusable); `ApprovalPolicy` uses the connection outcome for MCP tools instead of instance default, `hardBlock()` and `writeAuto` (§2.1); unattended rule (§0 #2); destructive hard refusals removed from `McpActionRunner`, `McpFetchRunner` and `McpToolCatalogAdapter` so the gate decides; `NotionToolHints` re-classified (§2.4); `NotionWriteGuard` refusals become an escalation (§0 #8). Unit tests for every row of §2.1. Routing snapshots re-recorded if the planner catalog drifts. | `backend-only` | §0 #8, #9, #10 |
 | TP2 | API of §4 with OpenAPI, Zod regenerated, "always allow" for MCP tools writes the connection (§0 #11), Notion write endpoint removed (§0 #12). | `backend-only` | TP1, §0 #11, #12 |
 | TP3 | Copy and wireframe review (§3) in all five locales, then the Permissions tab: `McpToolPermissions.vue`, `McpToolCategory.vue`, `McpToolRow.vue`, `ToolOutcomeSelect.vue` (each under 300 lines), Overview/Permissions tabs on the MCP connection and the Notion panel, deep link, states of §3.4. `McpServersConfiguration.vue` must not grow; the tabs are a new component. | per `.github/mobile-impact-policy.json` (web UI) | TP2 |
-| TP4 | Chat: approval card title, connection and **Change permission**; blocked-tool answer with link (§3.5); one-time notice (§3.6). | per policy file | TP3, §0 #13 |
-| TP5 | Playwright `@ci` spec for J-TP-1 to J-TP-6; `docs/CONNECTIONS.md` and `docs/ADMIN.md` updated (connection choice vs. group policy); changelog line about §0 #6. | `no-app-impact` (tests, docs) | TP4 |
+| TP4 | Chat: **approval for `mcp_fetch` (§0 #17)**: a read tool set to Approve pauses the turn, shows the approval card, runs on accept and is skipped on decline with an honest answer; approval card title, connection and **Change permission**; blocked-tool answer with link (§3.5); the refusal message for unattended steps links to the Permissions tab; one-time notice (§3.6). | per policy file | TP3, §0 #13, #17 |
+| TP5 | Playwright `@ci` spec for J-TP-1 to J-TP-7; `docs/CONNECTIONS.md` and `docs/ADMIN.md` updated (connection choice vs. group policy); changelog line about §0 #6. | `no-app-impact` (tests, docs) | TP4 |
 | TP6 | Drop `BALLOWWRITE` / `BWRITEAUTO` one release later (§0 #14). | `backend-only` | §0 #14 |
 
 TP1 and TP2 may land as one pull request if the diff stays reviewable;
@@ -285,6 +293,7 @@ before the next (root `AGENTS.md`).
 | J-TP-4 | I set "Delete pages" to Auto, confirm the dialog, and the AI moves a test page to Trash without asking. |
 | J-TP-5 | An approval card for "Create pages" appears; I press "Always allow"; the Permissions tab now shows Create pages as Auto; a Saved Task that creates pages still waits in the approvals inbox (§0 #2). |
 | J-TP-6 | As a member using the admin's shared Notion connection I see the list read-only with the admin's name and no write tools. |
+| J-TP-7 | I set "Search" to Approve and ask the AI to find a page. An approval card appears and nothing runs. I decline: the AI says it was not allowed to search and gives no result. I ask again and accept: the search runs and the answer lists the page. |
 
 ## 7. Exit and gates
 
@@ -306,6 +315,7 @@ before the next (root `AGENTS.md`).
 
 ## 8. Risks
 
+- **Pause in the read path.** `mcp_fetch` runs inside a planned task and cannot pause today, so TP1 refuses Approve there (#16). TP4 must add the pause and the resume or skip, and must keep the refusal for unattended steps. Until TP4 lands, Approve on a read tool in chat fails with a refusal.
 - **Silent behaviour change** for existing connections (§0 #6). Mitigated
   by the notice (§0 #13) and the changelog.
 - **Overlap between tools.** Blocking `delete-pages` does not stop

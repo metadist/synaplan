@@ -1119,7 +1119,9 @@
       "executed": "Erledigt",
       "failed": "Fehlgeschlagen"
     },
-    "openTasks": "Aufgaben öffnen"
+    "openTasks": "Aufgaben öffnen",
+    "onConnection": "Auf {connection}",
+    "changePermission": "Berechtigung ändern"
   },
   "knowledgeSources": {
     "title": "Quellen",

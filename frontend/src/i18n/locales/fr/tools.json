@@ -551,7 +551,10 @@
       "loadFailed": "Les outils de cette connexion n'ont pas pu être chargés. Rien n'a été modifié.",
       "retry": "Réessayer",
       "empty": "Cette connexion n'offre pas encore d'outils. Vérifiez qu'elle est connectée, puis rechargez.",
-      "clientOff": "Les appels MCP sont désactivés, il n'y a donc rien à régler ici. Activez-les pour gérer les autorisations."
+      "clientOff": "Les appels MCP sont désactivés, il n'y a donc rien à régler ici. Activez-les pour gérer les autorisations.",
+      "notice": "L’IA peut désormais utiliser des outils d’écriture sur cette connexion sans demander. Les outils destructeurs demandent toujours.",
+      "noticeReview": "Vérifier les autorisations",
+      "noticeDismiss": "Compris"
     }
   },
   "messagesGateway": {

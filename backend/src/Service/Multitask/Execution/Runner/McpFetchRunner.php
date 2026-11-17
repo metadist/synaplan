@@ -190,8 +190,9 @@ final readonly class McpFetchRunner implements TaskRunner
         $gateName = sprintf('mcp:%d:%s', $serverId, $tool);
         $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
         $unattended = $runId > 0 || true === ($context->options['saved_task'] ?? false);
-        // Only a saved-task run can resume the waiting step. A chat label
-        // would run the fetch in the chat continuation and leave the step waiting.
+        // A tool set to Approve waits for a person in chat too. The approval
+        // is labelled with the chat message; once approved, the tool runs in
+        // the approval handler and the answer lands in the thread.
         $requestedBy = $runId > 0
             ? sprintf('task_run:%d:%s', $runId, $node->id)
             : 'chat:'.(int) $context->message->getId();

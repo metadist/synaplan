@@ -11,6 +11,7 @@ use App\Service\AgentTemplate\AgentPublishReview;
 use App\Service\AgentTemplate\Exception\AgentPublishReviewException;
 use App\Service\Email\MailerConfig;
 use App\Service\Mcp\Permissions\McpApprovalAllowance;
+use App\Service\Mcp\Permissions\McpApprovalConnection;
 use App\Service\Tool\ApprovalNotFoundException;
 use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ToolsConfig;
@@ -35,6 +36,7 @@ final class ApprovalController extends AbstractController
         private MailerConfig $mailerConfig,
         private AgentPublishReview $reviews,
         private McpApprovalAllowance $mcpAllowance,
+        private McpApprovalConnection $connections,
     ) {
     }
 
@@ -77,6 +79,7 @@ final class ApprovalController extends AbstractController
             $row['canDecide'] = true;
             $approvals[] = $row;
         }
+        $approvals = array_map(fn (array $row): array => $this->connections->decorate($row, (int) $user->getId()), $approvals);
 
         return $this->json([
             'success' => true,
@@ -137,7 +140,7 @@ final class ApprovalController extends AbstractController
         }
         $this->bus->dispatch(new ResumeApprovalCommand((int) $approval->getId()));
 
-        return $this->json(['success' => true, 'approval' => $this->approvals->toArray($approval)]);
+        return $this->json(['success' => true, 'approval' => $this->connections->decorate($this->approvals->toArray($approval), (int) $user->getId())]);
     }
 
     #[Route('/{id}/reject', name: 'reject', methods: ['POST'], requirements: ['id' => '\d+'])]
@@ -183,7 +186,7 @@ final class ApprovalController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json(['success' => true, 'approval' => $this->approvals->toArray($approval)]);
+        return $this->json(['success' => true, 'approval' => $this->connections->decorate($this->approvals->toArray($approval), (int) $user->getId())]);
     }
 
     #[Route('/{id}', name: 'show', methods: ['GET'], requirements: ['id' => '\d+'])]
@@ -222,7 +225,7 @@ final class ApprovalController extends AbstractController
             return $this->json(['success' => false, 'error' => 'Not found'], Response::HTTP_NOT_FOUND);
         }
 
-        return $this->json(['success' => true, 'approval' => $approval]);
+        return $this->json(['success' => true, 'approval' => $this->connections->decorate($approval, (int) $user->getId())]);
     }
 
     #[Route('/notify-setting', name: 'notify_get', methods: ['GET'])]
