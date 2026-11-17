@@ -263,7 +263,8 @@ final class ProjectController extends AbstractController
             )),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'No such project, or the feature is off'),
-            new OA\Response(response: 409, description: 'A limit was reached (sources, storage, rate)'),
+            new OA\Response(response: 409, description: 'A limit was reached (sources or storage)'),
+            new OA\Response(response: 429, description: 'Too many sources read in a short time'),
             new OA\Response(response: 422, description: 'The request names no valid source'),
         ]
     )]
@@ -312,7 +313,9 @@ final class ProjectController extends AbstractController
             )),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'No such project or source, or the feature is off'),
+            new OA\Response(response: 409, description: 'The storage limit was reached; the earlier snapshot stays'),
             new OA\Response(response: 422, description: 'The source is not a link'),
+            new OA\Response(response: 429, description: 'Too many sources read in a short time'),
             new OA\Response(response: 502, description: 'The page could not be read; the earlier snapshot stays'),
         ]
     )]
@@ -398,7 +401,7 @@ final class ProjectController extends AbstractController
         summary: 'Start a new chat inside a project',
         tags: ['Projects'],
         parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
-        requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(properties: [new OA\Property(property: 'title', type: 'string')])),
+        requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(properties: [new OA\Property(property: 'title', type: 'string', maxLength: 255, example: 'Tiles and grout')])),
         responses: [
             new OA\Response(response: 201, description: 'The new chat', content: new OA\JsonContent(
                 required: ['success', 'chat'],
@@ -419,14 +422,8 @@ final class ProjectController extends AbstractController
         \assert($user instanceof User);
 
         return $this->respond(function () use ($uuid, $request, $user): JsonResponse {
-            $project = $this->owned($uuid, $user);
             $title = $this->body($request)['title'] ?? null;
-            $chat = new Chat();
-            $chat->setUserId((int) $user->getId());
-            if (\is_string($title) && '' !== trim($title)) {
-                $chat->setTitle(mb_substr(trim($title), 0, 255));
-            }
-            $this->membership->move($chat, $project->getUuid());
+            $chat = $this->membership->start($this->owned($uuid, $user), \is_string($title) ? $title : null);
 
             return $this->json(['success' => true, 'chat' => $this->presenter->chat($chat)], Response::HTTP_CREATED);
         });
@@ -445,6 +442,7 @@ final class ProjectController extends AbstractController
             new OA\Response(response: 200, description: 'The chat is in the project; its later turns search the sources', content: new OA\JsonContent(required: ['success'], properties: [new OA\Property(property: 'success', type: 'boolean', example: true)])),
             new OA\Response(response: 401, description: 'Not authenticated'),
             new OA\Response(response: 404, description: 'No such project or chat, or the feature is off'),
+            new OA\Response(response: 422, description: 'The chat is not a web chat'),
         ]
     )]
     public function chatsJoin(string $uuid, int $chatId, #[CurrentUser] ?User $user): JsonResponse

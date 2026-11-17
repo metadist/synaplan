@@ -12,8 +12,11 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERID'], name: 'idx_chat_user')]
 #[ORM\Index(columns: ['BSHARETOKEN'], name: 'idx_chat_share')]
 #[ORM\Index(columns: ['BSOURCE'], name: 'idx_chat_source')]
+#[ORM\Index(columns: ['BPROJECTID'], name: 'idx_chat_project')]
 class Chat
 {
+    public const SOURCE_WEB = 'web';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'integer')]

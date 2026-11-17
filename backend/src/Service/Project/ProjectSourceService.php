@@ -8,14 +8,9 @@ use App\Entity\File;
 use App\Entity\Project;
 use App\Entity\User;
 use App\Repository\FileRepository;
-use App\Service\File\FileHelper;
-use App\Service\File\FileStorageService;
+use App\Service\File\FileGroupDeletionService;
 use App\Service\File\FileUploadService;
-use App\Service\File\VectorizationService;
-use App\Service\RAG\VectorStorage\VectorStorageFacade;
-use App\Service\RateLimitService;
 use App\Service\Research\UrlContentService;
-use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 
@@ -28,6 +23,7 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
  * A link is a snapshot of the page when it was added. `refresh` fetches it
  * again into the same row. A link that cannot be read is kept as a `failed`
  * row with the reason, so the person sees it and can remove or retry it.
+ * Pages are read hop by hop, and every redirect target passes the SSRF guard.
  */
 final readonly class ProjectSourceService
 {
@@ -37,16 +33,14 @@ final readonly class ProjectSourceService
 
     private const TITLE_MAX = 200;
     private const TEXT_MAX_CHARS = 500000;
+    private const LINK_MAX_CHARS = 200000;
 
     public function __construct(
         private FileRepository $files,
         private FileUploadService $uploads,
         private UrlContentService $urls,
-        private FileStorageService $storage,
-        private VectorizationService $vectors,
-        private VectorStorageFacade $vectorStorage,
-        private StorageQuotaService $quota,
-        private RateLimitService $rates,
+        private ProjectSourceIndexer $indexer,
+        private FileGroupDeletionService $deletion,
         private ProjectsConfig $config,
         private EntityManagerInterface $em,
     ) {
@@ -107,6 +101,7 @@ final readonly class ProjectSourceService
             throw ProjectException::invalid('url must start with http:// or https://');
         }
         $this->assertRoom($project, 1);
+        $this->indexer->assertRate($user);
 
         $file = $this->newRow($project, $url, self::SOURCE_LINK, 'link')->setSourceId($url);
         $this->em->persist($file);
@@ -128,12 +123,13 @@ final readonly class ProjectSourceService
             throw ProjectException::invalid('text is longer than '.self::TEXT_MAX_CHARS.' characters');
         }
         $this->assertRoom($project, 1);
-        $this->guard($user, \strlen($text));
+        $this->indexer->assertRate($user);
+        $this->indexer->assertStorage($user, \strlen($text));
 
         $file = $this->newRow($project, $title, self::SOURCE_TEXT, 'text');
         $this->em->persist($file);
         $this->em->flush();
-        $this->indexText($file, $user, $project, $text, $title);
+        $this->indexer->index($file, $user, $project, $text, $title);
 
         return $this->present($file);
     }
@@ -144,19 +140,14 @@ final readonly class ProjectSourceService
         if (self::SOURCE_LINK !== $file->getSource()) {
             throw ProjectException::invalid('Only a link can be refreshed');
         }
+        $this->indexer->assertRate($user);
 
         return $this->fillLink($file, $user, $project);
     }
 
     public function remove(Project $project, int $fileId): void
     {
-        $file = $this->find($project, $fileId);
-        $this->vectorStorage->deleteByFile($project->getUserId(), (int) $file->getId());
-        $path = $file->getFilePath();
-        if ('' !== $path) {
-            $this->storage->deleteFile($path);
-        }
-        $this->files->delete($file);
+        $this->deletion->deleteFile($project->getUserId(), $this->find($project, $fileId));
     }
 
     public function find(Project $project, int $fileId): File
@@ -172,64 +163,40 @@ final readonly class ProjectSourceService
         return $file;
     }
 
+    /**
+     * Reads the page into the row. A first read that fails leaves a failed
+     * row with the reason; a refresh that fails keeps the earlier snapshot
+     * and answers with the reason instead.
+     */
     private function fillLink(File $file, User $user, Project $project): ProjectSource
     {
-        $url = (string) $file->getSourceId();
-        $page = $this->urls->fetch($url);
+        $hasSnapshot = '' !== $file->getFilePath() && File::VECTOR_STATE_VECTORIZED === $file->getVectorState();
+        $page = $this->urls->fetchForReading((string) $file->getSourceId(), self::LINK_MAX_CHARS);
         if (!$page->success || '' === trim($page->extractedText)) {
-            $reason = $page->error ?? $page->blockedReason ?? 'The page has no readable text';
-            if ('' !== $file->getFileText() && File::VECTOR_STATE_VECTORIZED === $file->getVectorState()) {
-                // A refresh that fails leaves the earlier snapshot in place.
-                throw ProjectException::upstream($reason);
-            }
-            $this->fail($file, $reason);
-
-            return $this->present($file);
+            return $this->failLink($file, $hasSnapshot, $page->error ?? 'The page has no readable text');
         }
-        $this->guard($user, \strlen($page->extractedText));
+        try {
+            $this->indexer->assertStorage($user, \strlen($page->extractedText));
+        } catch (ProjectException $e) {
+            return $this->failLink($file, $hasSnapshot, $e->getMessage(), $e);
+        }
 
         $title = '' !== trim($page->title) ? trim($page->title) : $page->hostname;
         $file->setFileName(mb_substr($title, 0, 250));
-        $file->setOriginalName($url);
-        $this->vectorStorage->deleteByFile($project->getUserId(), (int) $file->getId());
-        $this->indexText($file, $user, $project, $page->extractedText, $title);
+        $file->setOriginalName((string) $file->getSourceId());
+        $this->indexer->index($file, $user, $project, $page->extractedText, $title);
 
         return $this->present($file);
     }
 
-    private function indexText(File $file, User $user, Project $project, string $text, string $title): void
+    private function failLink(File $file, bool $hasSnapshot, string $reason, ?ProjectException $cause = null): ProjectSource
     {
-        $stored = $this->storage->storeRawContent($text, $project->getUserId(), $title.'.txt', 'text/plain');
-        if (!$stored['success']) {
-            $this->fail($file, (string) ($stored['error'] ?? 'The text could not be stored'));
-
-            return;
+        if ($hasSnapshot) {
+            throw $cause ?? ProjectException::upstream($reason);
         }
-        $oldPath = $file->getFilePath();
-        if ('' !== $oldPath) {
-            $this->storage->deleteFile($oldPath);
-        }
-        $file->setFilePath((string) $stored['path'])->setFileSize((int) $stored['size'])->setFileText($text);
-        $file->setStatus('extracted');
-        $this->em->flush();
+        $this->indexer->fail($file, $reason);
 
-        $vector = $this->vectors->vectorizeAndStore(
-            $text,
-            $project->getUserId(),
-            (int) $file->getId(),
-            $project->getGroupKey(),
-            FileHelper::getFileTypeCode('txt'),
-        );
-        if (!($vector['success'] ?? false)) {
-            $error = $vector['error'] ?? 'Indexing failed';
-            $this->fail($file, \is_string($error) ? $error : 'Indexing failed');
-
-            return;
-        }
-        $file->markVectorized();
-        $file->setChunkCount((int) ($vector['chunks_created'] ?? 0));
-        $this->em->flush();
-        $this->rates->recordFileAnalysisOnce($user, (int) $file->getId(), ['source' => 'PROJECT', 'filename' => $title]);
+        return $this->present($file);
     }
 
     private function newRow(Project $project, string $name, string $source, string $kind): File
@@ -246,30 +213,6 @@ final readonly class ProjectSourceService
             ->setSource($source)
             ->setOriginKind($kind)
             ->setStatus('uploaded');
-    }
-
-    /**
-     * Marks a row failed with its reason. The reason lives in the file text
-     * of a failed row, which is never indexed.
-     */
-    private function fail(File $file, string $reason): void
-    {
-        $file->setStatus('failed');
-        $file->setVectorState(File::VECTOR_STATE_FAILED);
-        $file->setFileText(mb_substr($reason, 0, 500));
-        $this->em->flush();
-    }
-
-    private function guard(User $user, int $bytes): void
-    {
-        if (!($this->rates->checkLimit($user, 'FILE_ANALYSIS')['allowed'] ?? false)) {
-            throw ProjectException::limit('Rate limit exceeded for file analysis');
-        }
-        try {
-            $this->quota->checkStorageLimit($user, $bytes);
-        } catch (\RuntimeException $e) {
-            throw ProjectException::limit($e->getMessage());
-        }
     }
 
     private function assertRoom(Project $project, int $adding): void

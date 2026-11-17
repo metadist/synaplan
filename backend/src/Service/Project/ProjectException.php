@@ -13,6 +13,7 @@ final class ProjectException extends \RuntimeException
     public const NOT_FOUND = 404;
     public const INVALID = 422;
     public const LIMIT = 409;
+    public const RATE_LIMITED = 429;
     public const UPSTREAM = 502;
 
     public static function notFound(string $what): self
@@ -28,6 +29,11 @@ final class ProjectException extends \RuntimeException
     public static function limit(string $message): self
     {
         return new self($message, self::LIMIT);
+    }
+
+    public static function rateLimited(string $message): self
+    {
+        return new self($message, self::RATE_LIMITED);
     }
 
     public static function upstream(string $message): self

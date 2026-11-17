@@ -12,6 +12,7 @@ use App\Service\Project\ProjectChatMembership;
 use App\Service\Project\ProjectChatScope;
 use App\Service\Project\ProjectsConfig;
 use App\Service\Project\ProjectService;
+use App\Service\Project\ProjectSourceIndexer;
 use App\Service\Project\ProjectSourceService;
 
 /**
@@ -89,6 +90,7 @@ final class ProjectsModule implements FeatureModuleInterface
             ProjectsConfig::class,
             ProjectService::class,
             ProjectSourceService::class,
+            ProjectSourceIndexer::class,
             ProjectChatScope::class,
             ProjectChatMembership::class,
         ];

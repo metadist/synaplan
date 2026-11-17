@@ -34,7 +34,8 @@ class Project
     #[ORM\Column(name: 'BDESCRIPTION', type: 'string', length: 500, nullable: true)]
     private ?string $description = null;
 
-    #[ORM\Column(name: 'BINSTRUCTIONS', type: 'text', nullable: true)]
+    /** length 65535 pins the DBAL comparator to TEXT, the migration DDL, instead of LONGTEXT. */
+    #[ORM\Column(name: 'BINSTRUCTIONS', type: 'text', length: 65535, nullable: true)]
     private ?string $instructions = null;
 
     #[ORM\Column(name: 'BGROUPKEY', type: 'string', length: 64)]
