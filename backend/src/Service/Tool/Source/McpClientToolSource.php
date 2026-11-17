@@ -7,6 +7,9 @@ namespace App\Service\Tool\Source;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\Entity\McpServerConfig;
 use App\Service\Mcp\McpToolRegistry;
+use App\Service\Mcp\Permissions\McpToolPermissions;
+use App\Service\Tool\Policy\McpToolMeta;
+use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolSource;
@@ -17,6 +20,7 @@ final readonly class McpClientToolSource implements ToolSourceInterface
     public function __construct(
         private McpToolRegistry $mcpToolRegistry,
         private McpToolCatalogAdapter $catalogAdapter,
+        private McpToolPermissions $permissions,
     ) {
     }
 
@@ -44,20 +48,21 @@ final readonly class McpClientToolSource implements ToolSourceInterface
                 $destructive = isset($annotations['destructiveHint']) ? (bool) $annotations['destructiveHint'] : null;
                 $gatewayName = $this->catalogAdapter->namespace($serverId, (string) $tool['name']);
                 $schema = $tool['inputSchema'];
+                $class = SideEffect::fromHints($readOnly, $destructive);
                 $descriptors[] = new ToolDescriptor(
                     name: sprintf('mcp:%d:%s', $serverId, (string) $tool['name']),
                     title: (string) $tool['name'],
                     description: $tool['description'],
                     inputSchema: $schema,
-                    sideEffect: SideEffect::fromHints($readOnly, $destructive),
+                    sideEffect: $class,
                     source: ToolSource::Mcp,
                     ownerId: $userId,
                     meta: [
                         'serverId' => $serverId,
                         'serverName' => $server->getName(),
                         'tool' => (string) $tool['name'],
-                        'allowWrite' => $server->allowsWrite(),
-                        'writeAuto' => $server->isWriteAuto(),
+                        McpToolMeta::CONNECTION_OUTCOME => $this->permissions->outcome($server, (string) $tool['name'], $class)->value,
+                        McpToolMeta::SERVER_URL => $server->getUrl(),
                         'gatewayName' => $gatewayName,
                         'annotations' => $annotations,
                     ],
@@ -92,6 +97,10 @@ final readonly class McpClientToolSource implements ToolSourceInterface
                 continue;
             }
             $name = (string) $tool['name'];
+            $outcome = $this->permissions->outcome($server, $name, SideEffect::Read);
+            if (PolicyOutcome::Block === $outcome) {
+                continue;
+            }
             $descriptors[] = new ToolDescriptor(
                 name: sprintf('mcp:%d:%s', $serverId, $name),
                 title: $name,
@@ -104,8 +113,8 @@ final readonly class McpClientToolSource implements ToolSourceInterface
                     'serverId' => $serverId,
                     'serverName' => $server->getName(),
                     'tool' => $name,
-                    'allowWrite' => false,
-                    'writeAuto' => false,
+                    McpToolMeta::CONNECTION_OUTCOME => $outcome->value,
+                    McpToolMeta::SERVER_URL => $server->getUrl(),
                     'shared' => true,
                     'gatewayName' => $this->catalogAdapter->namespace($serverId, $name),
                     'annotations' => $annotations,

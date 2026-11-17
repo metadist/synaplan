@@ -79,6 +79,14 @@ class McpServerConfig
     private bool $writeAuto = false;
 
     /**
+     * JSON `{"v":1,"tools":{name: outcome},"seen":[name]}`. Holds only the
+     * tools whose choice differs from the class default; `{}` means all
+     * defaults. Read it through {@see getToolOverrides()}.
+     */
+    #[ORM\Column(name: 'BTOOLPOLICY', type: 'text', options: ['default' => '{}'])]
+    private string $toolPolicy = '{}';
+
+    /**
      * How this server authenticates: `none`, `bearer` (static header, default)
      * or `oauth` (RFC 9728 discovery + PKCE consent).
      */
@@ -234,6 +242,19 @@ class McpServerConfig
     public function setWriteAuto(bool $writeAuto): self
     {
         $this->writeAuto = $writeAuto;
+        $this->touch();
+
+        return $this;
+    }
+
+    public function getToolPolicy(): string
+    {
+        return $this->toolPolicy;
+    }
+
+    public function setToolPolicy(string $toolPolicy): self
+    {
+        $this->toolPolicy = $toolPolicy;
         $this->touch();
 
         return $this;

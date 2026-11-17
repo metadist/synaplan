@@ -126,6 +126,48 @@ final class McpClientTest extends TestCase
         self::assertSame(['query' => 'acme'], $body['params']['arguments']);
     }
 
+    public function testArgumentsThatDeleteNotionContentAreRefusedUnlessAPersonApprovedThem(): void
+    {
+        $captured = [];
+        $client = $this->client([], $captured);
+        $notion = $this->server('https://mcp.notion.com/mcp');
+        $arguments = ['page_id' => 'p1', 'command' => 'replace_content'];
+
+        try {
+            $client->callTool($notion, 'notion-update-page', $arguments);
+            self::fail('A deleting call must not leave without approval.');
+        } catch (McpClientException $e) {
+            self::assertStringContainsString('without your approval', $e->getMessage());
+        }
+        self::assertSame([], $captured, 'nothing was sent');
+
+        $sent = [];
+        $approved = $this->client([
+            self::rpc([], []),
+            new MockResponse('', ['http_code' => 202]),
+            self::rpc(['content' => [['type' => 'text', 'text' => 'done']], 'isError' => false]),
+        ], $sent);
+        $result = $approved->callTool($notion, 'notion-update-page', $arguments, contentDeletionApproved: true);
+
+        self::assertFalse($result['isError']);
+        self::assertSame('tools/call', json_decode((string) $sent[2]['options']['body'], true)['method']);
+    }
+
+    public function testAToolTheOwnerBlockedNeverLeavesForAnyCaller(): void
+    {
+        $captured = [];
+        $client = $this->client([], $captured);
+        $server = $this->server()->setToolPolicy('{"v":1,"tools":{"search_customers":"block"}}');
+
+        try {
+            $client->callTool($server, 'search_customers', ['query' => 'acme'], contentDeletionApproved: true);
+            self::fail('A blocked tool must not be called.');
+        } catch (McpClientException $e) {
+            self::assertStringContainsString('blocked in the permissions', $e->getMessage());
+        }
+        self::assertSame([], $captured, 'nothing was sent');
+    }
+
     public function testAuthHeaderIsDecryptedAndSent(): void
     {
         $captured = [];

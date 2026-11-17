@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\AI\Messages\Mcp;
 
 use App\Service\Mcp\McpToolRegistry;
+use App\Service\Mcp\Permissions\McpToolPermissions;
+use App\Service\Tool\Policy\PolicyOutcome;
 
 /**
  * Maps {@see McpToolRegistry::catalogForUser()} to Anthropic `tools[]`.
@@ -35,6 +37,7 @@ final readonly class McpToolCatalogAdapter
 
     public function __construct(
         private McpToolRegistry $toolRegistry,
+        private McpToolPermissions $permissions = new McpToolPermissions(),
     ) {
     }
 
@@ -58,6 +61,9 @@ final readonly class McpToolCatalogAdapter
 
             foreach ($entry['tools'] as $tool) {
                 if (!$includeMutating && $this->isMutatingTool($tool['annotations'])) {
+                    continue;
+                }
+                if (PolicyOutcome::Block === $this->permissions->outcomeForTool($server, $tool)) {
                     continue;
                 }
 

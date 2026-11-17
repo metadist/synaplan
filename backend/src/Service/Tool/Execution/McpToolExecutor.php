@@ -42,7 +42,12 @@ final readonly class McpToolExecutor implements ToolExecutorInterface
         }
 
         try {
-            $call = $this->client->callTool($server, $mcpTool, $invocation->arguments);
+            $call = $this->client->callTool(
+                $server,
+                $mcpTool,
+                $invocation->arguments,
+                $this->approvedByPerson($invocation),
+            );
         } catch (McpClientException $e) {
             return new ToolExecution($e->getMessage(), true, 'mcp', $tool->sideEffect->value, details: [
                 'transport' => true,
@@ -69,6 +74,17 @@ final readonly class McpToolExecutor implements ToolExecutorInterface
             'ref' => 'mcp:'.$serverId.':'.$mcpTool,
             'summary' => $this->plain($content),
         ]);
+    }
+
+    /**
+     * A person approved this call: the gate opened an approval for it and it
+     * was granted. A call the gate let through on its own never counts.
+     */
+    private function approvedByPerson(ToolInvocation $invocation): bool
+    {
+        $approvalId = $invocation->caller->approvalId;
+
+        return (null !== $approvalId && $approvalId > 0) || true === $invocation->decision?->alreadyApproved;
     }
 
     /**

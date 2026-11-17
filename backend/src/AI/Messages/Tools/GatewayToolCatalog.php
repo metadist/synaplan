@@ -9,6 +9,8 @@ use App\Entity\User;
 use App\Service\Compute\ComputeRunGrant;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\Runtime\RuntimeProfile;
+use App\Service\Tool\Policy\McpToolMeta;
+use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
@@ -562,6 +564,9 @@ final readonly class GatewayToolCatalog
                 continue;
             }
             if (!$includeMutating && SideEffect::Read !== $descriptor->sideEffect) {
+                continue;
+            }
+            if (PolicyOutcome::Block->value === ($descriptor->meta[McpToolMeta::CONNECTION_OUTCOME] ?? null)) {
                 continue;
             }
             $name = $descriptor->callName();

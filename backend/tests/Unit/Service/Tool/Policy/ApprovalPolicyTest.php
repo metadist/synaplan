@@ -26,46 +26,6 @@ final class ApprovalPolicyTest extends TestCase
         $this->assertSame(PolicyOutcome::Block, $policy->decide($this->tool(SideEffect::Destructive), 1, PolicyContext::Interactive));
     }
 
-    public function testAllowWriteOffBlocksRegardlessOfOverrides(): void
-    {
-        $policy = $this->policy();
-        $tool = new ToolDescriptor(
-            'mcp:1:create',
-            'Create',
-            '',
-            [],
-            SideEffect::Write,
-            ToolSource::Mcp,
-            1,
-            meta: ['allowWrite' => false],
-        );
-        $this->assertSame(
-            PolicyOutcome::Block,
-            $policy->decide(
-                $tool,
-                1,
-                PolicyContext::Unattended,
-                ['policy' => ['create' => 'auto', 'write' => 'auto']],
-                true,
-                'assistant:9',
-            ),
-        );
-    }
-
-    public function testMcpWriteAutoSkipsTheCardOnlyForInteractiveWrites(): void
-    {
-        $policy = $this->policy();
-        $write = $this->mcpTool(SideEffect::Write, true);
-        $this->assertSame(PolicyOutcome::Auto, $policy->decide($write, 1, PolicyContext::Interactive));
-        $this->assertSame(PolicyOutcome::Approve, $policy->decide($write, 1, PolicyContext::Unattended));
-
-        $blocked = $this->mcpTool(SideEffect::Write, true, false);
-        $this->assertSame(PolicyOutcome::Block, $policy->decide($blocked, 1, PolicyContext::Interactive));
-
-        $destructive = $this->mcpTool(SideEffect::Destructive, true);
-        $this->assertSame(PolicyOutcome::Block, $policy->decide($destructive, 1, PolicyContext::Interactive));
-    }
-
     public function testAllowUnattendedTurnsApproveIntoAutoForWriteOnly(): void
     {
         $policy = $this->policy();
@@ -148,22 +108,6 @@ final class ApprovalPolicyTest extends TestCase
         $this->assertSame(PolicyOutcome::Block, $policy->decide($tool, 1, PolicyContext::Interactive));
     }
 
-    public function testMcpWriteAutoKeepsAnApprovalAnAdminOrStepAsksFor(): void
-    {
-        $group = $this->createMock(GroupPolicyProviderInterface::class);
-        $group->method('outcomeFor')->willReturn(PolicyOutcome::Approve);
-        $config = $this->createMock(ToolsConfig::class);
-        $config->method('defaultOutcome')->willReturn(PolicyOutcome::Approve);
-        $config->method('alwaysAllowTools')->willReturn([]);
-        $write = $this->mcpTool(SideEffect::Write, true);
-
-        $byGroup = new ApprovalPolicy($config, $group, $this->assistant());
-        $this->assertSame(PolicyOutcome::Approve, $byGroup->decide($write, 1, PolicyContext::Interactive));
-
-        $byStep = $this->policy();
-        $this->assertSame(PolicyOutcome::Approve, $byStep->decide($write, 1, PolicyContext::Interactive, nodeOverride: PolicyOutcome::Approve));
-    }
-
     public function testMostRestrictiveWins(): void
     {
         $group = $this->createMock(GroupPolicyProviderInterface::class);
@@ -203,19 +147,5 @@ final class ApprovalPolicyTest extends TestCase
     private function tool(SideEffect $side): ToolDescriptor
     {
         return new ToolDescriptor('web_search', 'Web search', '', [], $side, ToolSource::Builtin, 0);
-    }
-
-    private function mcpTool(SideEffect $side, bool $writeAuto, bool $allowWrite = true): ToolDescriptor
-    {
-        return new ToolDescriptor(
-            'mcp:1:create-pages',
-            'Create pages',
-            '',
-            [],
-            $side,
-            ToolSource::Mcp,
-            1,
-            meta: ['allowWrite' => $allowWrite, 'writeAuto' => $writeAuto],
-        );
     }
 }

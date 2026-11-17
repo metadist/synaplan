@@ -8,6 +8,7 @@ use App\Entity\McpServerConfig;
 use App\Service\Egress\EgressCall;
 use App\Service\Mcp\Notion\NotionActivityLog;
 use App\Service\Mcp\Notion\NotionWriteGuard;
+use App\Service\Mcp\Permissions\McpToolPermissions;
 use App\Service\Security\EncryptionService;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
@@ -95,16 +96,26 @@ final readonly class McpClient
     /**
      * Call one tool and return its result block.
      *
+     * @param bool                 $contentDeletionApproved true only when a person approved this call
+     *                                                      and its arguments delete content
      * @param array<string, mixed> $arguments
      *
      * @return array{content: list<array<string, mixed>>, isError: bool}
      */
-    public function callTool(McpServerConfig $server, string $tool, array $arguments): array
+    public function callTool(McpServerConfig $server, string $tool, array $arguments, bool $contentDeletionApproved = false): array
     {
+        // Last line of defence for every caller, also those outside the gate
+        // (Notion app actions, linked-page readers): a tool the owner set to
+        // Block never leaves.
+        if ((new McpToolPermissions())->isBlockedByOwner($server, $tool)) {
+            throw new McpClientException(sprintf('The tool "%s" is blocked in the permissions of %s. Nothing was sent.', $tool, $server->getName()));
+        }
         $arguments = NotionWriteGuard::normalize($server->getUrl(), $tool, $arguments);
-        $refusal = NotionWriteGuard::refusal($server->getUrl(), $tool, $arguments);
-        if (null !== $refusal) {
-            throw new McpClientException($refusal);
+        // Arguments that delete content only leave after a person approved
+        // this exact call.
+        $deletion = NotionWriteGuard::contentDeletion($server->getUrl(), $tool, $arguments);
+        if (null !== $deletion && !$contentDeletionApproved) {
+            throw new McpClientException($deletion);
         }
 
         $result = $this->withSession(

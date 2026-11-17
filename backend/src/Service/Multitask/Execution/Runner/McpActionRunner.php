@@ -16,7 +16,7 @@ use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionFetchArguments;
 use App\Service\Mcp\Notion\NotionPageWrite;
 use App\Service\Mcp\Notion\NotionToolHints;
-use App\Service\Mcp\Notion\NotionWriteGuard;
+use App\Service\Mcp\Permissions\McpToolPermissions;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\StructuredField;
@@ -36,6 +36,7 @@ use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
 use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolExecutionGate;
@@ -50,17 +51,15 @@ use Symfony\Contracts\Service\Attribute\Required;
  * {@see McpFetchRunner} (same locked node shape: server/tool in `params`, tool
  * arguments in `inputs.arguments`).
  *
- * Writes are double-opt-in: beyond the read gate chain, the SERVER OWNER must
- * have flipped `allow_write` on the connection (`BMCPSERVERS.BALLOWWRITE`) —
- * a server without the flag never appears in the planner sub-catalog and is
- * refused at run time. Tools that declare themselves DESTRUCTIVE
- * (`destructiveHint: true` — deletes, irreversible updates) stay refused
- * entirely in v1; creation/update tools are the scope of this capability.
+ * What the AI may do with each tool is the connection's own choice
+ * (auto / approve / block, {@see McpToolPermissions}). A blocked tool never
+ * appears in the planner sub-catalog and is refused at run time; the gate
+ * then asks for approval or lets the call through per tool.
  *
  * Gate chain (each re-checked at run time, defense in depth):
  *   MCP.CLIENT_ENABLED → MULTITASK.MCP_ACTION_ENABLED → topic `tool_mcp`
- *   (+ optional `mcp_servers` allowlist) → server owned + enabled +
- *   `allow_write` → tool exists on the server → tool not destructive.
+ *   (+ optional `mcp_servers` allowlist) → server owned + enabled →
+ *   tool exists on the server → tool not blocked → ToolExecutionGate.
  */
 final readonly class McpActionRunner implements TaskRunner
 {
@@ -68,6 +67,8 @@ final readonly class McpActionRunner implements TaskRunner
     private const MAX_OUTPUT_CHARS = 12000;
 
     private ToolInvokerSlot $toolInvoker;
+
+    private McpToolPermissions $permissions;
 
     public function __construct(
         private McpClient $client,
@@ -82,6 +83,7 @@ final readonly class McpActionRunner implements TaskRunner
         private ?UserRepository $users = null,
     ) {
         $this->toolInvoker = new ToolInvokerSlot();
+        $this->permissions = new McpToolPermissions();
     }
 
     #[Required]
@@ -103,7 +105,7 @@ final readonly class McpActionRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::McpAction,
-                'Perform a WRITE action on one of the user\'s connected external systems — e.g. create a Confluence page, create a Jira ticket. ONLY when the user explicitly asks to create/update something there. Set params.server_id and params.tool from the write-enabled connections listed below; pass the tool arguments in inputs.arguments. ONLY use a server/tool listed below — if none fits, do NOT emit mcp_action.',
+                'Perform a WRITE action on one of the user\'s connected external systems — e.g. create a Confluence page, create a Jira ticket. ONLY when the user explicitly asks to create/update something there. Set params.server_id and params.tool from the connections listed below; pass the tool arguments in inputs.arguments. ONLY use a server/tool listed below — if none fits, do NOT emit mcp_action.',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->renderToolSubCatalog($userId, $context),
                 planAdjuster: fn (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array => $this->adjustNotionTitlePlan($payload, $messageText, $userId, $allowed, $topic),
                 enabledFlag: MultitaskRoutingConfig::KEY_MCP_ACTION_ENABLED,
@@ -129,14 +131,10 @@ final readonly class McpActionRunner implements TaskRunner
             return NodeResult::failed('mcp_action needs params.server_id and params.tool');
         }
 
-        // Ownership + enabled + the write opt-in — a server whose owner never
-        // flipped `allow_write` is structurally unreachable for writes.
+        // Ownership + enabled.
         $server = $this->servers->findByIdAndUser($serverId, (int) $userId);
         if (null === $server || !$server->isEnabled()) {
             return NodeResult::failed('this connection is not available');
-        }
-        if (!$server->allowsWrite()) {
-            return NodeResult::failed('this connection does not allow write actions — enable "allow write actions" on the MCP server first');
         }
 
         // Topic entitlement re-check (same contract as mcp_fetch).
@@ -148,8 +146,8 @@ final readonly class McpActionRunner implements TaskRunner
         if (null === $catalogTool) {
             return NodeResult::failed(sprintf("the tool '%s' does not exist on this connection", $tool));
         }
-        if ($this->isDestructiveTool($catalogTool['annotations'])) {
-            return NodeResult::failed(sprintf("the tool '%s' declares itself destructive and is not allowed", $tool), $this->callMetadata($serverId, $server->getName(), $tool));
+        if ($this->isBlocked($server, $catalogTool)) {
+            return NodeResult::failed(sprintf("the tool '%s' is blocked in the permissions of this connection", $tool), $this->callMetadata($serverId, $server->getName(), $tool));
         }
 
         $sourceText = (string) $context->message->getText();
@@ -163,11 +161,11 @@ final readonly class McpActionRunner implements TaskRunner
                 ),
             $catalogTool['inputSchema'],
         );
-        $refusal = StructuredField::hasUnresolved($arguments)
-            ? sprintf('The earlier step did not say which item to change, so nothing was sent to %s and nothing was changed.', $server->getName())
-            : NotionWriteGuard::refusal($server->getUrl(), $tool, $arguments);
-        if (null !== $refusal) {
-            return NodeResult::reportableFailure($refusal, $this->callMetadata($serverId, $server->getName(), $tool));
+        if (StructuredField::hasUnresolved($arguments)) {
+            return NodeResult::reportableFailure(
+                sprintf('The earlier step did not say which item to change, so nothing was sent to %s and nothing was changed.', $server->getName()),
+                $this->callMetadata($serverId, $server->getName(), $tool),
+            );
         }
 
         return $this->callConnected($context, $node, $userId, $server, $serverId, $tool, $arguments);
@@ -319,9 +317,9 @@ final readonly class McpActionRunner implements TaskRunner
     }
 
     /**
-     * The write-tool sub-catalog: ONLY servers whose owner enabled writes, and
-     * ONLY tools that declare themselves mutating (read tools stay under
-     * `mcp_fetch`; destructive tools are excluded entirely).
+     * The write-tool sub-catalog: ONLY tools that declare themselves mutating
+     * (read tools stay under `mcp_fetch`) and that the connection does not
+     * block. Destructive tools are listed; the gate asks before they run.
      *
      * @param array<string, mixed> $context
      */
@@ -340,9 +338,6 @@ final readonly class McpActionRunner implements TaskRunner
         $lines = [];
         foreach ($this->toolRegistry->catalogForUser($userId) as $entry) {
             $server = $entry['server'];
-            if (!$server->allowsWrite()) {
-                continue;
-            }
             $serverId = (int) $server->getId();
             if (null !== $allowlist && !in_array($serverId, $allowlist, true)) {
                 continue;
@@ -351,7 +346,7 @@ final readonly class McpActionRunner implements TaskRunner
             $tools = [];
             $notion = NotionToolHints::HOST === strtolower((string) parse_url($server->getUrl(), PHP_URL_HOST));
             foreach ($entry['tools'] as $tool) {
-                if (!$this->isMutatingTool($tool['annotations']) || $this->isDestructiveTool($tool['annotations'])) {
+                if (!$this->isMutatingTool($tool['annotations']) || $this->isBlocked($server, $tool)) {
                     continue;
                 }
                 $tools[] = $tool['name'].$this->renderArgumentHint($tool['inputSchema'])
@@ -408,9 +403,6 @@ final readonly class McpActionRunner implements TaskRunner
 
         $server = null;
         foreach ($this->servers->findEnabledByUser($userId) as $candidate) {
-            if (!$candidate->allowsWrite()) {
-                continue;
-            }
             if (NotionToolHints::HOST !== strtolower((string) parse_url($candidate->getUrl(), PHP_URL_HOST))) {
                 continue;
             }
@@ -528,14 +520,11 @@ final readonly class McpActionRunner implements TaskRunner
     }
 
     /**
-     * Destructive (deletes, irreversible updates) stays out of scope in v1 —
-     * creating pages/tickets is reversible by the user, deleting them is not.
-     *
-     * @param array<string, mixed> $annotations
+     * @param array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>} $tool
      */
-    private function isDestructiveTool(array $annotations): bool
+    private function isBlocked(McpServerConfig $server, array $tool): bool
     {
-        return true === ($annotations['destructiveHint'] ?? null);
+        return PolicyOutcome::Block === $this->permissions->outcomeForTool($server, $tool);
     }
 
     /**
