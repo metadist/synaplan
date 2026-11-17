@@ -1,0 +1,7 @@
+Kitchen measurements (synthetic document for the chat-loop corpus)
+
+Room: 3.62 m long, 2.85 m wide, ceiling height 2.48 m.
+Cut-out for the hob in the existing worktop: 78 cm.
+Window sill height: 94 cm above the floor.
+Water connection: 1.10 m from the left corner on the long wall.
+Door opens inwards, hinge on the right, clear width 86 cm.

@@ -1,0 +1,52 @@
+{
+  "id": "long-chat-150",
+  "kind": "conversation",
+  "length": 150,
+  "description": "Gate G6. 150 messages in one chat. A picture is generated at message 5, a fact is stated at message 10; after message 150 two probes ask for both.",
+  "messages": {
+    "5": {
+      "text": "Generate a picture of a small kitchen with light oak cabinets and a white worktop."
+    },
+    "10": {
+      "text": "Please remember for this chat: the cut-out for the hob is 78 cm and the budget ceiling is 13,000 EUR."
+    }
+  },
+  "filler": [
+    "What should I look out for when choosing a sink?",
+    "Is a 60 cm dishwasher enough for four people?",
+    "How high should the worktop be for someone who is 1.78 m tall?",
+    "What is the usual depth of a base cabinet?",
+    "Do I need an extractor hood with an induction hob?",
+    "Which wall colour goes with oak?",
+    "How many sockets does a kitchen normally need?",
+    "What is a corner carousel?",
+    "Is a built-in microwave worth it?",
+    "How do I clean a matt lacquered front?",
+    "What is the difference between a recirculating and a ducted hood?",
+    "How much space do I need between island and wall?",
+    "Which flooring is robust enough for a kitchen?",
+    "What does a plinth heater do?",
+    "How long does it usually take to fit a kitchen?",
+    "Should the fridge stand next to the oven?",
+    "What is a good height for wall cabinets above the worktop?",
+    "Are drawers better than doors in base cabinets?",
+    "What lighting do I need under wall cabinets?",
+    "How do I plan the work triangle?"
+  ],
+  "probes": [
+    {
+      "id": "probe-picture",
+      "text": "Make the cabinets in the first picture darker.",
+      "note": "PJ7 checks that the picture of message 5 is the source image of the edit."
+    },
+    {
+      "id": "probe-fact",
+      "text": "How wide did I say the cut-out for the hob is?",
+      "expect": [
+        [
+          "78"
+        ]
+      ]
+    }
+  ]
+}
