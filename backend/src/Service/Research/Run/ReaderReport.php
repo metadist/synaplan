@@ -15,14 +15,16 @@ use App\Service\Research\Run\Stage\CitationMarks;
  * deeper, the count the check appended, the evidence ids — but the person
  * asked a question, not for the audit. So the reader's version holds the
  * answer only: the Not confirmed section and the check's closing lines stay
- * out, a heading the check emptied goes with them, and every evidence id
- * becomes the number of its source in the order the sources first appear,
- * so "[e12][e31]" reads as "[1][2]" and the chat lists the sources beneath.
+ * out, a heading the check emptied goes with them, with the dividing line
+ * the writer drew under it, and every evidence id becomes the number of its
+ * source in the order the sources first appear, so "[e12][e31]" reads as
+ * "[1][2]" and the chat lists the sources beneath.
  */
 final class ReaderReport
 {
     private const CITATION_GROUP = '/(?:[ \t]*\[\s*e\d+(?:\s*,\s*e\d+)*\s*\])+/i';
     private const HEADING = '/^\s*(#{1,6})\s+\S/u';
+    private const DIVIDER = '/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/';
 
     /**
      * @return array{markdown: string, sources: list<array{title: string, url: string, host: string, description: string}>}
@@ -88,7 +90,10 @@ final class ReaderReport
 
     /**
      * A heading with nothing under it before the next heading of its level
-     * or above (or the end) is a section the check emptied.
+     * or above (or the end) is a section the check emptied. A dividing line
+     * the writer drew between sections is not content: a heading with only
+     * that under it goes too, and a line that no longer divides two parts —
+     * at the start, at the end, or right after another one — goes with it.
      *
      * @param list<string> $lines
      */
@@ -96,21 +101,62 @@ final class ReaderReport
     {
         $kept = [];
         $count = count($lines);
+        $textAbove = false;
+        $openDivider = null;
         foreach ($lines as $index => $line) {
+            if (self::isDivider($lines, $index)) {
+                if (!$textAbove) {
+                    continue;
+                }
+                // Directly under a text line the dashes would turn that line into a heading.
+                if ('' !== $kept[array_key_last($kept)]) {
+                    $kept[] = '';
+                }
+                $openDivider = count($kept);
+                $textAbove = false;
+                $kept[] = rtrim($line);
+                continue;
+            }
             if (1 === preg_match(self::HEADING, $line, $match)) {
                 $level = strlen($match[1]);
                 $next = $index + 1;
-                while ($next < $count && '' === trim($lines[$next])) {
+                while ($next < $count && ('' === trim($lines[$next]) || self::isDivider($lines, $next))) {
                     ++$next;
                 }
                 if ($next >= $count || (1 === preg_match(self::HEADING, $lines[$next], $after) && strlen($after[1]) <= $level)) {
                     continue;
                 }
             }
+            if ('' !== trim($line)) {
+                $textAbove = true;
+                $openDivider = null;
+            }
             $kept[] = rtrim($line);
+        }
+        if (null !== $openDivider) {
+            array_splice($kept, $openDivider);
         }
 
         return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $kept)));
+    }
+
+    /**
+     * A horizontal rule such as "---", "***" or "___". Dashes directly
+     * under a line of text are that line's heading underline, not a rule.
+     *
+     * @param list<string> $lines
+     */
+    private static function isDivider(array $lines, int $index): bool
+    {
+        if (1 !== preg_match(self::DIVIDER, $lines[$index], $match)) {
+            return false;
+        }
+        $above = $index > 0 ? trim($lines[$index - 1]) : '';
+
+        return '-' !== $match[1]
+            || '' === $above
+            || 1 === preg_match(self::HEADING, $above)
+            || 1 === preg_match(self::DIVIDER, $above);
     }
 
     /**

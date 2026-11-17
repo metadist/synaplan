@@ -75,6 +75,35 @@ REPORT);
         self::assertSame('Done: 5 statements, 1 backed by a source.', $ctx->state->outcome->text());
     }
 
+    public function testASupportedTableRowWithAFullStopInACellStaysWhole(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'Empire State of Mind, with Alicia Keys, spent five weeks at No. 1 in 2009.');
+        $row = '| "Empire State of Mind" (feat. Alicia Keys) | 2009 | No. 1 [e1] |';
+        $ctx->state->ledger->setReport("## Top 10\n\n| Song | Year | Peak |\n|---|---|---|\n".$row);
+        $caller->script[] = $this->verdicts([['c1', 'supported']]);
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertStringContainsString("| Song | Year | Peak |\n|---|---|---|\n".$row, (string) $ctx->state->ledger->report());
+        self::assertSame(['statements' => 1, 'supported' => 1, 'removed' => 0], $ctx->state->ledger->check());
+        self::assertStringContainsString('(feat. Alicia Keys)', $caller->seen[0]['user']);
+    }
+
+    public function testTwoCitedSentencesOnOneLineEachKeepTheirOwnCitation(): void
+    {
+        [$ctx, $caller] = $this->open(false);
+        $this->card($ctx, 'The unit price is 12.40 EUR.');
+        $this->card($ctx, 'The warranty is two years.');
+        $ctx->state->ledger->setReport('The price is 12.40 EUR. [e1] The warranty is two years. [e2]');
+        $caller->script[] = $this->verdicts([['c1', 'supported'], ['c2', 'supported']]);
+
+        $this->stage($caller)->run($ctx);
+
+        self::assertStringStartsWith('The price is 12.40 EUR. [e1] The warranty is two years. [e2]', (string) $ctx->state->ledger->report());
+        self::assertSame(['statements' => 2, 'supported' => 2, 'removed' => 0], $ctx->state->ledger->check());
+    }
+
     public function testThePersonReadsWhichStatementsChangedAndWhy(): void
     {
         [$ctx, $caller] = $this->open(false);

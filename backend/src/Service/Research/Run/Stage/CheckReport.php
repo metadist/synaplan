@@ -127,7 +127,7 @@ final class CheckReport
         $kept = [];
         for ($i = $section['start']; $i < $section['end']; ++$i) {
             $line = $lines[$i];
-            if ($i !== $section['start'] && !self::isTableRow($line) && CitationMarks::cites($line)) {
+            if ($i !== $section['start'] && !DraftSentences::isTableRow($line) && CitationMarks::cites($line)) {
                 $claims[] = $line;
                 continue;
             }
@@ -259,7 +259,7 @@ final class CheckReport
             if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index)) {
                 continue;
             }
-            if (self::isTableRow($line) && self::headerOfEmptyTable($lines, $index - 1)) {
+            if (DraftSentences::isTableRow($line) && self::headerOfEmptyTable($lines, $index - 1)) {
                 continue;
             }
             $kept[] = $line;
@@ -275,18 +275,11 @@ final class CheckReport
      */
     private static function headerOfEmptyTable(array $lines, int $index): bool
     {
-        if ($index < 0 || !self::isTableRow($lines[$index] ?? '') || 1 !== preg_match(DraftSentences::TABLE_RULE, trim($lines[$index + 1] ?? ''))) {
+        if ($index < 0 || !DraftSentences::isTableRow($lines[$index] ?? '') || 1 !== preg_match(DraftSentences::TABLE_RULE, trim($lines[$index + 1] ?? ''))) {
             return false;
         }
 
-        return !self::isTableRow($lines[$index + 2] ?? '');
-    }
-
-    private static function isTableRow(string $line): bool
-    {
-        $line = trim($line);
-
-        return str_starts_with($line, '|') && str_ends_with($line, '|') && strlen($line) > 1;
+        return !DraftSentences::isTableRow($lines[$index + 2] ?? '');
     }
 
     /**

@@ -8,9 +8,12 @@ use App\Service\Research\Run\Ledger\PassageText;
 
 /**
  * Splits a draft into the statements the fact-check looks at. Headings,
- * the sources section, table rules and table headers are skipped. A list
- * marker such as "1." or "-" is not part of a statement, the dot in
- * "12. März", "Mar. 12", "Art. 5" or "z. B." does not end one, a part
+ * the sources section, table rules and table headers are skipped. A table
+ * row is one statement, whatever full stops its cells hold: "feat." or two
+ * sentences in a cell do not break the row apart. A list marker such as
+ * "1." or "-" is not part of a statement, the dot in "12. März", "Mar. 12",
+ * "Art. 5", "z. B." or "feat. Rihanna" does not end one, nor does a dot
+ * inside a bracket that is still open, as in "(approx. 5 weeks)". A part
  * that starts with a comma or a small letter (after "..." inside a quote)
  * continues the sentence, and markers that stand after the full stop
  * belong to the sentence before them.
@@ -20,8 +23,10 @@ final class DraftSentences
     public const MARKER = '/\[\s*e\d+(?:\s*,\s*e\d+)*\s*\]/i';
 
     private const SOURCES = '/^#{1,6}\s*(?:sources?|references?|quellen|literatur|fuentes|referencias|r[ée]f[ée]rences|kaynaklar|kaynak[çc]a)\b/iu';
-    private const ABBREVIATION_END = '/(?:\b(?:Art|Abs|Buchst|Bst|Nr|Ziff|lit|Kap|Rn|Anh|bzw|ca|vgl|ggf|Mio|Mrd|etc|vs|No|Vol|Sec|Ch|pp|ff|Dr|Prof|St|Mr|Mrs|Ms|Mme|cf|al)|\b\p{L}|(?<![\d.])\d{1,2})\.$/u';
+    private const ABBREVIATION_END = '/(?:\b(?:Art|Abs|Buchst|Bst|Nr|Ziff|lit|Kap|Rn|Anh|bzw|ca|vgl|ggf|Mio|Mrd|etc|vs|No|Vol|Sec|Ch|pp|ff|Dr|Prof|St|Mr|Mrs|Ms|Mme|cf|al|feat|Feat)|\b\p{L}|(?<![\d.])\d{1,2})\.$/u';
     private const CONTINUES = '/^(?:[,;:)\]]|\p{Ll})/u';
+    private const LEADING_MARKERS = '/^((?:\[\s*e\d+(?:\s*,\s*e\d+)*\s*\]\s*)+)(.*)$/isu';
+    private const OPEN_BRACKET = '/\([^()]{0,60}$/u';
     private const LIST_MARKER = '/^(?:[-*+•]|\d{1,3}[.)])\s+/u';
     public const TABLE_RULE = '/^\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)*\|?$/';
 
@@ -40,6 +45,10 @@ final class DraftSentences
                 continue;
             }
             if ($inSources || '' === $trimmed || self::isTableRule($trimmed) || self::isTableRule(trim($lines[$index + 1] ?? ''))) {
+                continue;
+            }
+            if (self::isTableRow($trimmed)) {
+                $out[] = $trimmed;
                 continue;
             }
             $trimmed = preg_replace(self::LIST_MARKER, '', $trimmed) ?? $trimmed;
@@ -64,8 +73,20 @@ final class DraftSentences
         $parts = preg_split('/(?<=[.!?])\s+/u', $line, -1, PREG_SPLIT_NO_EMPTY) ?: [];
         $out = [];
         foreach ($parts as $part) {
+            $glue = ' ';
+            // "One. [e1] Two. [e2]" breaks after each full stop, so [e1] opens the second part.
+            if ([] !== $out && 1 === preg_match(self::LEADING_MARKERS, $part, $match)) {
+                $markers = rtrim($match[1]);
+                $out[array_key_last($out)] .= ' '.$markers;
+                // What follows keeps the spacing it had, so the sentence is found in the report again.
+                $glue = $markers === $match[1] ? '' : ' ';
+                $part = $match[2];
+                if ('' === $part) {
+                    continue;
+                }
+            }
             if ([] !== $out && self::dotInsideSentence($out[array_key_last($out)], $part)) {
-                $out[array_key_last($out)] .= ' '.$part;
+                $out[array_key_last($out)] .= $glue.$part;
                 continue;
             }
             $out[] = $part;
@@ -83,9 +104,19 @@ final class DraftSentences
         return trim((string) preg_replace('/\s+/u', ' ', $text));
     }
 
+    /** A line that opens and closes with a pipe: a table header or one of its rows. */
+    public static function isTableRow(string $line): bool
+    {
+        $line = trim($line);
+
+        return str_starts_with($line, '|') && str_ends_with($line, '|') && strlen($line) > 1;
+    }
+
     private static function dotInsideSentence(string $before, string $after): bool
     {
-        if (1 === preg_match(self::CONTINUES, $after) || 1 === preg_match(self::ABBREVIATION_END, $before)) {
+        if (1 === preg_match(self::CONTINUES, $after)
+            || 1 === preg_match(self::ABBREVIATION_END, $before)
+            || 1 === preg_match(self::OPEN_BRACKET, $before)) {
             return true;
         }
 

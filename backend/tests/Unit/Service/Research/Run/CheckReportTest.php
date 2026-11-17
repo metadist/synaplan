@@ -52,6 +52,44 @@ final class CheckReportTest extends TestCase
         self::assertCount(1, $sentences);
     }
 
+    public function testATableRowIsOneStatementWhateverFullStopsItsCellsHold(): void
+    {
+        $row = '| "Run This Town" (feat. Rihanna) | Peaked at No. 2. Won two awards. [e1] |';
+
+        self::assertSame([$row], DraftSentences::split("| Song | Notes |\n|---|---|\n".$row));
+    }
+
+    public function testAnAbbreviationInsideABracketDoesNotSplitTheSentence(): void
+    {
+        $sentences = DraftSentences::split('- "Run This Town" (feat. Rihanna) stayed (approx. Five weeks) in the top 10. [e1] It won two awards. [e2]');
+
+        self::assertSame(['"Run This Town" (feat. Rihanna) stayed (approx. Five weeks) in the top 10. [e1]', 'It won two awards. [e2]'], $sentences);
+    }
+
+    public function testAMarkerAfterTheFullStopBelongsToTheSentenceBeforeIt(): void
+    {
+        $sentences = DraftSentences::split('The fee is 90 EUR. [e2] Income must be 3,480 EUR. [e1][e2] It is due in the top 10. [e3] Nothing else applies.');
+
+        self::assertSame([
+            'The fee is 90 EUR. [e2]',
+            'Income must be 3,480 EUR. [e1][e2]',
+            'It is due in the top 10. [e3]',
+            'Nothing else applies.',
+        ], $sentences);
+    }
+
+    public function testASentenceThatGoesOnAfterAMarkerKeepsItsSpacing(): void
+    {
+        $line = 'It was published in June 2014. [e2], and RFC 9110 is current. [e3]';
+
+        self::assertSame([$line], DraftSentences::split($line));
+    }
+
+    public function testFeatDoesNotEndASentence(): void
+    {
+        self::assertCount(1, DraftSentences::split('"Holy Grail" feat. Justin Timberlake peaked at No. 4. [e1]'));
+    }
+
     public function testABareSentenceHasNoSpaceBeforePunctuation(): void
     {
         self::assertSame('It was published in June 2014, and RFC 9110 is current.', DraftSentences::bare('It was published in June 2014 [e2], and RFC 9110 is current [e3].'));
