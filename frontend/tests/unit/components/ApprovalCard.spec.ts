@@ -42,6 +42,17 @@ describe('ApprovalCard', () => {
     expect(wrapper.find('[data-testid="approval-open-context"]').exists()).toBe(false)
   })
 
+  it('says always allow covers the whole connection for an MCP tool', () => {
+    const mcp = mountCard(approval())
+    expect(mcp.get('[data-testid="approval-always-allow"]').text()).toBe(
+      'Always allow on this connection'
+    )
+    const builtIn = mountCard(approval({ tool: 'email.send' }))
+    expect(builtIn.get('[data-testid="approval-always-allow"]').text()).toBe(
+      'Always allow for this agent'
+    )
+  })
+
   it('uses the singular expiry branch for one hour', () => {
     const wrapper = mountCard(approval({ expiresAt: Math.floor(Date.now() / 1000) + 3600 + 30 }))
     expect(wrapper.get('[data-testid="approval-expires"]').text()).toBe('Expires in 1 hour')

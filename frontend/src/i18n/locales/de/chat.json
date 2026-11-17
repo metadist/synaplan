@@ -1092,6 +1092,7 @@
     "waitingForAnotherAdmin": "Eine andere Person mit Administratorrechten muss zustimmen. Den eigenen Agenten kannst du nicht freigeben.",
     "sharingOff": "Teilen mit allen ist aus, deshalb wurde nichts geteilt.",
     "alwaysAllow": "Für diesen Agenten immer erlauben",
+    "alwaysAllowConnection": "Auf dieser Verbindung immer erlauben",
     "rejectReason": "Warum lehnst du das ab?",
     "rejectReasonPlaceholder": "Optionale Notiz",
     "expired": "Diese Anfrage ist abgelaufen",

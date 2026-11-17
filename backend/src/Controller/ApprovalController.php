@@ -10,6 +10,7 @@ use App\Message\ResumeApprovalCommand;
 use App\Service\AgentTemplate\AgentPublishReview;
 use App\Service\AgentTemplate\Exception\AgentPublishReviewException;
 use App\Service\Email\MailerConfig;
+use App\Service\Mcp\Permissions\McpApprovalAllowance;
 use App\Service\Tool\ApprovalNotFoundException;
 use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ToolsConfig;
@@ -33,6 +34,7 @@ final class ApprovalController extends AbstractController
         private MessageBusInterface $bus,
         private MailerConfig $mailerConfig,
         private AgentPublishReview $reviews,
+        private McpApprovalAllowance $mcpAllowance,
     ) {
     }
 
@@ -129,6 +131,9 @@ final class ApprovalController extends AbstractController
             );
         } catch (ApprovalNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (true === ($payload['alwaysAllow'] ?? false)) {
+            $this->mcpAllowance->grant($approval, $user);
         }
         $this->bus->dispatch(new ResumeApprovalCommand((int) $approval->getId()));
 

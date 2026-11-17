@@ -1094,6 +1094,7 @@
     "waitingForAnotherAdmin": "Another admin has to approve this. You cannot approve your own agent.",
     "sharingOff": "Sharing with everyone is turned off, so nothing was shared.",
     "alwaysAllow": "Always allow for this agent",
+    "alwaysAllowConnection": "Always allow on this connection",
     "rejectReason": "Why are you rejecting this?",
     "rejectReasonPlaceholder": "Optional note",
     "expired": "This request expired",

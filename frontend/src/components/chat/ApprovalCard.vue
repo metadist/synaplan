@@ -40,6 +40,14 @@ const showAlwaysAllow = computed(
     props.approval.sideEffect !== 'destructive'
 )
 
+// For an MCP tool, always allow sets the tool to Auto on its connection, for
+// every chat and agent, not just this one.
+const alwaysAllowLabel = computed(() =>
+  props.approval.tool.startsWith('mcp:')
+    ? 'approvals.alwaysAllowConnection'
+    : 'approvals.alwaysAllow'
+)
+
 const showApprove = computed(() => canDecide.value && props.approval.sideEffect !== 'destructive')
 
 const showReject = computed(() => canDecide.value)
@@ -122,7 +130,7 @@ const onReject = async () => {
         data-testid="approval-always-allow"
         @click="onAlwaysAllow"
       >
-        {{ $t('approvals.alwaysAllow') }}
+        {{ $t(alwaysAllowLabel) }}
       </button>
       <button
         v-if="showOpenContext"
