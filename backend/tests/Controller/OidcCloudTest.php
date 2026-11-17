@@ -61,6 +61,14 @@ final class OidcCloudTest extends WebTestCase
         self::assertSame('http://opencloud-synaplan.cloud.svc:9106/api/synaplan/inbound', $second->getDeliveryUrl());
     }
 
+    public function testACloudInTheOperatorNetworkGetsItsRow(): void
+    {
+        $this->seed('https://10.20.30.40', 'http://synaplan-opencloud:9106');
+
+        self::assertSame(PlatformInstance::STATUS_ACTIVE, $this->row()->getStatus());
+        self::assertSame('10.20.30.40', $this->row()->getHost());
+    }
+
     public function testWithoutTheConfigurationNothingIsWritten(): void
     {
         $seeder = new OidcCloudSeeder(new OidcCloud('', '', ''), $this->instances(), static::getContainer()->get(RedirectUriPolicy::class), static::getContainer()->get(AuditLogWriter::class), static::getContainer()->get(PlatformInstanceSupersession::class));
