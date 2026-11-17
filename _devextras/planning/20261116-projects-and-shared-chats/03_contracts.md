@@ -124,6 +124,47 @@ reason `circling`. A run that keeps finding new things never triggers.
   every compaction and at terminal.
 - A failed compaction ends in a wrap-up, not in an error.
 
+#### 1.5.1 The ledger, the guard and the end of a run
+
+Measured in the PJ2 spike (`STATUS.md`, three two-hour runs on a model with
+an 8,000-token window): notes the model writes itself lose figures and drift;
+a model that is asked to say "done" often does not. These rules replace
+"the model keeps the running result" and "the model ends the run".
+
+- **Ledger.** The run state holds a ledger next to the notes: named
+  values filled from tool results through a declared reducer: `sum`, `max`
+  (with a `ref`), `latest`, `set`. The loop computes them. They are written
+  into every prompt as a block the model reads and never rewrites, and a
+  compaction does not touch them. The list of what is read or done is the
+  loop's too (ranges, not one plan line per item).
+- **Record before continue.** A tool may declare a required follow-up (a
+  read that must be recorded). While one is pending, the loop answers the
+  next call of the first tool with an error that names the pending item. The
+  loop caps these rejections per run (the spike used 40) and then goes on.
+- **Notes stay small.** Plan: at most 5 items, only what is still to do;
+  progress is a counter or a range. The compaction call has an output budget
+  (1,200 tokens in the spike). A summary that reaches it is a failed
+  compaction (the existing wrap-up path), never silently cut.
+- **The loop ends the run.** When the work list is empty and nothing waits
+  to be recorded, the loop makes one call with only `finish` offered and the
+  call required. If that answer is malformed (HTTP 400, `tool_use_failed`),
+  the loop asks once more for the same answer as plain JSON. If that fails
+  too, the run ends in the wrap-up path with what the ledger holds. A
+  `finish` before the work list is empty is answered with an error naming
+  what is missing (the spike capped this at 12).
+- **A step without a tool call** gets a nudge that names the next open
+  item; after five in a row the run ends in the wrap-up path.
+- **A malformed tool call is a retryable step**, never the end of a run.
+  A repeated read is answered from the run's call ledger without a model
+  call (same name, same arguments).
+- **Seen per run** (for AU26 and AH8): compactions and notes size after each,
+  failed compactions, duplicate calls, steps without a tool call, rejected
+  `finish`, guard rejections, malformed calls and their retries, whether the
+  answer came from the required `finish` or the JSON fallback, the ledger,
+  peak prompt tokens against the window.
+- Tests for this: `backend/tests/Eval/ChatLoop/` gains a scripted long task
+  (the spike's document, gold values, no model) and the G7 run uses it.
+
 Between turns: `ConversationSummaryService` stays as it is. In a shared
 chat its input lines carry the author (`[Ana] …`). The chat shows a divider
 at `BCHATSUMMARIES.BUPTOMESSAGEID`.

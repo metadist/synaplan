@@ -8,8 +8,9 @@ to them.
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
 | PJ1 | merged | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
-| PJ2 | in review | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
-| PJ3–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
+| PJ2 | merged | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
+| PJ3 | ready to start | — | §0 #4–#7 agreed by the owner on 2026-11-17; the migration (#63, Ask) still needs its own yes |
+| PJ4–PJ28 | not started | — | every other ☐ and Ask row of §0 still waits; #21 is confirmed by the PJ2 spike, its tick is the owner's |
 
 ---
 
