@@ -6,7 +6,9 @@ import {
   PatchApiMcpServersUpdateResponseSchema,
   DeleteApiMcpServersDeleteResponseSchema,
   PostApiMcpServersTestResponseSchema,
-  GetApiMcpServersToolsResponseSchema,
+  GetApiMcpToolPermissionsListResponseSchema,
+  PutApiMcpToolPermissionsUpdateResponseSchema,
+  PostApiMcpToolPermissionsSeenResponseSchema,
 } from '@/generated/api-schemas'
 
 /**
@@ -23,6 +25,9 @@ export type McpServer = NonNullable<
 export type McpTool = NonNullable<
   z.infer<typeof PostApiMcpServersTestResponseSchema>['tools']
 >[number]
+
+export type ToolPermissionBody =
+  { tools: Record<string, string> } | { category: string; outcome: string }
 
 export interface McpServerPayload {
   name?: string
@@ -106,9 +111,31 @@ export const mcpServersApi = {
   async tools(id: number): Promise<McpTool[]> {
     const data = await httpClient(`/api/v1/mcp-servers/${id}/tools`, {
       method: 'GET',
-      schema: GetApiMcpServersToolsResponseSchema,
+      schema: GetApiMcpToolPermissionsListResponseSchema,
     })
     return data.tools ?? []
+  },
+
+  async toolPermissions(id: number) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tools`, {
+      method: 'GET',
+      schema: GetApiMcpToolPermissionsListResponseSchema,
+    })
+  },
+
+  async setToolPermissions(id: number, body: ToolPermissionBody) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tool-permissions`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      schema: PutApiMcpToolPermissionsUpdateResponseSchema,
+    })
+  },
+
+  async markToolsSeen(id: number) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tool-permissions/seen`, {
+      method: 'POST',
+      schema: PostApiMcpToolPermissionsSeenResponseSchema,
+    })
   },
 
   async startOAuth(id: number): Promise<string> {

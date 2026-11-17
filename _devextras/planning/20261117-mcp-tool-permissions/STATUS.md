@@ -8,7 +8,8 @@ to them.
 | ---- | ----- | -- | ----- |
 | TP0 | done | — | plan written 2026-11-17; §0 #1–#14 decided by the owner, #15–#16 added while building TP1 |
 | TP1 | in review | — | storage, resolution, gate, Notion classes; see below |
-| TP2–TP6 | not started | — | TP2 next |
+| TP2 | in review | — | API, always allow; Notion PATCH stays until TP3 (see below) |
+| TP3–TP6 | not started | — | TP3 next |
 
 ## TP1 notes
 
@@ -20,3 +21,10 @@ to them.
 - Kept on purpose: `McpFetchRunner` stays read-only (refuses any non-read tool). The gateway loops still offer only read tools while approvals are off (unchanged). Both are narrower than the plan text; widen only if the owner wants writes with approvals off.
 - Dead until TP2/TP3: `BALLOWWRITE` / `BWRITEAUTO` and the Notion "The AI may change Notion" switch are ignored by the policy. Between TP1 and TP3 the switch does nothing.
 - Catalog size before/after: not measured yet.
+
+## TP2 notes
+
+- `McpToolPermissionController` owns `GET /api/v1/mcp-servers/{id}/tools` (moved out of `McpServerConfigController`, answer extended and still carries `name` and `description`), `PUT .../tool-permissions` and `POST .../tool-permissions/seen`. Logic: `McpToolPolicyStore` (writes only choices that differ from the class default; every name checked against the discovered tools; unusable tools refuse), `McpToolPermissionView` (rows, `locked_reason`).
+- A member of a shared connection reads the read tools, `can_edit` is false, writes answer 403. A group policy Block shows `locked_reason: group_policy`.
+- "Always allow" on an MCP approval: `McpApprovalAllowance` sets the tool to Auto on the owner's connection. Write tools only, never destructive, never a tool that is Block now. It needs no `assistantKey`; the old per-assistant entry is no longer written for `mcp:` tools.
+- Deviation from the plan table: `PATCH /api/v1/apps/notion` and the `allow_write` / `write_auto` status fields are **not** removed here. The Notion panel still calls them, so removing them would break the UI before TP3 replaces the switch. They are removed in TP3.

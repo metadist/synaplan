@@ -85,7 +85,7 @@ final readonly class ApprovalService
         $approval = $this->requireOwnedPending($id, $actor);
         $approval->markApproved((int) $actor->getId());
         $this->approvals->save($approval);
-        if ($alwaysAllow && $this->canAlwaysAllow($approval) && null !== $assistantKey && '' !== $assistantKey) {
+        if ($alwaysAllow && $this->canAlwaysAllow($approval) && !str_starts_with($approval->getTool(), 'mcp:') && null !== $assistantKey && '' !== $assistantKey) {
             $this->toolsConfig->addAlwaysAllow((int) $actor->getId(), $assistantKey, $approval->getTool());
         }
         $this->auditLogWriter->record(
