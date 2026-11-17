@@ -105,7 +105,7 @@ final readonly class McpActionRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::McpAction,
-                'Perform a WRITE action on one of the user\'s connected external systems — e.g. create a Confluence page, create a Jira ticket. ONLY when the user explicitly asks to create/update something there. Set params.server_id and params.tool from the write-enabled connections listed below; pass the tool arguments in inputs.arguments. ONLY use a server/tool listed below — if none fits, do NOT emit mcp_action.',
+                'Perform a WRITE action on one of the user\'s connected external systems — e.g. create a Confluence page, create a Jira ticket. ONLY when the user explicitly asks to create/update something there. Set params.server_id and params.tool from the connections listed below; pass the tool arguments in inputs.arguments. ONLY use a server/tool listed below — if none fits, do NOT emit mcp_action.',
                 dynamicNote: fn (?int $userId, array $context): ?string => $this->renderToolSubCatalog($userId, $context),
                 planAdjuster: fn (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array => $this->adjustNotionTitlePlan($payload, $messageText, $userId, $allowed, $topic),
                 enabledFlag: MultitaskRoutingConfig::KEY_MCP_ACTION_ENABLED,
@@ -524,13 +524,7 @@ final readonly class McpActionRunner implements TaskRunner
      */
     private function isBlocked(McpServerConfig $server, array $tool): bool
     {
-        $annotations = $tool['annotations'];
-        $class = SideEffect::fromHints(
-            isset($annotations['readOnlyHint']) ? (bool) $annotations['readOnlyHint'] : null,
-            isset($annotations['destructiveHint']) ? (bool) $annotations['destructiveHint'] : null,
-        );
-
-        return PolicyOutcome::Block === $this->permissions->outcome($server, $tool['name'], $class);
+        return PolicyOutcome::Block === $this->permissions->outcomeForTool($server, $tool);
     }
 
     /**
