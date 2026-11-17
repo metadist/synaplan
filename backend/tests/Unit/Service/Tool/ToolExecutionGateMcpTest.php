@@ -76,10 +76,13 @@ final class ToolExecutionGateMcpTest extends TestCase
     {
         $approval = $this->createStub(Approval::class);
         $approvals = $this->createMock(ApprovalService::class);
-        $approvals->expects(self::once())->method('request')->willReturn($approval);
+        $approvals->expects(self::once())->method('request')
+            ->with(self::callback(static fn (ToolDescriptor $d): bool => SideEffect::Destructive === $d->sideEffect))
+            ->willReturn($approval);
 
         $decision = $this->inspect('auto', approvalsOn: true, approvals: $approvals, tool: 'notion-update-page', args: ['command' => 'replace_content']);
         self::assertSame(PolicyOutcome::Approve, $decision['outcome']);
+        self::assertSame(SideEffect::Destructive, $decision['descriptor']->sideEffect, 'a deleting call is asked for as destructive, so no "always allow"');
 
         self::assertSame(
             PolicyOutcome::Auto,

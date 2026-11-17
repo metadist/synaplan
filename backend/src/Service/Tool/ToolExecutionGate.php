@@ -103,6 +103,8 @@ final readonly class ToolExecutionGate
             ];
         }
 
+        $deletesContent = $this->deletesContent($descriptor, $args);
+        $descriptor = $this->classedForCall($descriptor, $deletesContent);
         $outcome = $this->approvalPolicy->decide(
             $descriptor,
             $userId,
@@ -111,7 +113,7 @@ final readonly class ToolExecutionGate
             $allowUnattended,
             $assistantKey,
             $nodeOverride,
-            $this->deletesContent($descriptor, $args),
+            $deletesContent,
         );
         if ($requireApproval && PolicyOutcome::Auto === $outcome) {
             $outcome = PolicyOutcome::Approve;
@@ -150,6 +152,30 @@ final readonly class ToolExecutionGate
             'approval' => null,
             'refusal' => $refusal,
         ];
+    }
+
+    /**
+     * A call that deletes content is a destructive call, whatever the tool's
+     * class: policy, approval and audit see it as such, and its approval
+     * offers no "always allow".
+     */
+    private function classedForCall(ToolDescriptor $descriptor, bool $deletesContent): ToolDescriptor
+    {
+        if (!$deletesContent || SideEffect::Destructive === $descriptor->sideEffect) {
+            return $descriptor;
+        }
+
+        return new ToolDescriptor(
+            $descriptor->name,
+            $descriptor->title,
+            $descriptor->description,
+            $descriptor->inputSchema,
+            SideEffect::Destructive,
+            $descriptor->source,
+            $descriptor->ownerId,
+            $descriptor->policyException,
+            $descriptor->meta,
+        );
     }
 
     /**

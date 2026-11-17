@@ -16,11 +16,12 @@ use App\Service\Tool\SideEffect;
  * follow the class default (read and write auto, destructive approve). A tool
  * that cannot work through a tool call is block and cannot be changed.
  *
- * Fails closed: a stored policy that cannot be read, or a stored value that
- * is not one of the three outcomes, makes the affected tools ask (approve)
+ * Fails closed: a stored policy that cannot be read makes every tool of the
+ * connection ask (approve), read tools included, because it may hide a Block.
+ * A stored value that is not one of the three outcomes makes that tool ask
  * instead of silently falling back to the more permissive default.
  */
-final class McpToolPermissions
+final readonly class McpToolPermissions
 {
     public function defaultFor(SideEffect $class): PolicyOutcome
     {
@@ -39,13 +40,44 @@ final class McpToolPermissions
         }
         $stored = $this->stored($server);
         if (null === $stored) {
-            return SideEffect::Read === $class ? PolicyOutcome::Auto : PolicyOutcome::Approve;
+            return PolicyOutcome::Approve;
         }
         if (!array_key_exists($tool, $stored)) {
             return $this->defaultFor($class);
         }
 
         return PolicyOutcome::tryFrom($stored[$tool]) ?? PolicyOutcome::Approve;
+    }
+
+    /**
+     * Outcome for a catalog entry, classed by the server's own hints.
+     *
+     * @param array{name: string, annotations: array<string, mixed>} $tool
+     */
+    public function outcomeForTool(McpServerConfig $server, array $tool): PolicyOutcome
+    {
+        return $this->outcome($server, $tool['name'], self::classOf($tool['annotations']));
+    }
+
+    /**
+     * True when the owner set this tool to Block. Needs no class, because no
+     * class defaults to Block. Unusable tools are not counted: the app itself
+     * still runs them for file transfers, only the AI may not.
+     */
+    public function isBlockedByOwner(McpServerConfig $server, string $tool): bool
+    {
+        return PolicyOutcome::Block === ($this->overrides($server)[$tool] ?? null);
+    }
+
+    /**
+     * @param array<string, mixed> $annotations
+     */
+    public static function classOf(array $annotations): SideEffect
+    {
+        return SideEffect::fromHints(
+            isset($annotations['readOnlyHint']) ? (bool) $annotations['readOnlyHint'] : null,
+            isset($annotations['destructiveHint']) ? (bool) $annotations['destructiveHint'] : null,
+        );
     }
 
     /**
