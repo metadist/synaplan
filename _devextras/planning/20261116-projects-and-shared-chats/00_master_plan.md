@@ -88,10 +88,10 @@ proposal and wait for a tick. **Ask** rows are ask-first by `AGENTS.md`.
 | 1 | Projects exist: a name, sources, instructions, chats, later members. | As written | Yes — owner |
 | 2 | No project templates. | None | Yes — owner |
 | 3 | Sources: files, images and screenshots, links, pasted text. Indexed once on insert; a chat searches them, it does not re-read them. | As written | Yes — owner |
-| 4 | A project's sources are a knowledge folder (`BFILES.BGROUPKEY`, `BRAG`). No second store, no second search. | Reuse | ☐ |
-| 5 | A link is a snapshot of the page at the time it was added. "Refresh" fetches it again. No automatic watching in v1. | Snapshot | ☐ |
-| 6 | Where projects live: a "Projects" section in the Chats panel and a project page. No new rail item (U2). | Chats panel | ☐ |
-| 7 | A chat can be moved into a project and out of it. Moving out removes access to the project's sources and memory for later turns. | Movable | ☐ |
+| 4 | A project's sources are a knowledge folder (`BFILES.BGROUPKEY`, `BRAG`). No second store, no second search. | Reuse | Yes — owner, 2026-11-17 |
+| 5 | A link is a snapshot of the page at the time it was added. "Refresh" fetches it again. No automatic watching in v1. | Snapshot | Yes — owner, 2026-11-17 |
+| 6 | Where projects live: a "Projects" section in the Chats panel and a project page. No new rail item (U2). | Chats panel | Yes — owner, 2026-11-17 |
+| 7 | A chat can be moved into a project and out of it. Moving out removes access to the project's sources and memory for later turns. | Movable | Yes — owner, 2026-11-17 |
 
 ### The chat that works as long as it needs
 
