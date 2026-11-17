@@ -109,7 +109,6 @@ test.describe('@ci MCP sign-in to your own server', () => {
       oauth_status: status,
       oauth_sign_in_host: host,
       enabled: true,
-      allow_write: false,
       created: '20261027120000',
       updated: '20261027120000',
     })

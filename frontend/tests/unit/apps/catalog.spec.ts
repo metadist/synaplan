@@ -44,8 +44,6 @@ vi.mock('@/services/api/notionAppApi', async () => {
           success: true,
           status: 'not_connected',
           server_id: null,
-          allow_write: false,
-          write_auto: false,
         }
       },
     },

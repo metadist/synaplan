@@ -428,9 +428,57 @@
       "unknown": "Oturum açma başlatılamadı. Yeniden deneyin veya sunucuyu yöneten kişiye sorun."
     },
     "savedSignInNotStarted": "\"{name}\" kaydedildi. Oturum açma başlamadı: {reason}",
-    "allowWriteLabel": "Yazma eylemlerine izin ver (oluşturma/güncelleme)",
-    "allowWriteHint": "Etkinleştirildiğinde yapay zekâ, siz istediğinizde bu sistemde içerik oluşturabilir veya güncelleyebilir. Silme eylemlerine asla izin verilmez.",
-    "writeBadge": "Yazma izinli"
+    "permissions": {
+      "open": "İzinler",
+      "hide": "İzinleri gizle",
+      "overviewTab": "Genel bakış",
+      "permissionsTab": "İzinler",
+      "title": "Araç izinleri",
+      "intro": "Yapay zekânın bu araçları ne zaman kullanabileceğini seçin. Kayıtlı görevler ve iş akışları, adım izin vermedikçe yazmadan önce yine sorar.",
+      "category": {
+        "read": "Okuma araçları",
+        "write": "Yazma araçları",
+        "destructive": "Yıkıcı araçlar",
+        "unavailable": "Kullanılamıyor"
+      },
+      "outcome": {
+        "auto": "Otomatik",
+        "approve": "Onay",
+        "block": "Engelle",
+        "mixed": "Karışık"
+      },
+      "outcomeHint": {
+        "auto": "Sormadan çalışır",
+        "approve": "Önce size sorar",
+        "block": "Hiç çalışmaz"
+      },
+      "categoryLabel": "Tümünü ayarla: {category}",
+      "toolLabel": "{tool} için izin",
+      "changed": "Değişti",
+      "new": "Yeni",
+      "showMore": "Daha fazla göster",
+      "showLess": "Daha az göster",
+      "inputs": "1 girdi alır | {count} girdi alır",
+      "inputNames": "Girdiler: {names}",
+      "noHints": "Sunucu bu aracın neyi değiştirdiğini belirtmiyor.",
+      "locked": {
+        "group_policy": "Bir yöneticinin ilkesi bu aracı engelliyor.",
+        "shared": "Sizinle paylaşıldı. Bu izinleri yalnızca sahibi değiştirebilir.",
+        "unavailable": "Sohbette bir araç çağrısı üzerinden çalışmaz."
+      },
+      "saved": "{tool}, {outcome} olarak ayarlandı.",
+      "categorySaved": "{count} araç {outcome} olarak ayarlandı. | {count} araç {outcome} olarak ayarlandı.",
+      "undo": "Geri al",
+      "saveFailed": "İzin kaydedilmedi. Hiçbir şey değişmedi. Tekrar deneyin.",
+      "confirmTitle": "Yapay zekâ sormadan silebilsin mi?",
+      "confirmMessage": "Yapay zekâ, size sormadan {connection} içinde silecek veya üzerine yazacak. Devam edilsin mi?",
+      "confirmAction": "Otomatik yap",
+      "loading": "Araçlar yükleniyor…",
+      "loadFailed": "Bu bağlantının araçları yüklenemedi. Hiçbir şey değişmedi.",
+      "retry": "Tekrar dene",
+      "empty": "Bu bağlantı henüz araç sunmuyor. Oturum açıldığından emin olun ve yeniden yükleyin.",
+      "clientOff": "MCP çağrıları kapalı, bu yüzden burada ayarlanacak bir şey yok. İzinleri yönetmek için açın."
+    }
   },
   "messagesGateway": {
     "title": "Kodlama aracınızı bağlayın",
@@ -1056,12 +1104,6 @@
       "connectedAs": "{workspace} Notion çalışma alanında {account} olarak oturum açıldı.",
       "connectedAsAccount": "Notion'da {account} olarak oturum açıldı.",
       "scope": "Yapay zeka yalnızca bu Notion hesabının görebildiklerini görür.",
-      "writeLabel": "Yapay zeka Notion'da değişiklik yapabilir",
-      "writeOn": "Yapay zeka her seferinde sormadan Notion'da sayfa oluşturabilir ve düzenleyebilir. Sayfa silemez, taşıyamaz veya üzerine yazamaz.",
-      "writeOff": "Yapay zeka Notion'u okuyabilir. Hiçbir şeyi değiştirmez.",
-      "writeSavedOn": "Yapay zeka artık sormadan Notion sayfaları oluşturabilir ve düzenleyebilir. Yine de sayfa silemez, taşıyamaz veya üzerine yazamaz.",
-      "writeSavedOff": "Yazma kapalı. Yapay zeka Notion'u okumaya devam eder ve hiçbir şeyi değiştirmez.",
-      "writeFailed": "Ayar kaydedilmedi. Notion değişmedi. Yeniden deneyin.",
       "examplesTitle": "Sohbette bunlardan birini deneyin",
       "exampleRead": "Yol haritası sayfamı özetle",
       "exampleWrite": "Toplantı notları adında bir sayfa oluştur",

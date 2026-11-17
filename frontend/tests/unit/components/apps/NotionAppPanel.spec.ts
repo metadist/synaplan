@@ -6,15 +6,12 @@ const status = {
   success: true,
   status: 'not_connected' as 'not_connected' | 'connected' | 'reauth_required',
   server_id: null as number | null,
-  allow_write: false,
-  write_auto: false,
   sharing: { shared_by: null as string | null, can_share: false, shared_on: false },
 }
 
 const {
   statusMock,
   accountMock,
-  setWriting,
   connect,
   disconnectOAuth,
   confirm,
@@ -26,7 +23,6 @@ const {
 } = vi.hoisted(() => ({
   statusMock: vi.fn(),
   accountMock: vi.fn(),
-  setWriting: vi.fn(),
   connect: vi.fn(),
   disconnectOAuth: vi.fn(),
   confirm: vi.fn(),
@@ -41,7 +37,6 @@ vi.mock('@/services/api/notionAppApi', () => ({
   notionAppApi: {
     status: statusMock,
     account: accountMock,
-    setWriting,
     connect,
     setShared,
     useShared,
@@ -74,8 +69,6 @@ describe('NotionAppPanel', () => {
     vi.clearAllMocks()
     status.status = 'not_connected'
     status.server_id = null
-    status.allow_write = false
-    status.write_auto = false
     status.sharing = { shared_by: null, can_share: false, shared_on: false }
     statusMock.mockImplementation(async () => ({ ...status }))
     accountMock.mockResolvedValue({
@@ -110,7 +103,7 @@ describe('NotionAppPanel', () => {
     const wrapper = await mountPanel()
 
     expect(wrapper.get('[data-testid="text-notion-account"]').text()).toBe('Notion is connected.')
-    expect(wrapper.find('[data-testid="toggle-notion-write"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-notion-permissions"]').exists()).toBe(true)
   })
 
   it('does not ask Notion for the account before it is connected', async () => {
@@ -124,7 +117,7 @@ describe('NotionAppPanel', () => {
       'Connect Notion so the AI can read your pages in chat.'
     )
     expect(wrapper.get('[data-testid="btn-notion-connect"]').text()).toBe('Connect Notion')
-    expect(wrapper.find('[data-testid="toggle-notion-write"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-notion-permissions"]').exists()).toBe(false)
   })
 
   it('asks to connect again when the session expired', async () => {
@@ -137,28 +130,14 @@ describe('NotionAppPanel', () => {
     expect(wrapper.get('[data-testid="btn-notion-reconnect"]').text()).toBe('Connect again')
   })
 
-  it('turns writing on and shows what the AI may and may not do', async () => {
+  it('has no write switch: tool permissions live on their own tab', async () => {
     status.status = 'connected'
     status.server_id = 4
-    setWriting.mockImplementation(async (allow: boolean) => ({
-      ...status,
-      status: 'connected',
-      allow_write: allow,
-      write_auto: allow,
-    }))
     const wrapper = await mountPanel()
-    expect(wrapper.get('[data-testid="text-notion-write-consequence"]').text()).toContain(
-      'will not change anything'
-    )
 
-    await wrapper.get('[data-testid="toggle-notion-write"]').setValue(true)
-    await flushPromises()
-
-    expect(setWriting).toHaveBeenCalledWith(true)
-    expect(wrapper.get('[data-testid="text-notion-write-consequence"]').text()).toContain(
-      'cannot delete, move or overwrite pages'
-    )
-    expect(success).toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="toggle-notion-write"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="tab-notion-overview"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="tab-notion-permissions"]').exists()).toBe(true)
   })
 
   it('opens chat with an example and disconnects from the same card', async () => {

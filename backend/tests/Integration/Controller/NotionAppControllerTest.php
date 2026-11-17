@@ -140,9 +140,8 @@ class NotionAppControllerTest extends WebTestCase
         self::assertNull($noAccount['workspace_name']);
         self::assertNull($noAccount['user_email']);
 
-        $missing = $this->request('PATCH', '/api/v1/apps/notion', ['allow_write' => true]);
-        self::assertSame(Response::HTTP_BAD_REQUEST, $this->client->getResponse()->getStatusCode());
-        self::assertStringContainsString('Connect Notion first', (string) $missing['error']);
+        $this->request('PATCH', '/api/v1/apps/notion', ['allow_write' => true]);
+        self::assertSame(Response::HTTP_METHOD_NOT_ALLOWED, $this->client->getResponse()->getStatusCode());
 
         $em = $this->client->getContainer()->get('doctrine')->getManager();
         /** @var EncryptionService $encryption */
@@ -164,17 +163,9 @@ class NotionAppControllerTest extends WebTestCase
 
         $connected = $this->request('GET', '/api/v1/apps/notion');
         self::assertSame('connected', $connected['status']);
-        self::assertFalse($connected['allow_write']);
-        self::assertFalse($connected['write_auto']);
-
-        $writing = $this->request('PATCH', '/api/v1/apps/notion', ['allow_write' => true]);
-        self::assertTrue($writing['allow_write']);
-        self::assertTrue($writing['write_auto']);
-
-        $stopped = $this->request('PATCH', '/api/v1/apps/notion', ['allow_write' => false]);
-        self::assertFalse($stopped['allow_write']);
-        self::assertFalse($stopped['write_auto']);
-        self::assertSame(['shared_by' => null, 'can_share' => false, 'shared_on' => false], $stopped['sharing']);
+        self::assertArrayNotHasKey('allow_write', $connected);
+        self::assertArrayNotHasKey('write_auto', $connected);
+        self::assertSame(['shared_by' => null, 'can_share' => false, 'shared_on' => false], $connected['sharing']);
 
         $sharing = $this->request('PATCH', '/api/v1/apps/notion/sharing', ['shared' => true]);
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);

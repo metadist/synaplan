@@ -9,7 +9,8 @@ to them.
 | TP0 | done | — | plan written 2026-11-17; §0 #1–#14 decided by the owner, #15–#16 added while building TP1 |
 | TP1 | in review | — | storage, resolution, gate, Notion classes; see below |
 | TP2 | in review | — | API, always allow; Notion PATCH stays until TP3 (see below) |
-| TP3–TP6 | not started | — | TP3 next |
+| TP3 | in review | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
+| TP4–TP6 | not started | — | TP4 next |
 
 ## TP1 notes
 
@@ -29,3 +30,10 @@ to them.
 - A write never loosens what applies now: an unknown stored value or an unreadable policy (both ask today) is written out as `approve` instead of being dropped to the default. `seen` keeps the newest 1000 names. A member of a shared connection never sees `is_new`.
 - "Always allow" on an MCP approval: `McpApprovalAllowance` sets the tool to Auto on the owner's connection. Write tools only, never destructive, never a tool that is Block now. It needs no `assistantKey`; the old per-assistant entry is no longer written for `mcp:` tools. A failure is logged and does not stop the resumed run. The card says "Always allow on this connection" for MCP tools.
 - Deviation from the plan table: `PATCH /api/v1/apps/notion` and the `allow_write` / `write_auto` status fields are **not** removed here. The Notion panel still calls them, so removing them would break the UI before TP3 replaces the switch. They are removed in TP3.
+
+## TP3 notes
+
+- Removed `PATCH /api/v1/apps/notion` and the `allow_write` / `write_auto` status fields, plus the Notion write switch and the MCP page "allow write" checkbox and badge (decision #12). `BALLOWWRITE` / `BWRITEAUTO` stay in the entity until TP6.
+- Deviation: the MCP page opens permissions from a per-row "Permissions" button (inline panel, deep link `?server=ID&tab=permissions`) instead of formal Overview/Permissions tabs, so `McpServersConfiguration.vue` does not grow. The Notion panel uses real tabs.
+- A member who only uses an organisation-shared Notion connection has no connection of their own and sees no permissions tab yet.
+- The one-time notice (decision #13) is TP4.

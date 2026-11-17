@@ -1,0 +1,126 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount } from '@vue/test-utils'
+import { createI18n } from 'vue-i18n'
+import McpToolPermissions from '@/components/config/mcp/McpToolPermissions.vue'
+import tools from '@/i18n/locales/en/tools.json'
+
+const { toolPermissions, setToolPermissions, markToolsSeen, confirm, push, error } = vi.hoisted(
+  () => ({
+    toolPermissions: vi.fn(),
+    setToolPermissions: vi.fn(),
+    markToolsSeen: vi.fn(),
+    confirm: vi.fn(),
+    push: vi.fn(),
+    error: vi.fn(),
+  })
+)
+
+vi.mock('@/services/api/mcpServersApi', () => ({
+  mcpServersApi: { toolPermissions, setToolPermissions, markToolsSeen },
+}))
+vi.mock('@/composables/useDialog', () => ({ useDialog: () => ({ confirm }) }))
+vi.mock('@/composables/useNotification', () => ({ useNotification: () => ({ push, error }) }))
+
+const tool = (over: Record<string, unknown> = {}) => ({
+  name: 'search',
+  title: 'Search',
+  description: 'Find pages',
+  input_count: 1,
+  input_names: ['query'],
+  category: 'read',
+  outcome: 'auto',
+  default_outcome: 'auto',
+  hinted: true,
+  is_new: false,
+  locked_reason: null,
+  ...over,
+})
+
+const list = (tools: unknown[], canEdit = true) => ({
+  success: true,
+  error: null,
+  can_edit: canEdit,
+  tools,
+})
+
+const mountIt = async () => {
+  const i18n = createI18n({ legacy: false, locale: 'en', messages: { en: tools } })
+  const wrapper = mount(McpToolPermissions, {
+    props: { serverId: 4, serverName: 'Notion' },
+    global: { plugins: [i18n] },
+  })
+  await flushPromises()
+  return wrapper
+}
+
+describe('McpToolPermissions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    markToolsSeen.mockResolvedValue(undefined)
+  })
+
+  it('shows a retry when the list cannot be loaded', async () => {
+    toolPermissions.mockRejectedValue(new Error('down'))
+    const wrapper = await mountIt()
+    expect(wrapper.find('[data-testid="mcp-permissions-error"]').exists()).toBe(true)
+    toolPermissions.mockResolvedValue(list([tool()]))
+    await wrapper.get('[data-testid="btn-mcp-permissions-retry"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="mcp-permissions-error"]').exists()).toBe(false)
+  })
+
+  it('says so when the connection has no tools', async () => {
+    toolPermissions.mockResolvedValue(list([]))
+    const wrapper = await mountIt()
+    expect(wrapper.find('[data-testid="mcp-permissions-empty"]').exists()).toBe(true)
+  })
+
+  it('marks new tools as seen only for an editor', async () => {
+    toolPermissions.mockResolvedValue(list([tool({ is_new: true })]))
+    await mountIt()
+    expect(markToolsSeen).toHaveBeenCalledWith(4)
+
+    markToolsSeen.mockClear()
+    toolPermissions.mockResolvedValue(list([tool({ is_new: true })], false))
+    await mountIt()
+    expect(markToolsSeen).not.toHaveBeenCalled()
+  })
+
+  it('asks before a destructive tool is set to auto and keeps it on no', async () => {
+    const destructive = tool({
+      name: 'delete-pages',
+      title: 'Delete pages',
+      category: 'destructive',
+      outcome: 'approve',
+      default_outcome: 'approve',
+    })
+    toolPermissions.mockResolvedValue(list([destructive]))
+    confirm.mockResolvedValue(false)
+    const wrapper = await mountIt()
+
+    const selects = wrapper.findAll('select')
+    await selects[selects.length - 1].setValue('auto')
+    await flushPromises()
+
+    expect(confirm).toHaveBeenCalled()
+    expect(setToolPermissions).not.toHaveBeenCalled()
+  })
+
+  it('saves a change at once and offers undo with the previous choice', async () => {
+    toolPermissions.mockResolvedValue(list([tool()]))
+    setToolPermissions.mockResolvedValue(list([tool({ outcome: 'block' })]))
+    const wrapper = await mountIt()
+
+    const selects = wrapper.findAll('select')
+    await selects[selects.length - 1].setValue('block')
+    await flushPromises()
+
+    expect(setToolPermissions).toHaveBeenCalledWith(4, { tools: { search: 'block' } })
+    const toast = push.mock.calls[0][0]
+    expect(toast.action.label).toBeTruthy()
+    setToolPermissions.mockResolvedValue(list([tool()]))
+    toast.action.onClick()
+    await flushPromises()
+    expect(setToolPermissions).toHaveBeenLastCalledWith(4, { tools: { search: 'auto' } })
+  })
+})
