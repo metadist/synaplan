@@ -49,7 +49,9 @@ $maxCost = (float) ($o['max-cost'] ?? 1.00);
 $maxSteps = (int) ($o['max-steps'] ?? 260);
 $seed = (int) ($o['seed'] ?? 7);
 $guardFinish = (bool) (int) ($o['guard-finish'] ?? 0);
-// 1: the first prototype. 2: the changes the first run called for (short plan,
+// 3: as 2, plus named values the loop keeps verbatim (tool `note`), a ledger
+// of read sections the loop writes into every prompt, and a forced `finish`
+// once the work list is empty. 1: the first prototype. 2: the changes the first run called for (short plan,
 // running values as facts, summary size check, repeat calls from the ledger).
 $contract = (int) ($o['contract'] ?? 1);
 $key = getenv('GROQ_API_KEY');
@@ -113,8 +115,8 @@ $call = static function (array $body) use ($http, $key, &$cost, &$calls, $emit):
 
             return ['message' => $data['choices'][0]['message'] ?? [], 'in' => $in, 'out' => $out, 'finish' => $data['choices'][0]['finish_reason'] ?? null];
         }
-        $emit(['event' => 'retry', 'try' => $try, 'http' => $status]);
-        sleep(15 * $try);
+        $emit(['event' => 'retry', 'try' => $try, 'http' => $status, 'error' => mb_substr((string) ($data['error']['message'] ?? ''), 0, 260), 'code' => $data['error']['code'] ?? null]);
+        sleep(5 * $try);
     }
 
     return null;
@@ -124,19 +126,52 @@ $estimate = static fn (array $messages): int => (int) ceil(mb_strlen(json_encode
 
 // ---- the run ---------------------------------------------------------------
 $system = 'You work through a long document one section at a time with the tool read_section. Your working memory is small. A message that starts with NOTES is your own summary of earlier work: trust it, and never read a section again that the notes say you read. When every section is read, call finish with the final answer.';
+if (3 === $contract) {
+    $system .= ' After you read a section, call record(section, supplier, amount, code_word if the section prints one) before the next read. The system keeps the ledger of recorded sections and the totals, and shows them in every prompt as VALUES; you do not add anything yourself. When all sections are read and recorded, call finish with the answer from VALUES.';
+}
 $goal = "Read sections 1 to $sections, one at a time, in order. Then call finish with: (1) total_nordholz, the sum of the amounts of all sections whose supplier is Nordholz; (2) top_section, the number of the section with the highest amount; (3) code_word, the code word printed in section 3.";
 $tools = [
     ['type' => 'function', 'function' => ['name' => 'read_section', 'description' => 'Returns the text of one section.', 'parameters' => ['type' => 'object', 'properties' => ['n' => ['type' => 'integer']], 'required' => ['n']]]],
+    ['type' => 'function', 'function' => ['name' => 'note', 'description' => 'Stores a named value; it replaces the old value of that name.', 'parameters' => ['type' => 'object', 'properties' => ['name' => ['type' => 'string'], 'value' => ['type' => 'string']], 'required' => ['name', 'value']]]],
+    ['type' => 'function', 'function' => ['name' => 'record', 'description' => 'Records the figures of one section you just read in the system ledger. The system keeps the totals.', 'parameters' => ['type' => 'object', 'properties' => ['section' => ['type' => 'integer'], 'supplier' => ['type' => 'string'], 'amount' => ['type' => 'integer'], 'code_word' => ['type' => 'string']], 'required' => ['section', 'supplier', 'amount']]]],
     ['type' => 'function', 'function' => ['name' => 'finish', 'description' => 'Ends the run with the final answer.', 'parameters' => ['type' => 'object', 'properties' => ['total_nordholz' => ['type' => 'integer'], 'top_section' => ['type' => 'integer'], 'code_word' => ['type' => 'string']], 'required' => ['total_nordholz', 'top_section', 'code_word']]]],
 ];
 $checkpoint = sys_get_temp_dir().'/pj2-'.$label.'.json';
-$state = ['notes' => null, 'steps' => [], 'read' => [], 'compactions' => 0, 'dup' => 0, 'answer' => null, 'end' => null, 'maxPrompt' => 0, 'nudges' => 0, 'rejected' => 0];
+$state = ['notes' => null, 'steps' => [], 'read' => [], 'compactions' => 0, 'dup' => 0, 'answer' => null, 'end' => null, 'maxPrompt' => 0, 'nudges' => 0, 'rejected' => 0, 'values' => [], 'postRead' => 0, 'rows' => [], 'pending' => null, 'pendingRejected' => 0];
 file_put_contents($checkpoint, json_encode($state));
 
 $build = static function (array $state) use ($system, $goal): array {
     $messages = [['role' => 'system', 'content' => $system], ['role' => 'user', 'content' => $goal]];
     if (null !== $state['notes']) {
         $messages[] = ['role' => 'user', 'content' => "NOTES (your summary of earlier work):\n".json_encode($state['notes'], JSON_UNESCAPED_UNICODE)];
+    }
+    if (3 === $GLOBALS['contract']) {
+        $read = array_keys($state['read']);
+        sort($read);
+        $ranges = [];
+        foreach ($read as $n) {
+            $last = \count($ranges) - 1;
+            if ($last >= 0 && $ranges[$last][1] === $n - 1) {
+                $ranges[$last][1] = $n;
+            } else {
+                $ranges[] = [$n, $n];
+            }
+        }
+        $totals = [];
+        $top = null;
+        $code = null;
+        foreach ($state['rows'] as $sec => $row) {
+            $totals[$row['supplier']] = ($totals[$row['supplier']] ?? 0) + $row['amount'];
+            if (null === $top || $row['amount'] > $top['amount']) {
+                $top = ['section' => $sec, 'amount' => $row['amount']];
+            }
+            if ('' !== $row['code']) {
+                $code = $row['code'];
+            }
+        }
+        $values = ['recorded_sections' => \count($state['rows']), 'totals_by_supplier' => (object) $totals, 'highest_amount' => $top, 'code_word' => $code];
+        $ledger = implode(', ', array_map(static fn (array $r): string => $r[0] === $r[1] ? (string) $r[0] : $r[0].'-'.$r[1], $ranges));
+        $messages[] = ['role' => 'user', 'content' => "LEDGER (kept by the system): sections read: ".('' === $ledger ? 'none' : $ledger).".\nVALUES (kept by the system, exact): ".json_encode($values, JSON_UNESCAPED_UNICODE)];
     }
     foreach ($state['steps'] as $step) {
         foreach ($step as $message) {
@@ -165,17 +200,19 @@ for ($i = 0; $i < $maxSteps; ++$i) {
         }
         $result = $call([
             'messages' => [
-                ['role' => 'system', 'content' => 2 === $contract
+                ['role' => 'system', 'content' => 3 === $contract
+                    ? 'You compact the work of an agent into notes so it can continue with a small memory. Reply with one JSON object only: {"goal": string, "plan": [{"text": string, "state": "doing|open"}], "decisions": [string], "open": [string], "facts": [{"text": string, "ref": string}]}. Rules: the plan has at most 5 items and lists only what is still to do; the system keeps the running values and the list of read sections itself, so do not put sums, maxima or section lists in the notes; facts holds only other things that must survive. Keep the whole object under 1000 characters.'
+                    : (2 === $contract
                     ? 'You compact the work of an agent into notes so it can continue with a small memory. Reply with one JSON object only: {"goal": string, "progress": string, "plan": [{"text": string, "state": "doing|open"}], "facts": [{"text": string, "ref": string}], "decisions": [string], "open": [string]}. Rules: the plan has at most 5 items and lists only what is still to do, never one item per section; progress is one short line such as "sections 1-37 read"; facts holds the running results the goal needs as single values (for example the sum so far of the amounts of one supplier, the highest amount so far with its section number, a code word), and you update each value, you do not list rows to add up again. Do not copy page text. Keep the whole object under 1500 characters.'
-                    : 'You compact the work of an agent into notes so it can continue with a small memory. Reply with one JSON object only: {"goal": string, "plan": [{"text": string, "state": "done|doing|open"}], "facts": [{"text": string, "ref": string}], "decisions": [string], "open": [string]}. Keep every exact figure, name and number the goal needs, and which sections were read. A ref names the section a fact came from. Do not copy page text.'],
+                    : 'You compact the work of an agent into notes so it can continue with a small memory. Reply with one JSON object only: {"goal": string, "plan": [{"text": string, "state": "done|doing|open"}], "facts": [{"text": string, "ref": string}], "decisions": [string], "open": [string]}. Keep every exact figure, name and number the goal needs, and which sections were read. A ref names the section a fact came from. Do not copy page text.'),],
                 ['role' => 'user', 'content' => "GOAL:\n$goal\n\nNOTES SO FAR:\n".json_encode($state['notes'], JSON_UNESCAPED_UNICODE)."\n\nTRANSCRIPT TO REPLACE:\n".json_encode($transcript, JSON_UNESCAPED_UNICODE)],
             ],
             'response_format' => ['type' => 'json_object'],
-            'max_completion_tokens' => 2 === $contract ? 1200 : 2500,
+            'max_completion_tokens' => $contract >= 2 ? 1200 : 2500,
             'reasoning_effort' => 'low',
         ]);
         $notes = null === $result ? null : json_decode((string) ($result['message']['content'] ?? ''), true);
-        if (2 === $contract && null !== $result && $result['out'] >= 1200) {
+        if ($contract >= 2 && null !== $result && $result['out'] >= 1200) {
             $notes = null; // a summary that hits its budget is a failed compaction
         }
         if (!\is_array($notes) || !isset($notes['goal'], $notes['facts']) || !\is_array($notes['facts'])) {
@@ -191,7 +228,30 @@ for ($i = 0; $i < $maxSteps; ++$i) {
         file_put_contents($checkpoint, json_encode($state));
     }
 
-    $result = $call(['messages' => $messages, 'tools' => $tools, 'tool_choice' => 'auto', 'parallel_tool_calls' => false, 'max_completion_tokens' => 1200, 'reasoning_effort' => 'low']);
+    $toolChoice = 'auto';
+    $offered = $tools;
+    if (3 === $contract && \count($state['read']) === $sections) {
+        ++$state['postRead'];
+        if (($state['postRead'] >= 3 && null === $state['pending']) || $state['postRead'] >= 10) {
+            // the work list is empty: ask for the answer instead of waiting for it
+            $toolChoice = 'required';
+            $offered = [$tools[3]]; // only `finish` is offered
+            $emit(['event' => 'finish_forced']);
+        }
+    }
+    $result = $call(['messages' => $messages, 'tools' => $offered, 'tool_choice' => $toolChoice, 'parallel_tool_calls' => false, 'max_completion_tokens' => 1200, 'reasoning_effort' => 'low']);
+    if (null === $result && 'auto' !== $toolChoice) {
+        // the tool call came back malformed: ask for the answer as plain JSON instead
+        $emit(['event' => 'finish_fallback_json']);
+        $fallback = $call(['messages' => [...$messages, ['role' => 'user', 'content' => 'Reply with one JSON object only: {"total_nordholz": integer, "top_section": integer, "code_word": string}, from the VALUES.']], 'response_format' => ['type' => 'json_object'], 'max_completion_tokens' => 400, 'reasoning_effort' => 'low']);
+        $answer = null === $fallback ? null : json_decode((string) ($fallback['message']['content'] ?? ''), true);
+        if (\is_array($answer)) {
+            $state['answer'] = $answer;
+            $state['end'] = 'finished';
+            $emit(['event' => 'finish_called', 'sections_read' => \count($state['read']), 'args' => $answer, 'via' => 'json']);
+            break;
+        }
+    }
     if (null === $result) {
         $state['end'] = 'provider unavailable';
         break;
@@ -207,7 +267,14 @@ for ($i = 0; $i < $maxSteps; ++$i) {
             $state['end'] = 'no tool call';
             break;
         }
-        $step = [$assistant, ['role' => 'user', 'content' => 'Continue with the tool.']];
+        $unread = [];
+        for ($k = 1; $k <= $sections; ++$k) {
+            if (!isset($state['read'][$k])) {
+                $unread[] = $k;
+            }
+        }
+        $hint = 3 === $contract && [] !== $unread ? ' Next unread section: '.$unread[0].'.' : '';
+        $step = [$assistant, ['role' => 'user', 'content' => 'Continue with the tool.'.$hint]];
     } else {
         $state['nudges'] = 0;
         $assistant['tool_calls'] = $calls_;
@@ -229,17 +296,38 @@ for ($i = 0; $i < $maxSteps; ++$i) {
                 $emit(['event' => 'finish_called', 'sections_read' => \count($state['read']), 'args' => $args]);
                 break;
             }
+            if ('record' === $name && 3 === $contract) {
+                $sec = (int) ($args['section'] ?? 0);
+                $state['rows'][$sec] = ['supplier' => (string) ($args['supplier'] ?? ''), 'amount' => (int) ($args['amount'] ?? 0), 'code' => (string) ($args['code_word'] ?? '')];
+                $state['pending'] = null;
+                $step[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'content' => 'recorded section '.$sec];
+                $emit(['event' => 'record', 'section' => $sec]);
+                continue;
+            }
+            if ('note' === $name && 3 === $contract) {
+                $state['values'][(string) ($args['name'] ?? '?')] = (string) ($args['value'] ?? '');
+                $step[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'content' => 'noted'];
+                $emit(['event' => 'note', 'name' => $args['name'] ?? null, 'value' => $args['value'] ?? null]);
+                continue;
+            }
             $n = (int) ($args['n'] ?? 0);
+            if ('read_section' === $name && 3 === $contract && null !== $state['pending'] && $state['pendingRejected'] < 40) {
+                ++$state['pendingRejected'];
+                $step[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'content' => 'error: record section '.$state['pending'].' first with record(section, supplier, amount).'];
+                $emit(['event' => 'read_rejected', 'pending' => $state['pending']]);
+                continue;
+            }
             if ('read_section' === $name && isset($doc[$n])) {
                 if (isset($state['read'][$n])) {
                     ++$state['dup'];
-                    if (2 === $contract) {
+                    if ($contract >= 2) {
                         $step[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'content' => 'already read; its figures are in your notes. Continue with the next unread section.'];
                         $emit(['event' => 'repeat_answered', 'n' => $n]);
                         continue;
                     }
                 }
                 $state['read'][$n] = true;
+                $state['pending'] = $n;
                 $step[] = ['role' => 'tool', 'tool_call_id' => $tc['id'], 'content' => $doc[$n]['text']];
                 $emit(['event' => 'read', 'n' => $n, 'in' => $result['in'], 'out' => $result['out'], 'dup' => isset($state['read'][$n]) && $state['dup'] > 0 ? $state['dup'] : 0]);
             } else {
@@ -269,6 +357,9 @@ $emit([
     'sections_read' => \count($state['read']),
     'duplicate_reads' => $state['dup'],
     'contract' => $contract,
+    'values' => $state['values'],
+    'rows_recorded' => \count($state['rows']),
+    'pending_rejected' => $state['pendingRejected'],
     'finish_rejected' => $state['rejected'],
     'complete_read' => \count($state['read']) === $sections,
     'goal_kept' => $goalKept,

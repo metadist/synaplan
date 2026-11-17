@@ -8,7 +8,7 @@ to them.
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
 | PJ1 | in review | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
-| PJ2 | in review | #3142 | spike; §0 #21 holds, also under load; G7 prototype did **not** pass in two runs, see 2026-11-16 below |
+| PJ2 | in review | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
 | PJ3–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
 
 ---
@@ -137,60 +137,22 @@ neared the window and nothing crashed, but the notes lost state:
 - The loop keeps the ledger of tool calls it has made (`read_section(7)`
   already done) and answers a repeat from it without a model round trip.
 
-**For AU26 and AH8 to expose:** per run, the compaction count and size of the
-notes after each compaction; a failed-compaction state and reason; duplicate
-tool calls (same name and arguments); text-only steps (nudges sent); the
-rejected `finish` count; peak prompt tokens against the window. AU26 shows
-them to the person, AH8 alerts on a failed compaction and on repeated nudges.
-This list is sent to those plans in this pull request.
+**For AU26 and AH8 to expose** (final list after three runs): per run, the
+compaction count and the size of the notes after each; a failed-compaction
+state with its reason; duplicate tool calls (same name and arguments); steps
+without a tool call (nudges sent); rejected `finish` calls; the guard
+rejections (read before record); malformed tool calls and how each was
+retried; whether the answer came from a required `finish` or the JSON
+fallback; the ledger (rows, reducers, current values); peak prompt tokens
+against the window; and the queue depth and wait of the run consumers
+(from the load run). AU26 shows them to the person, AH8 alerts on a failed
+compaction, repeated nudges, repeated malformed calls and a consumer queue
+that keeps growing. This list lives here; the owners of AU26 and AH8 take it
+from this section.
 
-**Second run, contract v2 (`--contract=2`).** The changes above, in the
-prototype: plan of at most 5 items, progress line, running values as facts,
-a summary budget of 1,200 tokens (hitting it is a failed compaction), a
-repeat call answered from the ledger. Same document, window and model.
-
-| Measure | v1 | v2 | G7 asks |
-| ------- | -- | -- | ------- |
-| Duration | 8,013 s | 7,880 s | two hours |
-| Cost | 0.1275 | 0.0536 | — |
-| Compactions | 22 | 8 | at least 3 |
-| Notes after a compaction | up to 8,800 chars, cap hit 13 times | about 380 chars, cap never hit | — |
-| Duplicate reads | 32 | **0** | none |
-| Sections read | 90 | 90 | all |
-| Early `finish` rejected | 2 | 7 | — |
-| Text-only steps | 18 | 23 | — |
-| Ended with | `finish` | **no `finish`: five nudges in a row, then "no tool call"** | `finish` |
-| Answer | wrong total, wrong top | **none** | right |
-
-```bash
-php /tmp/long-run-v2.php --label=v2 --contract=2 --sections=90 --guard-finish=1 \
-  --pause=65 --max-cost=0.50   # spike/long-run.php copied into the container
-```
-
-What it says. **Size and duplicates are fixed, correctness is not.**
-
-- The notes stay small and no section is read twice: the short plan, the
-  progress line and the budget work.
-- The model's running values are wrong. At compaction 8 the notes say
-  `total_nordholz=262838` and `top_section=3 (94483)` after 82 sections, the
-  gold top is section 77. A model that keeps a running sum and maximum in
-  its own summary drifts; the loop cannot trust them.
-- The run ended before it answered: after all 90 sections the model kept
-  announcing instead of calling `finish`, and the nudge limit of five ended
-  it. G7 is **not met**.
-
-**Consequence for §1.5.** The model must not be the only keeper of the
-running result. Two ways, to be decided in PJ with the run layer: a tool
-that holds named values (`note(name, value)` and `get(name)`, updated by the
-model from each result and read back verbatim, so a value is never rewritten
-by a summary), or a ledger the loop fills from structured tool results. And
-the end of a run must not rely on the model calling `finish`: when the work
-list is empty the loop asks once for the answer with `tool_choice` forced
-to `finish`, and a run that cannot produce it ends in the wrap-up path.
-Neither is tested yet; a third prototype run would test the first.
-
-**Open:** a third run with named values and a forced `finish` (decides G7); the real run in the worker with lease and
-restart, which this prototype does not test.
+**Open:** the real run in the worker with lease and restart, which this
+prototype does not test; a second document and a second model for the same
+prototype, before G7 is called passed for the product.
 
 ---
 
