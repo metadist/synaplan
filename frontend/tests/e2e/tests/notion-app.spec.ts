@@ -97,6 +97,39 @@ test.describe('@ci Notion app', () => {
     await expect(page.getByTestId('text-notion-account')).toHaveText(
       'Signed in to the Notion workspace Acme as Ada Lovelace (ada@example.com).'
     )
+
+    await page.route('**/api/v1/mcp-servers/9/tools', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          error: null,
+          can_edit: true,
+          tools: [
+            {
+              name: 'notion-search',
+              title: 'Search',
+              description: 'Find pages',
+              input_count: 1,
+              input_names: ['query'],
+              category: 'read',
+              outcome: 'auto',
+              default_outcome: 'auto',
+              hinted: true,
+              is_new: false,
+              locked_reason: null,
+            },
+          ],
+        }),
+      })
+    )
+    await page.getByTestId('tab-notion-permissions').click()
+    await expect(page.getByTestId('mcp-tool-notion-search')).toBeVisible()
+    await expect(page).toHaveURL(/tab=permissions/)
+    await page.getByTestId('tab-notion-overview').click()
+    await expect(page).not.toHaveURL(/tab=permissions/)
+
     await page.getByTestId('btn-notion-disconnect').click()
     await page.getByTestId('btn-dialog-confirm').click()
     await expect(page.getByTestId('btn-notion-connect')).toBeVisible()

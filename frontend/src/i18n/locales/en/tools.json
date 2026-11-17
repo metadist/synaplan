@@ -551,7 +551,10 @@
       "loadFailed": "The tools of this connection could not be loaded. Nothing was changed.",
       "retry": "Try again",
       "empty": "This connection offers no tools yet. Check that it is signed in, then reload.",
-      "clientOff": "MCP calls are turned off, so there is nothing to set here. Turn them on to manage tool permissions."
+      "clientOff": "MCP calls are turned off, so there is nothing to set here. Turn them on to manage tool permissions.",
+      "tabsLabel": "Connection sections",
+      "reset": "Reset to default ({outcome})",
+      "undone": "Change undone."
     }
   },
   "messagesGateway": {

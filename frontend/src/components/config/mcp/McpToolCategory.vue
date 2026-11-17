@@ -19,7 +19,7 @@
       <ToolOutcomeSelect
         v-if="category !== 'unavailable'"
         :model-value="categoryOutcome(tools)"
-        :disabled="disabled"
+        :disabled="disabled || editableTools(tools).length === 0"
         :label="
           $t('mcpServers.permissions.categoryLabel', {
             category: $t(`mcpServers.permissions.category.${category}`),
@@ -48,7 +48,12 @@ import { Icon } from '@iconify/vue'
 import type { McpToolPermission } from '@/services/api/mcpServersApi'
 import McpToolRow from './McpToolRow.vue'
 import ToolOutcomeSelect from './ToolOutcomeSelect.vue'
-import { categoryOutcome, type ToolCategory, type ToolOutcome } from './toolPermissions'
+import {
+  categoryOutcome,
+  editableTools,
+  type ToolCategory,
+  type ToolOutcome,
+} from './toolPermissions'
 
 const props = defineProps<{
   category: ToolCategory
@@ -58,7 +63,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'set-tool': [tool: McpToolPermission, outcome: ToolOutcome]
+  'set-tool': [tool: McpToolPermission, outcome: ToolOutcome | 'default']
   'set-category': [outcome: ToolOutcome]
 }>()
 

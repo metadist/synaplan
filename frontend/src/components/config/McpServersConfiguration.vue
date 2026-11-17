@@ -191,7 +191,7 @@
               class="text-sm text-[var(--brand)] hover:underline"
               :aria-expanded="permissionsId === server.id"
               :data-testid="`btn-mcp-permissions-${server.id}`"
-              @click="permissionsId = permissionsId === server.id ? null : (server.id ?? null)"
+              @click="togglePermissions(server.id ?? null)"
             >
               {{
                 permissionsId === server.id
@@ -436,6 +436,16 @@ const testingId = ref<number | null>(null)
 /** The connection whose permissions are open; `?server=ID&tab=permissions` opens it. */
 const permissionsId = ref<number | null>(null)
 const disconnectingId = ref<number | null>(null)
+
+/** Opens or closes a connection's permissions and keeps that in the URL. */
+const togglePermissions = (id: number | null) => {
+  permissionsId.value = permissionsId.value === id ? null : id
+  const query = { ...route.query }
+  delete query.server
+  delete query.tab
+  if (permissionsId.value !== null) Object.assign(query, { server: String(id), tab: 'permissions' })
+  void router.replace({ query })
+}
 
 // Task usage panel: routing topics with their `tool_mcp` opt-in state.
 const taskPrompts = ref<TaskPrompt[]>([])

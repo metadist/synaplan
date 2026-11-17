@@ -8,7 +8,7 @@
         {{ tool.title }}
         <span
           v-if="isNew"
-          class="ml-2 text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400"
+          class="ml-2 text-xs px-2 py-0.5 rounded-full bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]"
           :data-testid="`mcp-tool-new-${tool.name}`"
           >{{ $t('mcpServers.permissions.new') }}</span
         >
@@ -23,20 +23,35 @@
       >
         {{ tool.description }}
       </p>
-      <button
-        v-if="tool.description.length > 140 || tool.input_count > 0"
-        type="button"
-        class="txt-secondary text-xs underline mt-1"
-        :aria-expanded="expanded"
-        :data-testid="`btn-mcp-tool-more-${tool.name}`"
-        @click="expanded = !expanded"
-      >
-        {{
-          expanded ? $t('mcpServers.permissions.showLess') : $t('mcpServers.permissions.showMore')
-        }}
-      </button>
+      <div class="flex flex-wrap gap-x-3">
+        <button
+          v-if="tool.description.length > 140 || tool.input_count > 0"
+          type="button"
+          class="txt-secondary text-xs underline mt-1"
+          :aria-expanded="expanded"
+          :data-testid="`btn-mcp-tool-more-${tool.name}`"
+          @click="expanded = !expanded"
+        >
+          {{
+            expanded ? $t('mcpServers.permissions.showLess') : $t('mcpServers.permissions.showMore')
+          }}
+        </button>
+        <button
+          v-if="changed && tool.locked_reason === null && !disabled"
+          type="button"
+          class="txt-secondary text-xs underline mt-1"
+          :data-testid="`btn-mcp-tool-reset-${tool.name}`"
+          @click="emit('change', 'default')"
+        >
+          {{
+            $t('mcpServers.permissions.reset', {
+              outcome: $t(`mcpServers.permissions.outcome.${tool.default_outcome}`),
+            })
+          }}
+        </button>
+      </div>
       <p v-if="expanded && tool.input_count > 0" class="txt-secondary text-xs mt-1 break-words">
-        {{ $t('mcpServers.permissions.inputs', { count: tool.input_count }) }}.
+        {{ $t('mcpServers.permissions.inputs', { count: tool.input_count }, tool.input_count) }}.
         {{ $t('mcpServers.permissions.inputNames', { names: tool.input_names.join(', ') }) }}
       </p>
       <p v-if="!tool.hinted && tool.category !== 'unavailable'" class="txt-secondary text-xs mt-1">
@@ -73,7 +88,7 @@ const props = defineProps<{
   isNew: boolean
 }>()
 
-const emit = defineEmits<{ change: [outcome: ToolOutcome] }>()
+const emit = defineEmits<{ change: [outcome: ToolOutcome | 'default'] }>()
 
 const expanded = ref(false)
 const changed = computed(() => props.tool.outcome !== props.tool.default_outcome)
