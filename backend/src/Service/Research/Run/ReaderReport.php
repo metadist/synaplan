@@ -25,6 +25,8 @@ final class ReaderReport
     private const CITATION_GROUP = '/(?:[ \t]*\[\s*e\d+(?:\s*,\s*e\d+)*\s*\])+/i';
     private const HEADING = '/^\s*(#{1,6})\s+\S/u';
     private const DIVIDER = '/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/';
+    private const FENCE = '/^ {0,3}(`{3,}|~{3,})/';
+    private const FENCE_END = '/^ {0,3}(`{3,}|~{3,})[ \t]*$/';
 
     /**
      * @return array{markdown: string, sources: list<array{title: string, url: string, host: string, description: string}>}
@@ -91,19 +93,28 @@ final class ReaderReport
     /**
      * A heading with nothing under it before the next heading of its level
      * or above (or the end) is a section the check emptied. A dividing line
-     * the writer drew between sections is not content: a heading with only
-     * that under it goes too, and a line that no longer divides two parts —
-     * at the start, at the end, or right after another one — goes with it.
+     * the writer drew between sections is not content, and neither is a
+     * deeper heading that is empty itself: a heading with only those under
+     * it goes too. A dividing line that no longer divides two parts — at
+     * the start, at the end, or right after another one — goes with it.
+     * A fenced code block is content and stays as it was written.
      *
      * @param list<string> $lines
      */
     private static function withoutEmptyHeadings(array $lines): string
     {
         $kept = [];
-        $count = count($lines);
         $textAbove = false;
         $openDivider = null;
+        $fence = null;
         foreach ($lines as $index => $line) {
+            if (null !== $fence) {
+                $kept[] = $line;
+                if (self::closesFence($line, $fence)) {
+                    $fence = null;
+                }
+                continue;
+            }
             if (self::isDivider($lines, $index)) {
                 if (!$textAbove) {
                     continue;
@@ -117,27 +128,58 @@ final class ReaderReport
                 $kept[] = rtrim($line);
                 continue;
             }
-            if (1 === preg_match(self::HEADING, $line, $match)) {
-                $level = strlen($match[1]);
-                $next = $index + 1;
-                while ($next < $count && ('' === trim($lines[$next]) || self::isDivider($lines, $next))) {
-                    ++$next;
-                }
-                if ($next >= $count || (1 === preg_match(self::HEADING, $lines[$next], $after) && strlen($after[1]) <= $level)) {
-                    continue;
-                }
+            if (1 === preg_match(self::HEADING, $line, $match) && !self::hasContent($lines, $index, strlen($match[1]))) {
+                continue;
             }
-            if ('' !== trim($line)) {
-                $textAbove = true;
-                $openDivider = null;
+            if ('' === trim($line)) {
+                if ([] !== $kept && '' !== $kept[array_key_last($kept)]) {
+                    $kept[] = '';
+                }
+                continue;
             }
+            if (1 === preg_match(self::FENCE, $line, $match)) {
+                $fence = $match[1];
+            }
+            $textAbove = true;
+            $openDivider = null;
             $kept[] = rtrim($line);
         }
         if (null !== $openDivider) {
             array_splice($kept, $openDivider);
         }
 
-        return trim((string) preg_replace("/\n{3,}/u", "\n\n", implode("\n", $kept)));
+        return trim(implode("\n", $kept));
+    }
+
+    /**
+     * Whether a section holds more than blank lines, dividing lines and
+     * headings below it.
+     *
+     * @param list<string> $lines
+     */
+    private static function hasContent(array $lines, int $heading, int $level): bool
+    {
+        for ($next = $heading + 1, $count = count($lines); $next < $count; ++$next) {
+            if ('' === trim($lines[$next]) || self::isDivider($lines, $next)) {
+                continue;
+            }
+            if (1 !== preg_match(self::HEADING, $lines[$next], $match)) {
+                return true;
+            }
+            if (strlen($match[1]) <= $level) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /** The line that ends a code block: the same fence character, at least as long, and nothing after it. */
+    private static function closesFence(string $line, string $fence): bool
+    {
+        return 1 === preg_match(self::FENCE_END, $line, $match)
+            && $match[1][0] === $fence[0]
+            && strlen($match[1]) >= strlen($fence);
     }
 
     /**
@@ -156,7 +198,8 @@ final class ReaderReport
         return '-' !== $match[1]
             || '' === $above
             || 1 === preg_match(self::HEADING, $above)
-            || 1 === preg_match(self::DIVIDER, $above);
+            || 1 === preg_match(self::DIVIDER, $above)
+            || 1 === preg_match(self::FENCE, $above);
     }
 
     /**

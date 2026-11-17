@@ -256,10 +256,8 @@ final class CheckReport
         $kept = [];
         foreach ($lines as $index => $line) {
             $line = rtrim($line);
-            if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index)) {
-                continue;
-            }
-            if (DraftSentences::isTableRow($line) && self::headerOfEmptyTable($lines, $index - 1)) {
+            // The header of a table without rows, or the rule line under it.
+            if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index) || self::headerOfEmptyTable($lines, $index - 1)) {
                 continue;
             }
             $kept[] = $line;
@@ -269,17 +267,24 @@ final class CheckReport
     }
 
     /**
-     * A table header whose rule line is followed by no row.
+     * A table header whose rule line is followed by no row. A table may
+     * leave out its outer pipes ("Song | Notes" over "--- | ---"); then
+     * the pipe in the rule line tells it from a line of dashes.
      *
      * @param list<string> $lines
      */
     private static function headerOfEmptyTable(array $lines, int $index): bool
     {
-        if ($index < 0 || !DraftSentences::isTableRow($lines[$index] ?? '') || 1 !== preg_match(DraftSentences::TABLE_RULE, trim($lines[$index + 1] ?? ''))) {
+        $header = $lines[$index] ?? '';
+        $rule = trim($lines[$index + 1] ?? '');
+        if ($index < 0 || 1 !== preg_match(DraftSentences::TABLE_RULE, $rule)) {
+            return false;
+        }
+        if (!DraftSentences::isTableRow($header) && !(str_contains($header, '|') && str_contains($rule, '|'))) {
             return false;
         }
 
-        return !DraftSentences::isTableRow($lines[$index + 2] ?? '');
+        return !str_contains($lines[$index + 2] ?? '', '|');
     }
 
     /**

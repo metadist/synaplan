@@ -85,6 +85,54 @@ final class CheckReportTest extends TestCase
         self::assertSame([$line], DraftSentences::split($line));
     }
 
+    public function testARejectedSentenceIsFoundAgainWhateverSpaceStoodBeforeItsMarker(): void
+    {
+        $draft = 'The fee is 99 EUR.  [e1] The warranty is two years. [e2]';
+
+        self::assertSame(['The fee is 99 EUR.  [e1]', 'The warranty is two years. [e2]'], DraftSentences::split($draft));
+        self::assertStringStartsWith('The warranty is two years. [e2]', $this->removing($draft, DraftSentences::split($draft)[0]));
+    }
+
+    public function testTheEmphasisAroundASentenceIsRemovedWithIt(): void
+    {
+        $draft = "**The fee is 99 EUR. [e1]**\n\nThe warranty is two years. [e2]";
+
+        self::assertSame(['**The fee is 99 EUR. [e1]**', 'The warranty is two years. [e2]'], DraftSentences::split($draft));
+        self::assertStringStartsWith('The warranty is two years. [e2]', $this->removing($draft, DraftSentences::split($draft)[0]));
+    }
+
+    public function testASmallLetterAfterAMarkerStartsANewSentence(): void
+    {
+        $sentences = DraftSentences::split('The fee is 12 EUR. [e1] iPhone costs 99 EUR. [e2]');
+
+        self::assertSame(['The fee is 12 EUR. [e1]', 'iPhone costs 99 EUR. [e2]'], $sentences);
+    }
+
+    public function testABracketInsideABracketDoesNotSplitTheSentence(): void
+    {
+        $line = 'The fee (set in 2024 (under the new law). Six weeks after approval) is 90 EUR. [e1]';
+
+        self::assertSame([$line], DraftSentences::split($line));
+    }
+
+    public function testARowOfATableWithoutOuterPipesIsOneStatement(): void
+    {
+        $row = 'Example | 2019. Six weeks at the top. [e1]';
+
+        $sentences = DraftSentences::split("Song | Notes\n--- | ---\n".$row."\n\nA | B is no row here. It goes on. [e2]");
+
+        self::assertSame([$row, 'A | B is no row here.', 'It goes on. [e2]'], $sentences);
+    }
+
+    public function testATableWithoutOuterPipesThatLostEveryRowIsDropped(): void
+    {
+        $row = 'Example | 2019. Six weeks at the top. [e1]';
+
+        $report = $this->removing("## Songs\n\nSong | Notes\n--- | ---\n".$row."\n\nText. [e2]", $row);
+
+        self::assertStringStartsWith("## Songs\n\nText. [e2]", $report);
+    }
+
     public function testFeatDoesNotEndASentence(): void
     {
         self::assertCount(1, DraftSentences::split('"Holy Grail" feat. Justin Timberlake peaked at No. 4. [e1]'));

@@ -82,6 +82,22 @@ final class ReaderReportTest extends TestCase
         self::assertSame("Visa\n---\n\nText. [1]", $reader['markdown']);
     }
 
+    public function testAHeadingWithOnlyAnEmptySubsectionGoesWithIt(): void
+    {
+        $reader = ReaderReport::from("## Answer\n\nText. [e1]\n\n## Costs\n\n### Portugal\n\n---\n\n### Spain", $this->ledger());
+
+        self::assertSame("## Answer\n\nText. [1]", $reader['markdown']);
+    }
+
+    public function testACodeBlockStaysAsItWasWritten(): void
+    {
+        $code = "```text\n# not a heading\n***\n***\n\n\n---\n```";
+
+        $reader = ReaderReport::from("## Example\n\n".$code."\n\n## Outlook", $this->ledger());
+
+        self::assertSame("## Example\n\n".$code, $reader['markdown']);
+    }
+
     public function testAFileSourceLinksToTheFile(): void
     {
         $ledger = new EvidenceLedger();
