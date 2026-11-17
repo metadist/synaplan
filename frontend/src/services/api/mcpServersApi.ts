@@ -29,6 +29,9 @@ export type McpTool = NonNullable<
 /** `default` removes the override and the tool follows its category default. */
 export type ToolPermissionChoice = 'auto' | 'approve' | 'block' | 'default'
 
+export type McpToolPermissionList = z.infer<typeof GetApiMcpToolPermissionsListResponseSchema>
+export type McpToolPermission = McpToolPermissionList['tools'][number]
+
 export type ToolPermissionBody =
   | { tools: Record<string, ToolPermissionChoice> }
   | { category: 'read' | 'write' | 'destructive'; outcome: ToolPermissionChoice }
@@ -40,8 +43,6 @@ export interface McpServerPayload {
   /** Absent = keep the stored secret; empty string = clear it. */
   auth_token?: string
   enabled?: boolean
-  /** Opt-in: let the AI call mutating tools (create/update) on this server. */
-  allow_write?: boolean
   auth_mode?: 'none' | 'bearer' | 'oauth'
 }
 

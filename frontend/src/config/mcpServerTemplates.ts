@@ -13,7 +13,6 @@ export interface McpServerTemplate {
   /** Prefill for the display name; empty for the custom (blank) form. */
   name: string
   authHeader: string
-  allowWrite: boolean
   /** Default `bearer` — static header. `oauth` templates hide the token fields. */
   authMode?: McpAuthMode
   /** Locked Streamable HTTP URL for hosted OAuth servers. */
@@ -28,28 +27,24 @@ export const mcpServerTemplates: McpServerTemplate[] = [
     icon: 'heroicons:puzzle-piece',
     name: '',
     authHeader: '',
-    allowWrite: false,
   },
   {
     key: 'github',
     icon: 'simple-icons:github',
     name: 'GitHub',
     authHeader: 'Authorization',
-    allowWrite: false,
   },
   {
     key: 'n8n',
     icon: 'simple-icons:n8n',
     name: 'n8n',
     authHeader: 'Authorization',
-    allowWrite: false,
   },
   {
     key: 'atlassian',
     icon: 'simple-icons:atlassian',
     name: 'Jira & Confluence',
     authHeader: '',
-    allowWrite: false,
     authMode: 'oauth',
     urlPrefill: 'https://mcp.atlassian.com/v2/mcp',
   },
@@ -58,7 +53,6 @@ export const mcpServerTemplates: McpServerTemplate[] = [
     icon: 'simple-icons:notion',
     name: 'Notion',
     authHeader: '',
-    allowWrite: false,
     authMode: 'oauth',
     urlPrefill: 'https://mcp.notion.com/mcp',
   },
@@ -67,7 +61,6 @@ export const mcpServerTemplates: McpServerTemplate[] = [
     icon: 'heroicons:sparkles',
     name: 'Higgsfield',
     authHeader: '',
-    allowWrite: false,
     authMode: 'oauth',
     urlPrefill: 'https://mcp.higgsfield.ai/mcp',
   },

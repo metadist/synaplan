@@ -502,9 +502,60 @@
       "unknown": "Sign-in could not start. Try again, or ask whoever runs the server."
     },
     "savedSignInNotStarted": "Saved \"{name}\". Sign-in did not start: {reason}",
-    "allowWriteLabel": "Allow write actions (create/update)",
-    "allowWriteHint": "When enabled, the AI may create or update content in this system when you ask for it. Delete actions are never allowed.",
-    "writeBadge": "Writes allowed"
+    "permissions": {
+      "open": "Permissions",
+      "hide": "Hide permissions",
+      "overviewTab": "Overview",
+      "permissionsTab": "Permissions",
+      "title": "Tool permissions",
+      "intro": "Choose when the AI may use these tools. Saved Tasks and workflows still ask before they write, unless the step allows it.",
+      "category": {
+        "read": "Read tools",
+        "write": "Write tools",
+        "destructive": "Destructive tools",
+        "unavailable": "Not available"
+      },
+      "outcome": {
+        "auto": "Auto",
+        "approve": "Approve",
+        "block": "Block",
+        "mixed": "Mixed"
+      },
+      "outcomeHint": {
+        "auto": "Runs without asking",
+        "approve": "Asks you first",
+        "block": "Never runs"
+      },
+      "categoryLabel": "Set all {category}",
+      "toolLabel": "Permission for {tool}",
+      "changed": "Changed",
+      "new": "New",
+      "showMore": "Show more",
+      "showLess": "Show less",
+      "inputs": "Takes 1 input | Takes {count} inputs",
+      "inputNames": "Inputs: {names}",
+      "noHints": "The server does not say what this tool changes.",
+      "locked": {
+        "group_policy": "An administrator's policy blocks this tool.",
+        "shared": "Shared with you. Only the owner can change these permissions.",
+        "unavailable": "Cannot work through a chat tool call."
+      },
+      "saved": "{tool} set to {outcome}.",
+      "categorySaved": "{count} tool set to {outcome}. | {count} tools set to {outcome}.",
+      "undo": "Undo",
+      "saveFailed": "The permission was not saved. Nothing was changed. Try again.",
+      "confirmTitle": "Let the AI delete without asking?",
+      "confirmMessage": "The AI will delete or overwrite in {connection} without asking you. Continue?",
+      "confirmAction": "Set to Auto",
+      "loading": "Loading tools…",
+      "loadFailed": "The tools of this connection could not be loaded. Nothing was changed.",
+      "retry": "Try again",
+      "empty": "This connection offers no tools yet. Check that it is signed in, then reload.",
+      "clientOff": "MCP calls are turned off, so there is nothing to set here. Turn them on to manage tool permissions.",
+      "tabsLabel": "Connection sections",
+      "reset": "Reset to default ({outcome})",
+      "undone": "Change undone."
+    }
   },
   "messagesGateway": {
     "title": "Connect your coding tool",
@@ -1130,12 +1181,6 @@
       "connectedAs": "Signed in to the Notion workspace {workspace} as {account}.",
       "connectedAsAccount": "Signed in to Notion as {account}.",
       "scope": "The AI sees only what this Notion account can see.",
-      "writeLabel": "The AI may change Notion",
-      "writeOn": "The AI can create and edit pages in Notion without asking each time. It cannot delete, move or overwrite pages.",
-      "writeOff": "The AI can read Notion. It will not change anything.",
-      "writeSavedOn": "The AI can now create and edit Notion pages without asking. It still cannot delete, move or overwrite pages.",
-      "writeSavedOff": "Writing is off. The AI can still read Notion and will not change anything.",
-      "writeFailed": "The setting was not saved. Notion was not changed. Try again.",
       "examplesTitle": "Try one of these in chat",
       "exampleRead": "Summarize my Roadmap page",
       "exampleWrite": "Create a page called Meeting notes",

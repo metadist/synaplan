@@ -425,9 +425,60 @@
       "unknown": "Die Anmeldung konnte nicht starten. Versuchen Sie es erneut oder fragen Sie die Betreiber des Servers."
     },
     "savedSignInNotStarted": "„{name}“ wurde gespeichert. Die Anmeldung hat nicht begonnen: {reason}",
-    "allowWriteLabel": "Schreibaktionen erlauben (Anlegen/Aktualisieren)",
-    "allowWriteHint": "Wenn aktiviert, darf die KI auf deine Anfrage Inhalte in diesem System anlegen oder aktualisieren. Löschaktionen sind niemals erlaubt.",
-    "writeBadge": "Schreiben erlaubt"
+    "permissions": {
+      "open": "Berechtigungen",
+      "hide": "Berechtigungen ausblenden",
+      "overviewTab": "Übersicht",
+      "permissionsTab": "Berechtigungen",
+      "title": "Tool-Berechtigungen",
+      "intro": "Lege fest, wann die KI diese Tools nutzen darf. Gespeicherte Aufgaben und Workflows fragen vor dem Schreiben weiterhin nach, sofern der Schritt es nicht erlaubt.",
+      "category": {
+        "read": "Lese-Tools",
+        "write": "Schreib-Tools",
+        "destructive": "Löschende Tools",
+        "unavailable": "Nicht verfügbar"
+      },
+      "outcome": {
+        "auto": "Automatisch",
+        "approve": "Freigabe",
+        "block": "Blockiert",
+        "mixed": "Gemischt"
+      },
+      "outcomeHint": {
+        "auto": "Läuft ohne Nachfrage",
+        "approve": "Fragt dich zuerst",
+        "block": "Läuft nie"
+      },
+      "categoryLabel": "Alle setzen: {category}",
+      "toolLabel": "Berechtigung für {tool}",
+      "changed": "Geändert",
+      "new": "Neu",
+      "showMore": "Mehr anzeigen",
+      "showLess": "Weniger anzeigen",
+      "inputs": "Nimmt 1 Eingabe | Nimmt {count} Eingaben",
+      "inputNames": "Eingaben: {names}",
+      "noHints": "Der Server gibt nicht an, was dieses Tool ändert.",
+      "locked": {
+        "group_policy": "Die Richtlinie einer Administratorin oder eines Administrators blockiert dieses Tool.",
+        "shared": "Mit dir geteilt. Nur der Besitzer kann diese Berechtigungen ändern.",
+        "unavailable": "Funktioniert nicht über einen Tool-Aufruf im Chat."
+      },
+      "saved": "{tool} auf {outcome} gesetzt.",
+      "categorySaved": "{count} Tool auf {outcome} gesetzt. | {count} Tools auf {outcome} gesetzt.",
+      "undo": "Rückgängig",
+      "saveFailed": "Die Berechtigung wurde nicht gespeichert. Es wurde nichts geändert. Versuche es erneut.",
+      "confirmTitle": "Die KI ohne Nachfrage löschen lassen?",
+      "confirmMessage": "Die KI löscht oder überschreibt in {connection}, ohne dich zu fragen. Fortfahren?",
+      "confirmAction": "Auf Automatisch setzen",
+      "loading": "Tools werden geladen…",
+      "loadFailed": "Die Tools dieser Verbindung konnten nicht geladen werden. Es wurde nichts geändert.",
+      "retry": "Erneut versuchen",
+      "empty": "Diese Verbindung bietet noch keine Tools. Prüfe, ob sie angemeldet ist, und lade neu.",
+      "clientOff": "MCP-Aufrufe sind ausgeschaltet, daher gibt es hier nichts einzustellen. Schalte sie ein, um Tool-Berechtigungen zu verwalten.",
+      "tabsLabel": "Bereiche der Verbindung",
+      "reset": "Auf Standard zurücksetzen ({outcome})",
+      "undone": "Änderung rückgängig gemacht."
+    }
   },
   "messagesGateway": {
     "title": "Coding-Tool verbinden",
@@ -1053,12 +1104,6 @@
       "connectedAs": "Angemeldet im Notion-Workspace {workspace} als {account}.",
       "connectedAsAccount": "Bei Notion angemeldet als {account}.",
       "scope": "Die KI sieht nur, was dieser Notion-Account sehen kann.",
-      "writeLabel": "Die KI darf in Notion schreiben",
-      "writeOn": "Die KI kann Seiten in Notion anlegen und ändern, ohne jedes Mal zu fragen. Löschen, Verschieben und Überschreiben kann sie nicht.",
-      "writeOff": "Die KI kann Notion lesen. Sie ändert nichts.",
-      "writeSavedOn": "Die KI kann Notion-Seiten jetzt ohne Nachfrage anlegen und ändern. Löschen, Verschieben und Überschreiben kann sie weiterhin nicht.",
-      "writeSavedOff": "Schreiben ist aus. Die KI kann Notion weiter lesen und ändert nichts.",
-      "writeFailed": "Die Einstellung wurde nicht gespeichert. Notion wurde nicht geändert. Versuch es erneut.",
       "examplesTitle": "Probier einen Satz im Chat",
       "exampleRead": "Fasse meine Seite Roadmap zusammen",
       "exampleWrite": "Leg eine Seite Meeting-Notizen an",

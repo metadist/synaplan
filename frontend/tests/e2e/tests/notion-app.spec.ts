@@ -37,29 +37,17 @@ async function mockLists(page: Page, watches: unknown[] = []) {
  * endpoint is mocked: a real connect would leave the app for Notion.
  */
 test.describe('@ci Notion app', () => {
-  test('connect state, writing switch, and disconnect', async ({ page }) => {
+  test('connect state, permissions tab, and disconnect', async ({ page }) => {
     let body = {
       success: true,
       status: 'not_connected' as 'not_connected' | 'connected',
       server_id: null as number | null,
-      allow_write: false,
-      write_auto: false,
       sharing: noSharing,
     }
 
     await page.route('**/api/v1/apps/notion**', async (route) => {
       if (new URL(route.request().url()).pathname !== '/api/v1/apps/notion') {
         return route.fallback()
-      }
-      if (route.request().method() === 'PATCH') {
-        const payload = route.request().postDataJSON() as { allow_write?: boolean }
-        body = {
-          ...body,
-          status: 'connected',
-          server_id: 9,
-          allow_write: payload.allow_write === true,
-          write_auto: payload.allow_write === true,
-        }
       }
       await route.fulfill({
         status: 200,
@@ -80,7 +68,7 @@ test.describe('@ci Notion app', () => {
       })
     })
     await page.route('**/api/v1/mcp-servers/*/oauth/disconnect', async (route) => {
-      body = { ...body, status: 'not_connected', allow_write: false, write_auto: false }
+      body = { ...body, status: 'not_connected' }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -100,27 +88,47 @@ test.describe('@ci Notion app', () => {
       success: true,
       status: 'connected',
       server_id: 9,
-      allow_write: false,
-      write_auto: false,
       sharing: noSharing,
     }
     await mockLists(page)
     await page.reload()
-    await expect(page.getByTestId('toggle-notion-write')).toBeVisible()
+    await expect(page.getByTestId('tab-notion-permissions')).toBeVisible()
+    await expect(page.getByTestId('toggle-notion-write')).toHaveCount(0)
     await expect(page.getByTestId('text-notion-account')).toHaveText(
       'Signed in to the Notion workspace Acme as Ada Lovelace (ada@example.com).'
     )
-    await expect(page.getByTestId('text-notion-write-consequence')).toContainText(
-      'will not change anything'
-    )
 
-    await page
-      .locator('label')
-      .filter({ has: page.getByTestId('toggle-notion-write') })
-      .click()
-    await expect(page.getByTestId('text-notion-write-consequence')).toContainText(
-      'cannot delete, move or overwrite pages'
+    await page.route('**/api/v1/mcp-servers/9/tools', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          error: null,
+          can_edit: true,
+          tools: [
+            {
+              name: 'notion-search',
+              title: 'Search',
+              description: 'Find pages',
+              input_count: 1,
+              input_names: ['query'],
+              category: 'read',
+              outcome: 'auto',
+              default_outcome: 'auto',
+              hinted: true,
+              is_new: false,
+              locked_reason: null,
+            },
+          ],
+        }),
+      })
     )
+    await page.getByTestId('tab-notion-permissions').click()
+    await expect(page.getByTestId('mcp-tool-notion-search')).toBeVisible()
+    await expect(page).toHaveURL(/tab=permissions/)
+    await page.getByTestId('tab-notion-overview').click()
+    await expect(page).not.toHaveURL(/tab=permissions/)
 
     await page.getByTestId('btn-notion-disconnect').click()
     await page.getByTestId('btn-dialog-confirm').click()
@@ -132,8 +140,6 @@ test.describe('@ci Notion app', () => {
       success: true,
       status: 'connected',
       server_id: 9,
-      allow_write: false,
-      write_auto: false,
       sharing: noSharing,
     }
     const watch = {
@@ -207,8 +213,6 @@ test.describe('@ci Notion app', () => {
       success: true,
       status: 'not_connected',
       server_id: null as number | null,
-      allow_write: false,
-      write_auto: false,
       sharing: { shared_by: 'Ada', can_share: false, shared_on: false },
     }
     await page.route('**/api/v1/apps/notion**', (route) => {

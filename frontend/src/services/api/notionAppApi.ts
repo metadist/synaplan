@@ -8,7 +8,6 @@ import {
   GetApiAppsNotionWatchesListResponseSchema,
   PatchApiAppsNotionSharingResponseSchema,
   PatchApiAppsNotionWatchesUpdateResponseSchema,
-  PatchApiAppsNotionWritingResponseSchema,
   PostApiAppsNotionConnectResponseSchema,
   PostApiAppsNotionContentFilesResponseSchema,
   PostApiAppsNotionSharedUseResponseSchema,
@@ -52,14 +51,6 @@ export const notionAppApi = {
       schema: PostApiAppsNotionConnectResponseSchema,
     })
     return data.authorize_url
-  },
-
-  async setWriting(allowWrite: boolean): Promise<NotionAppStatus> {
-    return httpClient('/api/v1/apps/notion', {
-      method: 'PATCH',
-      body: JSON.stringify({ allow_write: allowWrite }),
-      schema: PatchApiAppsNotionWritingResponseSchema,
-    })
   },
 
   async setShared(shared: boolean): Promise<NotionAppStatus> {

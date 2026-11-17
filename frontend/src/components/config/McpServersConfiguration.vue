@@ -139,13 +139,6 @@
             {{ server.enabled ? $t('mcpServers.enabled') : $t('mcpServers.disabled') }}
           </span>
           <span
-            v-if="server.allow_write"
-            class="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400"
-            :data-testid="`mcp-write-badge-${server.id}`"
-          >
-            {{ $t('mcpServers.writeBadge') }}
-          </span>
-          <span
             v-if="server.auth_mode === 'oauth'"
             class="text-xs px-2 py-1 rounded-full"
             :class="oauthStatusClass(server.oauth_status)"
@@ -196,6 +189,19 @@
             <button
               type="button"
               class="text-sm text-[var(--brand)] hover:underline"
+              :aria-expanded="permissionsId === server.id"
+              :data-testid="`btn-mcp-permissions-${server.id}`"
+              @click="togglePermissions(server.id ?? null)"
+            >
+              {{
+                permissionsId === server.id
+                  ? $t('mcpServers.permissions.hide')
+                  : $t('mcpServers.permissions.open')
+              }}
+            </button>
+            <button
+              type="button"
+              class="text-sm text-[var(--brand)] hover:underline"
               :data-testid="`btn-mcp-edit-${server.id}`"
               @click="startEdit(server)"
             >
@@ -209,6 +215,9 @@
             >
               {{ $t('common.delete') }}
             </button>
+          </div>
+          <div v-if="permissionsId === server.id" class="w-full pl-1">
+            <McpToolPermissions :server-id="server.id" :server-name="server.name ?? ''" />
           </div>
           <div v-if="toolsByServer[server.id ?? -1]" class="w-full pl-1">
             <p class="text-xs txt-secondary mb-1">
@@ -352,20 +361,6 @@
           <input v-model="form.enabled" type="checkbox" class="accent-[var(--brand)]" />
           {{ $t('mcpServers.enabledLabel') }}
         </label>
-        <div>
-          <label class="inline-flex items-center gap-2 text-sm txt-primary">
-            <input
-              v-model="form.allowWrite"
-              type="checkbox"
-              class="accent-[var(--brand)]"
-              data-testid="input-mcp-allow-write"
-            />
-            {{ $t('mcpServers.allowWriteLabel') }}
-          </label>
-          <p class="text-xs txt-secondary mt-1 leading-relaxed">
-            {{ $t('mcpServers.allowWriteHint') }}
-          </p>
-        </div>
       </div>
 
       <div class="flex flex-wrap items-center gap-3 mt-6">
@@ -399,7 +394,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { Icon } from '@iconify/vue'
-import { RouterLink, useRouter } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import PageHeader from '@/components/PageHeader.vue'
 import { useDialog } from '@/composables/useDialog'
@@ -409,6 +404,7 @@ import { updateConfigValue } from '@/services/api/adminConfigApi'
 import McpTemplatePicker from '@/components/config/McpTemplatePicker.vue'
 import McpServerUrlField from '@/components/config/McpServerUrlField.vue'
 import McpServerAuthFields from '@/components/config/McpServerAuthFields.vue'
+import McpToolPermissions from '@/components/config/mcp/McpToolPermissions.vue'
 import {
   MCP_CUSTOM_TEMPLATE,
   findMcpServerTemplate,
@@ -424,6 +420,7 @@ const { t, locale } = useI18n()
 const { confirm } = useDialog()
 const { success, error } = useNotification()
 const router = useRouter()
+const route = useRoute()
 const { connectingId, start: startOAuth, finish: finishSignIn } = useMcpSignInStart(() => load())
 const authStore = useAuthStore()
 const isAdmin = computed(() => authStore.isAdmin)
@@ -436,7 +433,19 @@ const togglingClient = ref(false)
 const servers = ref<McpServer[]>([])
 const toolsByServer = reactive<Record<number, McpTool[]>>({})
 const testingId = ref<number | null>(null)
+/** The connection whose permissions are open; `?server=ID&tab=permissions` opens it. */
+const permissionsId = ref<number | null>(null)
 const disconnectingId = ref<number | null>(null)
+
+/** Opens or closes a connection's permissions and keeps that in the URL. */
+const togglePermissions = (id: number | null) => {
+  permissionsId.value = permissionsId.value === id ? null : id
+  const query = { ...route.query }
+  delete query.server
+  delete query.tab
+  if (permissionsId.value !== null) Object.assign(query, { server: String(id), tab: 'permissions' })
+  void router.replace({ query })
+}
 
 // Task usage panel: routing topics with their `tool_mcp` opt-in state.
 const taskPrompts = ref<TaskPrompt[]>([])
@@ -463,7 +472,6 @@ const form = reactive({
   authHeader: '',
   authToken: '',
   enabled: true,
-  allowWrite: false,
   authMode: 'bearer' as McpAuthMode,
 })
 
@@ -502,7 +510,6 @@ const applyTemplate = (key: string) => {
     form.name = next.name
   }
   form.authHeader = next.authHeader
-  form.allowWrite = next.allowWrite
   form.authMode = next.authMode ?? 'bearer'
   if (isOAuthTemplate(next) && next.urlPrefill) {
     form.url = next.urlPrefill
@@ -520,7 +527,6 @@ const resetForm = (template: McpServerTemplate = findMcpServerTemplate(MCP_CUSTO
     authHeader: template.authHeader,
     authToken: '',
     enabled: true,
-    allowWrite: template.allowWrite,
     authMode: template.authMode ?? 'bearer',
   })
   activeTemplate.value = template.key
@@ -645,7 +651,6 @@ const startEdit = (server: McpServer) => {
     authHeader: server.auth_header ?? '',
     authToken: '',
     enabled: server.enabled ?? true,
-    allowWrite: server.allow_write ?? false,
     authMode: (server.auth_mode as McpAuthMode | undefined) ?? 'bearer',
   })
   void revealEditor()
@@ -679,7 +684,6 @@ const save = async () => {
       url: form.url.trim(),
       auth_header: form.authHeader.trim(),
       enabled: form.enabled,
-      allow_write: form.allowWrite,
       ...(editingId.value === null || form.authMode !== editingAuthMode.value
         ? { auth_mode: form.authMode }
         : {}),
@@ -785,6 +789,10 @@ const disconnectOAuth = async (server: McpServer) => {
 onMounted(async () => {
   void loadTaskPrompts()
   await load()
+  const linked = Number(route.query.server)
+  if (route.query.tab === 'permissions' && servers.value.some((server) => server.id === linked)) {
+    permissionsId.value = linked
+  }
   await finishSignIn(servers.value)
 })
 </script>
