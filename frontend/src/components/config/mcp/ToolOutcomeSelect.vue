@@ -27,7 +27,7 @@
 import { Icon } from '@iconify/vue'
 import { OUTCOMES, type ToolOutcome } from './toolPermissions'
 
-defineProps<{
+const props = defineProps<{
   modelValue: ToolOutcome | 'mixed'
   disabled?: boolean
   label: string
@@ -43,8 +43,15 @@ const ICONS: Record<ToolOutcome | 'mixed', string> = {
   mixed: 'heroicons:minus-circle',
 }
 
+/**
+ * The parent decides: it may ask first, refuse, or save. Until the prop
+ * changes, the select keeps showing the current value, so a cancelled
+ * change needs no reload.
+ */
 const onChange = (event: Event) => {
-  const value = (event.target as HTMLSelectElement).value
+  const select = event.target as HTMLSelectElement
+  const value = select.value
+  select.value = props.modelValue
   if (value === 'auto' || value === 'approve' || value === 'block') emit('update:modelValue', value)
 }
 </script>

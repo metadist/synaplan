@@ -480,7 +480,10 @@
       "clientOff": "MCP çağrıları kapalı, bu yüzden burada ayarlanacak bir şey yok. İzinleri yönetmek için açın.",
       "notice": "Yapay zekâ artık bu bağlantıda yazma araçlarını sormadan kullanabilir. Yıkıcı araçlar yine de sorar.",
       "noticeReview": "İzinleri gözden geçir",
-      "noticeDismiss": "Anladım"
+      "noticeDismiss": "Anladım",
+      "tabsLabel": "Bağlantı bölümleri",
+      "reset": "Varsayılana sıfırla ({outcome})",
+      "undone": "Değişiklik geri alındı."
     }
   },
   "messagesGateway": {

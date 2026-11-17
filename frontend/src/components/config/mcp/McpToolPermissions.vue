@@ -3,6 +3,14 @@
     <div>
       <p class="txt-primary text-sm font-medium">{{ $t('mcpServers.permissions.title') }}</p>
       <p class="txt-secondary text-sm mt-1">{{ $t('mcpServers.permissions.intro') }}</p>
+      <ul class="txt-secondary text-xs mt-2 flex flex-wrap gap-x-4 gap-y-1">
+        <li v-for="outcome in OUTCOMES" :key="outcome">
+          <span class="font-medium txt-primary">{{
+            $t(`mcpServers.permissions.outcome.${outcome}`)
+          }}</span>
+          · {{ $t(`mcpServers.permissions.outcomeHint.${outcome}`) }}
+        </li>
+      </ul>
     </div>
 
     <McpPermissionsNotice
@@ -60,24 +68,32 @@ import {
   mcpServersApi,
   type McpToolPermission,
   type McpToolPermissionList,
+  type ToolPermissionChoice,
 } from '@/services/api/mcpServersApi'
 import { userFacingError } from '@/utils/userFacingError'
 import McpPermissionsNotice from './McpPermissionsNotice.vue'
 import McpToolCategory from './McpToolCategory.vue'
-import { CATEGORIES, type ToolCategory, type ToolOutcome } from './toolPermissions'
+import {
+  CATEGORIES,
+  OUTCOMES,
+  editableTools,
+  restoreChoice,
+  type ToolCategory,
+  type ToolOutcome,
+} from './toolPermissions'
 
 const props = defineProps<{ serverId: number; serverName: string }>()
 const emit = defineEmits<{ 'notice-dismissed': [] }>()
 
 const { t } = useI18n()
 const { confirm } = useDialog()
-const { push, error } = useNotification()
+const { push, success, error } = useNotification()
 
 const list = ref<McpToolPermissionList | null>(null)
 const loading = ref(true)
 const loadError = ref(false)
 const saving = ref(false)
-/** Tools that were new when the tab opened; they stay marked for this view. */
+/** Tools that were new when the panel opened; they stay marked for this view. */
 const newNames = ref(new Set<string>())
 
 const groups = computed(() =>
@@ -120,6 +136,15 @@ const dismissNotice = async () => {
   }
 }
 
+/** Re-reads what applies after a failed save, without blanking the panel. */
+const refresh = async () => {
+  try {
+    list.value = await mcpServersApi.toolPermissions(props.serverId)
+  } catch {
+    // The list on screen stays; the error toast already told the user.
+  }
+}
+
 /** Auto on a destructive tool needs a yes first. */
 const confirmDestructive = (category: ToolCategory, outcome: ToolOutcome) =>
   category !== 'destructive' || outcome !== 'auto'
@@ -131,52 +156,46 @@ const confirmDestructive = (category: ToolCategory, outcome: ToolOutcome) =>
         danger: true,
       })
 
-/** Saves at once and offers Undo, which restores each tool's earlier choice. */
-const apply = async (
-  changes: Record<string, ToolOutcome>,
-  previous: Record<string, ToolOutcome>,
-  message: string
-) => {
+const save = async (changes: Record<string, ToolPermissionChoice>): Promise<boolean> => {
   saving.value = true
   try {
     list.value = await mcpServersApi.setToolPermissions(props.serverId, { tools: changes })
-    push({
-      type: 'success',
-      message,
-      duration: 8000,
-      action: { label: t('mcpServers.permissions.undo'), onClick: () => void undo(previous) },
-    })
+    return true
   } catch (err) {
     error(userFacingError(err, t('mcpServers.permissions.saveFailed')))
-    await load()
+    await refresh()
+    return false
   } finally {
     saving.value = false
   }
 }
 
-const undo = async (previous: Record<string, ToolOutcome>) => {
-  saving.value = true
-  try {
-    list.value = await mcpServersApi.setToolPermissions(props.serverId, { tools: previous })
-  } catch (err) {
-    error(userFacingError(err, t('mcpServers.permissions.saveFailed')))
-    await load()
-  } finally {
-    saving.value = false
-  }
+/** Saves at once and offers Undo, which restores each tool's earlier choice. */
+const apply = async (
+  changes: Record<string, ToolPermissionChoice>,
+  previous: Record<string, ToolPermissionChoice>,
+  message: string
+) => {
+  if (!(await save(changes))) return
+  push({
+    type: 'success',
+    message,
+    duration: 8000,
+    action: { label: t('mcpServers.permissions.undo'), onClick: () => void undo(previous) },
+  })
 }
 
-const setTool = async (tool: McpToolPermission, outcome: ToolOutcome) => {
-  if (
-    outcome === tool.outcome ||
-    !(await confirmDestructive(tool.category as ToolCategory, outcome))
-  ) {
-    await load()
-    return
-  }
+const undo = async (previous: Record<string, ToolPermissionChoice>) => {
+  if (await save(previous)) success(t('mcpServers.permissions.undone'))
+}
+
+const setTool = async (tool: McpToolPermission, choice: ToolOutcome | 'default') => {
+  const outcome = choice === 'default' ? (tool.default_outcome as ToolOutcome) : choice
+  if (choice !== 'default' && outcome === tool.outcome) return
+  if (!(await confirmDestructive(tool.category as ToolCategory, outcome))) return
   await apply(
-    { [tool.name]: outcome },
-    { [tool.name]: tool.outcome },
+    { [tool.name]: choice },
+    { [tool.name]: restoreChoice(tool) },
     t('mcpServers.permissions.saved', { tool: tool.title, outcome: outcomeLabel(outcome) })
   )
 }
@@ -186,14 +205,11 @@ const setCategory = async (
   tools: McpToolPermission[],
   outcome: ToolOutcome
 ) => {
-  const touched = tools.filter((tool) => tool.outcome !== outcome && tool.locked_reason === null)
-  if (touched.length === 0 || !(await confirmDestructive(category, outcome))) {
-    await load()
-    return
-  }
+  const touched = editableTools(tools).filter((tool) => tool.outcome !== outcome)
+  if (touched.length === 0 || !(await confirmDestructive(category, outcome))) return
   await apply(
     Object.fromEntries(touched.map((tool) => [tool.name, outcome])),
-    Object.fromEntries(touched.map((tool) => [tool.name, tool.outcome])),
+    Object.fromEntries(touched.map((tool) => [tool.name, restoreChoice(tool)])),
     t(
       'mcpServers.permissions.categorySaved',
       { count: touched.length, outcome: outcomeLabel(outcome) },

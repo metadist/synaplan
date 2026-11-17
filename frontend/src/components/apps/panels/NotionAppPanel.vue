@@ -91,11 +91,12 @@
 
     <div v-else class="space-y-4" data-testid="section-notion-connected">
       <TabNav
-        v-model="tab"
+        :model-value="tab"
         :tabs="tabs"
-        :aria-label="$t('mcpServers.permissions.title')"
+        :aria-label="$t('mcpServers.permissions.tabsLabel')"
         testid="tabs-notion"
         mobile-trigger-testid="tabs-notion-mobile-trigger"
+        @update:model-value="selectTab"
       />
       <div
         v-if="tab === 'permissions' && status?.server_id != null"
@@ -108,28 +109,7 @@
           @notice-dismissed="notice = false"
         />
       </div>
-      <div v-else class="surface-card rounded-2xl p-4 sm:p-5 space-y-5">
-        <NotionConnectedSection v-model:status="status" :account="account" @try="tryPrompt" />
-        <div class="flex flex-wrap gap-3">
-          <button
-            type="button"
-            class="btn-primary px-4 py-2.5 text-sm font-medium"
-            data-testid="btn-notion-try-chat"
-            @click="tryPrompt('')"
-          >
-            {{ $t('apps.notion.tryChat') }}
-          </button>
-          <button
-            type="button"
-            class="btn-danger rounded-lg px-4 py-2.5 text-sm font-medium"
-            data-testid="btn-notion-disconnect"
-            @click="disconnect"
-          >
-            {{ $t('apps.notion.disconnect') }}
-          </button>
-        </div>
-      </div>
-      <template v-if="tab === 'overview'">
+      <template v-else>
         <McpPermissionsNotice
           v-if="notice"
           :show-review="true"
@@ -137,6 +117,27 @@
           @review="tab = 'permissions'"
           @dismiss="dismissNotice"
         />
+        <div class="surface-card rounded-2xl p-4 sm:p-5 space-y-5">
+          <NotionConnectedSection v-model:status="status" :account="account" @try="tryPrompt" />
+          <div class="flex flex-wrap gap-3">
+            <button
+              type="button"
+              class="btn-primary px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-notion-try-chat"
+              @click="tryPrompt('')"
+            >
+              {{ $t('apps.notion.tryChat') }}
+            </button>
+            <button
+              type="button"
+              class="btn-danger rounded-lg px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-notion-disconnect"
+              @click="disconnect"
+            >
+              {{ $t('apps.notion.disconnect') }}
+            </button>
+          </div>
+        </div>
         <div class="surface-card rounded-2xl p-4 sm:p-5">
           <NotionWatches />
         </div>
@@ -178,7 +179,16 @@ const loading = ref(true)
 const loadError = ref(false)
 const connecting = ref(false)
 const usingShared = ref(false)
-const tab = ref(route.query.tab === 'permissions' ? 'permissions' : 'overview')
+type NotionTab = 'overview' | 'permissions'
+const tab = ref<NotionTab>(route.query.tab === 'permissions' ? 'permissions' : 'overview')
+/** Keeps the tab in the URL so a reload or a shared link opens the same tab. */
+const selectTab = (next: string) => {
+  tab.value = next === 'permissions' ? 'permissions' : 'overview'
+  const query = { ...route.query }
+  if (tab.value === 'permissions') query.tab = 'permissions'
+  else delete query.tab
+  void router.replace({ query })
+}
 const tabs = computed<TabNavItem[]>(() => [
   { id: 'overview', label: t('mcpServers.permissions.overviewTab'), testid: 'tab-notion-overview' },
   {

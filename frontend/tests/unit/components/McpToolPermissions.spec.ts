@@ -4,22 +4,24 @@ import { createI18n } from 'vue-i18n'
 import McpToolPermissions from '@/components/config/mcp/McpToolPermissions.vue'
 import tools from '@/i18n/locales/en/tools.json'
 
-const { toolPermissions, setToolPermissions, markToolsSeen, confirm, push, error } = vi.hoisted(
-  () => ({
+const { toolPermissions, setToolPermissions, markToolsSeen, confirm, push, success, error } =
+  vi.hoisted(() => ({
     toolPermissions: vi.fn(),
     setToolPermissions: vi.fn(),
     markToolsSeen: vi.fn(),
     confirm: vi.fn(),
     push: vi.fn(),
+    success: vi.fn(),
     error: vi.fn(),
-  })
-)
+  }))
 
 vi.mock('@/services/api/mcpServersApi', () => ({
   mcpServersApi: { toolPermissions, setToolPermissions, markToolsSeen },
 }))
 vi.mock('@/composables/useDialog', () => ({ useDialog: () => ({ confirm }) }))
-vi.mock('@/composables/useNotification', () => ({ useNotification: () => ({ push, error }) }))
+vi.mock('@/composables/useNotification', () => ({
+  useNotification: () => ({ push, success, error }),
+}))
 
 const tool = (over: Record<string, unknown> = {}) => ({
   name: 'search',
@@ -104,6 +106,8 @@ describe('McpToolPermissions', () => {
 
     expect(confirm).toHaveBeenCalled()
     expect(setToolPermissions).not.toHaveBeenCalled()
+    expect(toolPermissions).toHaveBeenCalledTimes(1)
+    expect((selects[selects.length - 1].element as HTMLSelectElement).value).toBe('approve')
   })
 
   it('saves a change at once and offers undo with the previous choice', async () => {
@@ -121,6 +125,58 @@ describe('McpToolPermissions', () => {
     setToolPermissions.mockResolvedValue(list([tool()]))
     toast.action.onClick()
     await flushPromises()
-    expect(setToolPermissions).toHaveBeenLastCalledWith(4, { tools: { search: 'auto' } })
+    expect(setToolPermissions).toHaveBeenLastCalledWith(4, { tools: { search: 'default' } })
+    expect(success).toHaveBeenCalled()
+  })
+
+  it('undo restores an earlier override as that value, not the default', async () => {
+    toolPermissions.mockResolvedValue(list([tool({ outcome: 'approve' })]))
+    setToolPermissions.mockResolvedValue(list([tool({ outcome: 'block' })]))
+    const wrapper = await mountIt()
+
+    const selects = wrapper.findAll('select')
+    await selects[selects.length - 1].setValue('block')
+    await flushPromises()
+
+    push.mock.calls[0][0].action.onClick()
+    await flushPromises()
+    expect(setToolPermissions).toHaveBeenLastCalledWith(4, { tools: { search: 'approve' } })
+  })
+
+  it('resets a changed tool to its default', async () => {
+    toolPermissions.mockResolvedValue(list([tool({ outcome: 'block' })]))
+    setToolPermissions.mockResolvedValue(list([tool()]))
+    const wrapper = await mountIt()
+
+    await wrapper.get('[data-testid="btn-mcp-tool-reset-search"]').trigger('click')
+    await flushPromises()
+
+    expect(setToolPermissions).toHaveBeenCalledWith(4, { tools: { search: 'default' } })
+    expect(wrapper.find('[data-testid="btn-mcp-tool-reset-search"]').exists()).toBe(false)
+  })
+
+  it('keeps the list and the New marks when a save fails', async () => {
+    toolPermissions.mockResolvedValueOnce(list([tool({ is_new: true })]))
+    toolPermissions.mockResolvedValue(list([tool({ is_new: false })]))
+    setToolPermissions.mockRejectedValue(new Error('down'))
+    const wrapper = await mountIt()
+
+    const selects = wrapper.findAll('select')
+    await selects[selects.length - 1].setValue('block')
+    await flushPromises()
+
+    expect(error).toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="mcp-tool-new-search"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="mcp-permissions-loading"]').exists()).toBe(false)
+  })
+
+  it('does not send a category change when every tool of it is locked', async () => {
+    toolPermissions.mockResolvedValue(
+      list([tool({ locked_reason: 'group_policy', outcome: 'block' })])
+    )
+    const wrapper = await mountIt()
+    const category = wrapper.get('[data-testid="select-mcp-category-read"]')
+    expect((category.element as HTMLSelectElement).disabled).toBe(true)
   })
 })
