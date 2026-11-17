@@ -50,7 +50,11 @@ final readonly class FileGroupDeletionService
         ];
     }
 
-    private function deleteFile(int $userId, File $file): void
+    /**
+     * Deletes one file of the account with its revisions, index entries and
+     * stored bytes, the same way a whole group is deleted.
+     */
+    public function deleteFile(int $userId, File $file): void
     {
         $this->documentRevisionService->deleteForFile($file);
 

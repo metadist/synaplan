@@ -4631,6 +4631,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "FEATURE_MODULES_GATE_PROJECTS": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_RESEARCH": {
                 "isMasked": false,
                 "isSet": false,
@@ -6531,6 +6537,17 @@
                 "tab": "features",
                 "type": "boolean"
             },
+            "FEATURE_MODULES_GATE_PROJECTS": {
+                "dbGroup": "MODULES",
+                "dbKey": "GATE_PROJECTS",
+                "default": "true",
+                "description": "Hide the \"projects\" module while it is not configured: its API routes answer 404 and the interface shows no card for it. On is the shipped default for new installs. Configure the module first — see Admin → System status.",
+                "section": "modules",
+                "sensitive": false,
+                "source": "database",
+                "tab": "features",
+                "type": "boolean"
+            },
             "FEATURE_MODULES_GATE_RESEARCH": {
                 "dbGroup": "MODULES",
                 "dbKey": "GATE_RESEARCH",
@@ -8172,6 +8189,7 @@
                             "FEATURE_MODULES_GATE_OFFICE_EDITOR",
                             "FEATURE_MODULES_GATE_OPENDESK_STT",
                             "FEATURE_MODULES_GATE_PIPER_TTS",
+                            "FEATURE_MODULES_GATE_PROJECTS",
                             "FEATURE_MODULES_GATE_RESEARCH",
                             "FEATURE_MODULES_GATE_SEARXNG",
                             "FEATURE_MODULES_GATE_STRIPE_BILLING",
@@ -9023,6 +9041,12 @@
                 "value": "true"
             },
             "FEATURE_MODULES_GATE_PIPER_TTS": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
+            "FEATURE_MODULES_GATE_PROJECTS": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,
@@ -12751,6 +12775,12 @@
                 "locked": false,
                 "value": "true"
             },
+            "FEATURE_MODULES_GATE_PROJECTS": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
             "FEATURE_MODULES_GATE_RESEARCH": {
                 "isMasked": false,
                 "isSet": false,
@@ -14077,6 +14107,12 @@
                 "value": "true"
             },
             "FEATURE_MODULES_GATE_PIPER_TTS": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "true"
+            },
+            "FEATURE_MODULES_GATE_PROJECTS": {
                 "isMasked": false,
                 "isSet": false,
                 "locked": false,

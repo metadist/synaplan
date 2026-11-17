@@ -12,8 +12,11 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(columns: ['BUSERID'], name: 'idx_chat_user')]
 #[ORM\Index(columns: ['BSHARETOKEN'], name: 'idx_chat_share')]
 #[ORM\Index(columns: ['BSOURCE'], name: 'idx_chat_source')]
+#[ORM\Index(columns: ['BPROJECTID'], name: 'idx_chat_project')]
 class Chat
 {
+    public const SOURCE_WEB = 'web';
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column(name: 'BID', type: 'integer')]
@@ -62,6 +65,17 @@ class Chat
     #[ORM\Column(name: 'BTAGS', type: 'string', length: 500, options: ['default' => '[]'])]
     private string $tags = '[]';
 
+    /** The project this chat belongs to; its knowledge folder is pinned for every turn. */
+    #[ORM\Column(name: 'BPROJECTID', type: 'bigint', nullable: true)]
+    private ?int $projectId = null;
+
+    #[ORM\Column(name: 'BPROJECTSHARED', type: 'boolean', options: ['default' => false])]
+    private bool $projectShared = false;
+
+    /** `project` or `project_personal`; null outside a project. */
+    #[ORM\Column(name: 'BMEMORYMODE', type: 'string', length: 20, nullable: true)]
+    private ?string $memoryMode = null;
+
     #[ORM\OneToMany(mappedBy: 'chat', targetEntity: Message::class)]
     private Collection $messages;
 
@@ -75,6 +89,32 @@ class Chat
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getProjectId(): ?int
+    {
+        return null === $this->projectId ? null : (int) $this->projectId;
+    }
+
+    public function setProjectId(?int $projectId): self
+    {
+        $this->projectId = $projectId;
+        if (null === $projectId) {
+            $this->projectShared = false;
+            $this->memoryMode = null;
+        }
+
+        return $this;
+    }
+
+    public function isProjectShared(): bool
+    {
+        return $this->projectShared;
+    }
+
+    public function getMemoryMode(): ?string
+    {
+        return $this->memoryMode;
     }
 
     public function getUserId(): int

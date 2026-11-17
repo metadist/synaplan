@@ -1655,6 +1655,9 @@
     "research": {
       "label": "Recherche"
     },
+    "projects": {
+      "label": "Projekte"
+    },
     "freeapi": {
       "label": "Synaplan-Demo"
     },

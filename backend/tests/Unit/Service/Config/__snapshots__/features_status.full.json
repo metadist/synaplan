@@ -601,6 +601,28 @@
             "mobile_class": "backend-only"
         },
         {
+            "id": "projects",
+            "label_key": "modules.projects.label",
+            "state": "absent",
+            "configured": false,
+            "healthy": false,
+            "message": "Projects are turned off",
+            "details": [],
+            "configured_by": {
+                "env": [
+                    "PROJECTS_ENABLED"
+                ],
+                "bconfig": [
+                    "PROJECTS.ENABLED"
+                ],
+                "providers": [],
+                "plugs": []
+            },
+            "capabilities": [],
+            "docs_anchor": "modules/projects",
+            "mobile_class": "backend-only"
+        },
+        {
             "id": "research",
             "label_key": "modules.research.label",
             "state": "absent",

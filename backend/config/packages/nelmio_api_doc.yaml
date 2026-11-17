@@ -14,6 +14,37 @@ nelmio_api_doc:
               description: Local development server
         components:
             schemas:
+                # Projects: a name, instructions and sources (ProjectPresenter).
+                Project:
+                    type: object
+                    required: [id, name, description, instructions, createdAt, updatedAt]
+                    properties:
+                        id: {type: string, format: uuid, example: 7b0f4c1e-6a4e-4a4b-9d0e-3a5b7c9d1e2f}
+                        name: {type: string, example: New kitchen}
+                        description: {type: string, nullable: true}
+                        instructions: {type: string, nullable: true}
+                        createdAt: {type: string, format: date-time}
+                        updatedAt: {type: string, format: date-time}
+                ProjectSource:
+                    type: object
+                    required: [id, name, kind, state, reason, sourceUrl, fetchedAt, size, createdAt]
+                    properties:
+                        id: {type: integer, example: 42}
+                        name: {type: string, example: offer.pdf}
+                        kind: {type: string, enum: [file, link, text]}
+                        state: {type: string, enum: [reading, ready, failed]}
+                        reason: {type: string, nullable: true, description: Why a source is failed}
+                        sourceUrl: {type: string, nullable: true}
+                        fetchedAt: {type: integer, nullable: true, description: Unix time of the last fetch of a link}
+                        size: {type: integer}
+                        createdAt: {type: integer, description: Unix time}
+                ProjectChat:
+                    type: object
+                    required: [id, title, updatedAt]
+                    properties:
+                        id: {type: integer}
+                        title: {type: string}
+                        updatedAt: {type: string, format: date-time}
                 # What Synaplan's OAuth server endpoints answer when they
                 # refuse (RFC 6749 section 5.2, RFC 7591 section 3.2.2).
                 OAuthError:

@@ -198,4 +198,14 @@ final class ChatPromptBlocks
     {
         return "\nWhen you answer, name the source file you used from the knowledge context above.\n";
     }
+
+    /**
+     * The owner's standing instructions for a project chat.
+     */
+    public static function projectInstructions(string $projectName, string $instructions): string
+    {
+        $label = '' === trim($projectName) ? 'this project' : 'the project "'.trim($projectName).'"';
+
+        return "\n\nInstructions from the owner of {$label}. Follow them in every answer in this chat:\n".trim($instructions)."\n";
+    }
 }
