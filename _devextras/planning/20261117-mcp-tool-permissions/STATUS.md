@@ -10,8 +10,9 @@ to them.
 | TP1 | merged (#3156) | — | storage, resolution, gate, Notion classes; see below |
 | TP2 | merged (#3157) | — | API, always allow; Notion PATCH stays until TP3 (see below) |
 | TP3 | merged (#3158) | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
-| TP4 | in review | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
-| TP5–TP6 | not started | — | TP5 next |
+| TP4 | merged (#3159) | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
+| TP5 | in progress | — | E2E `mcp-tool-permissions.spec.ts` (J-TP-1…4, notice, read-only), docs; J-TP-5/7 and J-TP-6 see TP5 notes |
+| TP6 | not started | — | one release after TP2 |
 
 ## TP1 notes
 
@@ -51,3 +52,11 @@ to them.
 - One-time notice: marker `notice` in `BTOOLPOLICY`, set by migration `Version20261117160000` on existing connections with writes off; closed via `POST /api/v1/mcp-servers/{id}/tool-permissions/notice/dismiss`. Shown on the Notion Overview (banner + badge on the Permissions tab) and above the permissions list.
 - Not covered: the model is not told which blocked tool it lacks; only runtime refusals link to Permissions.
 - Walked in the browser: notice, Review, Dismiss; Notion search on Approve, card, Approve ran the tool. Reject uses the existing flow and was not re-walked. E2E: 159 passed, 44 failed (same known local-only set as before, none in approval or permissions specs).
+
+## TP5 notes
+
+- `frontend/tests/e2e/tests/mcp-tool-permissions.spec.ts` mocks the permissions API (stateful PUT, `notice` included). Covers J-TP-1, J-TP-2 (UI half), J-TP-3 (UI half), J-TP-4, the one-time notice and the read-only view.
+- Not in Playwright: the chat halves of J-TP-2/3/5/7 (approval card, refusal text, Always allow) need a live model and a live Notion; they are covered by `ApprovalCard`, `approvalPlacement`, `ToolExecutionGateMcpTest`, `McpApprovalAllowanceTest`, `ChatApprovalAnswerTest`. J-TP-6 (member of an organisation-shared Notion connection) is not built for the Notion panel; the API side is covered by `McpToolPermissionControllerTest`.
+- Docs: `CONNECTIONS.md` (new "Tool permissions" section), `ADMIN.md`, `PLATFORM_REFERENCE.md`, `MULTITASK_DATA_NODES.md`. The repository has no changelog file; the behaviour change of decision #6 is in the CONNECTIONS notice and the PR text.
+- Plan §7 proofs checked: `McpClient::callTool()` refuses a Block tool for every caller (central choke point; `McpClientTest::testAToolTheOwnerBlockedNeverLeavesForAnyCaller`), so `NotionGateway`, `NotionPageWrite`, the linked-page readers and `NotionAccountReader` cannot reach one. Gate side: `ToolExecutionGateMcpTest`; Always allow never lifts Block: `McpApprovalAllowanceTest`.
+- Catalog-size measurement (plan §8): still not measured.
