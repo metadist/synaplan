@@ -295,7 +295,19 @@
               @media-job-update="onMediaJobUpdate(message, $event)"
               @media-job-completed="handleMediaJobCompleted(message, $event)"
               @media-job-cancel="mediaJobsStore.cancel($event)"
-            />
+            >
+              <template v-if="approvalsFor(message).length > 0" #approvals>
+                <ApprovalCard
+                  v-for="row in approvalsFor(message)"
+                  :key="row.id"
+                  :approval="row"
+                  :can-always-allow="row.canAlwaysAllow"
+                  @approved="onChatApprovalApproved"
+                  @rejected="onChatApprovalRejected"
+                  @always-allow="onChatApprovalAlwaysAllow"
+                />
+              </template>
+            </ChatMessage>
           </template>
         </div>
       </div>
@@ -348,21 +360,6 @@
         :can-continue="chatsStore.conversationAccess === 'use'"
         @continue="continueSharedConversation"
       />
-      <div
-        v-if="isApprovalsEnabled() && chatPendingApprovals.length > 0"
-        class="mx-4 mb-3 space-y-3"
-        data-testid="chat-approvals"
-      >
-        <ApprovalCard
-          v-for="row in chatPendingApprovals"
-          :key="row.id"
-          :approval="row"
-          :can-always-allow="row.canAlwaysAllow"
-          @approved="onChatApprovalApproved"
-          @rejected="onChatApprovalRejected"
-          @always-allow="onChatApprovalAlwaysAllow"
-        />
-      </div>
       <!-- Read-only viewers of a shared chat get no composer, but still see
            the chat's files (open only, no attach or delete). -->
       <div
@@ -984,6 +981,30 @@ const chatPendingApprovals = computed(() =>
     (row) => row.requestedBy.kind === 'chat' && row.requestedBy.chatId === chatsStore.activeChatId
   )
 )
+
+/**
+ * A pending approval sits in the answer to the message that asked for it: the
+ * first answer after that message, or the last answer when none matches.
+ */
+function approvalsFor(message: { id: string | number; role: string }) {
+  if (message.role !== 'assistant' || !isApprovalsEnabled()) {
+    return []
+  }
+  const all = historyStore.messages
+  const rows = chatPendingApprovals.value
+  if (rows.length === 0) {
+    return []
+  }
+  const lastAssistant = [...all].reverse().find((m) => m.role === 'assistant')
+  return rows.filter((row) => {
+    const askedAt = all.findIndex(
+      (m) => m.role === 'user' && m.backendMessageId === row.requestedBy.messageId
+    )
+    const target =
+      askedAt >= 0 ? all.slice(askedAt + 1).find((m) => m.role === 'assistant') : lastAssistant
+    return (target ?? lastAssistant)?.id === message.id
+  })
+}
 
 async function onChatApprovalApproved(id: number): Promise<void> {
   try {
