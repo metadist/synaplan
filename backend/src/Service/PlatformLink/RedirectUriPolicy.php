@@ -52,8 +52,9 @@ final readonly class RedirectUriPolicy
      * own configuration (PLATFORM_LINKS_OIDC_CLOUD_URL). Same form and checks
      * as {@see normalizeHost}, except that the host may resolve into the
      * operator's own network: a cloud next to Synaplan, in the same cluster
-     * or behind the same private ingress. Link-local and other reserved
-     * addresses stay refused. Never for a host a caller supplied.
+     * or behind the same private ingress. Loopback, link-local and other
+     * reserved addresses stay refused, as {@see DeliveryOriginPolicy} refuses
+     * them for this cloud. Never for a host a caller supplied.
      */
     public function normalizeOperatorHost(string $raw): string
     {
@@ -332,6 +333,26 @@ final readonly class RedirectUriPolicy
         if ($this->ssrfGuard->isBlockedHost($host, $operatorNetwork)) {
             throw new PlatformLinkValidationException('Host is not allowed.');
         }
+        if ($operatorNetwork && $this->resolvesToLoopbackOrLinkLocal($host)) {
+            throw new PlatformLinkValidationException('Host is not allowed.');
+        }
+    }
+
+    /**
+     * The operator's network includes loopback, but a cloud on this machine's
+     * own loopback is no cloud next to Synaplan: refuse it, whether named as
+     * a literal IP or resolved from a hostname.
+     */
+    private function resolvesToLoopbackOrLinkLocal(string $host): bool
+    {
+        $ips = false !== filter_var($host, \FILTER_VALIDATE_IP) ? [$host] : $this->ssrfGuard->resolvedIps($host);
+        foreach ($ips as $ip) {
+            if (DeliveryOriginPolicy::ipIsLoopbackOrLinkLocal($ip)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function isLocalDevHost(string $host): bool

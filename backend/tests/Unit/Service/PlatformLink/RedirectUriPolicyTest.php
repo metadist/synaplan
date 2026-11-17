@@ -125,6 +125,9 @@ final class RedirectUriPolicyTest extends TestCase
     {
         yield 'cloud metadata address' => ['https://169.254.169.254'];
         yield 'link-local IPv6' => ['https://[fe80::1]'];
+        yield 'loopback IPv4' => ['https://127.0.0.1'];
+        yield 'loopback IPv6' => ['https://[::1]'];
+        yield 'localhost' => ['https://localhost'];
         yield 'plain http' => ['http://10.20.30.40'];
         yield 'wildcard' => ['https://*.example.org'];
         yield 'look-alike' => ['xn--files-example-org'];
