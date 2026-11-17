@@ -909,6 +909,14 @@
     "apiKeys": {
       "title": "API-Schlüssel",
       "description": "Erstellen und verwalten Sie API-Schlüssel für den API-Zugriff.",
+      "usage": {
+        "title": "Diese API verwenden",
+        "intro": "Erstellen Sie auf dieser Seite einen Schlüssel. Senden Sie ihn als Authorization: Bearer. Kopieren Sie die Adresse, die Ihr Programm verlangt.",
+        "openai": "OpenAI-Basis-URL",
+        "chat": "Chat Completions",
+        "mcp": "MCP",
+        "copy": "{label} kopieren"
+      },
       "docsTitle": "API-Dokumentation",
       "docsDesc": "Alle verfügbaren Endpunkte, Anfrageformate und Authentifizierungsmethoden ansehen.",
       "createKey": "API-Schlüssel erstellen",
