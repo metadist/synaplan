@@ -938,8 +938,8 @@ person's link and every token it holds.
 Keycloak)** needs no registration: `PLATFORM_LINKS_OIDC_CLOUD*` configure it
 (see `backend/.env.example`). People's tokens are exchanged in Keycloak; a
 person's link is created on their first call through the cloud. Synaplan
-sends the OpenCloud app lifecycle notices only; it offers it no copies or
-pickups until the app takes them.
+offers the OpenCloud app copies and pickups, which the app takes from 1.2.0
+on. An older app leaves them waiting: update the app with Synaplan.
 
 **What a user sees.** **Channels & integrations → Linked platforms** lists the
 user's own links (platform, host, external id) with *Disconnect*, which ends
