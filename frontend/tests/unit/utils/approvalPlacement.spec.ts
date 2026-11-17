@@ -26,15 +26,18 @@ describe('placeApprovals', () => {
   })
 
   it('falls back to the last answer when no answer follows the asking message yet', () => {
-    const placed = placeApprovals([...thread, { id: 'u3', role: 'user', backendMessageId: 30 }], [
-      row(5, 30),
-    ])
+    const placed = placeApprovals(
+      [...thread, { id: 'u3', role: 'user', backendMessageId: 30 }],
+      [row(5, 30)]
+    )
 
     expect(placed.get('a2')?.map((r) => r.id)).toEqual([5])
   })
 
   it('places nothing without an answer bubble or without approvals', () => {
-    expect(placeApprovals([{ id: 'u1', role: 'user', backendMessageId: 10 }], [row(1, 10)]).size).toBe(0)
+    expect(
+      placeApprovals([{ id: 'u1', role: 'user', backendMessageId: 10 }], [row(1, 10)]).size
+    ).toBe(0)
     expect(placeApprovals(thread, []).size).toBe(0)
   })
 })
