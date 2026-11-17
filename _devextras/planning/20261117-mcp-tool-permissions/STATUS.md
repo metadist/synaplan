@@ -45,8 +45,8 @@ to them.
 
 ## TP4 notes
 
-- Approve on a read tool in chat now opens the approval card (the gate no longer refuses for a step that "cannot ask"). Accept runs the tool and posts a one-sentence follow-up; reject does not run it.
-- Limitation: after approval the result arrives as a clipped follow-up message, not an AI-composed answer. A full resume of the AI answer is a larger follow-up.
+- Approve on a read tool in chat opens the approval card inside the answer bubble (the gate no longer refuses for a step that "cannot ask"). Accept runs the tool and the AI-composed answer replaces the waiting text in the same bubble; the step card finishes. Reject does not run it.
+- Limits: the in-place answer covers the plain shape (one waiting step, at most two pending). Any other shape, or a model failure, falls back to a short follow-up message. Saved tasks and unattended runs are unchanged.
 - The card shows Approve for a destructive MCP tool the owner set to ask (built-in destructive tools still hide it); Always allow stays hidden for destructive.
 - One-time notice: marker `notice` in `BTOOLPOLICY`, set by migration `Version20261117160000` on existing connections with writes off; closed via `POST /api/v1/mcp-servers/{id}/tool-permissions/notice/dismiss`. Shown on the Notion Overview (banner + badge on the Permissions tab) and above the permissions list.
 - Not covered: the model is not told which blocked tool it lacks; only runtime refusals link to Permissions.

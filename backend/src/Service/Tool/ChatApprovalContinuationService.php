@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Tool;
 
 use App\Entity\Approval;
+use App\Entity\Chat;
 use App\Entity\Message;
 use App\Realtime\Channel\UserChannel;
 use App\Realtime\Publisher\RealtimePublisherInterface;
@@ -46,6 +47,7 @@ final readonly class ChatApprovalContinuationService
         private UserRepository $users,
         private TranslatorInterface $translator,
         private RealtimePublisherInterface $publisher,
+        private ChatApprovalAnswer $answers,
     ) {
     }
 
@@ -54,7 +56,7 @@ final readonly class ChatApprovalContinuationService
      *
      * @return (callable(): void)|null announcer to run after the approval save, or null when the approval is not a continuable chat approval
      */
-    public function continueChat(Approval $approval, string $outcome, ?string $detail): ?callable
+    public function continueChat(Approval $approval, string $outcome, ?string $detail, ?string $result = null): ?callable
     {
         $reference = ApprovalReference::parse($approval->getRequestedBy());
         if (ApprovalReference::KIND_CHAT !== $reference->kind || null === $reference->messageId || $reference->messageId <= 0) {
@@ -79,21 +81,14 @@ final readonly class ChatApprovalContinuationService
         $owner = $this->users->find($approval->getOwnerId());
         $locale = null !== $owner ? $owner->getLocale() : 'en';
 
-        $followUp = new Message();
-        $followUp->setUserId($approval->getOwnerId());
-        $followUp->setChat($chat);
-        $followUp->setText($this->text($outcome, $approval, $detail, $locale));
-        $followUp->setDirection('OUT');
-        $followUp->setStatus('complete');
-        $followUp->setMessageType($trigger->getMessageType());
-        $followUp->setTopic($trigger->getTopic());
-        $followUp->setLanguage($trigger->getLanguage());
-        $followUp->setTrackingId(time());
-        $followUp->setUnixTimestamp(time());
-        $followUp->setDateTime(date('YmdHis'));
-        $followUp->setProviderIndex('SYNA_APPROVAL');
-        $followUp->setFile(0);
-        $this->messages->save($followUp, false);
+        $answeredInPlace = self::OUTCOME_EXECUTED === $outcome
+            && null !== $result
+            && str_starts_with($approval->getTool(), 'mcp:')
+            && $this->answers->complete($trigger, $approval, $result);
+
+        if (!$answeredInPlace) {
+            $this->appendFollowUp($approval, $chat, $trigger, $outcome, $detail, $locale);
+        }
 
         $ownerId = $approval->getOwnerId();
         $approvalId = $approval->getId();
@@ -109,6 +104,25 @@ final readonly class ChatApprovalContinuationService
                 ],
             );
         };
+    }
+
+    private function appendFollowUp(Approval $approval, Chat $chat, Message $trigger, string $outcome, ?string $detail, string $locale): void
+    {
+        $followUp = new Message();
+        $followUp->setUserId($approval->getOwnerId());
+        $followUp->setChat($chat);
+        $followUp->setText($this->text($outcome, $approval, $detail, $locale));
+        $followUp->setDirection('OUT');
+        $followUp->setStatus('complete');
+        $followUp->setMessageType($trigger->getMessageType());
+        $followUp->setTopic($trigger->getTopic());
+        $followUp->setLanguage($trigger->getLanguage());
+        $followUp->setTrackingId(time());
+        $followUp->setUnixTimestamp(time());
+        $followUp->setDateTime(date('YmdHis'));
+        $followUp->setProviderIndex('SYNA_APPROVAL');
+        $followUp->setFile(0);
+        $this->messages->save($followUp, false);
     }
 
     /**
