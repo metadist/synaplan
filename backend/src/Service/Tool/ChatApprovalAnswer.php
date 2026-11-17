@@ -29,10 +29,11 @@ use Psr\Log\LoggerInterface;
  * The tool result is data from another system: the prompt says so and the
  * answer is plain text only, so nothing in it can run another tool.
  */
-readonly class ChatApprovalAnswer
+final readonly class ChatApprovalAnswer
 {
     private const MAX_PENDING_STEPS = 2;
     private const STEP_TEXT_CHARS = 2000;
+    private const PROMPT_RESULT_CHARS = 12000;
 
     public function __construct(
         private MessageRepository $messages,
@@ -103,6 +104,7 @@ readonly class ChatApprovalAnswer
         foreach ($this->messages->findByTrackingId($trigger->getTrackingId()) as $candidate) {
             if ($candidate instanceof Message
                 && 'OUT' === $candidate->getDirection()
+                && $candidate->getUserId() === $trigger->getUserId()
                 && $candidate->getChatId() === $trigger->getChatId()
                 && 'SYNA_APPROVAL' !== $candidate->getProviderIndex()) {
                 $answer = $candidate;
@@ -181,7 +183,10 @@ readonly class ChatApprovalAnswer
 
     private function userPrompt(Message $trigger, string $result): string
     {
-        return "Question:\n".$trigger->getText()."\n\nTool result:\n```\n".$this->clip($result, 12000)."\n```";
+        // A fence inside the result must not close the data block early.
+        $data = str_replace('```', "`\u{200B}``", $this->clip($result, self::PROMPT_RESULT_CHARS));
+
+        return "Question:\n".$trigger->getText()."\n\nTool result:\n```\n".$data."\n```";
     }
 
     private function clip(string $text, int $limit = self::STEP_TEXT_CHARS): string

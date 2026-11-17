@@ -296,9 +296,12 @@
               @media-job-completed="handleMediaJobCompleted(message, $event)"
               @media-job-cancel="mediaJobsStore.cancel($event)"
             >
-              <template v-if="approvalsFor(message).length > 0" #approvals>
+              <template
+                v-if="isApprovalsEnabled() && approvalsByMessage.has(message.id)"
+                #approvals
+              >
                 <ApprovalCard
-                  v-for="row in approvalsFor(message)"
+                  v-for="row in approvalsByMessage.get(message.id)"
                   :key="row.id"
                   :approval="row"
                   :can-always-allow="row.canAlwaysAllow"
@@ -710,6 +713,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useApprovalsStore } from '@/stores/approvals'
+import { placeApprovals } from '@/utils/approvalPlacement'
 import { useRealtimeStore } from '@/stores/realtime'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
@@ -982,29 +986,10 @@ const chatPendingApprovals = computed(() =>
   )
 )
 
-/**
- * A pending approval sits in the answer to the message that asked for it: the
- * first answer after that message, or the last answer when none matches.
- */
-function approvalsFor(message: { id: string | number; role: string }) {
-  if (message.role !== 'assistant' || !isApprovalsEnabled()) {
-    return []
-  }
-  const all = historyStore.messages
-  const rows = chatPendingApprovals.value
-  if (rows.length === 0) {
-    return []
-  }
-  const lastAssistant = [...all].reverse().find((m) => m.role === 'assistant')
-  return rows.filter((row) => {
-    const askedAt = all.findIndex(
-      (m) => m.role === 'user' && m.backendMessageId === row.requestedBy.messageId
-    )
-    const target =
-      askedAt >= 0 ? all.slice(askedAt + 1).find((m) => m.role === 'assistant') : lastAssistant
-    return (target ?? lastAssistant)?.id === message.id
-  })
-}
+/** Each pending approval of this chat, keyed by the answer bubble it sits in. */
+const approvalsByMessage = computed(() =>
+  placeApprovals(historyStore.messages, chatPendingApprovals.value)
+)
 
 async function onChatApprovalApproved(id: number): Promise<void> {
   try {
