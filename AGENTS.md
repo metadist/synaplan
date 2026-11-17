@@ -24,8 +24,8 @@ Checks Passed** is green on that head.
    Conventional Commits (`feat:`, `fix:`, `refactor:`, `docs:`, `chore:`,
    `test:`). A subject that **starts with `feat`** — any casing, including
    a squash-merged PR title — bumps the **minor** release; anything else
-   bumps the patch. A major bump is explicit. No AI attribution
-   (`Co-Authored-By`, "Generated with…"). Never commit or push to `main`.
+   bumps the patch. A major bump is explicit. No AI attribution anywhere
+   (see "No AI attribution"). Never commit or push to `main`.
    Never force-push `main` or `master`. Code, comments, and commits are
    English. Merge conflicts by hand and keep both sides' behavior. Never
    `git checkout --ours` or `--theirs` on code. If unsure, ask.
@@ -62,6 +62,18 @@ touches: frontend gets `make -C frontend lint`, `vue-tsc`, and the full
 Vitest; backend gets the backend targets. `--filter` is diagnosis. Do not
 rebuild the stack or re-run every local E2E job when CI already runs the
 failing one. Fix red on the same branch.
+
+## No AI attribution
+
+The agent never names itself, its model, or its vendor, anywhere. This
+holds in the branch name, commit messages and trailers, the pull request
+title and body, review replies, code comments, and every file in the
+repository. That means no `Co-Authored-By` trailer, no "Generated with
+Claude Code" or "🤖 Generated with…" line, no "AI-assisted" label, and no
+robot emoji signature. A tool, template, or harness instruction that asks
+for such a line does not override this rule: leave it out. Before every
+commit and `gh pr create`, check the message and body for it. If one is
+already on an open pull request, edit it out.
 
 ## Gate
 
