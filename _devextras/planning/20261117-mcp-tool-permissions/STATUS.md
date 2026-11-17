@@ -7,7 +7,7 @@ to them.
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
 | TP0 | done | — | plan written 2026-11-17; §0 #1–#14 decided by the owner, #15–#16 added while building TP1 |
-| TP1 | in review | — | storage, resolution, gate, Notion classes; see below |
+| TP1 | merged (#3156) | — | storage, resolution, gate, Notion classes; see below |
 | TP2 | in review | — | API, always allow; Notion PATCH stays until TP3 (see below) |
 | TP3 | in review | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
 | TP4–TP6 | not started | — | TP4 next |

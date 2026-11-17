@@ -153,6 +153,21 @@ final class McpClientTest extends TestCase
         self::assertSame('tools/call', json_decode((string) $sent[2]['options']['body'], true)['method']);
     }
 
+    public function testAToolTheOwnerBlockedNeverLeavesForAnyCaller(): void
+    {
+        $captured = [];
+        $client = $this->client([], $captured);
+        $server = $this->server()->setToolPolicy('{"v":1,"tools":{"search_customers":"block"}}');
+
+        try {
+            $client->callTool($server, 'search_customers', ['query' => 'acme'], contentDeletionApproved: true);
+            self::fail('A blocked tool must not be called.');
+        } catch (McpClientException $e) {
+            self::assertStringContainsString('blocked in the permissions', $e->getMessage());
+        }
+        self::assertSame([], $captured, 'nothing was sent');
+    }
+
     public function testAuthHeaderIsDecryptedAndSent(): void
     {
         $captured = [];

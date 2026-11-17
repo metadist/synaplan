@@ -50,6 +50,7 @@ final class McpToolPermissionsTest extends TestCase
     {
         foreach (['not json', '{"tools":"x"}', '[1'] as $raw) {
             $server = $this->server($raw);
+            self::assertSame(PolicyOutcome::Approve, $this->permissions->outcome($server, 'search', SideEffect::Read), $raw);
             self::assertSame(PolicyOutcome::Approve, $this->permissions->outcome($server, 'create', SideEffect::Write), $raw);
             self::assertSame(PolicyOutcome::Approve, $this->permissions->outcome($server, 'delete', SideEffect::Destructive), $raw);
         }
@@ -62,6 +63,23 @@ final class McpToolPermissionsTest extends TestCase
         self::assertSame(PolicyOutcome::Approve, $this->permissions->outcome($server, 'create', SideEffect::Write));
         self::assertSame(PolicyOutcome::Approve, $this->permissions->outcome($server, 'other', SideEffect::Write));
         self::assertSame([], $this->permissions->overrides($server));
+    }
+
+    public function testOnlyAnExplicitBlockCountsAsBlockedByTheOwner(): void
+    {
+        $server = $this->server('{"v":1,"tools":{"search":"block","create":"approve"}}', 'https://mcp.notion.com/mcp');
+
+        self::assertTrue($this->permissions->isBlockedByOwner($server, 'search'));
+        self::assertFalse($this->permissions->isBlockedByOwner($server, 'create'));
+        self::assertFalse($this->permissions->isBlockedByOwner($server, 'notion-create-file-upload'), 'unusable is not an owner block');
+    }
+
+    public function testOutcomeForToolClassesTheEntryByItsHints(): void
+    {
+        $server = $this->server();
+
+        self::assertSame(PolicyOutcome::Approve, $this->permissions->outcomeForTool($server, ['name' => 'drop', 'annotations' => ['destructiveHint' => true]]));
+        self::assertSame(PolicyOutcome::Auto, $this->permissions->outcomeForTool($server, ['name' => 'make', 'annotations' => []]));
     }
 
     public function testEmptyPolicyMeansAllDefaults(): void
