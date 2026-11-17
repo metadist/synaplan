@@ -97,20 +97,42 @@ final class McpToolPolicyStoreTest extends TestCase
         $server = $this->server();
         $this->store->setTools($server, ['create' => PolicyOutcome::Block], self::CLASSES);
 
-        $this->store->markSeen($server, ['search', 'create']);
-        $this->store->markSeen($server, ['create', 'update']);
+        $this->store->markSeen($server, ['search' => SideEffect::Read, 'create' => SideEffect::Write]);
+        $this->store->markSeen($server, ['create' => SideEffect::Write, 'update' => SideEffect::Write]);
 
         self::assertSame(['search', 'create', 'update'], $this->store->seen($server));
         self::assertSame(['create' => 'block'], $this->tools($server));
     }
 
-    public function testAnUnreadablePolicyIsReplacedByTheNewChoiceOnly(): void
+    public function testAnUnreadablePolicyKeepsEveryOtherWriteToolAsking(): void
     {
         $server = $this->server('not json');
 
         $this->store->setTools($server, ['create' => PolicyOutcome::Block], self::CLASSES);
 
-        self::assertSame(['create' => 'block'], $this->tools($server));
+        self::assertSame(['create' => 'block', 'update' => 'approve'], $this->tools($server));
+    }
+
+    public function testAnUnknownStoredValueStaysAskingWhenAnotherToolChanges(): void
+    {
+        $server = $this->server('{"v":1,"tools":{"update":"maybe"},"seen":[]}');
+
+        $this->store->setTools($server, ['create' => PolicyOutcome::Block], self::CLASSES);
+
+        self::assertSame(['update' => 'approve', 'create' => 'block'], $this->tools($server));
+    }
+
+    public function testSeenKeepsTheNewestNamesAtTheCap(): void
+    {
+        $old = array_map(static fn (int $i): string => 'old-'.$i, range(1, 1000));
+        $server = $this->server(json_encode(['v' => 1, 'tools' => (object) [], 'seen' => $old], JSON_THROW_ON_ERROR));
+
+        $this->store->markSeen($server, ['fresh' => SideEffect::Write]);
+
+        $seen = $this->store->seen($server);
+        self::assertCount(1000, $seen);
+        self::assertContains('fresh', $seen);
+        self::assertNotContains('old-1', $seen);
     }
 
     /**

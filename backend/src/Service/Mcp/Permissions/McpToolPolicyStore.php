@@ -16,6 +16,11 @@ use App\Service\Tool\SideEffect;
  * owner never touched keeps following the default. Every name is checked
  * against the tools the server really offers; a tool that cannot work through
  * a tool call stays Block and cannot be changed.
+ *
+ * A write never loosens what applies now: a stored value that is not one of
+ * the three outcomes, or a policy that cannot be read at all, makes the tool
+ * ask ({@see McpToolPermissions::outcome()}); that Approve is written out
+ * explicitly instead of being dropped back to the more permissive default.
  */
 final readonly class McpToolPolicyStore
 {
@@ -33,7 +38,7 @@ final readonly class McpToolPolicyStore
      */
     public function setTools(McpServerConfig $server, array $changes, array $classes): void
     {
-        $state = $this->read($server);
+        $state = $this->read($server, $classes);
         foreach ($changes as $name => $outcome) {
             $name = (string) $name;
             $class = $this->classOf($server, $name, $classes);
@@ -47,7 +52,7 @@ final readonly class McpToolPolicyStore
      */
     public function setCategory(McpServerConfig $server, SideEffect $category, ?PolicyOutcome $outcome, array $classes): void
     {
-        $state = $this->read($server);
+        $state = $this->read($server, $classes);
         foreach ($classes as $name => $class) {
             if ($class === $category && !$this->permissions->isUnusable($server, (string) $name)) {
                 $this->put($state['tools'], (string) $name, $class, $outcome);
@@ -57,12 +62,16 @@ final readonly class McpToolPolicyStore
     }
 
     /**
-     * @param list<string> $names
+     * Marks every tool in `$classes` as seen. The newest names are kept when
+     * the list would grow past its cap.
+     *
+     * @param array<string, SideEffect> $classes the tools the server offers, name to class
      */
-    public function markSeen(McpServerConfig $server, array $names): void
+    public function markSeen(McpServerConfig $server, array $classes): void
     {
-        $state = $this->read($server);
-        $state['seen'] = array_slice(array_values(array_unique([...$state['seen'], ...$names])), 0, self::MAX_SEEN);
+        $state = $this->read($server, $classes);
+        $names = array_map('strval', array_keys($classes));
+        $state['seen'] = array_slice(array_values(array_unique([...array_diff($state['seen'], $names), ...$names])), -self::MAX_SEEN);
         $this->write($server, $state);
     }
 
@@ -71,7 +80,7 @@ final readonly class McpToolPolicyStore
      */
     public function seen(McpServerConfig $server): array
     {
-        return $this->read($server)['seen'];
+        return $this->read($server, [])['seen'];
     }
 
     /**
@@ -103,27 +112,51 @@ final readonly class McpToolPolicyStore
     }
 
     /**
+     * @param array<string, SideEffect> $classes
+     *
      * @return array{tools: array<string, string>, seen: list<string>}
      */
-    private function read(McpServerConfig $server): array
+    private function read(McpServerConfig $server, array $classes): array
     {
-        $decoded = json_decode($server->getToolPolicy(), true);
+        $raw = trim($server->getToolPolicy());
+        $decoded = '' === $raw ? [] : json_decode($raw, true);
+        if (!is_array($decoded) || !is_array($decoded['tools'] ?? [])) {
+            return ['tools' => $this->askingNow($server, $classes), 'seen' => []];
+        }
         $tools = [];
+        foreach ($decoded['tools'] ?? [] as $name => $value) {
+            $outcome = is_string($value) ? PolicyOutcome::tryFrom($value) : null;
+            $tools[(string) $name] = ($outcome ?? PolicyOutcome::Approve)->value;
+        }
         $seen = [];
-        if (is_array($decoded)) {
-            foreach (is_array($decoded['tools'] ?? null) ? $decoded['tools'] : [] as $name => $value) {
-                if (is_string($value) && null !== PolicyOutcome::tryFrom($value)) {
-                    $tools[(string) $name] = $value;
-                }
-            }
-            foreach (is_array($decoded['seen'] ?? null) ? $decoded['seen'] : [] as $name) {
-                if (is_string($name)) {
-                    $seen[] = $name;
-                }
+        foreach (is_array($decoded['seen'] ?? null) ? $decoded['seen'] : [] as $name) {
+            if (is_string($name)) {
+                $seen[] = $name;
             }
         }
 
         return ['tools' => $tools, 'seen' => $seen];
+    }
+
+    /**
+     * What an unreadable policy means today, written out: every tool that is
+     * not a read tool asks.
+     *
+     * @param array<string, SideEffect> $classes
+     *
+     * @return array<string, string>
+     */
+    private function askingNow(McpServerConfig $server, array $classes): array
+    {
+        $tools = [];
+        foreach ($classes as $name => $class) {
+            $name = (string) $name;
+            if (SideEffect::Read !== $class && !$this->permissions->isUnusable($server, $name)) {
+                $this->put($tools, $name, $class, PolicyOutcome::Approve);
+            }
+        }
+
+        return $tools;
     }
 
     /**

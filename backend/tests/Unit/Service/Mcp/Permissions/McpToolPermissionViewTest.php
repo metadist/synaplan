@@ -47,6 +47,7 @@ final class McpToolPermissionViewTest extends TestCase
         $rows = $this->view()->rows($this->server(), 7, [$this->tool('search', ['readOnlyHint' => true])], true);
 
         self::assertSame('shared', $rows[0]['locked_reason']);
+        self::assertFalse($rows[0]['is_new'], 'a member cannot mark tools seen, so nothing is new for them');
     }
 
     public function testAGroupBlockLocksTheTool(): void

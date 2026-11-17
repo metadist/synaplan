@@ -10,11 +10,15 @@ use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpToolRegistry;
 use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\SideEffect;
+use Psr\Log\LoggerInterface;
 
 /**
  * "Always allow" on an approval for an MCP tool: sets that tool to Auto on its
  * connection. Only for a write tool on a connection the person owns, and never
  * for a tool that is blocked now. A destructive call is confirmed each time.
+ *
+ * The approval itself is already decided when this runs, so a failure here is
+ * logged and reported as "not granted" instead of stopping the resumed run.
  */
 final readonly class McpApprovalAllowance
 {
@@ -24,15 +28,26 @@ final readonly class McpApprovalAllowance
         private McpToolPolicyStore $store,
         private McpToolPermissionView $view,
         private McpToolPermissions $permissions,
+        private LoggerInterface $logger,
     ) {
     }
 
-    public static function isMcpTool(string $toolName): bool
+    public function grant(Approval $approval, User $actor): bool
     {
-        return 1 === preg_match('/^mcp:\d+:.+$/', $toolName);
+        try {
+            return $this->tryGrant($approval, $actor);
+        } catch (\Throwable $e) {
+            $this->logger->error('Always allow for an MCP tool failed', [
+                'approval' => $approval->getId(),
+                'tool' => $approval->getTool(),
+                'exception' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
     }
 
-    public function grant(Approval $approval, User $actor): bool
+    private function tryGrant(Approval $approval, User $actor): bool
     {
         if (SideEffect::Write->value !== $approval->getSideEffect()
             || 1 !== preg_match('/^mcp:(\d+):(.+)$/', $approval->getTool(), $m)) {

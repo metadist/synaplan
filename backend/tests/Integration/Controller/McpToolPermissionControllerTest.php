@@ -59,6 +59,7 @@ class McpToolPermissionControllerTest extends WebTestCase
             ['tools' => ['ghost' => 'yolo']],
             ['category' => 'nuclear', 'outcome' => 'auto'],
             ['category' => 'write', 'outcome' => 'maybe'],
+            ['category' => 'write', 'outcome' => 'block', 'tools' => ['ghost' => 'auto']],
         ] as $body) {
             $this->request('PUT', "/api/v1/mcp-servers/{$id}/tool-permissions", $body);
             self::assertSame(Response::HTTP_UNPROCESSABLE_ENTITY, $this->httpStatus(), (string) json_encode($body));

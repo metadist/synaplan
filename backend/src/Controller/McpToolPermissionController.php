@@ -140,7 +140,7 @@ final class McpToolPermissionController extends AbstractController
         if ($found[1]) {
             return $this->json(['success' => false, 'error' => 'This connection is shared with you'], Response::HTTP_FORBIDDEN);
         }
-        $this->store->markSeen($found[0], array_keys($this->view->classes($this->registry->toolsFor($found[0]))));
+        $this->store->markSeen($found[0], $this->view->classes($this->registry->toolsFor($found[0])));
 
         return $this->json($this->listing($found[0], $user, false));
     }
@@ -188,6 +188,9 @@ final class McpToolPermissionController extends AbstractController
      */
     private function apply(McpServerConfig $server, array $body, array $classes): void
     {
+        if (isset($body['category'], $body['tools'])) {
+            throw new McpToolPermissionException('Send either "tools" or "category" and "outcome", not both');
+        }
         if (isset($body['category'])) {
             $category = is_string($body['category']) ? SideEffect::tryFromString($body['category']) : null;
             if (null === $category) {

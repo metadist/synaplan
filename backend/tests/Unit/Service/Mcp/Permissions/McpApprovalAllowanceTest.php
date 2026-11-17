@@ -15,6 +15,8 @@ use App\Service\Mcp\Permissions\McpToolPermissionView;
 use App\Service\Mcp\Permissions\McpToolPolicyStore;
 use App\Service\Tool\Policy\GroupPolicyProviderInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class McpApprovalAllowanceTest extends TestCase
 {
@@ -53,14 +55,26 @@ final class McpApprovalAllowanceTest extends TestCase
 
     public function testOnlyMcpToolNamesQualify(): void
     {
-        self::assertTrue(McpApprovalAllowance::isMcpTool('mcp:5:create'));
-        self::assertFalse(McpApprovalAllowance::isMcpTool('email.send'));
         self::assertFalse($this->allowance($this->server())->grant($this->approval('email.send', 'write'), $this->user(7)));
     }
 
-    private function allowance(McpServerConfig $server): McpApprovalAllowance
+    public function testAFailingSaveIsLoggedAndDoesNotEscape(): void
+    {
+        $server = $this->server('{"v":1,"tools":{"create":"approve"},"seen":[]}');
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('error');
+
+        $allowance = $this->allowance($server, $logger, new \RuntimeException('database gone'));
+
+        self::assertFalse($allowance->grant($this->approval('mcp:5:create', 'write'), $this->user(7)));
+    }
+
+    private function allowance(McpServerConfig $server, ?LoggerInterface $logger = null, ?\Throwable $saveFails = null): McpApprovalAllowance
     {
         $servers = $this->createStub(McpServerConfigRepository::class);
+        if (null !== $saveFails) {
+            $servers->method('save')->willThrowException($saveFails);
+        }
         $servers->method('findByIdAndUser')->willReturnCallback(
             static fn (int $id, int $userId): ?McpServerConfig => 5 === $id && $server->getUserId() === $userId ? $server : null,
         );
@@ -78,6 +92,7 @@ final class McpApprovalAllowanceTest extends TestCase
             $store,
             new McpToolPermissionView($permissions, $store, $this->createStub(GroupPolicyProviderInterface::class)),
             $permissions,
+            $logger ?? new NullLogger(),
         );
     }
 

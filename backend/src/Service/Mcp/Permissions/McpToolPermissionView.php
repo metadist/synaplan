@@ -80,7 +80,7 @@ final readonly class McpToolPermissionView
             'outcome' => $outcome->value,
             'default_outcome' => $default->value,
             'hinted' => array_key_exists('readOnlyHint', $annotations) || array_key_exists('destructiveHint', $annotations),
-            'is_new' => !in_array($name, $seen, true),
+            'is_new' => !$shared && !in_array($name, $seen, true),
             'locked_reason' => $this->lockedReason($server, $userId, $name, $class, $unusable, $shared),
         ];
     }

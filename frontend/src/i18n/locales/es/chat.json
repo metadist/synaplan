@@ -1035,6 +1035,7 @@
     "waitingForAnotherAdmin": "Otra persona con acceso de administración tiene que aprobarlo. No puedes aprobar tu propio agente.",
     "sharingOff": "Compartir con todos está desactivado, así que no se compartió nada.",
     "alwaysAllow": "Permitir siempre para este agente",
+    "alwaysAllowConnection": "Permitir siempre en esta conexión",
     "rejectReason": "¿Por qué lo rechazas?",
     "rejectReasonPlaceholder": "Nota opcional",
     "expired": "Esta solicitud caducó",
