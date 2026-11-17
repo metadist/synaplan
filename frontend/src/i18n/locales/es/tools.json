@@ -478,6 +478,9 @@
       "retry": "Reintentar",
       "empty": "Esta conexión aún no ofrece herramientas. Comprueba que haya iniciado sesión y recarga.",
       "clientOff": "Las llamadas MCP están desactivadas, así que aquí no hay nada que ajustar. Actívalas para gestionar los permisos.",
+      "notice": "La IA ahora puede usar herramientas de escritura en esta conexión sin preguntar. Las herramientas destructivas siguen preguntando.",
+      "noticeReview": "Revisar permisos",
+      "noticeDismiss": "Entendido",
       "tabsLabel": "Secciones de la conexión",
       "reset": "Restablecer al valor predeterminado ({outcome})",
       "undone": "Cambio deshecho."

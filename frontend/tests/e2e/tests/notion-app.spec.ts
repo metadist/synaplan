@@ -106,6 +106,7 @@ test.describe('@ci Notion app', () => {
           success: true,
           error: null,
           can_edit: true,
+          notice: false,
           tools: [
             {
               name: 'notion-search',

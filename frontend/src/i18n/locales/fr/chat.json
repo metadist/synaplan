@@ -1121,7 +1121,9 @@
       "executed": "Terminé",
       "failed": "Échoué"
     },
-    "openTasks": "Ouvrir les tâches"
+    "openTasks": "Ouvrir les tâches",
+    "onConnection": "Sur {connection}",
+    "changePermission": "Modifier l’autorisation"
   },
   "knowledgeSources": {
     "title": "Sources",

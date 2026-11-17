@@ -552,6 +552,9 @@
       "retry": "Try again",
       "empty": "This connection offers no tools yet. Check that it is signed in, then reload.",
       "clientOff": "MCP calls are turned off, so there is nothing to set here. Turn them on to manage tool permissions.",
+      "notice": "The AI may now use write tools on this connection without asking. Destructive tools still ask.",
+      "noticeReview": "Review permissions",
+      "noticeDismiss": "Got it",
       "tabsLabel": "Connection sections",
       "reset": "Reset to default ({outcome})",
       "undone": "Change undone."

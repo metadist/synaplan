@@ -34,6 +34,18 @@ use OpenApi\Attributes as OA;
         ),
         new OA\Property(property: 'canAlwaysAllow', type: 'boolean'),
         new OA\Property(property: 'canDecide', type: 'boolean', description: 'False for agent.publish (another administrator decides), and when an administrator is reading another person\'s approval.'),
+        new OA\Property(
+            property: 'connection',
+            type: 'object',
+            nullable: true,
+            description: 'The MCP connection behind an MCP tool, when it is the viewer\'s own. permissions_path is where its permissions are changed.',
+            required: ['id', 'name', 'permissions_path'],
+            properties: [
+                new OA\Property(property: 'id', type: 'integer', example: 4),
+                new OA\Property(property: 'name', type: 'string', example: 'Notion'),
+                new OA\Property(property: 'permissions_path', type: 'string', example: '/apps/mcp?server=4&tab=permissions'),
+            ]
+        ),
         new OA\Property(property: 'requestedBy', ref: new Model(type: ApprovalRequestedBy::class)),
     ]
 )]

@@ -84,6 +84,27 @@ final readonly class McpToolPolicyStore
     }
 
     /**
+     * True while the one-time "writes no longer ask" notice is still open.
+     */
+    public function hasNotice(McpServerConfig $server): bool
+    {
+        return $this->read($server, [])['notice'];
+    }
+
+    /**
+     * Closes the notice. Nothing is written when it is not open.
+     */
+    public function dismissNotice(McpServerConfig $server): void
+    {
+        $state = $this->read($server, []);
+        if (!$state['notice']) {
+            return;
+        }
+        $state['notice'] = false;
+        $this->write($server, $state);
+    }
+
+    /**
      * @param array<string, SideEffect> $classes
      */
     private function classOf(McpServerConfig $server, string $name, array $classes): SideEffect
@@ -114,14 +135,14 @@ final readonly class McpToolPolicyStore
     /**
      * @param array<string, SideEffect> $classes
      *
-     * @return array{tools: array<string, string>, seen: list<string>}
+     * @return array{tools: array<string, string>, seen: list<string>, notice: bool}
      */
     private function read(McpServerConfig $server, array $classes): array
     {
         $raw = trim($server->getToolPolicy());
         $decoded = '' === $raw ? [] : json_decode($raw, true);
         if (!is_array($decoded) || !is_array($decoded['tools'] ?? [])) {
-            return ['tools' => $this->askingNow($server, $classes), 'seen' => []];
+            return ['tools' => $this->askingNow($server, $classes), 'seen' => [], 'notice' => false];
         }
         $tools = [];
         foreach ($decoded['tools'] ?? [] as $name => $value) {
@@ -135,7 +156,7 @@ final readonly class McpToolPolicyStore
             }
         }
 
-        return ['tools' => $tools, 'seen' => $seen];
+        return ['tools' => $tools, 'seen' => $seen, 'notice' => true === ($decoded['notice'] ?? null)];
     }
 
     /**
@@ -160,11 +181,15 @@ final readonly class McpToolPolicyStore
     }
 
     /**
-     * @param array{tools: array<string, string>, seen: list<string>} $state
+     * @param array{tools: array<string, string>, seen: list<string>, notice: bool} $state
      */
     private function write(McpServerConfig $server, array $state): void
     {
-        $server->setToolPolicy(json_encode(['v' => 1, 'tools' => (object) $state['tools'], 'seen' => $state['seen']], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        $policy = ['v' => 1, 'tools' => (object) $state['tools'], 'seen' => $state['seen']];
+        if ($state['notice']) {
+            $policy['notice'] = true;
+        }
+        $server->setToolPolicy(json_encode($policy, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
         $this->servers->save($server);
     }
 }

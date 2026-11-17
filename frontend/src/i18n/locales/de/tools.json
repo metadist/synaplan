@@ -475,6 +475,9 @@
       "retry": "Erneut versuchen",
       "empty": "Diese Verbindung bietet noch keine Tools. Prüfe, ob sie angemeldet ist, und lade neu.",
       "clientOff": "MCP-Aufrufe sind ausgeschaltet, daher gibt es hier nichts einzustellen. Schalte sie ein, um Tool-Berechtigungen zu verwalten.",
+      "notice": "Die KI darf auf dieser Verbindung jetzt Schreib-Tools ohne Nachfrage nutzen. Zerstörerische Tools fragen weiterhin nach.",
+      "noticeReview": "Berechtigungen prüfen",
+      "noticeDismiss": "Verstanden",
       "tabsLabel": "Bereiche der Verbindung",
       "reset": "Auf Standard zurücksetzen ({outcome})",
       "undone": "Änderung rückgängig gemacht."

@@ -1062,7 +1062,9 @@
       "executed": "Hecho",
       "failed": "Fallido"
     },
-    "openTasks": "Abrir tareas"
+    "openTasks": "Abrir tareas",
+    "onConnection": "En {connection}",
+    "changePermission": "Cambiar permiso"
   },
   "knowledgeSources": {
     "title": "Fuentes",

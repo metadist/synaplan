@@ -295,7 +295,22 @@
               @media-job-update="onMediaJobUpdate(message, $event)"
               @media-job-completed="handleMediaJobCompleted(message, $event)"
               @media-job-cancel="mediaJobsStore.cancel($event)"
-            />
+            >
+              <template
+                v-if="isApprovalsEnabled() && approvalsByMessage.has(message.id)"
+                #approvals
+              >
+                <ApprovalCard
+                  v-for="row in approvalsByMessage.get(message.id)"
+                  :key="row.id"
+                  :approval="row"
+                  :can-always-allow="row.canAlwaysAllow"
+                  @approved="onChatApprovalApproved"
+                  @rejected="onChatApprovalRejected"
+                  @always-allow="onChatApprovalAlwaysAllow"
+                />
+              </template>
+            </ChatMessage>
           </template>
         </div>
       </div>
@@ -348,21 +363,6 @@
         :can-continue="chatsStore.conversationAccess === 'use'"
         @continue="continueSharedConversation"
       />
-      <div
-        v-if="isApprovalsEnabled() && chatPendingApprovals.length > 0"
-        class="mx-4 mb-3 space-y-3"
-        data-testid="chat-approvals"
-      >
-        <ApprovalCard
-          v-for="row in chatPendingApprovals"
-          :key="row.id"
-          :approval="row"
-          :can-always-allow="row.canAlwaysAllow"
-          @approved="onChatApprovalApproved"
-          @rejected="onChatApprovalRejected"
-          @always-allow="onChatApprovalAlwaysAllow"
-        />
-      </div>
       <!-- Read-only viewers of a shared chat get no composer, but still see
            the chat's files (open only, no attach or delete). -->
       <div
@@ -713,6 +713,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useApprovalsStore } from '@/stores/approvals'
+import { placeApprovals } from '@/utils/approvalPlacement'
 import { useRealtimeStore } from '@/stores/realtime'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
@@ -983,6 +984,11 @@ const chatPendingApprovals = computed(() =>
   approvalsStore.pending.filter(
     (row) => row.requestedBy.kind === 'chat' && row.requestedBy.chatId === chatsStore.activeChatId
   )
+)
+
+/** Each pending approval of this chat, keyed by the answer bubble it sits in. */
+const approvalsByMessage = computed(() =>
+  placeApprovals(historyStore.messages, chatPendingApprovals.value)
 )
 
 async function onChatApprovalApproved(id: number): Promise<void> {

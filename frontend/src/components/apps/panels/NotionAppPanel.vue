@@ -103,9 +103,20 @@
         class="surface-card rounded-2xl p-4 sm:p-5"
         data-testid="section-notion-permissions"
       >
-        <McpToolPermissions :server-id="status.server_id" server-name="Notion" />
+        <McpToolPermissions
+          :server-id="status.server_id"
+          server-name="Notion"
+          @notice-dismissed="notice = false"
+        />
       </div>
       <template v-else>
+        <McpPermissionsNotice
+          v-if="notice"
+          :show-review="true"
+          :busy="noticeBusy"
+          @review="tab = 'permissions'"
+          @dismiss="dismissNotice"
+        />
         <div class="surface-card rounded-2xl p-4 sm:p-5 space-y-5">
           <NotionConnectedSection v-model:status="status" :account="account" @try="tryPrompt" />
           <div class="flex flex-wrap gap-3">
@@ -147,6 +158,7 @@ import { useNotification } from '@/composables/useNotification'
 import { mcpServersApi } from '@/services/api/mcpServersApi'
 import { userFacingError } from '@/utils/userFacingError'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
+import McpPermissionsNotice from '@/components/config/mcp/McpPermissionsNotice.vue'
 import McpToolPermissions from '@/components/config/mcp/McpToolPermissions.vue'
 import NotionConnectedSection from './notion/NotionConnectedSection.vue'
 import NotionRecentChanges from './notion/NotionRecentChanges.vue'
@@ -183,8 +195,11 @@ const tabs = computed<TabNavItem[]>(() => [
     id: 'permissions',
     label: t('mcpServers.permissions.permissionsTab'),
     testid: 'tab-notion-permissions',
+    badge: notice.value ? 1 : undefined,
   },
 ])
+const notice = ref(false)
+const noticeBusy = ref(false)
 const status = ref<NotionAppStatus | null>(null)
 const account = ref<NotionAppAccount | null>(null)
 
@@ -196,13 +211,37 @@ const loadAccount = async () => {
   }
 }
 
+const loadNotice = async (id: number) => {
+  try {
+    notice.value = (await mcpServersApi.toolPermissions(id)).notice
+  } catch {
+    notice.value = false
+  }
+}
+
+const dismissNotice = async () => {
+  const id = status.value?.server_id
+  if (id == null) return
+  noticeBusy.value = true
+  try {
+    notice.value = (await mcpServersApi.dismissToolNotice(id)).notice
+  } catch (err) {
+    error(userFacingError(err, t('mcpServers.permissions.saveFailed')))
+  } finally {
+    noticeBusy.value = false
+  }
+}
+
 const load = async () => {
   loading.value = true
   loadError.value = false
   account.value = null
   try {
     status.value = await notionAppApi.status()
-    if (status.value.status === 'connected') void loadAccount()
+    if (status.value.status === 'connected') {
+      void loadAccount()
+      if (status.value.server_id != null) void loadNotice(status.value.server_id)
+    }
   } catch {
     loadError.value = true
     status.value = null

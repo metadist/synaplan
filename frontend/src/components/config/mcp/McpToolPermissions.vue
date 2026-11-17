@@ -13,6 +13,13 @@
       </ul>
     </div>
 
+    <McpPermissionsNotice
+      v-if="list?.notice && list.can_edit"
+      :show-review="false"
+      :busy="saving"
+      @dismiss="dismissNotice"
+    />
+
     <p v-if="loading" class="txt-secondary text-sm" data-testid="mcp-permissions-loading">
       {{ $t('mcpServers.permissions.loading') }}
     </p>
@@ -64,6 +71,7 @@ import {
   type ToolPermissionChoice,
 } from '@/services/api/mcpServersApi'
 import { userFacingError } from '@/utils/userFacingError'
+import McpPermissionsNotice from './McpPermissionsNotice.vue'
 import McpToolCategory from './McpToolCategory.vue'
 import {
   CATEGORIES,
@@ -75,6 +83,7 @@ import {
 } from './toolPermissions'
 
 const props = defineProps<{ serverId: number; serverName: string }>()
+const emit = defineEmits<{ 'notice-dismissed': [] }>()
 
 const { t } = useI18n()
 const { confirm } = useDialog()
@@ -112,6 +121,18 @@ const load = async () => {
     list.value = null
   } finally {
     loading.value = false
+  }
+}
+
+const dismissNotice = async () => {
+  saving.value = true
+  try {
+    list.value = await mcpServersApi.dismissToolNotice(props.serverId)
+    emit('notice-dismissed')
+  } catch (err) {
+    error(userFacingError(err, t('mcpServers.permissions.saveFailed')))
+  } finally {
+    saving.value = false
   }
 }
 

@@ -92,6 +92,37 @@ final class McpToolPolicyStoreTest extends TestCase
         self::assertSame(['notion-delete-pages' => 'auto'], $this->tools($server));
     }
 
+    public function testTheNoticeStaysOpenAcrossOtherWritesUntilDismissed(): void
+    {
+        $server = $this->server('{"v":1,"tools":{},"seen":[],"notice":true}');
+        self::assertTrue($this->store->hasNotice($server));
+
+        $this->store->setTools($server, ['create' => PolicyOutcome::Approve], self::CLASSES);
+        $this->store->markSeen($server, ['search' => SideEffect::Read]);
+        self::assertTrue($this->store->hasNotice($server));
+        self::assertSame(['create' => 'approve'], $this->tools($server));
+
+        $this->store->dismissNotice($server);
+        self::assertFalse($this->store->hasNotice($server));
+        self::assertStringNotContainsString('notice', $server->getToolPolicy());
+        self::assertSame(['create' => 'approve'], $this->tools($server));
+    }
+
+    public function testDismissingWithoutANoticeWritesNothing(): void
+    {
+        $server = $this->server();
+
+        $this->store->dismissNotice($server);
+
+        self::assertSame('{}', $server->getToolPolicy());
+        self::assertFalse($this->store->hasNotice($server));
+    }
+
+    public function testAnUnreadablePolicyHasNoNotice(): void
+    {
+        self::assertFalse($this->store->hasNotice($this->server('not json')));
+    }
+
     public function testSeenKeepsTheChoicesAndDoesNotDuplicate(): void
     {
         $server = $this->server();
