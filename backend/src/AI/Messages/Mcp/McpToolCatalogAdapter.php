@@ -7,7 +7,6 @@ namespace App\AI\Messages\Mcp;
 use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Permissions\McpToolPermissions;
 use App\Service\Tool\Policy\PolicyOutcome;
-use App\Service\Tool\SideEffect;
 
 /**
  * Maps {@see McpToolRegistry::catalogForUser()} to Anthropic `tools[]`.
@@ -64,7 +63,7 @@ final readonly class McpToolCatalogAdapter
                 if (!$includeMutating && $this->isMutatingTool($tool['annotations'])) {
                     continue;
                 }
-                if (PolicyOutcome::Block === $this->permissions->outcome($server, $tool['name'], $this->classOf($tool['annotations']))) {
+                if (PolicyOutcome::Block === $this->permissions->outcomeForTool($server, $tool)) {
                     continue;
                 }
 
@@ -138,17 +137,6 @@ final readonly class McpToolCatalogAdapter
     public function isOurs(string $toolName): bool
     {
         return str_starts_with($toolName, self::NAME_PREFIX);
-    }
-
-    /**
-     * @param array<string, mixed> $annotations
-     */
-    private function classOf(array $annotations): SideEffect
-    {
-        return SideEffect::fromHints(
-            isset($annotations['readOnlyHint']) ? (bool) $annotations['readOnlyHint'] : null,
-            isset($annotations['destructiveHint']) ? (bool) $annotations['destructiveHint'] : null,
-        );
     }
 
     /**
