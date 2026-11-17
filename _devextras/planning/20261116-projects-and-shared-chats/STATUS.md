@@ -7,8 +7,152 @@ to them.
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
 | PJ0 | merged | #3133 | plan written 2026-11-16; §0 partly decided, see below |
-| PJ1 | in review | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
-| PJ2–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
+| PJ1 | merged | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
+| PJ2 | in review | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
+| PJ3–PJ28 | not started | — | the owner ordered phase 0 on 2026-11-16; every ☐ and Ask row of §0 still waits |
+
+---
+
+## 2026-11-16 — spike: a chat turn as run units (PJ2)
+
+**Ordered:** the owner said "start PJ2 now" on 2026-11-16, before #3141 was
+merged. The branch is cut from `test/chat-loop-corpus`, because the script
+uses PJ1's client.
+
+**What was measured.** Variant 1, every turn queued, exists as a switch:
+`RUNTIME.STREAM_PUMP=all` with `STREAM_PUMP_PERCENT=100` sends the web
+chat's turn to the `pump` container, and the request copies the frames
+from Redis. Variant 2 hands over at the first tool call; the time it adds
+is the same hand-over, so one measurement answers both.
+
+The ten `simple` turns of the corpus, three passes per mode, modes
+alternating, one turn at a time, local development stack, the seeded demo
+account on the test provider (no model cost, so only the path is timed):
+
+| Mode | Turns | Answered | First frame median / p95 (s) | First text median / p95 (s) | Total median / p95 (s) |
+| ---- | ----- | -------- | ---------------------------- | --------------------------- | ---------------------- |
+| In the request (today) | 30 | 30 | 0.082 / 0.112 | 0.112 / 0.160 | 1.706 / 1.825 |
+| Queued for the pump | 30 | 30 | 0.114 / 0.198 | 0.135 / 0.233 | 1.617 / 1.731 |
+
+```bash
+docker compose up -d pump
+docker compose exec -T -e CHAT_LOOP_EVAL_PASSWORD backend \
+  php -- --email=<account> --label=request < _devextras/planning/20261116-projects-and-shared-chats/spike/turn-latency.php
+```
+
+What it says:
+
+- **The hand-over costs about 0.03 s at the median and 0.09 s at p95**
+  with an idle pump. Against today's first token of a `simple` turn on a
+  real model (2.56 s) that is about 1 % and 3 %. G1's limit is 10 %.
+- **No model call is added by queueing**, so the cost of a simple turn
+  does not change.
+- **§0 #21 holds, and not for speed.** At rest both variants are inside
+  G1. "First call in the request" keeps a simple turn independent of the
+  pump: with the pump down or full it still answers. That, not the 0.03 s,
+  is the reason to keep it.
+
+**Under load** (8 and 16 turns started at once, the seeded demo account on
+the test provider, one `pump` container with its single consumer, 48
+messages in all):
+
+| Mode | At once | Answered | First text median / p95 (s) | Total median / p95 (s) |
+| ---- | ------- | -------- | --------------------------- | ---------------------- |
+| In the request | 8 | 8 | 0.26 / 0.27 | 1.74 / 1.79 |
+| In the request | 16 | 16 | 0.40 / 0.44 | 1.89 / 2.01 |
+| Queued for the pump | 8 | 8 | 5.94 / 10.16 | 7.38 / 11.67 |
+| Queued for the pump | 16 | 16 | 12.76 / 23.13 | 14.27 / 24.10 |
+
+```bash
+spike/turn-latency.php --only=<turn id>   # one turn per process, N processes at once
+```
+
+**Variant 1, every turn queued, fails G1 under load.** With one consumer
+the pump answers one turn after the other, so the 16th turn waits for 15.
+Idle, the cost was 3 %; at 16 at once it is a factor of 30 on the first
+text. A queue for every turn would need as many consumers as turns that can
+overlap, and a full or stopped pump would stop plain chat. Variant 2 keeps
+the simple turn in the request and queues only the turns that need a tool,
+where a wait of seconds is already normal. **§0 #21 is confirmed, now for
+speed under load as well as for independence from the pump.** The run layer
+for tool turns must run several consumers (AH8 sizes that).
+
+Limits of this measurement: one machine, one turn per process, the test
+provider (no model time), so a real model makes every turn longer and the
+queue longer still. The totals of the idle comparison are not compared: the
+two containers do not run with the same settings.
+
+**Two-hour run (G7 prototype).** `spike/long-run.php`, not product code: one
+process, `openai/gpt-oss-120b` straight at Groq, a 90-section document, a
+window of 8,000 tokens, compaction at 70 %, last 4 steps kept, 55 s pause
+per step, notes reloaded from a file each step. Task: read every section,
+then `finish(total_nordholz, top_section, code_word)`.
+
+| Measure | Result | G7 asks |
+| ------- | ------ | ------- |
+| Duration | 8,013 s (2 h 13 min) | two hours |
+| Cost | 0.1275 (cap was 0.50) | — |
+| Compactions | 22 | at least 3 |
+| Largest prompt | 4,623 of 8,000 tokens | below the window |
+| Sections read | 90 of 90 | all |
+| Duplicate reads | **32** | none |
+| Early `finish` rejected by the guard | 2 (at 84 and 87 sections) | — |
+| Code word | right | right |
+| Total (Nordholz) | **303,408, gold 326,390: wrong** | right |
+| Top section | **23, gold 77: wrong** | right |
+| Goal kept | **no** | yes |
+
+```bash
+docker compose exec -T backend php /tmp/long-run.php --label=paced --sections=90 \
+  --guard-finish=1 --pause=55 --max-cost=0.50   # copy spike/long-run.php there first
+```
+
+What it says. **The window held, the work did not.** The prompt never
+neared the window and nothing crashed, but the notes lost state:
+
+- **The notes grow until they hit their budget.** Every compaction kept one
+  `plan` item per section (up to 90). From compaction 10 on the summary call
+  ended at its 2,500-token output cap (13 of 22 compactions), so facts (amounts, suppliers) were
+  cut. That is where the wrong total and top section come from, and why 32
+  sections were read twice.
+- **The model quits.** In 18 steps it answered in text ("I'm unable to
+  complete the request") or announced an answer from partial data instead of
+  calling a tool. Left alone, the run ends there. Twice it called `finish`
+  before everything was read.
+- **So G7 is not met by this prototype,** and the prototype is the naive
+  version of §1.5. It is evidence for the contract, not against it.
+
+**What follows for the contract (§1.5) and the plans:**
+
+- `plan` is a short list of the few open steps, never one item per unit of
+  work; progress is a counter or a range ("sections 1–60 read"), not a list.
+- A running result (sum, maximum, section of the maximum) lives in `facts`
+  as one value that every step updates, not as raw rows to re-add.
+- Compaction output has its own budget and a size check; a summary that
+  hits the cap is a failed compaction (the existing wrap-up path), not a
+  silent cut.
+- The loop, not the model, decides "done": a `finish` is checked against the
+  goal (here: all sections read) and rejected with the missing part; a text
+  answer without a tool call is answered with a nudge, with a limit.
+- The loop keeps the ledger of tool calls it has made (`read_section(7)`
+  already done) and answers a repeat from it without a model round trip.
+
+**For AU26 and AH8 to expose** (final list after three runs): per run, the
+compaction count and the size of the notes after each; a failed-compaction
+state with its reason; duplicate tool calls (same name and arguments); steps
+without a tool call (nudges sent); rejected `finish` calls; the guard
+rejections (read before record); malformed tool calls and how each was
+retried; whether the answer came from a required `finish` or the JSON
+fallback; the ledger (rows, reducers, current values); peak prompt tokens
+against the window; and the queue depth and wait of the run consumers
+(from the load run). AU26 shows them to the person, AH8 alerts on a failed
+compaction, repeated nudges, repeated malformed calls and a consumer queue
+that keeps growing. This list lives here; the owners of AU26 and AH8 take it
+from this section.
+
+**Open:** the real run in the worker with lease and restart, which this
+prototype does not test; a second document and a second model for the same
+prototype, before G7 is called passed for the product.
 
 ---
 
