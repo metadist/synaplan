@@ -45,7 +45,7 @@ final readonly class OidcCloudSeeder implements SeederInterface
         if (!$this->cloud->isEnabled()) {
             return $this->deactivate();
         }
-        $host = $this->redirects->normalizeHost($this->cloud->url);
+        $host = $this->redirects->normalizeOperatorHost($this->cloud->url);
         $instance = $this->instances->findByInstanceId(PlatformInstance::OIDC_CLOUD_ID);
         $created = !$instance instanceof PlatformInstance;
         if (!$instance instanceof PlatformInstance) {

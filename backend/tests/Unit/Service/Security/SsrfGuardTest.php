@@ -150,4 +150,20 @@ final class SsrfGuardTest extends TestCase
         self::assertSame([], $this->guard->pinnedIps('169.254.169.254', allowOperatorNetwork: true));
         self::assertSame([], $this->guard->pinnedIps('[fe80::1]', allowOperatorNetwork: true));
     }
+
+    /**
+     * A host the operator named in the configuration may be in the operator's
+     * own network; the same host from a caller may not.
+     */
+    public function testBlockedHostWithOperatorNetworkKeepsPrivateLiteralsAndRefusesLinkLocal(): void
+    {
+        foreach (['10.1.2.3', '192.168.0.10', '[fd00::1]'] as $host) {
+            self::assertFalse($this->guard->isBlockedHost($host, allowOperatorNetwork: true), "allowed with operator network: {$host}");
+            self::assertTrue($this->guard->isBlockedHost($host), "still blocked by default: {$host}");
+        }
+
+        foreach (['169.254.169.254', '[fe80::1]', '0.0.0.0', 'localhost'] as $host) {
+            self::assertTrue($this->guard->isBlockedHost($host, allowOperatorNetwork: true), "blocked even with operator network: {$host}");
+        }
+    }
 }

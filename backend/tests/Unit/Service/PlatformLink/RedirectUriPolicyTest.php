@@ -104,6 +104,40 @@ final class RedirectUriPolicyTest extends TestCase
         self::assertSame('nextcloud', $host);
     }
 
+    /**
+     * The cloud of PLATFORM_LINKS_OIDC_CLOUD_URL sits next to Synaplan, so
+     * its address is often a private one. A caller cannot register such a
+     * host; the operator's configuration can name it.
+     */
+    public function testAHostTheOperatorConfiguredMayBeInTheOperatorNetwork(): void
+    {
+        self::assertSame('10.20.30.40', $this->prod->normalizeOperatorHost('https://10.20.30.40'));
+        self::assertSame('192.168.1.5:8443', $this->prod->normalizeOperatorHost('https://192.168.1.5:8443'));
+
+        $this->expectException(PlatformLinkValidationException::class);
+        $this->prod->normalizeHost('https://10.20.30.40');
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function hostsNoConfigurationMayName(): iterable
+    {
+        yield 'cloud metadata address' => ['https://169.254.169.254'];
+        yield 'link-local IPv6' => ['https://[fe80::1]'];
+        yield 'plain http' => ['http://10.20.30.40'];
+        yield 'wildcard' => ['https://*.example.org'];
+        yield 'look-alike' => ['xn--files-example-org'];
+        yield 'empty' => [''];
+    }
+
+    #[DataProvider('hostsNoConfigurationMayName')]
+    public function testTheOperatorHostKeepsEveryOtherCheck(string $host): void
+    {
+        $this->expectException(PlatformLinkValidationException::class);
+        $this->prod->normalizeOperatorHost($host);
+    }
+
     public function testWildcardHostCannotBeRegistered(): void
     {
         $this->expectException(PlatformLinkValidationException::class);
