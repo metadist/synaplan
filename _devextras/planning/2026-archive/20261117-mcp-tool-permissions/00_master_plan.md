@@ -1,7 +1,7 @@
 # MCP tool permissions: see every tool, choose auto, approve or block
 
-**Status:** 2026-11-17. §0 #1–#14 are decided by the owner. TP1 is in
-review; see [`STATUS.md`](./STATUS.md).
+**Status:** archived 2026-11-18, TP0–TP6 shipped. §0 #1–#14 are decided by
+the owner; see [`STATUS.md`](./STATUS.md).
 **Owner:** product owner.
 **Roadmap:** row 47. Steps `TP0`–`TP6`, journeys `J-TP-1`–`J-TP-7`.
 **Binding:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) (U1–U12)

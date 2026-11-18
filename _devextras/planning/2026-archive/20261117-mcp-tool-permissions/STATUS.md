@@ -1,3 +1,5 @@
+> **Archived 2026-11-18.** TP0–TP6 are on `main` and deployed; `BALLOWWRITE` and `BWRITEAUTO` are dropped (#3184). Not automated: the chat halves of J-TP-2/3/5/7 need a live model and Notion and are covered by unit tests; J-TP-5 (Always allow, then a saved task still waits) was never walked in the browser.
+
 # MCP tool permissions — STATUS
 
 Step log for [`00_master_plan.md`](./00_master_plan.md). A walk is an entry
@@ -12,7 +14,7 @@ to them.
 | TP3 | merged (#3158) | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
 | TP4 | merged (#3159) | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
 | TP5 | merged (#3164) | — | E2E `mcp-tool-permissions.spec.ts` (J-TP-1…4, notice, read-only), docs; J-TP-5/7 and J-TP-6 see TP5 notes |
-| TP6 | phase 1 merged (#3174), phase 2 merged (#3182), phase 3 in review | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 unmaps both (5.8.8 still maps them); phase 3 drops them, see TP6 notes |
+| TP6 | merged and deployed (#3174, #3182, #3184) | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 unmaps both; phase 3 drops them after phase 2 ran on every production node, see TP6 notes |
 
 ## TP1 notes
 
@@ -37,7 +39,7 @@ to them.
 
 - Removed `PATCH /api/v1/apps/notion` and the `allow_write` / `write_auto` status fields, plus the Notion write switch and the MCP page "allow write" checkbox and badge (decision #12). `BALLOWWRITE` / `BWRITEAUTO` stay in the entity until TP6.
 - Deviation: the MCP page opens permissions from a per-row "Permissions" button (inline panel, deep link `?server=ID&tab=permissions`) instead of formal Overview/Permissions tabs, so `McpServersConfiguration.vue` does not grow. The Notion panel uses real tabs.
-- A member who only uses an organisation-shared Notion connection has no connection of their own and sees no permissions tab yet.
+- A member who only uses an organisation-shared Notion connection has no connection of their own and sees no permissions tab; the read-only member view came later (see Follow-ups, J-TP-6).
 - The one-time notice (decision #13) is TP4.
 
 ## Found while testing TP3
@@ -56,7 +58,7 @@ to them.
 ## TP5 notes
 
 - `frontend/tests/e2e/tests/mcp-tool-permissions.spec.ts` mocks the permissions API (stateful PUT, `notice` included). Covers J-TP-1, J-TP-2 (UI half), J-TP-3 (UI half), J-TP-4, the one-time notice and the read-only view.
-- Not in Playwright: the chat halves of J-TP-2/3/5/7 (approval card, refusal text, Always allow) need a live model and a live Notion; they are covered by `ApprovalCard`, `approvalPlacement`, `ToolExecutionGateMcpTest`, `McpApprovalAllowanceTest`, `ChatApprovalAnswerTest`. J-TP-6 (member of an organisation-shared Notion connection) is not built for the Notion panel; the API side is covered by `McpToolPermissionControllerTest`.
+- Not in Playwright: the chat halves of J-TP-2/3/5/7 (approval card, refusal text, Always allow) need a live model and a live Notion; they are covered by `ApprovalCard`, `approvalPlacement`, `ToolExecutionGateMcpTest`, `McpApprovalAllowanceTest`, `ChatApprovalAnswerTest`. J-TP-6 (member of an organisation-shared Notion connection) was built afterwards, see Follow-ups (`NotionSharedPermissions.vue`, E2E in `notion-app.spec.ts`); the API side is covered by `McpToolPermissionControllerTest`.
 - Docs: `CONNECTIONS.md` (new "Tool permissions" section), `ADMIN.md`, `PLATFORM_REFERENCE.md`, `MULTITASK_DATA_NODES.md`. The repository has no changelog file; the behaviour change of decision #6 is in the CONNECTIONS notice and the PR text.
 - Plan §7 proofs checked: `McpClient::callTool()` refuses a Block tool for every caller (central choke point; `McpClientTest::testAToolTheOwnerBlockedNeverLeavesForAnyCaller`), so `NotionGateway`, `NotionPageWrite`, the linked-page readers and `NotionAccountReader` cannot reach one. Gate side: `ToolExecutionGateMcpTest`; Always allow never lifts Block: `McpApprovalAllowanceTest`.
 - Catalog-size measurement (plan §8): see Follow-ups (measured 2026-11-18).
@@ -72,7 +74,7 @@ to them.
 ## Follow-ups
 
 - Approval answer limits: `ChatApprovalAnswer` checks the `MESSAGES` limit and the cost budget of the approval owner before its extra model call. Over a limit, or an owner that cannot be loaded, falls back to the short follow-up message with no model call. The call was already metered as `MULTITASK` through `AiChatUsageMeter`.
-- TP6 phase 3 (DROP COLUMN, `Version20261118130000`) must not merge before a release that contains phase 2 (#3182) runs on every production node.
+- TP6 phase 3 (DROP COLUMN, `Version20261118130000`, #3184) merged and deployed after phase 2 (#3182) ran on every production node.
 - Blocked tools named to the planner: the `mcp_fetch` sub-catalog lists each connection's blocked tools ("blocked by the owner, never plan these: …", at most 10 names), so the model can say a tool is blocked in Permissions instead of answering vaguely. The gateway tool loops still just omit a blocked tool.
 - Member view (J-TP-6): the Notion status carries `sharing.shared_server_id`; a member of a shared connection sees "See what the AI may do" and the read-only list (`NotionSharedPermissions.vue`, E2E in `notion-app.spec.ts`).
 - In-place answer, more plan shapes: any number of pending steps now, as long as each only writes text (chat, summarize, translate, rag_query, compose_reply or the hidden compose node). A pending step that would save, send or generate no longer gets marked done without running: it falls back to the follow-up message. (Before this, up to two pending steps of any kind were marked done.)
