@@ -212,6 +212,10 @@ declare as read-only is treated as destructive until you choose otherwise.
   **Auto** runs.
 - Arguments that delete page content escalate to **Approve** for that call,
   whatever the tool is set to.
+- A **Save to Notion** step follows the permission of Notion's `create-pages`
+  tool: Block refuses it before any file is uploaded, Approve makes a saved
+  task wait for approval (even when the step allows unattended runs) and
+  refuses the step in a chat reply, which cannot ask yet.
 - A person using a connection shared by an organisation can read its tools but
   cannot change them.
 - Connections that existed before this feature let the AI write without

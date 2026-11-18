@@ -27,12 +27,20 @@ final readonly class StepApprovalGate
 
     /**
      * @param array<string, mixed> $arguments
+     * @param string|null          $askRefusal set when the connection behind this step asks first
+     *                                         (its own tool permission is approve). A saved task then
+     *                                         waits for approval even with `allow_unattended`; a chat
+     *                                         reply cannot ask yet, so the step fails with this text
      */
-    public function consult(NodeContext $context, TaskNode $node, string $toolName, array $arguments): ?NodeResult
+    public function consult(NodeContext $context, TaskNode $node, string $toolName, array $arguments, ?string $askRefusal = null): ?NodeResult
     {
         $override = is_string($node->params['approval'] ?? null) ? $node->params['approval'] : null;
         if ($context->isApproved($node->id)) {
             return null;
+        }
+        $connectionAsks = null !== $askRefusal;
+        if ($connectionAsks && PolicyOutcome::Block !== PolicyOutcome::tryFrom((string) $override)) {
+            $override = PolicyOutcome::Approve->value;
         }
 
         $userId = (int) ($context->userId ?? $context->message->getUserId());
@@ -55,7 +63,7 @@ final readonly class StepApprovalGate
                 return NodeResult::failed(ToolExecutionGate::NODE_BLOCK_REFUSAL);
             }
 
-            return null;
+            return $connectionAsks ? NodeResult::failed($askRefusal) : null;
         }
         $requestedBy = sprintf('task_run:%d:%s', $runId, $node->id);
 
@@ -68,7 +76,7 @@ final readonly class StepApprovalGate
                 PolicyContext::Unattended,
                 $requestedBy,
                 null,
-                true === ($context->options['allow_unattended'] ?? false),
+                !$connectionAsks && true === ($context->options['allow_unattended'] ?? false),
                 null,
                 $override,
             );
