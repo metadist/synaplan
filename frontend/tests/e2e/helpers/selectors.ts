@@ -282,6 +282,9 @@ export const selectors = {
     draft: '[data-testid="research-draft"]',
     draftNote: '[data-testid="text-research-draft-note"]',
     lookDeeper: '[data-testid="btn-look-deeper"]',
+    download: '[data-testid="btn-research-download"]',
+    downloadFormat: (format: 'docx' | 'html' | 'md') =>
+      `[data-testid="btn-research-download-${format}"]`,
     lookDeeperSection: '[data-testid="section-look-deeper"]',
     /** Admin tab: the automatic-research switch under the research switch */
     adminAuto: '[data-testid="research-admin-auto"]',

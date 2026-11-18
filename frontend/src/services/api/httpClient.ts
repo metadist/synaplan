@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { GetApiConfigRuntimeConfigResponseSchema } from '@/generated/api-schemas'
 import { hasSessionHint, clearSessionHint } from '@/services/sessionHint'
 import { isNativeApp } from '@/services/api/nativeRuntime'
+import { readResponseBody, type ResponseType } from '@/services/api/responseBody'
 import {
   getNativeAccessToken,
   getNativeRefreshToken,
@@ -282,8 +283,6 @@ export function getUnavailableProviders(): string[] {
 export function getConfigSync(): RuntimeConfig {
   return runtimeConfigRef.value ?? runtimeConfigFallback()
 }
-
-type ResponseType = 'json' | 'blob' | 'text' | 'arrayBuffer'
 
 interface HttpClientOptions<S extends z.Schema | undefined = undefined> extends RequestInit {
   params?: Record<string, string>
@@ -807,23 +806,7 @@ async function httpClient<T = unknown, S extends z.Schema | undefined = undefine
     return undefined as T
   }
 
-  // Parse response based on requested type
-  let data: Blob | string | ArrayBuffer | unknown
-  switch (responseType) {
-    case 'blob':
-      data = await response.blob()
-      break
-    case 'text':
-      data = await response.text()
-      break
-    case 'arrayBuffer':
-      data = await response.arrayBuffer()
-      break
-    case 'json':
-    default:
-      data = await response.json()
-      break
-  }
+  const data = await readResponseBody(response, responseType)
 
   // Validate with schema if provided
   if (schema && responseType === 'json') {

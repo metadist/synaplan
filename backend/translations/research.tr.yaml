@@ -18,6 +18,7 @@ research:
     unknown: 'Araştırma durdu. Yanıta hâlâ ihtiyacın varsa yeniden başlat.'
   report:
     sources: 'Kaynaklar'
+    untitled: 'Araştırma'
   auto:
     notice: 'Bunun için birkaç kaynağa bakıyorum; yaklaşık %minutes% dakika.'
     why:

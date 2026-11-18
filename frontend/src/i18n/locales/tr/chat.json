@@ -1113,6 +1113,14 @@
     "answerNowFailed": "Şimdi yanıtla araştırmaya ulaşamadı. Araştırma sürüyor.",
     "answeredWithout": "Ek arama olmadan yanıtlandı.",
     "lookDeeper": "Daha derin bak",
+    "download": {
+      "button": "İndir",
+      "menuLabel": "Bu araştırmayı indir",
+      "docx": "Word belgesi (.docx)",
+      "html": "Web sayfası (.html)",
+      "md": "Markdown (.md)",
+      "failed": "İndirme işe yaramadı. Birazdan tekrar deneyin."
+    },
     "turn": {
       "working": "Araştırılıyor…",
       "stepOf": "Adım {n} / {total}",

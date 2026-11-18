@@ -18,6 +18,7 @@ research:
     unknown: 'Die Recherche wurde beendet. Starte sie neu, wenn du die Antwort noch brauchst.'
   report:
     sources: 'Quellen'
+    untitled: 'Recherche'
   auto:
     notice: 'Ich sehe das für dich in mehreren Quellen nach — etwa %minutes% Minuten.'
     why:

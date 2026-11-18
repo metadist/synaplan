@@ -1172,6 +1172,14 @@
     "answerNowFailed": "Answer now did not reach the research. It is still running.",
     "answeredWithout": "Answered without the extra look.",
     "lookDeeper": "Look deeper",
+    "download": {
+      "button": "Download",
+      "menuLabel": "Download this research",
+      "docx": "Word document (.docx)",
+      "html": "Web page (.html)",
+      "md": "Markdown (.md)",
+      "failed": "The download did not work. Try again in a moment."
+    },
     "turn": {
       "working": "Researching…",
       "stepOf": "Step {n} of {total}",

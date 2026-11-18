@@ -3,7 +3,7 @@ nelmio_cors:
         allow_origin: ['*']
         allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
         allow_headers: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Widget-Id', 'X-Widget-Session', 'X-Widget-Host', 'X-API-Key']
-        expose_headers: ['Link', 'X-Total-Count']
+        expose_headers: ['Link', 'X-Total-Count', 'Content-Disposition']
         max_age: 3600
     paths:
         '^/':

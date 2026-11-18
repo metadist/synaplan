@@ -929,20 +929,20 @@
           </button>
 
           <!-- Right: Actions (assistant only, hidden during streaming) -->
-          <!-- Show if: has againData OR has backend message ID (can fetch models) -->
           <div
             v-if="role === 'assistant' && !isStreaming"
             class="flex items-center gap-2 flex-shrink-0"
           >
-            <LookDeeperAction
+            <ResearchReplyActions
               v-if="!isGuestMode"
+              :message-id="backendMessageId"
+              :run-id="researchRunId"
               :effort="effort"
               :effort-notice="effortNotice"
               @look-deeper="emit('look-deeper')"
             />
             <template v-if="backendMessageId">
-              <!-- Not correct and Report sit in one menu (Apple 1.2 still
-                 reaches Report). Look deeper stays a button of its own. -->
+              <!-- Not correct and Report sit in one menu (Apple 1.2 still reaches Report). -->
               <MessageMoreActions
                 :show-false-positive="isFeedbackServiceAvailable"
                 :show-report="!isGuestMode"
@@ -1150,7 +1150,7 @@ import ChatErrorNotice from './ChatErrorNotice.vue'
 import { stripStoredAdminDiagnostics } from '@/utils/storedAdminDiagnostics'
 import MessagePart from './MessagePart.vue'
 import KnowledgeSources from '@/components/chat/KnowledgeSources.vue'
-import LookDeeperAction from '@/components/research/LookDeeperAction.vue'
+import ResearchReplyActions from '@/components/research/ResearchReplyActions.vue'
 import MessageMoreActions from '@/components/chat/MessageMoreActions.vue'
 import ResearchTurn from '@/components/research/ResearchTurn.vue'
 import { useResearchTurn } from '@/composables/useResearchTurn'
