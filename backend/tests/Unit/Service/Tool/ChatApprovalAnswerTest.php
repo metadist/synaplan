@@ -68,6 +68,39 @@ final class ChatApprovalAnswerTest extends TestCase
         self::assertFalse($done);
     }
 
+    public function testAPendingStepThatWouldActIsNeverMarkedDone(): void
+    {
+        $trigger = $this->message('IN', 'q', 10);
+        $waiting = $this->message('OUT', 'Waiting', 11);
+        $waiting->setMeta('task_plan', '{"cards":[{"nodeId":"n1","capability":"mcp_fetch","state":"waiting_approval"},{"nodeId":"n2","capability":"save_to_notion","state":"pending"}]}');
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')->willReturn([$this->row('n1', 'waiting_approval'), $this->row('n2', 'pending')]);
+        $connection->expects(self::never())->method('update');
+        $messages = $this->createMock(MessageRepository::class);
+        $messages->method('findByTrackingId')->willReturn([$trigger, $waiting]);
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects(self::never())->method('chat');
+
+        self::assertFalse($this->answer($connection, $messages, $ai)->complete($trigger, $this->approval(), 'result'));
+    }
+
+    public function testManyTextStepsAreAnsweredInPlace(): void
+    {
+        $trigger = $this->message('IN', 'q', 10);
+        $waiting = $this->message('OUT', 'Waiting', 11);
+        $waiting->setMeta('task_plan', '{"cards":[{"nodeId":"n1","capability":"mcp_fetch","state":"waiting_approval"},{"nodeId":"n2","capability":"summarize","state":"pending"},{"nodeId":"n3","capability":"translate","state":"pending"},{"nodeId":"n4","capability":"chat","state":"pending"}]}');
+        $rows = [$this->row('n1', 'waiting_approval'), $this->row('n2', 'pending'), $this->row('n3', 'pending'), $this->row('n4', 'pending'), $this->row('n5', 'pending')];
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')->willReturn($rows);
+        $messages = $this->createMock(MessageRepository::class);
+        $messages->method('findByTrackingId')->willReturn([$trigger, $waiting]);
+        $ai = $this->createMock(AiFacade::class);
+        $ai->method('chat')->willReturn(['content' => 'Done.']);
+
+        self::assertTrue($this->answer($connection, $messages, $ai)->complete($trigger, $this->approval(), 'result'));
+        self::assertSame('Done.', $waiting->getText());
+    }
+
     public function testAFailingModelFallsBackAndChangesNothing(): void
     {
         $trigger = $this->message('IN', 'q', 10);

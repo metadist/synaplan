@@ -2,7 +2,12 @@ import { test, expect } from '../test-setup'
 import type { Page } from '@playwright/test'
 import { openApp } from '../helpers/auth'
 
-const noSharing = { shared_by: null as string | null, can_share: false, shared_on: false }
+const noSharing = {
+  shared_by: null as string | null,
+  shared_server_id: null as number | null,
+  can_share: false,
+  shared_on: false,
+}
 
 const json = (data: unknown, status = 200) => ({
   status,
@@ -214,7 +219,7 @@ test.describe('@ci Notion app', () => {
       success: true,
       status: 'not_connected',
       server_id: null as number | null,
-      sharing: { shared_by: 'Ada', can_share: false, shared_on: false },
+      sharing: { shared_by: 'Ada', shared_server_id: 9, can_share: false, shared_on: false },
     }
     await page.route('**/api/v1/apps/notion**', (route) => {
       if (new URL(route.request().url()).pathname !== '/api/v1/apps/notion') {
@@ -233,6 +238,36 @@ test.describe('@ci Notion app', () => {
       'Ada shares a Notion connection.'
     )
     await expect(page.getByTestId('btn-notion-connect')).toBeVisible()
+
+    await page.route('**/api/v1/mcp-servers/9/tools', (route) =>
+      route.fulfill(
+        json({
+          success: true,
+          error: null,
+          can_edit: false,
+          notice: false,
+          tools: [
+            {
+              name: 'notion-search',
+              title: 'Search',
+              description: 'Find pages',
+              input_count: 1,
+              input_names: ['query'],
+              category: 'read',
+              outcome: 'auto',
+              default_outcome: 'auto',
+              hinted: true,
+              is_new: false,
+              locked_reason: null,
+            },
+          ],
+        })
+      )
+    )
+    await page.getByTestId('btn-notion-shared-permissions').click()
+    await expect(page.getByTestId('mcp-tool-notion-search')).toBeVisible()
+    await expect(page.getByTestId('select-mcp-tool-notion-search')).toBeDisabled()
+
     await page.getByTestId('btn-notion-use-shared').click()
     await expect(
       page.getByText('Chat can now read Notion through the shared connection.')

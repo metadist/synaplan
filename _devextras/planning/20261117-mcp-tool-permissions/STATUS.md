@@ -47,7 +47,7 @@ to them.
 ## TP4 notes
 
 - Approve on a read tool in chat opens the approval card inside the answer bubble (the gate no longer refuses for a step that "cannot ask"). Accept runs the tool and the AI-composed answer replaces the waiting text in the same bubble; the step card finishes. Reject does not run it.
-- Limits: the in-place answer covers the plain shape (one waiting step, at most two pending). Any other shape, or a model failure, falls back to a short follow-up message. Saved tasks and unattended runs are unchanged.
+- Limits: the in-place answer covers the plain shape (one waiting step; the others only write text, see Follow-ups). Any other shape, or a model failure, falls back to a short follow-up message. Saved tasks and unattended runs are unchanged.
 - The card shows Approve for a destructive MCP tool the owner set to ask (built-in destructive tools still hide it); Always allow stays hidden for destructive.
 - One-time notice: marker `notice` in `BTOOLPOLICY`, set by migration `Version20261117160000` on existing connections with writes off; closed via `POST /api/v1/mcp-servers/{id}/tool-permissions/notice/dismiss`. Shown on the Notion Overview (banner + badge on the Permissions tab) and above the permissions list.
 - Not covered: the model is not told which blocked tool it lacks; only runtime refusals link to Permissions.
@@ -72,3 +72,6 @@ to them.
 
 - Approval answer limits: `ChatApprovalAnswer` checks the `MESSAGES` limit and the cost budget of the approval owner before its extra model call. Over a limit, or an owner that cannot be loaded, falls back to the short follow-up message with no model call. The call was already metered as `MULTITASK` through `AiChatUsageMeter`.
 - TP6 phase 2 waits for a release that contains phase 1 (latest tag at the time: v5.8.7, which predates #3174).
+- Blocked tools named to the planner: the `mcp_fetch` sub-catalog lists each connection's blocked tools ("blocked by the owner, never plan these: …", at most 10 names), so the model can say a tool is blocked in Permissions instead of answering vaguely. The gateway tool loops still just omit a blocked tool.
+- Member view (J-TP-6): the Notion status carries `sharing.shared_server_id`; a member of a shared connection sees "See what the AI may do" and the read-only list (`NotionSharedPermissions.vue`, E2E in `notion-app.spec.ts`).
+- In-place answer, more plan shapes: any number of pending steps now, as long as each only writes text (chat, summarize, translate, rag_query, compose_reply or the hidden compose node). A pending step that would save, send or generate no longer gets marked done without running: it falls back to the follow-up message. (Before this, up to two pending steps of any kind were marked done.)

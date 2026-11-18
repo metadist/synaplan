@@ -165,7 +165,7 @@ class NotionAppControllerTest extends WebTestCase
         self::assertSame('connected', $connected['status']);
         self::assertArrayNotHasKey('allow_write', $connected);
         self::assertArrayNotHasKey('write_auto', $connected);
-        self::assertSame(['shared_by' => null, 'can_share' => false, 'shared_on' => false], $connected['sharing']);
+        self::assertSame(['shared_by' => null, 'shared_server_id' => null, 'can_share' => false, 'shared_on' => false], $connected['sharing']);
 
         $sharing = $this->request('PATCH', '/api/v1/apps/notion/sharing', ['shared' => true]);
         self::assertResponseStatusCodeSame(Response::HTTP_BAD_REQUEST);

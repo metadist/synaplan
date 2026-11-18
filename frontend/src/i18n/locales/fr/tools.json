@@ -1252,6 +1252,8 @@
         "savedOff": "Le partage est désactivé. Vous seul utilisez cette connexion désormais.",
         "failed": "Le réglage de partage n’a pas été enregistré. Rien n’a été modifié. Réessayez.",
         "memberNote": "{owner} partage une connexion Notion. L’IA peut lire Notion avec elle, mais jamais rien modifier.",
+        "showPermissions": "Voir ce que l’IA peut faire",
+        "hidePermissions": "Masquer les autorisations",
         "use": "L’utiliser dans le chat",
         "connectOwn": "Connecter mon propre Notion",
         "usingToast": "Le chat peut maintenant lire Notion via la connexion partagée.",

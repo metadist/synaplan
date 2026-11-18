@@ -24,9 +24,12 @@ use Psr\Log\LoggerInterface;
  * composed answer into that message and marks its steps done, so the thread
  * shows one answer instead of a second message with the raw tool result.
  *
- * It only acts on the plain shape of such a turn: one step waiting and at most
- * two steps still pending. Anything else, or a model that fails, returns false
- * and the caller falls back to the one-sentence follow-up message.
+ * It only acts on the plain shape of such a turn: one step waiting and every
+ * other unfinished step only writes text (chat, summarize, translate, rag_query,
+ * compose_reply), so the answer can stand in for it. A step that would do
+ * something else (save, send, generate) never gets marked done without running.
+ * Anything else, or a model that fails, returns false and the caller falls back
+ * to the one-sentence follow-up message.
  *
  * The answer is one more model call after the tool ran, so it is held to the
  * same message limit and cost budget as a chat message. An owner over either,
@@ -37,7 +40,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class ChatApprovalAnswer
 {
-    private const MAX_PENDING_STEPS = 2;
+    /** Steps that only write text: the composed answer can stand in for them. */
+    private const ANSWER_STEPS = ['chat', 'summarize', 'translate', 'rag_query', 'compose_reply'];
     private const STEP_TEXT_CHARS = 2000;
     private const PROMPT_RESULT_CHARS = 12000;
 
@@ -62,9 +66,12 @@ final readonly class ChatApprovalAnswer
         if (null === $triggerId || '' === trim($result)) {
             return false;
         }
-        $steps = $this->steps($triggerId);
         $waiting = $this->waitingAnswer($trigger);
-        if (null === $steps || null === $waiting) {
+        if (null === $waiting) {
+            return false;
+        }
+        $steps = $this->steps($triggerId, $this->capabilities($waiting));
+        if (null === $steps) {
             return false;
         }
         if (!$this->mayCompose($approval)) {
@@ -88,9 +95,11 @@ final readonly class ChatApprovalAnswer
     }
 
     /**
+     * @param array<string, string> $capabilities capability by node id, from the step cards
+     *
      * @return array{waiting: string, pending: list<string>}|null
      */
-    private function steps(int $triggerId): ?array
+    private function steps(int $triggerId, array $capabilities): ?array
     {
         $waiting = [];
         $pending = [];
@@ -102,11 +111,34 @@ final readonly class ChatApprovalAnswer
                 default => $waiting[] = '',
             };
         }
-        if (1 !== count($waiting) || '' === $waiting[0] || count($pending) > self::MAX_PENDING_STEPS) {
+        if (1 !== count($waiting) || '' === $waiting[0]) {
             return null;
+        }
+        foreach ($pending as $nodeId) {
+            // A step without a card is the hidden compose_reply node.
+            if (isset($capabilities[$nodeId]) && !in_array($capabilities[$nodeId], self::ANSWER_STEPS, true)) {
+                return null;
+            }
         }
 
         return ['waiting' => $waiting[0], 'pending' => $pending];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function capabilities(Message $waiting): array
+    {
+        $raw = $waiting->getMeta('task_plan');
+        $plan = null !== $raw ? json_decode($raw, true) : null;
+        $map = [];
+        foreach (is_array($plan) && is_array($plan['cards'] ?? null) ? $plan['cards'] : [] as $card) {
+            if (is_array($card) && is_string($card['nodeId'] ?? null) && is_string($card['capability'] ?? null)) {
+                $map[$card['nodeId']] = $card['capability'];
+            }
+        }
+
+        return $map;
     }
 
     private function waitingAnswer(Message $trigger): ?Message

@@ -6,7 +6,12 @@ const status = {
   success: true,
   status: 'not_connected' as 'not_connected' | 'connected' | 'reauth_required',
   server_id: null as number | null,
-  sharing: { shared_by: null as string | null, can_share: false, shared_on: false },
+  sharing: {
+    shared_by: null as string | null,
+    shared_server_id: null as number | null,
+    can_share: false,
+    shared_on: false,
+  },
 }
 
 const {
@@ -69,7 +74,7 @@ describe('NotionAppPanel', () => {
     vi.clearAllMocks()
     status.status = 'not_connected'
     status.server_id = null
-    status.sharing = { shared_by: null, can_share: false, shared_on: false }
+    status.sharing = { shared_by: null, shared_server_id: null, can_share: false, shared_on: false }
     statusMock.mockImplementation(async () => ({ ...status }))
     accountMock.mockResolvedValue({
       success: true,
@@ -164,12 +169,20 @@ describe('NotionAppPanel', () => {
   })
 
   it('offers the shared connection to a person without their own', async () => {
-    status.sharing = { shared_by: 'Ada Lovelace', can_share: false, shared_on: false }
+    status.sharing = {
+      shared_by: 'Ada Lovelace',
+      shared_server_id: 9,
+      can_share: false,
+      shared_on: false,
+    }
     useShared.mockResolvedValue(undefined)
     const wrapper = await mountPanel()
 
     expect(wrapper.get('[data-testid="text-notion-shared"]').text()).toContain('Ada Lovelace')
     expect(wrapper.get('[data-testid="btn-notion-connect"]').text()).toBe('Connect your own Notion')
+    expect(wrapper.get('[data-testid="btn-notion-shared-permissions"]').text()).toBe(
+      'See what the AI may do'
+    )
 
     await wrapper.get('[data-testid="btn-notion-use-shared"]').trigger('click')
     await flushPromises()
@@ -182,10 +195,10 @@ describe('NotionAppPanel', () => {
   it('lets an admin share the connection read-only and says what that means', async () => {
     status.status = 'connected'
     status.server_id = 4
-    status.sharing = { shared_by: null, can_share: true, shared_on: false }
+    status.sharing = { shared_by: null, shared_server_id: null, can_share: true, shared_on: false }
     setShared.mockImplementation(async (on: boolean) => ({
       ...status,
-      sharing: { shared_by: null, can_share: true, shared_on: on },
+      sharing: { shared_by: null, shared_server_id: null, can_share: true, shared_on: on },
     }))
     const wrapper = await mountPanel()
     expect(wrapper.get('[data-testid="text-notion-share-consequence"]').text()).toBe(

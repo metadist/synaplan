@@ -1178,6 +1178,8 @@
         "savedOff": "Ya no se comparte. Ahora solo tú usas esta conexión.",
         "failed": "No se guardó el ajuste de compartir. No se cambió nada. Inténtalo de nuevo.",
         "memberNote": "{owner} comparte una conexión con Notion. La IA puede leer Notion con ella, pero nunca cambiar nada.",
+        "showPermissions": "Ver lo que puede hacer la IA",
+        "hidePermissions": "Ocultar los permisos",
         "use": "Usarla en el chat",
         "connectOwn": "Conectar mi propio Notion",
         "usingToast": "El chat ya puede leer Notion con la conexión compartida.",
