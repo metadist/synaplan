@@ -20,13 +20,15 @@ final class ExportMarkdown
     private const FENCE = '/^ {0,3}(`{3,}|~{3,})/';
     private const INLINE_CODE = '/(`+)(?:(?!\1).)+?\1/u';
     private const INLINE_IMAGE = '/!\[([^\]\n]*)\]\(\s*<?([^)\s>]*)>?([^)]*)\)/u';
+    /** A "<" that does not open an autolink such as <https://example.com>. */
+    private const RAW_HTML_OPEN = '/<(?!(?:https?|mailto):[^\s<>]+>)/iu';
 
     /**
      * For the Word converter, which reads raw HTML and image tags.
      */
     public static function forDocument(string $markdown): string
     {
-        return self::outsideCode($markdown, static fn (string $text): string => str_replace('<', '&lt;', self::withoutImages($text)));
+        return self::outsideCode($markdown, static fn (string $text): string => (string) preg_replace(self::RAW_HTML_OPEN, '&lt;', self::withoutImages($text)));
     }
 
     /**

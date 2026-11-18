@@ -144,7 +144,7 @@ final readonly class ResearchReplyExporter
 
     private static function fileName(string $title): string
     {
-        $slug = trim((string) preg_replace('/[^\p{L}\p{N}]+/u', '-', mb_strtolower($title)), '-');
+        $slug = trim((string) preg_replace('/[^\p{L}\p{M}\p{N}]+/u', '-', mb_strtolower($title)), '-');
         $slug = rtrim(mb_substr($slug, 0, self::FILE_NAME_LIMIT), '-');
 
         return '' !== $slug ? $slug : self::FALLBACK_FILE_NAME;

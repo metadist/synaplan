@@ -1,6 +1,7 @@
 <template>
   <div v-if="offered" ref="root" class="relative" data-testid="section-research-download">
     <button
+      ref="trigger"
       type="button"
       :class="[
         'pill text-xs disabled:opacity-50 disabled:cursor-not-allowed',
@@ -13,9 +14,9 @@
       aria-haspopup="menu"
       data-testid="btn-research-download"
       @click.stop="open = !open"
-      @keydown.escape="close"
     >
-      <ArrowDownTrayIcon class="w-4 h-4" aria-hidden="true" />
+      <ResearchSpinner v-if="busy" class="w-4 h-4" />
+      <ArrowDownTrayIcon v-else class="w-4 h-4" aria-hidden="true" />
       <span class="font-medium hidden sm:inline">{{ t('research.download.button') }}</span>
     </button>
     <div
@@ -23,7 +24,6 @@
       class="dropdown-up right-0 w-56 max-w-[calc(100vw-1rem)]"
       role="menu"
       data-testid="dropdown-research-download"
-      @keydown.escape="close"
     >
       <button
         v-for="format in REPLY_EXPORT_FORMATS"
@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ArrowDownTrayIcon,
@@ -50,6 +50,7 @@ import {
   DocumentTextIcon,
   GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
+import ResearchSpinner from '@/components/research/ResearchSpinner.vue'
 import { canExportChats } from '@/composables/useChatWelcome'
 import { useNotification } from '@/composables/useNotification'
 import { useResearchTurn } from '@/composables/useResearchTurn'
@@ -83,6 +84,7 @@ const { running } = useResearchTurn(() => props.runId)
 const open = ref(false)
 const busy = ref(false)
 const root = ref<HTMLElement | null>(null)
+const trigger = ref<HTMLButtonElement | null>(null)
 
 const offered = computed(() => !!props.runId && !props.guest && !running.value && canExportChats())
 
@@ -100,6 +102,8 @@ const download = async (format: ReplyExportFormat) => {
     notification.error(t('research.download.failed'))
   } finally {
     busy.value = false
+    await nextTick()
+    trigger.value?.focus()
   }
 }
 
@@ -113,6 +117,7 @@ const onKeyDown = (event: KeyboardEvent) => {
   if (event.key !== 'Escape' || !open.value) return
   event.stopPropagation()
   close()
+  trigger.value?.focus()
 }
 
 const detach = () => {

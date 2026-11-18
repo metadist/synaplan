@@ -57,6 +57,13 @@ final class ResearchReplyExporterTest extends TestCase
         );
     }
 
+    public function testCombiningMarksStayInsideTheirWordInTheFileName(): void
+    {
+        $file = $this->exporter('हिंदी में वीज़ा', [])->export($this->reply('Body.'), ReplyExportFormat::Markdown, 'hi');
+
+        self::assertSame('हिंदी-में-वीज़ा.md', $file->fileName);
+    }
+
     public function testAUnicodeTitleKeepsItsLettersAndGetsAnAsciiFallback(): void
     {
         $file = $this->exporter('Wärmepumpe für ein Altbau-Haus?', [])->export($this->reply('Ja.'), ReplyExportFormat::Html, 'de');

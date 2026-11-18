@@ -101,6 +101,9 @@ describe('ResearchDownload', () => {
     expect(
       wrapper.get('[data-testid="btn-research-download"]').attributes('disabled')
     ).toBeDefined()
+    expect(wrapper.find('[data-testid="btn-research-download"] svg.animate-spin').exists()).toBe(
+      true
+    )
 
     fail(new Error('network'))
     await flushPromises()
@@ -120,6 +123,9 @@ describe('ResearchDownload', () => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await wrapper.vm.$nextTick()
     expect(wrapper.find('[data-testid="dropdown-research-download"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-testid="btn-research-download"]').element
+    )
 
     await wrapper.get('[data-testid="btn-research-download"]').trigger('click')
     document.body.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
