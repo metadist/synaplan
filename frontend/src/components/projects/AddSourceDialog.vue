@@ -33,17 +33,14 @@
         </div>
 
         <form class="p-4 sm:p-6 space-y-4" @submit.prevent="submit">
-          <div class="flex gap-2" role="tablist" :aria-label="$t('projects.addSource.title')">
+          <div class="tab-nav mb-0" role="tablist" :aria-label="$t('projects.addSource.title')">
             <button
               v-for="option in kinds"
               :key="option"
               type="button"
               role="tab"
               :aria-selected="kind === option"
-              :class="[
-                'flex-1 px-3 py-2 rounded-xl text-sm font-medium',
-                kind === option ? 'mode-toggle-active' : 'surface-chip txt-secondary',
-              ]"
+              :class="['tab-nav-item', kind === option && 'tab-nav-item--active']"
               :data-testid="`tab-project-add-source-${option}`"
               @click="kind = option"
             >
