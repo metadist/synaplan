@@ -32,7 +32,7 @@ changelog) is next. TP6 (drop the old columns) comes one release later.
 | TP3 permissions UI | merged | #3158 |
 | TP4 chat approval, notice | merged | #3159 (squash `f193a4657`) |
 | TP5 Playwright journeys, docs, changelog | **not started** | — |
-| TP6 drop `BALLOWWRITE` / `BWRITEAUTO` | not started, one release after TP2 | — |
+| TP6 drop `BALLOWWRITE` / `BWRITEAUTO` | phases 1–2 merged, phase 3 in review (see STATUS.md) | #3174, #3182, #3184 |
 
 All four PRs were merged by the agent with `--admin`, without review and
 without waiting for Copilot, because the owner explicitly allowed it in chat
@@ -149,10 +149,9 @@ Priority order.
    measured; STATUS says "not measured yet". Record the command used.
 3. **Missing unit proofs of plan §7** if the search in §3 finds none.
 4. **Shared-connection member view** (J-TP-6) if the owner wants it in TP5.
-5. **TP6**: drop `BALLOWWRITE` / `BWRITEAUTO` (entity
-   `backend/src/Entity/McpServerConfig.php` lines ~70 and ~78, still the only
-   references in `backend/src`) with an idempotent raw-SQL migration, one
-   release after TP2 (decision #14). Not before.
+5. **TP6**: done in three phases (see STATUS.md, TP6 notes). Phase 3, the
+   `DROP COLUMN` (#3184), merges only after a release containing phase 2
+   (#3182) runs on every production node.
 6. Optional follow-ups, none decided by the owner: tell the model which
    blocked tool it lacks; a rate-limit check for the composition call of
    `ChatApprovalAnswer`; in-place answer for more plan shapes; the saved-task
