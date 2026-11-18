@@ -32,7 +32,7 @@ final class DraftSentences
     private const CONTINUES = '/^(?:[,;:)\]]|\p{Ll})/u';
     private const CONTINUES_AFTER_MARKERS = '/^[,;:)\]]/u';
     private const LEADING_MARKERS = '/^((?:\[\s*e\d+(?:\s*,\s*e\d+)*\s*\]\s*)+)(.*)$/isu';
-    private const CLOSING_MARKS = '/^([*_~`"\'”’»›]+)(\s*)(.*)$/su';
+    private const CLOSING_MARKS = '/^(\*+|_+|~+|`+|"|”)(\s*)(.*)$/su';
     private const BLOCK_START = '/^(?:#{1,6}\s|[-*+•]\s|\d{1,3}[.)]\s|>|`{3}|~{3})/u';
     private const WORD = '/[\p{L}\p{N}]/u';
     /** How far back an open bracket is looked for, so a bracket nobody closed does not swallow the paragraph. */
@@ -96,7 +96,7 @@ final class DraftSentences
                 $part = $match[2];
                 $closed = true;
                 // "**One. [e1]** Two." closes its emphasis right after the marker.
-                if ('' === $gap && 1 === preg_match(self::CLOSING_MARKS, $part, $close)) {
+                if ('' === $gap && 1 === preg_match(self::CLOSING_MARKS, $part, $close) && self::closes($out[array_key_last($out)], $close[1])) {
                     $out[array_key_last($out)] .= $close[1];
                     $gap = $close[2];
                     $part = $close[3];
@@ -168,6 +168,16 @@ final class DraftSentences
         $line = trim($line);
 
         return str_starts_with($line, '|') && str_ends_with($line, '|') && strlen($line) > 1;
+    }
+
+    /**
+     * Emphasis or a quote mark right after a marker closes the statement
+     * when the statement opened it and has not closed it yet. Otherwise
+     * it opens the next one: "One. [e1]**Two. [e2]**".
+     */
+    private static function closes(string $statement, string $marks): bool
+    {
+        return '”' === $marks || 1 === substr_count($statement, $marks) % 2;
     }
 
     /**

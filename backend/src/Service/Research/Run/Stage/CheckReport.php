@@ -61,6 +61,7 @@ final class CheckReport
         'tr' => 'Bu projede tek bir model ailesi var. Araştırma yalnızca bir kaynak alıntısının desteklediği cümleleri tutar. Kontrol edilmiş bir özet için ikinci bir sağlayıcı ekleyin.',
     ];
 
+    private const EMPHASIS = '*_~`"“”';
     private const EMPTY_LIST_ITEM = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s*$/u';
     private const LIST_MARKER = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s+/u';
 
@@ -247,7 +248,8 @@ final class CheckReport
             return preg_replace($line, '', $report, 1) ?? $report;
         }
 
-        return preg_replace('/(?<!\S)'.$quoted.'(?!\S)[ \t]*/u', '', $report, 1) ?? $report;
+        // Between white space, or touched by the emphasis of its neighbour: "One. [e1]**Two. [e2]**".
+        return preg_replace('/(?<![^\s'.self::EMPHASIS.'])'.$quoted.'(?![^\s'.self::EMPHASIS.'])[ \t]*/u', '', $report, 1) ?? $report;
     }
 
     /** Drops list markers, tables without rows and blank runs a removed sentence left behind. */

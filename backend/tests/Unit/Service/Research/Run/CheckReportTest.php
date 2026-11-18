@@ -179,6 +179,22 @@ final class CheckReportTest extends TestCase
         self::assertSame(['product | talks remain unspecified. further talks continue.'], array_keys($plan));
     }
 
+    public function testEmphasisThatOpensRightAfterAMarkerBelongsToTheNextSentence(): void
+    {
+        $draft = 'The fee is 99 EUR. [e1]**The warranty is 5 years. [e2]**';
+
+        self::assertSame(['The fee is 99 EUR. [e1]', '**The warranty is 5 years. [e2]**'], DraftSentences::split($draft));
+        self::assertStringStartsWith('**The warranty is 5 years. [e2]**', $this->removing($draft, 'The fee is 99 EUR. [e1]'));
+        self::assertStringStartsWith('The fee is 99 EUR. [e1]', $this->removing($draft, '**The warranty is 5 years. [e2]**'));
+    }
+
+    public function testARemovedSentenceIsNotCutOutOfALongerNumber(): void
+    {
+        $report = $this->removing('The index is 12.5. The fee is 12.5.', '5.');
+
+        self::assertStringStartsWith('The index is 12.5. The fee is 12.5.', $report);
+    }
+
     public function testFeatDoesNotEndASentence(): void
     {
         self::assertCount(1, DraftSentences::split('"Holy Grail" feat. Justin Timberlake peaked at No. 4. [e1]'));
