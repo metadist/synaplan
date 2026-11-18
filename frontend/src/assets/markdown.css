@@ -333,10 +333,13 @@
 }
 
 /* Once rendered in place (SVG injected into the <pre>), drop the code-block
- * chrome so the diagram is not boxed like source code. */
+ * chrome so the diagram is not boxed like source code. Mermaid measures labels
+ * in the body font, so the <pre> monospace font and white-space would clip them. */
 .markdown-content .mermaid-block.mermaid-rendered {
   padding: 0;
   background-color: transparent;
+  font-family: inherit;
+  white-space: normal;
 }
 
 .markdown-content .mermaid-block.mermaid-rendered svg {
