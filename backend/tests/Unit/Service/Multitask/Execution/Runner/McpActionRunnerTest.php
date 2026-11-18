@@ -35,9 +35,9 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 
 /**
  * `mcp_action` node contract: the write gate chain on top of the read gates
- * (server `allow_write` opt-in, destructive tools refused), plus the dynamic
- * planner sub-catalog that only advertises declared write tools of
- * write-enabled servers.
+ * (per-tool permissions: Block never offered, destructive tools ask), plus the dynamic
+ * planner sub-catalog that only advertises declared write tools that
+ * are not set to Block.
  */
 final class McpActionRunnerTest extends TestCase
 {

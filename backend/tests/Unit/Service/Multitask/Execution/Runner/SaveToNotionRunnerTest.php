@@ -69,20 +69,6 @@ final class SaveToNotionRunnerTest extends TestCase
         self::assertStringContainsString('Notion is not connected', (string) $result->error);
     }
 
-    public function testDoesNotWriteWhileNotionIsReadOnly(): void
-    {
-        $gateway = $this->createMock(NotionGateway::class);
-        $gateway->method('writable')->willReturn(new McpServerConfig());
-        $gateway->expects(self::never())->method('call');
-        $ctx = $this->context();
-        $ctx->setResult('n1', NodeResult::ok('Body'));
-
-        $result = $this->runner($gateway)->run($this->node(['page' => self::PAGE]), $ctx);
-
-        self::assertFalse($result->isSuccessful());
-        self::assertStringContainsString('Notion is read-only', (string) $result->error);
-    }
-
     public function testReportsWhatNotionSaidWhenThePageIsNotCreated(): void
     {
         $gateway = $this->createMock(NotionGateway::class);
@@ -122,7 +108,7 @@ final class SaveToNotionRunnerTest extends TestCase
 
     private function writableServer(): McpServerConfig
     {
-        return (new McpServerConfig())->setAllowWrite(true);
+        return new McpServerConfig();
     }
 
     private function runner(NotionGateway $gateway, ?StepApprovalGate $gate = null): SaveToNotionRunner

@@ -66,7 +66,6 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'oauth_status', type: 'string', nullable: true, example: 'connected', enum: ['not_connected', 'connected', 'reauth_required']),
                                 new OA\Property(property: 'oauth_sign_in_host', type: 'string', nullable: true, example: 'auth.atlassian.com', description: 'Host of the page where this server signs people in; null before the first sign-in'),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
-                                new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
                                 new OA\Property(property: 'updated', type: 'string', example: '20260702180000'),
                             ],
@@ -110,7 +109,6 @@ final class McpServerConfigController extends AbstractController
                     new OA\Property(property: 'auth_header', type: 'string', example: 'Authorization'),
                     new OA\Property(property: 'auth_token', type: 'string', example: 'Bearer sk-…'),
                     new OA\Property(property: 'enabled', type: 'boolean', example: true),
-                    new OA\Property(property: 'allow_write', type: 'boolean', example: false, description: 'Allow the AI to call mutating tools (create/update) on this server'),
                     new OA\Property(property: 'auth_mode', type: 'string', example: 'oauth', enum: ['none', 'bearer', 'oauth']),
                 ]
             )
@@ -135,7 +133,6 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'oauth_status', type: 'string', nullable: true, example: 'not_connected', enum: ['not_connected', 'connected', 'reauth_required']),
                                 new OA\Property(property: 'oauth_sign_in_host', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
-                                new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
                                 new OA\Property(property: 'updated', type: 'string', example: '20260702180000'),
                             ],
@@ -195,7 +192,6 @@ final class McpServerConfigController extends AbstractController
                                 new OA\Property(property: 'oauth_status', type: 'string', nullable: true, example: 'not_connected', enum: ['not_connected', 'connected', 'reauth_required']),
                                 new OA\Property(property: 'oauth_sign_in_host', type: 'string', nullable: true, example: null),
                                 new OA\Property(property: 'enabled', type: 'boolean', example: true),
-                                new OA\Property(property: 'allow_write', type: 'boolean', example: false),
                                 new OA\Property(property: 'created', type: 'string', example: '20260702180000'),
                                 new OA\Property(property: 'updated', type: 'string', example: '20260702180000'),
                             ],
@@ -394,9 +390,6 @@ final class McpServerConfigController extends AbstractController
         if (array_key_exists('enabled', $data)) {
             $server->setEnabled((bool) $data['enabled']);
         }
-        if (array_key_exists('allow_write', $data)) {
-            $server->setAllowWrite((bool) $data['allow_write']);
-        }
     }
 
     /**
@@ -423,7 +416,6 @@ final class McpServerConfigController extends AbstractController
             'oauth_status' => $oauthStatus,
             'oauth_sign_in_host' => $signInHost,
             'enabled' => $server->isEnabled(),
-            'allow_write' => $server->allowsWrite(),
             'created' => $server->getCreated(),
             'updated' => $server->getUpdated(),
         ];

@@ -53,7 +53,6 @@ final readonly class McpServersBundleSection implements BundleSectionInterface
                 'name' => $server->getName(),
                 'url' => $server->getUrl(),
                 'authMode' => $server->getAuthMode(),
-                'allowWrite' => $server->allowsWrite(),
                 'enabled' => $server->isEnabled(),
             ];
         }
@@ -76,11 +75,6 @@ final readonly class McpServersBundleSection implements BundleSectionInterface
             $authMode = (string) ($item['authMode'] ?? McpServerConfig::AUTH_MODE_NONE);
             if (McpServerConfig::AUTH_MODE_NONE !== $authMode) {
                 $rows[] = new ChecklistItem('needsCredential', $key, $name);
-            }
-            // Import keeps an existing server's own write switch; only say "off" where it is.
-            $writesStayOff = null === $existing || !$existing->allowsWrite();
-            if (true === ($item['allowWrite'] ?? false) && $writesStayOff) {
-                $rows[] = new ChecklistItem('writeOff', $key, $name);
             }
         }
 
@@ -120,7 +114,6 @@ final readonly class McpServersBundleSection implements BundleSectionInterface
                 }
                 $server->setAuthMode($authMode);
                 $server->setEnabled((bool) ($item['enabled'] ?? true));
-                // `allowWrite` is never applied: a file does not switch on write actions.
                 $this->servers->save($server);
                 $created[] = $key;
             } catch (\Throwable $e) {

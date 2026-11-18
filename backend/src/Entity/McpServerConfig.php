@@ -63,17 +63,18 @@ class McpServerConfig
     private bool $enabled = true;
 
     /**
-     * Owner's explicit opt-in for MUTATING tool calls on this server
-     * (`mcp_action`). OFF = the server is read-only (`mcp_fetch`), which is
-     * the safe default for every new connection.
+     * @deprecated Retired by the per-tool permissions (BTOOLPOLICY). Nothing
+     *             reads or writes it any more; it stays MAPPED (default 0) only so
+     *             the column survives the rolling-deploy window where previous-release
+     *             nodes still SELECT it, without failing CI's schema-sync validation.
+     *             Mapping and column go together in the phase-2 release
+     *             (docs/MIGRATIONS.md, two-phase note).
      */
     #[ORM\Column(name: 'BALLOWWRITE', type: 'boolean', options: ['default' => false])]
     private bool $allowWrite = false;
 
     /**
-     * When ON together with {@see $allowWrite}, mutating tools on this server
-     * run in an interactive chat without an approval card. Unattended runs
-     * and destructive tools are unchanged. OFF by default.
+     * @deprecated see $allowWrite — same phase-2 removal
      */
     #[ORM\Column(name: 'BWRITEAUTO', type: 'boolean', options: ['default' => false])]
     private bool $writeAuto = false;
@@ -216,32 +217,6 @@ class McpServerConfig
     public function setEnabled(bool $enabled): self
     {
         $this->enabled = $enabled;
-        $this->touch();
-
-        return $this;
-    }
-
-    public function allowsWrite(): bool
-    {
-        return $this->allowWrite;
-    }
-
-    public function setAllowWrite(bool $allowWrite): self
-    {
-        $this->allowWrite = $allowWrite;
-        $this->touch();
-
-        return $this;
-    }
-
-    public function isWriteAuto(): bool
-    {
-        return $this->writeAuto;
-    }
-
-    public function setWriteAuto(bool $writeAuto): self
-    {
-        $this->writeAuto = $writeAuto;
         $this->touch();
 
         return $this;

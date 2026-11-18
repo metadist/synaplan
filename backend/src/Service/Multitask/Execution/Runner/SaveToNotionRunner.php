@@ -73,9 +73,6 @@ final readonly class SaveToNotionRunner implements TaskRunner
         if (null === $server) {
             return NodeResult::failed('Notion is not connected — connect it under Apps → Notion. Nothing was saved to Notion');
         }
-        if (!$server->allowsWrite()) {
-            return NodeResult::failed('Notion is read-only — turn on "The AI may change Notion" under Apps → Notion. Nothing was saved to Notion');
-        }
 
         $inputs = $context->resolveInputs($node);
         $text = is_string($inputs['text'] ?? null) ? trim($inputs['text']) : '';
@@ -193,7 +190,7 @@ final readonly class SaveToNotionRunner implements TaskRunner
             return null;
         }
         try {
-            if (true !== $this->gateway->writable($userId)?->allowsWrite()) {
+            if (null === $this->gateway->writable($userId)) {
                 return null;
             }
         } catch (\Throwable) {

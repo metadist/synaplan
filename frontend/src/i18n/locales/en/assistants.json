@@ -277,7 +277,6 @@
       "needsWidget": "Needs a website widget — connect one after import ({key})",
       "needsWhatsapp": "Needs a WhatsApp number — connect one after import ({key})",
       "schedulesOff": "Schedules are off until you turn them on ({key})",
-      "writeOff": "Write actions stay off for {detail} — turn them on yourself if you want them",
       "droppedFolders": "Shared folders were not included ({key})",
       "conflict": "Already exists — will be skipped unless you replace it ({key})",
       "addressDiffers": "You already have a server named {detail} at another address — it stays as it is, and this one is skipped",

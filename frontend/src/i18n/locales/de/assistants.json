@@ -276,7 +276,6 @@
       "needsWidget": "Braucht ein Website-Widget — nach dem Import verbinden ({key})",
       "needsWhatsapp": "Braucht eine WhatsApp-Nummer — nach dem Import verbinden ({key})",
       "schedulesOff": "Zeitpläne bleiben aus, bis Sie sie einschalten ({key})",
-      "writeOff": "Schreibaktionen bleiben für {detail} aus — schalten Sie sie bei Bedarf selbst ein",
       "droppedFolders": "Geteilte Ordner waren nicht enthalten ({key})",
       "conflict": "Existiert bereits — wird übersprungen, außer Sie ersetzen ({key})",
       "addressDiffers": "Sie haben bereits einen Server namens {detail} mit einer anderen Adresse — er bleibt unverändert, dieser wird übersprungen",

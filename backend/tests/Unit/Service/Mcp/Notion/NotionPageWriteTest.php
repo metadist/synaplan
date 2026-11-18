@@ -246,7 +246,7 @@ final class NotionPageWriteTest extends TestCase
     private function notionServer(): McpServerConfig
     {
         $server = new McpServerConfig();
-        $server->setUserId(1)->setName('Notion')->setUrl('https://mcp.notion.com/mcp')->setAllowWrite(true);
+        $server->setUserId(1)->setName('Notion')->setUrl('https://mcp.notion.com/mcp');
         (new \ReflectionProperty($server, 'id'))->setValue($server, 3);
 
         return $server;

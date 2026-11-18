@@ -1576,7 +1576,7 @@ final class ToolLoopHarness
     private function makeServer(): McpServerConfig
     {
         $server = new McpServerConfig();
-        $server->setUserId(self::USER_ID)->setName('Jira')->setUrl('https://example.test/mcp')->setEnabled(true)->setAllowWrite(true);
+        $server->setUserId(self::USER_ID)->setName('Jira')->setUrl('https://example.test/mcp')->setEnabled(true);
         (new \ReflectionProperty(McpServerConfig::class, 'id'))->setValue($server, 1);
 
         return $server;

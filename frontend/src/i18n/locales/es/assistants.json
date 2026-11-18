@@ -276,7 +276,6 @@
       "needsWidget": "Necesita un widget del sitio — conéctelo después de importar ({key})",
       "needsWhatsapp": "Necesita un número de WhatsApp — conéctelo después de importar ({key})",
       "schedulesOff": "Las programaciones están apagadas hasta que las active ({key})",
-      "writeOff": "Las acciones de escritura quedan desactivadas para {detail} — actívelas usted si las necesita",
       "droppedFolders": "Las carpetas compartidas no se incluyeron ({key})",
       "conflict": "Ya existe — se omitirá salvo que lo reemplace ({key})",
       "addressDiffers": "Ya tiene un servidor llamado {detail} con otra dirección — se queda como está y este se omite",
