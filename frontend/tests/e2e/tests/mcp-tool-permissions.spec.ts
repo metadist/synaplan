@@ -100,7 +100,9 @@ async function mockPermissionsApi(
     )
   })
   await page.route('**/api/v1/apps/notion/account', (route) =>
-    route.fulfill(json({ success: true, workspace_name: 'Acme', user_name: null, user_email: null }))
+    route.fulfill(
+      json({ success: true, workspace_name: 'Acme', user_name: null, user_email: null })
+    )
   )
   await page.route('**/api/v1/apps/notion/activity', (route) =>
     route.fulfill(json({ success: true, items: [] }))
