@@ -50,11 +50,15 @@ final class CitationMarks
     public static function planBares(string $report): array
     {
         $out = [];
-        foreach (preg_split("/\r\n|\r|\n/u", $report) ?: [] as $line) {
+        $lines = preg_split("/\r\n|\r|\n/u", $report) ?: [];
+        $rows = DraftSentences::tableRows($lines);
+        foreach ($lines as $index => $line) {
             if (1 !== preg_match(self::PLAN, $line) || 1 === preg_match(self::EVIDENCE, $line)) {
                 continue;
             }
-            foreach (DraftSentences::split(self::plain($line)) as $sentence) {
+            // A table row is one statement, as it is for the check.
+            $sentences = isset($rows[$index]) ? [trim(self::plain($line))] : DraftSentences::split(self::plain($line));
+            foreach ($sentences as $sentence) {
                 $bare = PassageText::normalise(DraftSentences::bare($sentence));
                 if ('' !== $bare) {
                     $out[$bare] = true;

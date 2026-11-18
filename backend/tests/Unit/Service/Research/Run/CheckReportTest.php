@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Service\Research\Run\Stage\CheckReport;
+use App\Service\Research\Run\Stage\CitationMarks;
 use App\Service\Research\Run\Stage\DraftSentences;
 use PHPUnit\Framework\TestCase;
 
@@ -50,6 +51,174 @@ final class CheckReportTest extends TestCase
         $sentences = DraftSentences::split('These included claims (e.g., "It is defined in RFC 9110... ," and "It comes from the IETF") without citations. [e1]');
 
         self::assertCount(1, $sentences);
+    }
+
+    public function testATableRowIsOneStatementWhateverFullStopsItsCellsHold(): void
+    {
+        $row = '| "Run This Town" (feat. Rihanna) | Peaked at No. 2. Won two awards. [e1] |';
+
+        self::assertSame([$row], DraftSentences::split("| Song | Notes |\n|---|---|\n".$row));
+    }
+
+    public function testAnAbbreviationInsideABracketDoesNotSplitTheSentence(): void
+    {
+        $sentences = DraftSentences::split('- "Run This Town" (feat. Rihanna) stayed (approx. Five weeks) in the top 10. [e1] It won two awards. [e2]');
+
+        self::assertSame(['"Run This Town" (feat. Rihanna) stayed (approx. Five weeks) in the top 10. [e1]', 'It won two awards. [e2]'], $sentences);
+    }
+
+    public function testAMarkerAfterTheFullStopBelongsToTheSentenceBeforeIt(): void
+    {
+        $sentences = DraftSentences::split('The fee is 90 EUR. [e2] Income must be 3,480 EUR. [e1][e2] It is due in the top 10. [e3] Nothing else applies.');
+
+        self::assertSame([
+            'The fee is 90 EUR. [e2]',
+            'Income must be 3,480 EUR. [e1][e2]',
+            'It is due in the top 10. [e3]',
+            'Nothing else applies.',
+        ], $sentences);
+    }
+
+    public function testASentenceThatGoesOnAfterAMarkerKeepsItsSpacing(): void
+    {
+        $line = 'It was published in June 2014. [e2], and RFC 9110 is current. [e3]';
+
+        self::assertSame([$line], DraftSentences::split($line));
+    }
+
+    public function testARejectedSentenceIsFoundAgainWhateverSpaceStoodBeforeItsMarker(): void
+    {
+        $draft = 'The fee is 99 EUR.  [e1] The warranty is two years. [e2]';
+
+        self::assertSame(['The fee is 99 EUR.  [e1]', 'The warranty is two years. [e2]'], DraftSentences::split($draft));
+        self::assertStringStartsWith('The warranty is two years. [e2]', $this->removing($draft, DraftSentences::split($draft)[0]));
+    }
+
+    public function testTheEmphasisAroundASentenceIsRemovedWithIt(): void
+    {
+        $draft = "**The fee is 99 EUR. [e1]**\n\nThe warranty is two years. [e2]";
+
+        self::assertSame(['**The fee is 99 EUR. [e1]**', 'The warranty is two years. [e2]'], DraftSentences::split($draft));
+        self::assertStringStartsWith('The warranty is two years. [e2]', $this->removing($draft, DraftSentences::split($draft)[0]));
+    }
+
+    public function testASmallLetterAfterAMarkerStartsANewSentence(): void
+    {
+        $sentences = DraftSentences::split('The fee is 12 EUR. [e1] iPhone costs 99 EUR. [e2]');
+
+        self::assertSame(['The fee is 12 EUR. [e1]', 'iPhone costs 99 EUR. [e2]'], $sentences);
+    }
+
+    public function testABracketInsideABracketDoesNotSplitTheSentence(): void
+    {
+        $line = 'The fee (set in 2024 (under the new law). Six weeks after approval) is 90 EUR. [e1]';
+
+        self::assertSame([$line], DraftSentences::split($line));
+    }
+
+    public function testARowOfATableWithoutOuterPipesIsOneStatement(): void
+    {
+        $row = 'Example | 2019. Six weeks at the top. [e1]';
+
+        $sentences = DraftSentences::split("Song | Notes\n--- | ---\n".$row."\n\nA | B is no row here. It goes on. [e2]");
+
+        self::assertSame([$row, 'A | B is no row here.', 'It goes on. [e2]'], $sentences);
+    }
+
+    public function testATableWithoutOuterPipesThatLostEveryRowIsDropped(): void
+    {
+        $row = 'Example | 2019. Six weeks at the top. [e1]';
+
+        $report = $this->removing("## Songs\n\nSong | Notes\n--- | ---\n".$row."\n\nText. [e2]", $row);
+
+        self::assertStringStartsWith("## Songs\n\nText. [e2]", $report);
+    }
+
+    public function testTheEmphasisThatClosesBeforeTheNextSentenceIsRemovedWithItsOwn(): void
+    {
+        $draft = '**The fee is 99 EUR. [e1]** The warranty is two years. [e2]';
+
+        self::assertSame(['**The fee is 99 EUR. [e1]**', 'The warranty is two years. [e2]'], DraftSentences::split($draft));
+        self::assertStringStartsWith('The warranty is two years. [e2]', $this->removing($draft, DraftSentences::split($draft)[0]));
+    }
+
+    public function testEmphasisThatOpensAfterAMarkerBelongsToTheNextSentence(): void
+    {
+        $sentences = DraftSentences::split('The fee is 99 EUR. [e1] **The warranty is two years.** [e2]');
+
+        self::assertSame(['The fee is 99 EUR. [e1]', '**The warranty is two years.** [e2]'], $sentences);
+    }
+
+    public function testAMarkerInsideAnOpenBracketDoesNotSplitTheSentence(): void
+    {
+        $line = 'The fee (introduced in 2024. [e1] Extended in 2025) is 90 EUR. [e2]';
+
+        self::assertSame([$line], DraftSentences::split($line));
+    }
+
+    public function testAListItemAfterATableIsNotARowOfIt(): void
+    {
+        $sentences = DraftSentences::split("Song | Notes\n--- | ---\nA | B. Still B. [e1]\n- Cost | one. Two more. [e2]");
+
+        self::assertSame(['A | B. Still B. [e1]', 'Cost | one.', 'Two more. [e2]'], $sentences);
+    }
+
+    public function testAnEmptiedTableIsDroppedBeforeAHeadingThatHoldsAPipe(): void
+    {
+        $row = 'A | B. Still B. [e1]';
+
+        $report = $this->removing("Song | Notes\n--- | ---\n".$row."\n## Next | step\n\nText. [e2]", $row);
+
+        self::assertStringStartsWith("## Next | step\n\nText. [e2]", $report);
+    }
+
+    public function testTheLastRowAboveADividingLineIsCheckedLikeTheOthers(): void
+    {
+        $sentences = DraftSentences::split("| Song | Year |\n|---|---|\n| Empire | 2009 [e1] |\n| Made up | 2011 |\n---\n\nSong | Year\n--- | ---\nOther | 2001 [e2]\n---");
+
+        self::assertSame(['| Empire | 2009 [e1] |', '| Made up | 2011 |', 'Other | 2001 [e2]'], $sentences);
+    }
+
+    public function testASupportedLastRowAboveADividingLineStays(): void
+    {
+        $report = $this->removing("| Song | Year |\n|---|---|\n| Empire | 2009. Six weeks. [e1] |\n| Kept | 2011 [e2] |\n---\n\nText. [e3]", '| Empire | 2009. Six weeks. [e1] |');
+
+        self::assertStringStartsWith("| Song | Year |\n|---|---|\n| Kept | 2011 [e2] |\n---\n\nText. [e3]", $report);
+    }
+
+    public function testARowCitedOnlyByAPlanPointIsOneStatement(): void
+    {
+        $plan = CitationMarks::planBares("Product | Notes\n--- | ---\nProduct | Talks remain unspecified. Further talks continue. [p1]");
+
+        self::assertSame(['product | talks remain unspecified. further talks continue.'], array_keys($plan));
+    }
+
+    public function testEmphasisThatOpensRightAfterAMarkerBelongsToTheNextSentence(): void
+    {
+        $draft = 'The fee is 99 EUR. [e1]**The warranty is 5 years. [e2]**';
+
+        self::assertSame(['The fee is 99 EUR. [e1]', '**The warranty is 5 years. [e2]**'], DraftSentences::split($draft));
+        self::assertStringStartsWith("**The warranty is 5 years. [e2]**\n", $this->removing($draft, 'The fee is 99 EUR. [e1]'));
+        self::assertStringStartsWith("The fee is 99 EUR. [e1]\n", $this->removing($draft, '**The warranty is 5 years. [e2]**'));
+    }
+
+    public function testARemovedSentenceIsNotCutOutOfALongerNumber(): void
+    {
+        $report = $this->removing('The index is 12.5. The fee is 12.5.', '5.');
+
+        self::assertStringStartsWith("The index is 12.5. The fee is 12.5.\n", $report);
+    }
+
+    public function testASentenceBetweenWhiteSpaceIsRemovedBeforeOneThatTouchesItsNeighbour(): void
+    {
+        $report = $this->removing('**The fee is 99 EUR. [e1]**, as the offer says. [e2] The fee is 99 EUR. [e1]', 'The fee is 99 EUR. [e1]');
+
+        self::assertStringStartsWith("**The fee is 99 EUR. [e1]**, as the offer says. [e2]\n", $report);
+    }
+
+    public function testFeatDoesNotEndASentence(): void
+    {
+        self::assertCount(1, DraftSentences::split('"Holy Grail" feat. Justin Timberlake peaked at No. 4. [e1]'));
     }
 
     public function testABareSentenceHasNoSpaceBeforePunctuation(): void

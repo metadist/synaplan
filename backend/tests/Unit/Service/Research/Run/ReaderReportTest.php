@@ -58,6 +58,53 @@ final class ReaderReportTest extends TestCase
         self::assertSame("## Costs\n\n### Portugal\n\nText. [1]", $reader['markdown']);
     }
 
+    public function testAnEmptiedHeadingGoesWithTheDividingLineUnderIt(): void
+    {
+        $checked = "## Summary\n\nText. [e1]\n\n---\n\n## Top 10\n\n---\n\n## Number one\n\n---\n\n"
+            ."## Streams\n\nMore. [e2]\n\n---\n\n## Timeline\n\n---";
+
+        $reader = ReaderReport::from($checked, $this->ledger());
+
+        self::assertSame("## Summary\n\nText. [1]\n\n---\n\n## Streams\n\nMore. [2]", $reader['markdown']);
+    }
+
+    public function testADividingLineNeverTurnsTheLineAboveIntoAHeading(): void
+    {
+        $reader = ReaderReport::from("Text. [e1]\n## Top 10\n---\n## Streams\nMore. [e2]", $this->ledger());
+
+        self::assertSame("Text. [1]\n\n---\n## Streams\nMore. [2]", $reader['markdown']);
+    }
+
+    public function testDashesUnderATitleAreItsUnderlineAndStay(): void
+    {
+        $reader = ReaderReport::from("Visa\n---\n\nText. [e1]", $this->ledger());
+
+        self::assertSame("Visa\n---\n\nText. [1]", $reader['markdown']);
+    }
+
+    public function testAHeadingWithOnlyAnEmptySubsectionGoesWithIt(): void
+    {
+        $reader = ReaderReport::from("## Answer\n\nText. [e1]\n\n## Costs\n\n### Portugal\n\n---\n\n### Spain", $this->ledger());
+
+        self::assertSame("## Answer\n\nText. [1]", $reader['markdown']);
+    }
+
+    public function testACodeBlockStaysAsItWasWritten(): void
+    {
+        $code = "```text\n# not a heading\n***\n***\n\n\n---\n```";
+
+        $reader = ReaderReport::from("## Example\n\n".$code."\n\n## Outlook", $this->ledger());
+
+        self::assertSame("## Example\n\n".$code, $reader['markdown']);
+    }
+
+    public function testAHashInIndentedCodeIsNoHeading(): void
+    {
+        $reader = ReaderReport::from("## Setup\n\n    # install first\n\n## Outlook", $this->ledger());
+
+        self::assertSame("## Setup\n\n    # install first", $reader['markdown']);
+    }
+
     public function testAFileSourceLinksToTheFile(): void
     {
         $ledger = new EvidenceLedger();

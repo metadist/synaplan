@@ -125,9 +125,10 @@ final class CheckReport
         }
         $claims = [];
         $kept = [];
+        $rows = DraftSentences::tableRows($lines);
         for ($i = $section['start']; $i < $section['end']; ++$i) {
             $line = $lines[$i];
-            if ($i !== $section['start'] && !self::isTableRow($line) && CitationMarks::cites($line)) {
+            if ($i !== $section['start'] && !isset($rows[$i]) && CitationMarks::cites($line)) {
                 $claims[] = $line;
                 continue;
             }
@@ -238,28 +239,38 @@ final class CheckReport
         return trim($report);
     }
 
+    /**
+     * Removes a statement where it stands: as a line of its own, else
+     * between white space, else where it touches its neighbour, as in
+     * "One. [e1]**Two. [e2]**" — but never out of a word or a number.
+     */
     private static function cut(string $report, string $sentence): string
     {
         $quoted = preg_quote($sentence, '/');
-        $line = '/^[ \t]*'.$quoted.'[ \t]*(?:\r?\n|$)/mu';
-        if (1 === preg_match($line, $report)) {
-            return preg_replace($line, '', $report, 1) ?? $report;
+        $patterns = [
+            '/^[ \t]*'.$quoted.'[ \t]*(?:\r?\n|$)/mu',
+            '/(?<!\S)'.$quoted.'(?!\S)[ \t]*/u',
+            '/(?<![\p{L}\p{N}])(?<!\p{N}[.,])'.$quoted.'(?![\p{L}\p{N}])[ \t]*/u',
+        ];
+        foreach ($patterns as $pattern) {
+            if (1 === preg_match($pattern, $report)) {
+                return preg_replace($pattern, '', $report, 1) ?? $report;
+            }
         }
 
-        return preg_replace('/(?<!\S)'.$quoted.'(?!\S)[ \t]*/u', '', $report, 1) ?? $report;
+        return $report;
     }
 
     /** Drops list markers, tables without rows and blank runs a removed sentence left behind. */
     private static function tidy(string $report): string
     {
         $lines = self::lines($report);
+        $rows = DraftSentences::tableRows($lines);
         $kept = [];
         foreach ($lines as $index => $line) {
             $line = rtrim($line);
-            if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index)) {
-                continue;
-            }
-            if (self::isTableRow($line) && self::headerOfEmptyTable($lines, $index - 1)) {
+            // The header of a table without rows, or the rule line under it.
+            if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index, $rows) || self::headerOfEmptyTable($lines, $index - 1, $rows)) {
                 continue;
             }
             $kept[] = $line;
@@ -269,24 +280,26 @@ final class CheckReport
     }
 
     /**
-     * A table header whose rule line is followed by no row.
+     * A table header whose rule line is followed by no row. A table may
+     * leave out its outer pipes ("Song | Notes" over "--- | ---"); then
+     * the pipe in the rule line tells it from a line of dashes. A row is
+     * never a header, even with a dividing line right under it.
      *
-     * @param list<string> $lines
+     * @param list<string>     $lines
+     * @param array<int, true> $rows  the lines that are table rows
      */
-    private static function headerOfEmptyTable(array $lines, int $index): bool
+    private static function headerOfEmptyTable(array $lines, int $index, array $rows): bool
     {
-        if ($index < 0 || !self::isTableRow($lines[$index] ?? '') || 1 !== preg_match(DraftSentences::TABLE_RULE, trim($lines[$index + 1] ?? ''))) {
+        $header = $lines[$index] ?? '';
+        $rule = trim($lines[$index + 1] ?? '');
+        if ($index < 0 || isset($rows[$index]) || 1 !== preg_match(DraftSentences::TABLE_RULE, $rule)) {
+            return false;
+        }
+        if (!DraftSentences::isTableRow($header) && !(str_contains($header, '|') && str_contains($rule, '|'))) {
             return false;
         }
 
-        return !self::isTableRow($lines[$index + 2] ?? '');
-    }
-
-    private static function isTableRow(string $line): bool
-    {
-        $line = trim($line);
-
-        return str_starts_with($line, '|') && str_ends_with($line, '|') && strlen($line) > 1;
+        return !isset($rows[$index + 2]);
     }
 
     /**

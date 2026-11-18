@@ -98,7 +98,7 @@ A plan point marked "answered" without an attached evidence card stays open. Dep
 
 ### Two-Stage Fact & Citation Check
 
-Every report is verified before delivery:
+Every report is verified before delivery, one statement at a time. A statement is a sentence or a whole table row: a full stop inside a cell, after an abbreviation such as `feat.`, or inside an open bracket does not split it, and a citation written after the full stop (`… 90 EUR. [e2] Next …`) belongs to the sentence before it.
 
 1. **Stage 1 — Free deterministic check:**
    - Every cited statement must reference an evidence ID that actually exists (`p1` plan-point references are not valid sources).
@@ -155,7 +155,7 @@ A follow-up creates a new run that inherits the parent's sources, numbering, and
 
 When a run has a `chat_id`, the server writes one assistant message into that chat:
 
-- **Reader's report vs. checked report:** The chat message displays the clean **reader's report** (closing verification counts and emptied headings are stripped, and internal evidence IDs `[e12][e31]` are renumbered to `[1][2]` matching the source list beneath the message). If verification removed every sentence, the message displays the gaps under *"Not confirmed"*.
+- **Reader's report vs. checked report:** The chat message displays the clean **reader's report** (closing verification counts and emptied headings are stripped, together with the dividing line (`---`) the writer drew under an emptied section, and internal evidence IDs `[e12][e31]` are renumbered to `[1][2]` matching the source list beneath the message). If verification removed every sentence, the message displays the gaps under *"Not confirmed"*.
 - **Verification & cost transparency:** The research fold under the reply receives the `check` summary (`statements`, `supported`, `softened`, `removed`, `same_provider`), and the message info panel breaks down token usage and cost across every role (`LEAD`, `READ`, `WRITE`, `VERIFY`, `SORT`).
 - **Stopped or failed runs:** If a run stops or fails after finding evidence, the reason sentence is placed above the partial report so it is never mistaken for a complete run; if nothing was found, only the reason sentence is posted.
 
