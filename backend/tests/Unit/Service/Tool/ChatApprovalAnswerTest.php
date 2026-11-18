@@ -7,9 +7,12 @@ namespace App\Tests\Unit\Service\Tool;
 use App\AI\Service\AiFacade;
 use App\Entity\Approval;
 use App\Entity\Message;
+use App\Entity\User;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\TaskPlanStore;
+use App\Service\RateLimitService;
 use App\Service\Tool\ChatApprovalAnswer;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
@@ -125,11 +128,47 @@ final class ChatApprovalAnswerTest extends TestCase
         self::assertFalse($this->answer($connection, $this->createMock(MessageRepository::class), $this->createMock(AiFacade::class))->complete($this->message('IN', 'q', 10), $this->approval(), '  '));
     }
 
-    private function answer(Connection $connection, MessageRepository $messages, AiFacade $ai): ChatApprovalAnswer
+    public function testAnOwnerOverTheMessageLimitOrBudgetGetsNoModelCall(): void
+    {
+        foreach ([['MESSAGES' => false, 'budget' => true], ['MESSAGES' => true, 'budget' => false]] as $case) {
+            $connection = $this->createMock(Connection::class);
+            $connection->method('fetchAllAssociative')->willReturn([$this->row('n1', 'waiting_approval')]);
+            $trigger = $this->message('IN', 'q', 10);
+            $messages = $this->createMock(MessageRepository::class);
+            $messages->method('findByTrackingId')->willReturn([$trigger, $this->message('OUT', 'Waiting', 11)]);
+            $messages->expects(self::never())->method('save');
+            $ai = $this->createMock(AiFacade::class);
+            $ai->expects(self::never())->method('chat');
+
+            $done = $this->answer($connection, $messages, $ai, $case['MESSAGES'], $case['budget'])->complete($trigger, $this->approval(), 'result');
+
+            self::assertFalse($done);
+        }
+    }
+
+    public function testAnUnknownOwnerGetsNoModelCall(): void
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')->willReturn([$this->row('n1', 'waiting_approval')]);
+        $trigger = $this->message('IN', 'q', 10);
+        $messages = $this->createMock(MessageRepository::class);
+        $messages->method('findByTrackingId')->willReturn([$trigger, $this->message('OUT', 'Waiting', 11)]);
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects(self::never())->method('chat');
+
+        self::assertFalse($this->answer($connection, $messages, $ai, true, true, false)->complete($trigger, $this->approval(), 'result'));
+    }
+
+    private function answer(Connection $connection, MessageRepository $messages, AiFacade $ai, bool $messagesAllowed = true, bool $budgetAllowed = true, bool $ownerExists = true): ChatApprovalAnswer
     {
         $models = $this->createMock(ModelConfigService::class);
+        $limits = $this->createMock(RateLimitService::class);
+        $limits->method('checkLimit')->willReturn(['allowed' => $messagesAllowed]);
+        $limits->method('checkCostBudget')->willReturn(['allowed' => $budgetAllowed]);
+        $users = $this->createMock(UserRepository::class);
+        $users->method('find')->willReturn($ownerExists ? new User() : null);
 
-        return new ChatApprovalAnswer($messages, new TaskPlanStore($connection, new NullLogger()), $ai, $models, new NullLogger());
+        return new ChatApprovalAnswer($messages, new TaskPlanStore($connection, new NullLogger()), $ai, $models, $limits, $users, new NullLogger());
     }
 
     /**

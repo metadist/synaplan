@@ -11,8 +11,8 @@ to them.
 | TP2 | merged (#3157) | — | API, always allow; Notion PATCH stays until TP3 (see below) |
 | TP3 | merged (#3158) | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
 | TP4 | merged (#3159) | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
-| TP5 | in progress | — | E2E `mcp-tool-permissions.spec.ts` (J-TP-1…4, notice, read-only), docs; J-TP-5/7 and J-TP-6 see TP5 notes |
-| TP6 | phase 1 in review | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 (DROP COLUMN) next release, see TP6 notes |
+| TP5 | merged (#3164) | — | E2E `mcp-tool-permissions.spec.ts` (J-TP-1…4, notice, read-only), docs; J-TP-5/7 and J-TP-6 see TP5 notes |
+| TP6 | phase 1 merged (#3174) | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 (DROP COLUMN) next release, see TP6 notes |
 
 ## TP1 notes
 
@@ -67,3 +67,8 @@ to them.
 - Phase 1 (this change, no DDL): removed `allowsWrite()/setAllowWrite()/isWriteAuto()/setWriteAuto()`, the `allow_write` field of the MCP server API (create, update, list, OpenAPI, Zod), the `allowWrite` field of the bundle export and the `writeOff` preview row (key removed in five locales). The entity keeps both columns mapped as `@deprecated` fields with default 0, like `BPROMPTS.BKEYWORDS`.
 - Phase 2 (next release, ask first: schema): `ALTER TABLE BMCPSERVERS DROP COLUMN IF EXISTS BWRITEAUTO` and `BALLOWWRITE` (idempotent raw SQL) plus removing the two mapped fields and the open item in `docs/MIGRATIONS.md`. `Version20261117160000` reads `BALLOWWRITE` and stays valid because it runs before the drop.
 - Review follow-up: dropping the `allowsWrite()` check left `save_to_notion` honouring only Block, and only after the file upload. The runner now reads the `create-pages` permission first (`NotionGateway::permission()`): Block refuses before any upload and hides the planner note, Approve goes through `StepApprovalGate` with an ask refusal (saved task waits even with `allow_unattended`, chat reply refuses with a Change permission link).
+
+## Follow-ups
+
+- Approval answer limits: `ChatApprovalAnswer` checks the `MESSAGES` limit and the cost budget of the approval owner before its extra model call. Over a limit, or an owner that cannot be loaded, falls back to the short follow-up message with no model call. The call was already metered as `MULTITASK` through `AiChatUsageMeter`.
+- TP6 phase 2 waits for a release that contains phase 1 (latest tag at the time: v5.8.7, which predates #3174).

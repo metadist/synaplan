@@ -9,8 +9,10 @@ use App\AI\Stream\VisibleAnswer;
 use App\Entity\Approval;
 use App\Entity\Message;
 use App\Repository\MessageRepository;
+use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
 use App\Service\Multitask\TaskPlanStore;
+use App\Service\RateLimitService;
 use App\Service\Usage\AiChatUsageMeter;
 use Psr\Log\LoggerInterface;
 
@@ -26,6 +28,10 @@ use Psr\Log\LoggerInterface;
  * two steps still pending. Anything else, or a model that fails, returns false
  * and the caller falls back to the one-sentence follow-up message.
  *
+ * The answer is one more model call after the tool ran, so it is held to the
+ * same message limit and cost budget as a chat message. An owner over either,
+ * or one that cannot be loaded, gets the follow-up message and no model call.
+ *
  * The tool result is data from another system: the prompt says so and the
  * answer is plain text only, so nothing in it can run another tool.
  */
@@ -40,6 +46,8 @@ final readonly class ChatApprovalAnswer
         private TaskPlanStore $plan,
         private AiFacade $ai,
         private ModelConfigService $models,
+        private RateLimitService $rateLimit,
+        private UserRepository $users,
         private LoggerInterface $logger,
     ) {
     }
@@ -57,6 +65,9 @@ final readonly class ChatApprovalAnswer
         $steps = $this->steps($triggerId);
         $waiting = $this->waitingAnswer($trigger);
         if (null === $steps || null === $waiting) {
+            return false;
+        }
+        if (!$this->mayCompose($approval)) {
             return false;
         }
         $answer = $this->compose($trigger, $approval, $result);
@@ -142,6 +153,27 @@ final readonly class ChatApprovalAnswer
         if (false !== $encoded) {
             $waiting->setMeta('task_plan', $encoded);
         }
+    }
+
+    private function mayCompose(Approval $approval): bool
+    {
+        $owner = $this->users->find($approval->getOwnerId());
+        if (null === $owner) {
+            return false;
+        }
+        try {
+            $allowed = true === ($this->rateLimit->checkLimit($owner, 'MESSAGES')['allowed'] ?? false)
+                && $this->rateLimit->checkCostBudget($owner)['allowed'];
+        } catch (\Throwable $e) {
+            $this->logger->warning('ChatApprovalAnswer: limit check failed', ['approval_id' => $approval->getId(), 'error' => $e->getMessage()]);
+
+            return false;
+        }
+        if (!$allowed) {
+            $this->logger->info('ChatApprovalAnswer: owner is over a limit, using the follow-up message', ['approval_id' => $approval->getId()]);
+        }
+
+        return $allowed;
     }
 
     private function compose(Message $trigger, Approval $approval, string $result): ?string
