@@ -63,23 +63,6 @@ class McpServerConfig
     private bool $enabled = true;
 
     /**
-     * @deprecated Retired by the per-tool permissions (BTOOLPOLICY). Nothing
-     *             reads or writes it any more; it stays MAPPED (default 0) only so
-     *             the column survives the rolling-deploy window where previous-release
-     *             nodes still SELECT it, without failing CI's schema-sync validation.
-     *             Mapping and column go together in the phase-2 release
-     *             (docs/MIGRATIONS.md, two-phase note).
-     */
-    #[ORM\Column(name: 'BALLOWWRITE', type: 'boolean', options: ['default' => false])]
-    private bool $allowWrite = false;
-
-    /**
-     * @deprecated see $allowWrite — same phase-2 removal
-     */
-    #[ORM\Column(name: 'BWRITEAUTO', type: 'boolean', options: ['default' => false])]
-    private bool $writeAuto = false;
-
-    /**
      * JSON `{"v":1,"tools":{name: outcome},"seen":[name]}`. Holds only the
      * tools whose choice differs from the class default; `{}` means all
      * defaults. Read it through {@see getToolOverrides()}.
