@@ -184,15 +184,22 @@ final class CheckReportTest extends TestCase
         $draft = 'The fee is 99 EUR. [e1]**The warranty is 5 years. [e2]**';
 
         self::assertSame(['The fee is 99 EUR. [e1]', '**The warranty is 5 years. [e2]**'], DraftSentences::split($draft));
-        self::assertStringStartsWith('**The warranty is 5 years. [e2]**', $this->removing($draft, 'The fee is 99 EUR. [e1]'));
-        self::assertStringStartsWith('The fee is 99 EUR. [e1]', $this->removing($draft, '**The warranty is 5 years. [e2]**'));
+        self::assertStringStartsWith("**The warranty is 5 years. [e2]**\n", $this->removing($draft, 'The fee is 99 EUR. [e1]'));
+        self::assertStringStartsWith("The fee is 99 EUR. [e1]\n", $this->removing($draft, '**The warranty is 5 years. [e2]**'));
     }
 
     public function testARemovedSentenceIsNotCutOutOfALongerNumber(): void
     {
         $report = $this->removing('The index is 12.5. The fee is 12.5.', '5.');
 
-        self::assertStringStartsWith('The index is 12.5. The fee is 12.5.', $report);
+        self::assertStringStartsWith("The index is 12.5. The fee is 12.5.\n", $report);
+    }
+
+    public function testASentenceBetweenWhiteSpaceIsRemovedBeforeOneThatTouchesItsNeighbour(): void
+    {
+        $report = $this->removing('**The fee is 99 EUR. [e1]**, as the offer says. [e2] The fee is 99 EUR. [e1]', 'The fee is 99 EUR. [e1]');
+
+        self::assertStringStartsWith("**The fee is 99 EUR. [e1]**, as the offer says. [e2]\n", $report);
     }
 
     public function testFeatDoesNotEndASentence(): void

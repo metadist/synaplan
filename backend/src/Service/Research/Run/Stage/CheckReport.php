@@ -61,7 +61,6 @@ final class CheckReport
         'tr' => 'Bu projede tek bir model ailesi var. Araştırma yalnızca bir kaynak alıntısının desteklediği cümleleri tutar. Kontrol edilmiş bir özet için ikinci bir sağlayıcı ekleyin.',
     ];
 
-    private const EMPHASIS = '*_~`"“”';
     private const EMPTY_LIST_ITEM = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s*$/u';
     private const LIST_MARKER = '/^\s*(?:[-*+•]|\d{1,3}[.)])\s+/u';
 
@@ -240,16 +239,26 @@ final class CheckReport
         return trim($report);
     }
 
+    /**
+     * Removes a statement where it stands: as a line of its own, else
+     * between white space, else where it touches its neighbour, as in
+     * "One. [e1]**Two. [e2]**" — but never out of a word or a number.
+     */
     private static function cut(string $report, string $sentence): string
     {
         $quoted = preg_quote($sentence, '/');
-        $line = '/^[ \t]*'.$quoted.'[ \t]*(?:\r?\n|$)/mu';
-        if (1 === preg_match($line, $report)) {
-            return preg_replace($line, '', $report, 1) ?? $report;
+        $patterns = [
+            '/^[ \t]*'.$quoted.'[ \t]*(?:\r?\n|$)/mu',
+            '/(?<!\S)'.$quoted.'(?!\S)[ \t]*/u',
+            '/(?<![\p{L}\p{N}])(?<!\p{N}[.,])'.$quoted.'(?![\p{L}\p{N}])[ \t]*/u',
+        ];
+        foreach ($patterns as $pattern) {
+            if (1 === preg_match($pattern, $report)) {
+                return preg_replace($pattern, '', $report, 1) ?? $report;
+            }
         }
 
-        // Between white space, or touched by the emphasis of its neighbour: "One. [e1]**Two. [e2]**".
-        return preg_replace('/(?<![^\s'.self::EMPHASIS.'])'.$quoted.'(?![^\s'.self::EMPHASIS.'])[ \t]*/u', '', $report, 1) ?? $report;
+        return $report;
     }
 
     /** Drops list markers, tables without rows and blank runs a removed sentence left behind. */
