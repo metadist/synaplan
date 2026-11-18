@@ -65,3 +65,6 @@ live. Each folder has a dated note at the top.
 2026-11-13 housekeeping: `20261025-iam-consolidation/` moved here. The
 public steps are on main. PC3 still waits for D5. D8 and D9 stay owner
 decisions.
+
+2026-11-18 housekeeping: `20261117-mcp-tool-permissions/` moved here.
+TP0–TP6 are on main and deployed. J-TP-5 was never walked in the browser.
