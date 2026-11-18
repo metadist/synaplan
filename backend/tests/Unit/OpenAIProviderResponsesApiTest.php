@@ -516,6 +516,9 @@ class OpenAIProviderResponsesApiTest extends TestCase
             // gpt-6-sol / gpt-6-luna — publish `none` as the skip tier
             'gpt-6-sol' => ['gpt-6-sol',                'none'],
             'gpt-6-luna' => ['gpt-6-luna',               'none'],
+            // gpt-6.2-astra / gpt-6.2-sol — the API rejects `none`; lowest is 'low'
+            'gpt-6.2-astra' => ['gpt-6.2-astra',            'low'],
+            'gpt-6.2-sol' => ['gpt-6.2-sol',              'low'],
         ];
     }
 

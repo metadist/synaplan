@@ -402,6 +402,8 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['openai', 'gpt-6-sol', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
         ['openai', 'gpt-6-luna', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
         ['openai', 'gpt-6.1-sol', ['low', 'medium', 'high', 'xhigh', 'max']],
+        ['openai', 'gpt-6.2-sol', ['low', 'medium', 'high', 'xhigh', 'max']],
+        ['openai', 'gpt-6.2-astra', ['low', 'medium', 'high', 'xhigh', 'max']],
         ['openai', 'gpt-6-astra', ['low', 'medium', 'high', 'xhigh', 'max']],
         ['openai', 'gpt-5.6', ['none', 'low', 'medium', 'high', 'xhigh', 'max']],
         ['openai', 'gpt-5.5-pro', ['medium', 'high', 'xhigh']],

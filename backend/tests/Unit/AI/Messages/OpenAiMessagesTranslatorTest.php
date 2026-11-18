@@ -237,6 +237,8 @@ final class OpenAiMessagesTranslatorTest extends TestCase
             'gpt-6-sol' => ['gpt-6-sol', 'none'],
             'openai:gpt-6-luna' => ['openai:gpt-6-luna', 'none'],
             'gpt-6-astra' => ['gpt-6-astra', 'low'],
+            'openai:gpt-6.2-astra:chat' => ['openai:gpt-6.2-astra:chat', 'low'],
+            'gpt-6.2-sol' => ['gpt-6.2-sol', 'low'],
             'gpt-5.5-pro' => ['gpt-5.5-pro', 'medium'],
             'gpt-5' => ['gpt-5', 'minimal'],
             'o3' => ['o3', 'low'],
