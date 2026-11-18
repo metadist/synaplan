@@ -6,30 +6,20 @@ import { TIMEOUTS, getApiUrl } from '../config/config'
 
 /**
  * J-PJ-1: create a project, fill it with a note, open a chat in it, take it
- * apart again. The module switch is seeded off, so the spec turns it on as the
- * seeded admin and restores it afterwards.
+ * apart again. Skipped where the module is off (the dev stack seeds it off).
  */
-const FLAG_KEY = 'PROJECTS_ENABLED'
-
-async function setProjectsFlag(
-  request: import('@playwright/test').APIRequestContext,
-  value: '0' | '1'
-): Promise<void> {
+/** Projects ship off; the test environment turns them on (backend/.env.test). */
+async function projectsEnabled(
+  request: import('@playwright/test').APIRequestContext
+): Promise<boolean> {
   const headers = await getAuthHeaders(request, CREDENTIALS.getAdminCredentials())
-  const res = await request.put(`${getApiUrl()}/api/v1/admin/config/values`, {
-    headers,
-    data: { key: FLAG_KEY, value },
-  })
-  expect(res.ok(), `set ${FLAG_KEY}=${value}`).toBeTruthy()
+  const res = await request.get(`${getApiUrl()}/api/v1/projects`, { headers })
+  return res.ok()
 }
 
 test.describe('@ci Projects', () => {
-  test.beforeAll(async ({ request }) => {
-    await setProjectsFlag(request, '1')
-  })
-
-  test.afterAll(async ({ request }) => {
-    await setProjectsFlag(request, '0')
+  test.beforeEach(async ({ request }) => {
+    test.skip(!(await projectsEnabled(request)), 'PROJECTS_ENABLED is off on this stack')
   })
 
   test('a project takes a note as a source, hosts a chat and can be deleted', async ({ page }) => {
