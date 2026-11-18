@@ -436,6 +436,52 @@ test.describe('@ci @research Research the chat starts on its own', () => {
     await expect(page.locator(selectors.chat.messageText).last()).toContainText(ANSWER)
   })
 
+  test('a finished research reply downloads as a web page named after the question', async ({
+    page,
+  }) => {
+    await stubResearch(page, 'answer_now')
+    await stubChatStream(page, 'research')
+    const formats: string[] = []
+    await page.route('**/api/v1/messages/2/export**', async (route) => {
+      formats.push(new URL(route.request().url()).searchParams.get('format') ?? '')
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Disposition': 'attachment; filename=visa-for-a-short-stay.html',
+          'Access-Control-Expose-Headers': 'Content-Disposition',
+        },
+        body: '<!DOCTYPE html><title>Visa</title>',
+      })
+    })
+    await openApp(page)
+    const chat = new ChatHelper(page)
+    await chat.startNewChat()
+    await chat.sendMessage(QUESTION)
+
+    // While the research works, the reply offers nothing to download.
+    await expect(page.locator(selectors.research.turn)).toBeVisible()
+    await expect(page.locator(selectors.research.download)).toHaveCount(0)
+    await page.locator(selectors.research.answerNow).click()
+    await expect(page.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
+
+    // The saved reply (with its id) comes back from the history.
+    await page.reload()
+    const reply = chat.conversationBubbles().last()
+    await expect(reply.locator(selectors.research.turn)).toHaveAttribute('data-status', 'complete')
+    const download = reply.locator(selectors.research.download)
+    await expect(download).toBeVisible()
+    await download.click()
+    await expect(reply.locator(selectors.research.downloadFormat('docx'))).toBeVisible()
+    await expect(reply.locator(selectors.research.downloadFormat('md'))).toBeVisible()
+
+    const saved = page.waitForEvent('download')
+    await reply.locator(selectors.research.downloadFormat('html')).click()
+    expect((await saved).suggestedFilename()).toBe('visa-for-a-short-stay.html')
+    expect(formats).toEqual(['html'])
+    await expect(reply.locator(selectors.research.downloadFormat('html'))).toHaveCount(0)
+  })
+
   test('Look deeper under a direct answer starts the research the chat skipped in a new reply', async ({
     page,
   }) => {

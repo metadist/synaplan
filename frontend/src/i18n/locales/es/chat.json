@@ -1113,6 +1113,14 @@
     "answerNowFailed": "Responder ahora no llegó a la investigación. Sigue en marcha.",
     "answeredWithout": "Respondido sin la búsqueda adicional.",
     "lookDeeper": "Investigar a fondo",
+    "download": {
+      "button": "Descargar",
+      "menuLabel": "Descargar esta investigación",
+      "docx": "Documento de Word (.docx)",
+      "html": "Página web (.html)",
+      "md": "Markdown (.md)",
+      "failed": "La descarga no funcionó. Inténtalo de nuevo en un momento."
+    },
     "turn": {
       "working": "Investigando…",
       "stepOf": "Paso {n} de {total}",

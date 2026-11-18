@@ -18,6 +18,7 @@ research:
     unknown: 'The research stopped. Start it again if you still need the answer.'
   report:
     sources: 'Sources'
+    untitled: 'Research'
   auto:
     notice: 'I am looking through several sources for this — about %minutes% minutes.'
     why:

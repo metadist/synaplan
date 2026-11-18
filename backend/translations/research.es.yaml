@@ -18,6 +18,7 @@ research:
     unknown: 'La investigación se detuvo. Vuelve a iniciarla si aún necesitas la respuesta.'
   report:
     sources: 'Fuentes'
+    untitled: 'Investigación'
   auto:
     notice: 'Estoy consultando varias fuentes para esto; unos %minutes% minutos.'
     why:

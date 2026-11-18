@@ -1170,6 +1170,14 @@
     "answerNowFailed": "Jetzt antworten hat die Recherche nicht erreicht. Sie läuft weiter.",
     "answeredWithout": "Ohne die zusätzliche Suche beantwortet.",
     "lookDeeper": "Gründlicher nachsehen",
+    "download": {
+      "button": "Herunterladen",
+      "menuLabel": "Diese Recherche herunterladen",
+      "docx": "Word-Dokument (.docx)",
+      "html": "Webseite (.html)",
+      "md": "Markdown (.md)",
+      "failed": "Der Download hat nicht geklappt. Versuche es gleich noch einmal."
+    },
     "turn": {
       "working": "Recherchiere…",
       "stepOf": "Schritt {n} von {total}",

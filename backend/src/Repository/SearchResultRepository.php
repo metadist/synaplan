@@ -70,20 +70,7 @@ class SearchResultRepository extends ServiceEntityRepository
      */
     public function saveForReply(Message $reply, array $sources, string $query): bool
     {
-        $question = $this->getEntityManager()->createQueryBuilder()
-            ->select('m')
-            ->from(Message::class, 'm')
-            ->where('m.chatId = :chatId')
-            ->andWhere('m.direction = :direction')
-            ->andWhere('m.unixTimestamp < :timestamp')
-            ->setParameter('chatId', $reply->getChatId())
-            ->setParameter('direction', 'IN')
-            ->setParameter('timestamp', $reply->getUnixTimestamp())
-            ->orderBy('m.unixTimestamp', 'DESC')
-            ->addOrderBy('m.id', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        $question = $this->findQuestionFor($reply);
         if (!$question instanceof Message) {
             return false;
         }
@@ -99,6 +86,34 @@ class SearchResultRepository extends ServiceEntityRepository
         $this->saveSearchResults($question, ['results' => $results], $query);
 
         return true;
+    }
+
+    /**
+     * The question a reply answers, which holds the reply's sources: the
+     * latest incoming message of the chat before the reply. Null when the
+     * reply has no chat or the chat has no such message.
+     */
+    public function findQuestionFor(Message $reply): ?Message
+    {
+        if (null === $reply->getChatId()) {
+            return null;
+        }
+        $question = $this->getEntityManager()->createQueryBuilder()
+            ->select('m')
+            ->from(Message::class, 'm')
+            ->where('m.chatId = :chatId')
+            ->andWhere('m.direction = :direction')
+            ->andWhere('m.unixTimestamp < :timestamp')
+            ->setParameter('chatId', $reply->getChatId())
+            ->setParameter('direction', 'IN')
+            ->setParameter('timestamp', $reply->getUnixTimestamp())
+            ->orderBy('m.unixTimestamp', 'DESC')
+            ->addOrderBy('m.id', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $question instanceof Message ? $question : null;
     }
 
     /**
