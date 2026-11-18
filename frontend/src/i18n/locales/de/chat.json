@@ -1268,5 +1268,102 @@
       "stopped": "Gestoppt",
       "failed": "Nicht abgeschlossen"
     }
+  },
+  "projects": {
+    "title": "Projekte",
+    "new": "Neues Projekt",
+    "newMessage": "Gib dem Projekt einen Namen. Quellen und Anweisungen fügst du auf der nächsten Seite hinzu.",
+    "namePlaceholder": "Zum Beispiel: Neue Küche",
+    "create": "Anlegen",
+    "createFailed": "Das Projekt konnte nicht angelegt werden.",
+    "sidebarEmpty": "Noch keine Projekte.",
+    "unavailable": "Projekte sind hier nicht verfügbar.",
+    "notFound": "Dieses Projekt gibt es nicht.",
+    "loadFailed": "Das Projekt konnte nicht geladen werden.",
+    "nameLabel": "Projektname",
+    "rename": "Projekt umbenennen",
+    "renameFailed": "Das Projekt konnte nicht umbenannt werden.",
+    "delete": "Projekt löschen",
+    "deleteTitle": "„{name}“ löschen?",
+    "deleteEmpty": "Das Projekt und seine Quellen werden gelöscht. Das lässt sich nicht rückgängig machen.",
+    "deleteWithChats": "Das Projekt und seine Quellen werden gelöscht. Was passiert mit dem Chat? | Was passiert mit den {n} Chats?",
+    "deleteKeepChats": "Chats behalten",
+    "deleteAllChats": "Chats auch löschen",
+    "deleteFailed": "Das Projekt konnte nicht gelöscht werden.",
+    "tabs": {
+      "chats": "Chats",
+      "sources": "Quellen",
+      "instructions": "Anweisungen"
+    },
+    "source": {
+      "reading": "Wird gelesen…",
+      "ready": "Bereit",
+      "failed": "Konnte nicht gelesen werden",
+      "retry": "Erneut versuchen",
+      "remove": "Quelle entfernen"
+    },
+    "sources": {
+      "intro": "Dateien, Links und Notizen, die die Chats in diesem Projekt nutzen können.",
+      "add": "Quelle hinzufügen",
+      "empty": "Noch keine Quellen. Füge eine Datei, einen Link oder eine Notiz hinzu.",
+      "loadFailed": "Die Quellen konnten nicht geladen werden.",
+      "retryFailed": "Die Quelle konnte nicht erneut gelesen werden.",
+      "removeTitle": "Quelle entfernen?",
+      "removeMessage": "„{name}“ steht den Chats in diesem Projekt dann nicht mehr zur Verfügung.",
+      "removeFailed": "Die Quelle konnte nicht entfernt werden.",
+      "added": "Eine Quelle hinzugefügt | {n} Quellen hinzugefügt"
+    },
+    "addSource": {
+      "title": "Quelle hinzufügen",
+      "kind": {
+        "file": "Datei",
+        "link": "Link",
+        "text": "Notiz"
+      },
+      "fileLabel": "Dateien auswählen",
+      "fileHint": "PDF, Text, Bilder und andere Dokumente.",
+      "linkLabel": "Webadresse",
+      "linkHint": "Seiten mit Anmeldung können nicht gelesen werden.",
+      "textTitleLabel": "Titel",
+      "textLabel": "Text",
+      "submit": "Hinzufügen",
+      "adding": "Wird hinzugefügt…",
+      "errorRate": "Zu viele Quellen in kurzer Zeit. Versuche es in einer Minute erneut.",
+      "errorLimit": "Das Projekt hat sein Limit an Quellen erreicht.",
+      "errorInvalid": "Bitte prüfe deine Eingabe.",
+      "errorGeneric": "Die Quelle konnte nicht hinzugefügt werden."
+    },
+    "chats": {
+      "intro": "Chats in diesem Projekt antworten aus seinen Quellen und folgen seinen Anweisungen.",
+      "new": "Neuer Chat",
+      "empty": "Noch keine Chats in diesem Projekt.",
+      "createFailed": "Der Chat konnte nicht angelegt werden.",
+      "leave": "Aus Projekt entfernen",
+      "leaveTitle": "Chat aus dem Projekt entfernen?",
+      "leaveMessage": "Der Chat bleibt erhalten, sieht aber die Quellen und Anweisungen des Projekts nicht mehr.",
+      "left": "Chat aus dem Projekt entfernt.",
+      "leaveFailed": "Der Chat konnte nicht entfernt werden."
+    },
+    "instructions": {
+      "intro": "Sag den Chats in diesem Projekt, wie sie arbeiten sollen, etwa Ton oder Format der Antworten.",
+      "label": "Anweisungen",
+      "placeholder": "Antworte kurz und nenne die Quelle.",
+      "saved": "Gespeichert",
+      "saveFailed": "Die Anweisungen konnten nicht gespeichert werden."
+    },
+    "composer": {
+      "inProject": "Im Projekt: {name}",
+      "title": "Projekt {name} öffnen"
+    },
+    "move": {
+      "menu": "In Projekt verschieben…",
+      "title": "Chat in ein Projekt verschieben",
+      "none": "Du hast noch keine Projekte.",
+      "current": "Aktuelles Projekt",
+      "out": "Aus Projekt entfernen",
+      "moved": "Chat verschoben.",
+      "removed": "Chat aus dem Projekt entfernt.",
+      "failed": "Der Chat konnte nicht verschoben werden."
+    }
   }
 }

@@ -413,6 +413,10 @@
       />
       <div v-if="!needsProviderSetup && canComposeSharedChat" class="relative">
         <ScrollToBottomButton :visible="showJumpToBottom && !liveStage" @jump="jumpToBottom" />
+        <ProjectChatBadge
+          :chat-id="chatsStore.activeChatId"
+          class="mx-auto mb-1 flex max-w-4xl px-4"
+        />
         <ChatInput
           ref="chatInputRef"
           :is-streaming="isStreaming"
@@ -671,6 +675,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ScrollToBottomButton from '@/components/chat/ScrollToBottomButton.vue'
+import ProjectChatBadge from '@/components/projects/ProjectChatBadge.vue'
 import ChatAccessErrorBanner from '@/components/ChatAccessErrorBanner.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'

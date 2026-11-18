@@ -112,7 +112,8 @@
     "appDetail": "App",
     "adminUsage": "Kostenübersicht",
     "start": "Start",
-    "welcome": "Willkommen"
+    "welcome": "Willkommen",
+    "projects": "Projekt"
   },
   "welcome": "Willkommen bei Synaplan",
   "welcomeUser": "Willkommen, {name}",

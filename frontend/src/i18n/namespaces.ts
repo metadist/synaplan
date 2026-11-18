@@ -100,6 +100,7 @@ export const NAMESPACE_KEYS: Record<I18nNamespace, readonly string[]> = {
     'modelMix',
     'moderation',
     'processing',
+    'projects',
     'promoTips',
     'research',
     'savedPrompts',

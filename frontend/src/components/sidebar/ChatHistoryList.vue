@@ -203,6 +203,16 @@
             {{ $t('chat.tags') }}
           </button>
           <button
+            v-if="moveAllowed"
+            type="button"
+            class="dropdown-item"
+            data-testid="btn-chat-v2-move-project"
+            @click="onMove"
+          >
+            <Icon icon="mdi:folder-move-outline" class="w-4 h-4" />
+            {{ $t('projects.move.menu') }}
+          </button>
+          <button
             type="button"
             class="dropdown-item"
             data-testid="btn-chat-v2-archive"
@@ -246,6 +256,7 @@ import { canExportChats, canShareChats } from '@/composables/useChatWelcome'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useChatsStore } from '@/stores/chats'
+import { useProjectsStore } from '@/stores/projects'
 import { parseTagLines } from '@/utils/chatTags'
 import type { HistoryChat } from '@/composables/useChatHistory'
 
@@ -267,6 +278,8 @@ const props = defineProps<{
   listTestId?: string
   /** Label of the date group a row belongs to. Rows must arrive sorted, so groups stay contiguous. */
   groupOf?: (chat: HistoryChat) => string | null
+  /** Offer "Move to project" in the row menu (own chats only). */
+  allowMove?: boolean
 }>()
 
 const rowsTestId = computed(() => props.listTestId ?? 'list-chat-manager-rows')
@@ -302,12 +315,17 @@ const emit = defineEmits<{
   pin: [chatId: number]
   archive: [chatId: number]
   export: [chatId: number]
+  move: [chatId: number]
 }>()
 
 const { t } = useI18n()
 const chatsStore = useChatsStore()
 const shareAllowed = computed(() => canShareChats())
 const exportAllowed = computed(() => canExportChats())
+const projectsStore = useProjectsStore()
+const moveAllowed = computed(
+  () => props.allowMove === true && projectsStore.loaded && projectsStore.available
+)
 
 const menuChatId = ref<number | null>(null)
 const menuStyle = ref<Record<string, string>>({})
@@ -510,13 +528,18 @@ const toggleMenu = (chatId: number, event: MouseEvent) => {
   const btn = (event.currentTarget ?? event.target) as HTMLElement | null
   if (!(btn instanceof HTMLElement)) return
   const rect = btn.getBoundingClientRect()
-  const menuHeight = 176
+  const menuHeight = 216
   const menuWidth = 176
   const spaceBelow = window.innerHeight - rect.bottom
   const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4
   const left = Math.max(8, rect.right - menuWidth)
   menuStyle.value = { top: `${top}px`, left: `${left}px` }
   menuChatId.value = chatId
+}
+
+const onMove = () => {
+  const id = takeMenuId()
+  if (id !== null) emit('move', id)
 }
 
 const takeMenuId = (): number | null => {

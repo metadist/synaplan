@@ -1270,5 +1270,102 @@
       "stopped": "Arrêtée",
       "failed": "Non aboutie"
     }
+  },
+  "projects": {
+    "title": "Projets",
+    "new": "Nouveau projet",
+    "newMessage": "Donnez un nom au projet. Vous pourrez ajouter des sources et des instructions sur la page suivante.",
+    "namePlaceholder": "Par exemple : Nouvelle cuisine",
+    "create": "Créer",
+    "createFailed": "Le projet n’a pas pu être créé.",
+    "sidebarEmpty": "Aucun projet pour l’instant.",
+    "unavailable": "Les projets ne sont pas disponibles ici.",
+    "notFound": "Ce projet n’existe pas.",
+    "loadFailed": "Le projet n’a pas pu être chargé.",
+    "nameLabel": "Nom du projet",
+    "rename": "Renommer le projet",
+    "renameFailed": "Le projet n’a pas pu être renommé.",
+    "delete": "Supprimer le projet",
+    "deleteTitle": "Supprimer « {name} » ?",
+    "deleteEmpty": "Le projet et ses sources seront supprimés. Cette action est irréversible.",
+    "deleteWithChats": "Le projet et ses sources seront supprimés. Que faire de sa conversation ? | Que faire de ses {n} conversations ?",
+    "deleteKeepChats": "Garder les conversations",
+    "deleteAllChats": "Supprimer aussi les conversations",
+    "deleteFailed": "Le projet n’a pas pu être supprimé.",
+    "tabs": {
+      "chats": "Conversations",
+      "sources": "Sources",
+      "instructions": "Instructions"
+    },
+    "source": {
+      "reading": "Lecture en cours…",
+      "ready": "Prête",
+      "failed": "Lecture impossible",
+      "retry": "Réessayer",
+      "remove": "Retirer la source"
+    },
+    "sources": {
+      "intro": "Fichiers, liens et notes que les conversations de ce projet peuvent utiliser.",
+      "add": "Ajouter une source",
+      "empty": "Aucune source pour l’instant. Ajoutez un fichier, un lien ou une note.",
+      "loadFailed": "Les sources n’ont pas pu être chargées.",
+      "retryFailed": "La source n’a pas pu être relue.",
+      "removeTitle": "Retirer la source ?",
+      "removeMessage": "« {name} » ne sera plus disponible pour les conversations de ce projet.",
+      "removeFailed": "La source n’a pas pu être retirée.",
+      "added": "Une source ajoutée | {n} sources ajoutées"
+    },
+    "addSource": {
+      "title": "Ajouter une source",
+      "kind": {
+        "file": "Fichier",
+        "link": "Lien",
+        "text": "Note"
+      },
+      "fileLabel": "Choisir des fichiers",
+      "fileHint": "PDF, texte, images et autres documents.",
+      "linkLabel": "Adresse web",
+      "linkHint": "Les pages protégées par une connexion ne peuvent pas être lues.",
+      "textTitleLabel": "Titre",
+      "textLabel": "Texte",
+      "submit": "Ajouter",
+      "adding": "Ajout en cours…",
+      "errorRate": "Trop de sources en peu de temps. Réessayez dans une minute.",
+      "errorLimit": "Le projet a atteint sa limite de sources.",
+      "errorInvalid": "Vérifiez votre saisie.",
+      "errorGeneric": "La source n’a pas pu être ajoutée."
+    },
+    "chats": {
+      "intro": "Les conversations de ce projet répondent à partir de ses sources et suivent ses instructions.",
+      "new": "Nouvelle conversation",
+      "empty": "Aucune conversation dans ce projet pour l’instant.",
+      "createFailed": "La conversation n’a pas pu être créée.",
+      "leave": "Retirer du projet",
+      "leaveTitle": "Retirer la conversation du projet ?",
+      "leaveMessage": "La conversation est conservée, mais ne voit plus les sources ni les instructions du projet.",
+      "left": "Conversation retirée du projet.",
+      "leaveFailed": "La conversation n’a pas pu être retirée."
+    },
+    "instructions": {
+      "intro": "Indiquez aux conversations de ce projet comment travailler, par exemple le ton ou le format des réponses.",
+      "label": "Instructions",
+      "placeholder": "Réponds brièvement et cite la source.",
+      "saved": "Enregistré",
+      "saveFailed": "Les instructions n’ont pas pu être enregistrées."
+    },
+    "composer": {
+      "inProject": "Dans le projet : {name}",
+      "title": "Ouvrir le projet {name}"
+    },
+    "move": {
+      "menu": "Déplacer vers un projet…",
+      "title": "Déplacer la conversation vers un projet",
+      "none": "Vous n’avez pas encore de projet.",
+      "current": "Projet actuel",
+      "out": "Retirer du projet",
+      "moved": "Conversation déplacée.",
+      "removed": "Conversation retirée du projet.",
+      "failed": "La conversation n’a pas pu être déplacée."
+    }
   }
 }

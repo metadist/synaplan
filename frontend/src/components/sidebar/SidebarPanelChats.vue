@@ -86,6 +86,8 @@
       </div>
     </div>
 
+    <ProjectsSidebarSection v-if="!archiveStore.viewingArchived" />
+
     <div v-if="pinnedChats.length > 0" class="mt-5" data-testid="section-sidebar-pinned">
       <div class="group/section relative">
         <button
@@ -105,6 +107,7 @@
         <ChatHistoryList
           :chats="pinnedChats"
           list-test-id="list-chat-v2-pinned"
+          allow-move
           :active-chat-id="chatsStore.activeChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
@@ -117,6 +120,7 @@
           @archive="archiveChat"
           @export="exportChat"
           @pin="toggleChatPin"
+          @move="openMoveDialog"
         />
       </div>
     </div>
@@ -156,6 +160,7 @@
           :generating="isGenerating"
           :answer-ready="isAnswerReady"
           :group-of="dateGroupLabel"
+          allow-move
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -163,6 +168,7 @@
           @archive="archiveChat"
           @export="exportChat"
           @pin="toggleChatPin"
+          @move="openMoveDialog"
         >
           <template #empty>
             <p
@@ -192,6 +198,7 @@
         </ChatHistoryList>
       </div>
     </div>
+    <ChatProjectPickerDialog :open="moveChatId !== null" :chat-id="moveChatId" @close="moveChatId = null" />
   </div>
 </template>
 
@@ -206,6 +213,8 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
+import ProjectsSidebarSection from '@/components/projects/ProjectsSidebarSection.vue'
+import ChatProjectPickerDialog from '@/components/projects/ChatProjectPickerDialog.vue'
 import { chatDateGroup } from './chatDateGroups'
 import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
@@ -313,6 +322,11 @@ const isGuest = computed(() => !authStore.isAuthenticated)
 
 function startGuestTour(): void {
   startTour(GUEST_CHATS_TOUR_ID)
+}
+
+const moveChatId = ref<number | null>(null)
+const openMoveDialog = (chatId: number) => {
+  moveChatId.value = chatId
 }
 
 const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))

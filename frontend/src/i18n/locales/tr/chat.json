@@ -1211,5 +1211,102 @@
       "stopped": "Durduruldu",
       "failed": "Tamamlanamadı"
     }
+  },
+  "projects": {
+    "title": "Projeler",
+    "new": "Yeni proje",
+    "newMessage": "Projeye bir ad ver. Kaynakları ve talimatları sonraki sayfada ekleyebilirsin.",
+    "namePlaceholder": "Örneğin: Yeni mutfak",
+    "create": "Oluştur",
+    "createFailed": "Proje oluşturulamadı.",
+    "sidebarEmpty": "Henüz proje yok.",
+    "unavailable": "Projeler burada kullanılamıyor.",
+    "notFound": "Bu proje yok.",
+    "loadFailed": "Proje yüklenemedi.",
+    "nameLabel": "Proje adı",
+    "rename": "Projeyi yeniden adlandır",
+    "renameFailed": "Proje yeniden adlandırılamadı.",
+    "delete": "Projeyi sil",
+    "deleteTitle": "“{name}” silinsin mi?",
+    "deleteEmpty": "Proje ve kaynakları silinecek. Bu işlem geri alınamaz.",
+    "deleteWithChats": "Proje ve kaynakları silinecek. Sohbetine ne olsun? | {n} sohbetine ne olsun?",
+    "deleteKeepChats": "Sohbetleri koru",
+    "deleteAllChats": "Sohbetleri de sil",
+    "deleteFailed": "Proje silinemedi.",
+    "tabs": {
+      "chats": "Sohbetler",
+      "sources": "Kaynaklar",
+      "instructions": "Talimatlar"
+    },
+    "source": {
+      "reading": "Okunuyor…",
+      "ready": "Hazır",
+      "failed": "Okunamadı",
+      "retry": "Tekrar dene",
+      "remove": "Kaynağı kaldır"
+    },
+    "sources": {
+      "intro": "Bu projedeki sohbetlerin kullanabileceği dosyalar, bağlantılar ve notlar.",
+      "add": "Kaynak ekle",
+      "empty": "Henüz kaynak yok. Bir dosya, bağlantı veya not ekle.",
+      "loadFailed": "Kaynaklar yüklenemedi.",
+      "retryFailed": "Kaynak yeniden okunamadı.",
+      "removeTitle": "Kaynak kaldırılsın mı?",
+      "removeMessage": "“{name}” artık bu projedeki sohbetler için kullanılamayacak.",
+      "removeFailed": "Kaynak kaldırılamadı.",
+      "added": "Bir kaynak eklendi | {n} kaynak eklendi"
+    },
+    "addSource": {
+      "title": "Kaynak ekle",
+      "kind": {
+        "file": "Dosya",
+        "link": "Bağlantı",
+        "text": "Not"
+      },
+      "fileLabel": "Dosya seç",
+      "fileHint": "PDF, metin, görsel ve diğer belgeler.",
+      "linkLabel": "Web adresi",
+      "linkHint": "Giriş gerektiren sayfalar okunamaz.",
+      "textTitleLabel": "Başlık",
+      "textLabel": "Metin",
+      "submit": "Ekle",
+      "adding": "Ekleniyor…",
+      "errorRate": "Kısa sürede çok fazla kaynak. Bir dakika sonra tekrar dene.",
+      "errorLimit": "Proje kaynak sınırına ulaştı.",
+      "errorInvalid": "Lütfen girdiğini kontrol et.",
+      "errorGeneric": "Kaynak eklenemedi."
+    },
+    "chats": {
+      "intro": "Bu projedeki sohbetler kaynaklarından yanıt verir ve talimatlarını izler.",
+      "new": "Yeni sohbet",
+      "empty": "Bu projede henüz sohbet yok.",
+      "createFailed": "Sohbet oluşturulamadı.",
+      "leave": "Projeden çıkar",
+      "leaveTitle": "Sohbet projeden çıkarılsın mı?",
+      "leaveMessage": "Sohbet kalır, ancak projenin kaynaklarını ve talimatlarını artık görmez.",
+      "left": "Sohbet projeden çıkarıldı.",
+      "leaveFailed": "Sohbet çıkarılamadı."
+    },
+    "instructions": {
+      "intro": "Bu projedeki sohbetlere nasıl çalışacaklarını söyle, örneğin yanıtların tonu veya biçimi.",
+      "label": "Talimatlar",
+      "placeholder": "Kısa yanıt ver ve kaynağı belirt.",
+      "saved": "Kaydedildi",
+      "saveFailed": "Talimatlar kaydedilemedi."
+    },
+    "composer": {
+      "inProject": "Projede: {name}",
+      "title": "{name} projesini aç"
+    },
+    "move": {
+      "menu": "Projeye taşı…",
+      "title": "Sohbeti bir projeye taşı",
+      "none": "Henüz projen yok.",
+      "current": "Geçerli proje",
+      "out": "Projeden çıkar",
+      "moved": "Sohbet taşındı.",
+      "removed": "Sohbet projeden çıkarıldı.",
+      "failed": "Sohbet taşınamadı."
+    }
   }
 }
