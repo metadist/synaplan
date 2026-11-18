@@ -23,7 +23,7 @@ to them.
 - Deleting arguments: `NotionWriteGuard::contentDeletion()` escalates to Approve in the gate. `McpClient::callTool()` still refuses them unless `contentDeletionApproved` is true, which `McpToolExecutor` sets only after an approval.
 - Kept on purpose: `McpFetchRunner` stays read-only (refuses any non-read tool). The gateway loops still offer only read tools while approvals are off (unchanged). Both are narrower than the plan text; widen only if the owner wants writes with approvals off.
 - Dead until TP2/TP3: `BALLOWWRITE` / `BWRITEAUTO` and the Notion "The AI may change Notion" switch are ignored by the policy. Between TP1 and TP3 the switch does nothing.
-- Catalog size before/after: not measured yet.
+- Catalog size before/after: see Follow-ups (measured 2026-11-18).
 
 ## TP2 notes
 
@@ -59,7 +59,7 @@ to them.
 - Not in Playwright: the chat halves of J-TP-2/3/5/7 (approval card, refusal text, Always allow) need a live model and a live Notion; they are covered by `ApprovalCard`, `approvalPlacement`, `ToolExecutionGateMcpTest`, `McpApprovalAllowanceTest`, `ChatApprovalAnswerTest`. J-TP-6 (member of an organisation-shared Notion connection) is not built for the Notion panel; the API side is covered by `McpToolPermissionControllerTest`.
 - Docs: `CONNECTIONS.md` (new "Tool permissions" section), `ADMIN.md`, `PLATFORM_REFERENCE.md`, `MULTITASK_DATA_NODES.md`. The repository has no changelog file; the behaviour change of decision #6 is in the CONNECTIONS notice and the PR text.
 - Plan §7 proofs checked: `McpClient::callTool()` refuses a Block tool for every caller (central choke point; `McpClientTest::testAToolTheOwnerBlockedNeverLeavesForAnyCaller`), so `NotionGateway`, `NotionPageWrite`, the linked-page readers and `NotionAccountReader` cannot reach one. Gate side: `ToolExecutionGateMcpTest`; Always allow never lifts Block: `McpApprovalAllowanceTest`.
-- Catalog-size measurement (plan §8): still not measured.
+- Catalog-size measurement (plan §8): see Follow-ups (measured 2026-11-18).
 
 ## TP6 notes
 
@@ -75,3 +75,7 @@ to them.
 - Blocked tools named to the planner: the `mcp_fetch` sub-catalog lists each connection's blocked tools ("blocked by the owner, never plan these: …", at most 10 names), so the model can say a tool is blocked in Permissions instead of answering vaguely. The gateway tool loops still just omit a blocked tool.
 - Member view (J-TP-6): the Notion status carries `sharing.shared_server_id`; a member of a shared connection sees "See what the AI may do" and the read-only list (`NotionSharedPermissions.vue`, E2E in `notion-app.spec.ts`).
 - In-place answer, more plan shapes: any number of pending steps now, as long as each only writes text (chat, summarize, translate, rag_query, compose_reply or the hidden compose node). A pending step that would save, send or generate no longer gets marked done without running: it falls back to the follow-up message. (Before this, up to two pending steps of any kind were marked done.)
+- Catalog size (plan §8), measured 2026-11-18 on the local stack with the real Notion connection (77 tools, user 1). A throwaway console command (not committed) called `McpToolCatalogAdapter::toAnthropicTools(1, …)` and `SkillCatalog::renderCapabilityList(1, topic tool_mcp)`:
+  - Planner capability list: 26.3 KB now. Without the `mcp_action` block (what a connection with writes off showed before TP1) and the blocked-tools line it is about 16.4 KB. So a connection with writes off now adds about 9.9 KB (roughly 2.5k tokens) to every planned turn, because the 4 write tools (`notion-create-pages`, `notion-update-page`, `notion-delete-pages`, `notion-delete-databases`) are now offered. The blocked-tools line costs 213 bytes. Connections that already had writes on are unchanged.
+  - Gateway tool loops: 38 tools / 107 KB (read only, the default) versus 74 tools / 226 KB with mutating tools; the gateway keeps offering read tools only while approvals are off, so that path did not grow.
+  - Not trimmed: the write block is bounded by the connection's own tools and a blocked tool leaves the list, so an owner who wants a smaller prompt blocks the tools they do not use.
