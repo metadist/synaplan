@@ -11,6 +11,7 @@
  */
 
 import DOMPurify from 'dompurify'
+import type { MermaidConfig } from 'mermaid'
 
 let mermaidInitialized = false
 let mermaidModule: typeof import('mermaid') | null = null
@@ -31,6 +32,25 @@ function sanitizeSvg(svg: string): string {
 }
 
 /**
+ * Shared mermaid configuration.
+ *
+ * Mermaid 12 switched the default layout to ELK and the default look to
+ * `neo`, which re-lays out and recolours every diagram. `layout: 'dagre'` and
+ * `look: 'classic'` keep diagrams in existing chats rendering as before.
+ */
+function mermaidConfig(theme: 'light' | 'dark'): MermaidConfig {
+  return {
+    startOnLoad: false,
+    theme: theme === 'dark' ? 'dark' : 'default',
+    layout: 'dagre',
+    look: 'classic',
+    securityLevel: 'strict',
+    fontFamily: 'inherit',
+    suppressErrorRendering: true, // Don't render error messages in DOM
+  }
+}
+
+/**
  * Lazy-load and initialize mermaid
  */
 async function initMermaid(): Promise<typeof import('mermaid')> {
@@ -43,13 +63,7 @@ async function initMermaid(): Promise<typeof import('mermaid')> {
   const mermaid = mermaidModule.default
 
   if (!mermaidInitialized) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'strict',
-      fontFamily: 'inherit',
-      suppressErrorRendering: true, // Don't render error messages in DOM
-    })
+    mermaid.initialize(mermaidConfig('light'))
     mermaidInitialized = true
   }
 
@@ -133,13 +147,7 @@ export async function renderMermaidBlocks(
     const { default: mermaid } = await initMermaid()
 
     // Update theme if needed
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: theme === 'dark' ? 'dark' : 'default',
-      securityLevel: 'strict',
-      fontFamily: 'inherit',
-      suppressErrorRendering: true, // Don't render error messages in DOM
-    })
+    mermaid.initialize(mermaidConfig(theme))
 
     for (const block of mermaidBlocks) {
       const codeElement = block.querySelector('code.language-mermaid')

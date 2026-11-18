@@ -192,5 +192,12 @@
         'breaking',
       ],
     },
+    {
+      description: 'Hold vue-router on v4: v5 ships its file-routing build plugin (unplugin, picomatch, vite) as runtime dependencies, and picomatch <= 4.0.7 (GHSA-fc5q-39xc-vjpf) has no patched release, so v5 fails the production npm audit. Lift this once a patched picomatch is out.',
+      matchPackageNames: [
+        'vue-router',
+      ],
+      allowedVersions: '<5',
+    },
   ],
 }
