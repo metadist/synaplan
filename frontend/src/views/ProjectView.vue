@@ -92,6 +92,7 @@ import ProjectChatsTab from '@/components/projects/ProjectChatsTab.vue'
 import ProjectSourcesTab from '@/components/projects/ProjectSourcesTab.vue'
 import ProjectInstructionsTab from '@/components/projects/ProjectInstructionsTab.vue'
 import { useProjectsStore } from '@/stores/projects'
+import { useProjectChatsStore } from '@/stores/projectChats'
 import { projectsApi, type DeleteChatsMode } from '@/services/api/projectsApi'
 import { ApiError } from '@/services/api/httpClient'
 import { featureNotConfigured } from '@/services/api/featureNotConfigured'
@@ -104,6 +105,7 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const store = useProjectsStore()
+const chatsStore = useProjectChatsStore()
 const { confirm, choose } = useDialog()
 const { error: showError } = useNotification()
 
@@ -193,7 +195,7 @@ async function chooseDeleteMode(name: string, chatCount: number): Promise<Delete
 async function deleteProject(): Promise<void> {
   const current = project.value
   if (!current) return
-  const mode = await chooseDeleteMode(current.name, store.chatsByProject[current.id]?.length ?? 0)
+  const mode = await chooseDeleteMode(current.name, chatsStore.chatsOf(current.id).length)
   if (mode === null) return
   try {
     await store.remove(current.id, mode)

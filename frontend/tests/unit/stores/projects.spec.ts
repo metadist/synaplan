@@ -15,6 +15,7 @@ const api = vi.hoisted(() => ({
 vi.mock('@/services/api/projectsApi', () => ({ projectsApi: api }))
 
 import { useProjectsStore } from '@/stores/projects'
+import { useProjectChatsStore } from '@/stores/projectChats'
 import { ApiError } from '@/services/api/httpClient'
 
 const project = (id: string, updatedAt: string) => ({
@@ -89,7 +90,7 @@ describe('projects store', () => {
     const store = useProjectsStore()
     await store.load()
     expect(store.projectOfChat(5)?.id).toBe('a')
-    await store.moveChat('b', 5)
+    await useProjectChatsStore().move('b', 5)
     expect(api.joinChat).toHaveBeenCalledWith('b', 5)
     expect(store.projectOfChat(5)?.id).toBe('b')
   })
@@ -102,7 +103,7 @@ describe('projects store', () => {
     api.leaveChat.mockResolvedValue(undefined)
     const store = useProjectsStore()
     await store.load()
-    await store.removeChat('a', 5)
+    await useProjectChatsStore().remove('a', 5)
     expect(store.projectOfChat(5)).toBeUndefined()
   })
 

@@ -67,6 +67,7 @@ import { useI18n } from 'vue-i18n'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
 import { useNotification } from '@/composables/useNotification'
 import { useProjectsStore } from '@/stores/projects'
+import { useProjectChatsStore } from '@/stores/projectChats'
 
 const props = defineProps<{ open: boolean; chatId: number | null }>()
 const emit = defineEmits<{ close: [] }>()
@@ -75,6 +76,7 @@ const { t } = useI18n()
 const { teleportTarget } = useFullscreenTeleportTarget()
 const { success, error: showError } = useNotification()
 const store = useProjectsStore()
+const chatsStore = useProjectChatsStore()
 
 const uid = Math.random().toString(36).slice(2, 8)
 const titleId = `chat-project-picker-${uid}`
@@ -93,7 +95,7 @@ async function move(projectId: string): Promise<void> {
   if (props.chatId === null) return
   busy.value = true
   try {
-    await store.moveChat(projectId, props.chatId)
+    await chatsStore.move(projectId, props.chatId)
     success(t('projects.move.moved'))
     emit('close')
   } catch {
@@ -108,7 +110,7 @@ async function moveOut(): Promise<void> {
   if (props.chatId === null || !projectId) return
   busy.value = true
   try {
-    await store.removeChat(projectId, props.chatId)
+    await chatsStore.remove(projectId, props.chatId)
     success(t('projects.move.removed'))
     emit('close')
   } catch {

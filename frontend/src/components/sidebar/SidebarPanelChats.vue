@@ -107,7 +107,7 @@
         <ChatHistoryList
           :chats="pinnedChats"
           list-test-id="list-chat-v2-pinned"
-          allow-move
+          :allow-move="projectsStore.loaded && projectsStore.available"
           :active-chat-id="chatsStore.activeChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
@@ -160,7 +160,7 @@
           :generating="isGenerating"
           :answer-ready="isAnswerReady"
           :group-of="dateGroupLabel"
-          allow-move
+          :allow-move="projectsStore.loaded && projectsStore.available"
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -218,6 +218,7 @@ import {
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
 import ProjectsSidebarSection from '@/components/projects/ProjectsSidebarSection.vue'
+import { useProjectsStore } from '@/stores/projects'
 import ChatProjectPickerDialog from '@/components/projects/ChatProjectPickerDialog.vue'
 import { chatDateGroup } from './chatDateGroups'
 import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
@@ -328,6 +329,7 @@ function startGuestTour(): void {
   startTour(GUEST_CHATS_TOUR_ID)
 }
 
+const projectsStore = useProjectsStore()
 const moveChatId = ref<number | null>(null)
 const openMoveDialog = (chatId: number) => {
   moveChatId.value = chatId

@@ -256,7 +256,6 @@ import { canExportChats, canShareChats } from '@/composables/useChatWelcome'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { useChatsStore } from '@/stores/chats'
-import { useProjectsStore } from '@/stores/projects'
 import { parseTagLines } from '@/utils/chatTags'
 import type { HistoryChat } from '@/composables/useChatHistory'
 
@@ -322,10 +321,7 @@ const { t } = useI18n()
 const chatsStore = useChatsStore()
 const shareAllowed = computed(() => canShareChats())
 const exportAllowed = computed(() => canExportChats())
-const projectsStore = useProjectsStore()
-const moveAllowed = computed(
-  () => props.allowMove === true && projectsStore.loaded && projectsStore.available
-)
+const moveAllowed = computed(() => props.allowMove === true)
 
 const menuChatId = ref<number | null>(null)
 const menuStyle = ref<Record<string, string>>({})

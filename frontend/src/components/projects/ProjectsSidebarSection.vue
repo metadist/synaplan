@@ -37,7 +37,7 @@
           <router-link
             :to="`/projects/${project.id}`"
             class="sidebar-section-label flex items-center rounded-lg px-3 py-1.5 text-sm truncate"
-            :class="{ 'font-semibold': route.params.id === project.id }"
+            active-class="font-semibold"
             :data-testid="`link-sidebar-project-${project.id}`"
           >
             <span class="truncate">{{ project.name }}</span>
@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRouter } from 'vue-router'
 import { ChevronDownIcon, FolderIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { useProjectsStore } from '@/stores/projects'
 import { useDialog } from '@/composables/useDialog'
@@ -61,7 +61,6 @@ const EXPANDED_KEY = 'sidebar-projects-expanded'
 const NAME_MAX = 120
 
 const { t } = useI18n()
-const route = useRoute()
 const router = useRouter()
 const store = useProjectsStore()
 const { prompt } = useDialog()

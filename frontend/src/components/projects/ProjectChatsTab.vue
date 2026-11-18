@@ -56,7 +56,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
-import { useProjectsStore } from '@/stores/projects'
+import { useProjectChatsStore } from '@/stores/projectChats'
 import { useChatsStore } from '@/stores/chats'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
@@ -65,13 +65,13 @@ const props = defineProps<{ projectId: string }>()
 
 const { t, locale } = useI18n()
 const router = useRouter()
-const store = useProjectsStore()
+const store = useProjectChatsStore()
 const chatsStore = useChatsStore()
 const { error: showError, success } = useNotification()
 const { confirm } = useDialog()
 
 const creating = ref(false)
-const chats = computed(() => store.chatsByProject[props.projectId] ?? [])
+const chats = computed(() => store.chatsOf(props.projectId))
 
 function formatDate(iso: string): string {
   const time = Date.parse(iso)
@@ -87,7 +87,7 @@ async function open(chatId: number): Promise<void> {
 async function newChat(): Promise<void> {
   creating.value = true
   try {
-    const chat = await store.createChat(props.projectId)
+    const chat = await store.create(props.projectId)
     await open(chat.id)
   } catch {
     showError(t('projects.chats.createFailed'))
@@ -105,7 +105,7 @@ async function leave(chatId: number): Promise<void> {
   })
   if (!confirmed) return
   try {
-    await store.removeChat(props.projectId, chatId)
+    await store.remove(props.projectId, chatId)
     success(t('projects.chats.left'))
   } catch {
     showError(t('projects.chats.leaveFailed'))
