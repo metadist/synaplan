@@ -524,7 +524,7 @@ const toggleMenu = (chatId: number, event: MouseEvent) => {
   const btn = (event.currentTarget ?? event.target) as HTMLElement | null
   if (!(btn instanceof HTMLElement)) return
   const rect = btn.getBoundingClientRect()
-  const menuHeight = 216
+  const menuHeight = moveAllowed.value ? 216 : 176
   const menuWidth = 176
   const spaceBelow = window.innerHeight - rect.bottom
   const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4

@@ -7,12 +7,13 @@
       @click.self="close"
     >
       <div
-        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto scroll-thin"
+        ref="panel"
+        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-lg w-full overflow-y-auto scroll-thin focus:outline-none"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId"
+        tabindex="-1"
         @click.stop
-        @keydown.esc="close"
       >
         <div
           class="flex items-center justify-between p-4 sm:p-6 border-b border-light-border/10 dark:border-dark-border/10"
@@ -147,12 +148,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, toRef, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
 import { projectsApi, type AddSourcesResult } from '@/services/api/projectsApi'
 import { ApiError } from '@/services/api/httpClient'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 
 type Kind = 'file' | 'link' | 'text'
 
@@ -170,7 +172,7 @@ const { t } = useI18n()
 const { teleportTarget } = useFullscreenTeleportTarget()
 
 const kinds: Kind[] = ['file', 'link', 'text']
-const uid = Math.random().toString(36).slice(2, 8)
+const uid = useId()
 const titleId = `project-add-source-title-${uid}`
 const fileId = `project-add-source-file-${uid}`
 const urlId = `project-add-source-url-${uid}`
@@ -185,6 +187,7 @@ const textBody = ref('')
 const busy = ref(false)
 const errorMessage = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const panel = ref<HTMLElement | null>(null)
 
 const canSubmit = computed(() => {
   if (kind.value === 'file') return files.value.length > 0
@@ -205,8 +208,11 @@ function reset(): void {
 
 watch(
   () => props.open,
-  (isOpen) => {
-    if (isOpen) reset()
+  async (isOpen) => {
+    if (!isOpen) return
+    reset()
+    await nextTick()
+    panel.value?.focus()
   }
 )
 
@@ -218,6 +224,8 @@ function onFiles(event: Event): void {
 function close(): void {
   if (!busy.value) emit('close')
 }
+
+useEscapeKey(close, toRef(props, 'open'))
 
 async function submit(): Promise<void> {
   if (!canSubmit.value || busy.value) return

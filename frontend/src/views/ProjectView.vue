@@ -1,5 +1,10 @@
 <template>
-  <div class="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6" data-testid="page-project">
+  <MainLayout>
+    <div
+      class="flex h-full flex-col overflow-y-auto bg-chat px-3 py-4 sm:p-4 md:p-8 scroll-thin"
+      data-testid="page-project"
+    >
+      <div class="mx-auto w-full max-w-4xl">
     <p
       v-if="!store.available"
       class="rounded-xl surface-card px-4 py-8 text-center text-sm txt-secondary"
@@ -27,6 +32,7 @@
         <div class="min-w-0 flex-1">
           <input
             v-if="renaming"
+            ref="nameInput"
             v-model="nameDraft"
             type="text"
             maxlength="120"
@@ -74,12 +80,15 @@
       <div class="mt-4">
         <ProjectChatsTab v-if="tab === 'chats'" :project-id="project.id" />
         <ProjectSourcesTab v-else-if="tab === 'sources'" :project-id="project.id" />
-        <ProjectInstructionsTab v-else :project="project" />
+        <!-- Stays mounted so an unsaved draft survives a tab switch. -->
+        <ProjectInstructionsTab v-show="tab === 'instructions'" :project="project" />
       </div>
     </template>
 
     <p v-else class="text-sm txt-secondary" role="status">{{ $t('common.loading') }}</p>
-  </div>
+      </div>
+    </div>
+  </MainLayout>
 </template>
 
 <script setup lang="ts">
@@ -87,12 +96,14 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
+import MainLayout from '@/components/MainLayout.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
 import ProjectChatsTab from '@/components/projects/ProjectChatsTab.vue'
 import ProjectSourcesTab from '@/components/projects/ProjectSourcesTab.vue'
 import ProjectInstructionsTab from '@/components/projects/ProjectInstructionsTab.vue'
 import { useProjectsStore } from '@/stores/projects'
 import { useProjectChatsStore } from '@/stores/projectChats'
+import { useChatsStore } from '@/stores/chats'
 import { projectsApi, type DeleteChatsMode } from '@/services/api/projectsApi'
 import { ApiError } from '@/services/api/httpClient'
 import { featureNotConfigured } from '@/services/api/featureNotConfigured'
@@ -106,6 +117,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useProjectsStore()
 const chatsStore = useProjectChatsStore()
+const allChats = useChatsStore()
 const { confirm, choose } = useDialog()
 const { error: showError } = useNotification()
 
@@ -114,6 +126,7 @@ const notFound = ref(false)
 const loadFailed = ref(false)
 const renaming = ref(false)
 const nameDraft = ref('')
+const nameInput = ref<HTMLInputElement | null>(null)
 
 const projectId = computed(() => String(route.params.id ?? ''))
 const project = computed(() => store.projectById(projectId.value))
@@ -154,7 +167,8 @@ async function startRename(): Promise<void> {
   nameDraft.value = project.value?.name ?? ''
   renaming.value = true
   await nextTick()
-  document.querySelector<HTMLInputElement>('[data-testid="input-project-name"]')?.focus()
+  nameInput.value?.focus()
+  nameInput.value?.select()
 }
 
 async function saveName(): Promise<void> {
@@ -199,6 +213,8 @@ async function deleteProject(): Promise<void> {
   if (mode === null) return
   try {
     await store.remove(current.id, mode)
+    // Chats deleted with the project must leave the Chats panel too.
+    if (mode === 'delete') await allChats.loadChats()
     await router.push('/')
   } catch {
     showError(t('projects.deleteFailed'))

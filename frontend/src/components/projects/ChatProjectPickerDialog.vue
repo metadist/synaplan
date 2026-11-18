@@ -7,11 +7,12 @@
       @click.self="emit('close')"
     >
       <div
-        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4"
+        ref="panel"
+        class="modal-panel surface-card rounded-2xl shadow-2xl max-w-md w-full p-4 sm:p-6 space-y-4 focus:outline-none"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="titleId"
-        @keydown.esc="emit('close')"
+        tabindex="-1"
       >
         <h3 :id="titleId" class="text-base sm:text-lg font-semibold txt-primary">
           {{ $t('projects.move.title') }}
@@ -24,7 +25,8 @@
             <button
               type="button"
               class="w-full rounded-xl px-3 py-2.5 text-left text-sm txt-primary hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
-              :disabled="busy"
+              :disabled="busy || project.id === currentProjectId"
+              :aria-current="project.id === currentProjectId ? 'true' : undefined"
               :data-testid="`btn-chat-move-to-${project.id}`"
               @click="move(project.id)"
             >
@@ -62,9 +64,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, toRef, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import { useNotification } from '@/composables/useNotification'
 import { useProjectsStore } from '@/stores/projects'
 import { useProjectChatsStore } from '@/stores/projectChats'
@@ -78,18 +81,25 @@ const { success, error: showError } = useNotification()
 const store = useProjectsStore()
 const chatsStore = useProjectChatsStore()
 
-const uid = Math.random().toString(36).slice(2, 8)
-const titleId = `chat-project-picker-${uid}`
+const titleId = `chat-project-picker-${useId()}`
 const busy = ref(false)
+const panel = ref<HTMLElement | null>(null)
 
 const currentProjectId = computed(() => store.projectOfChat(props.chatId)?.id ?? null)
 
 watch(
   () => props.open,
-  (isOpen) => {
-    if (isOpen) void store.load()
+  async (isOpen) => {
+    if (!isOpen) return
+    void store.load()
+    await nextTick()
+    panel.value?.focus()
   }
 )
+
+useEscapeKey(() => {
+  if (!busy.value) emit('close')
+}, toRef(props, 'open'))
 
 async function move(projectId: string): Promise<void> {
   if (props.chatId === null) return

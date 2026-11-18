@@ -36,6 +36,9 @@ test.describe('@ci Projects', () => {
       await expect(page.locator('[data-testid="text-project-name"]')).toHaveText(name, {
         timeout: TIMEOUTS.STANDARD,
       })
+      await expect(
+        page.locator('[data-testid="list-sidebar-projects"]').getByText(name)
+      ).toBeVisible({ timeout: TIMEOUTS.STANDARD })
     })
 
     await test.step('Act: add a note on the Sources tab', async () => {
@@ -79,6 +82,9 @@ test.describe('@ci Projects', () => {
     })
 
     await test.step('Assert: the project is gone from the panel', async () => {
+      await expect(page.locator('[data-testid="section-sidebar-projects"]')).toBeVisible({
+        timeout: TIMEOUTS.STANDARD,
+      })
       await expect(
         page.locator('[data-testid="list-sidebar-projects"]').getByText(name)
       ).toHaveCount(0, { timeout: TIMEOUTS.STANDARD })

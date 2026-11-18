@@ -57,7 +57,6 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
 import { useProjectChatsStore } from '@/stores/projectChats'
-import { useChatsStore } from '@/stores/chats'
 import { useNotification } from '@/composables/useNotification'
 import { useDialog } from '@/composables/useDialog'
 
@@ -66,7 +65,6 @@ const props = defineProps<{ projectId: string }>()
 const { t, locale } = useI18n()
 const router = useRouter()
 const store = useProjectChatsStore()
-const chatsStore = useChatsStore()
 const { error: showError, success } = useNotification()
 const { confirm } = useDialog()
 
@@ -78,10 +76,9 @@ function formatDate(iso: string): string {
   return Number.isNaN(time) ? '' : new Date(time).toLocaleString(locale.value)
 }
 
+/** The chat view reads `?chat=` after it has loaded the list, so the new chat is found. */
 async function open(chatId: number): Promise<void> {
-  await chatsStore.loadChats()
-  chatsStore.setActiveChat(chatId)
-  await router.push('/')
+  await router.push({ path: '/', query: { chat: String(chatId) } })
 }
 
 async function newChat(): Promise<void> {

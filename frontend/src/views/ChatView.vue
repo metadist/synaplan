@@ -413,10 +413,9 @@
       />
       <div v-if="!needsProviderSetup && canComposeSharedChat" class="relative">
         <ScrollToBottomButton :visible="showJumpToBottom && !liveStage" @jump="jumpToBottom" />
-        <ProjectChatBadge
-          :chat-id="chatsStore.activeChatId"
-          class="mx-auto mb-1 flex max-w-4xl px-4"
-        />
+        <div class="mx-auto mb-1 flex max-w-4xl px-4 empty:hidden">
+          <ProjectChatBadge :chat-id="chatsStore.activeChatId" />
+        </div>
         <ChatInput
           ref="chatInputRef"
           :is-streaming="isStreaming"

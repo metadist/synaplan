@@ -44,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, useId, watch } from 'vue'
 import { useProjectsStore } from '@/stores/projects'
 import type { ProjectItem } from '@/services/api/projectsApi'
 
@@ -54,8 +54,7 @@ const maxChars = 4000
 const props = defineProps<{ project: ProjectItem }>()
 
 const store = useProjectsStore()
-const uid = Math.random().toString(36).slice(2, 8)
-const fieldId = `project-instructions-${uid}`
+const fieldId = `project-instructions-${useId()}`
 
 const draft = ref(props.project.instructions ?? '')
 const saving = ref(false)

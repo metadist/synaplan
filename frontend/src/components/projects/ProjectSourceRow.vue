@@ -39,10 +39,7 @@
         class="mt-0.5 flex items-center gap-1.5 text-xs txt-secondary"
         data-testid="text-project-source-ready"
       >
-        <CheckCircleIcon
-          class="h-3.5 w-3.5 text-green-600 dark:text-green-400"
-          aria-hidden="true"
-        />
+        <CheckCircleIcon class="h-3.5 w-3.5 text-success" aria-hidden="true" />
         {{ $t('projects.source.ready')
         }}<template v-if="source.size > 0"> · {{ sizeLabel }}</template>
       </p>
