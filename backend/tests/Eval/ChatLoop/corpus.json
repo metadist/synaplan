@@ -1,0 +1,378 @@
+{
+  "version": 1,
+  "description": "Fixed turns for roadmap row 46 (PJ1). Five groups by what a turn needs: nothing, one search, the chat's files, several steps, long research. Run with tests/Eval/ChatLoop/run.php.",
+  "turns": [
+    {
+      "id": "simple-01",
+      "group": "simple",
+      "language": "en",
+      "text": "Hi, how are you?"
+    },
+    {
+      "id": "simple-02",
+      "group": "simple",
+      "language": "en",
+      "text": "What is 17 times 23? Answer with the number only.",
+      "expect": [
+        [
+          "391"
+        ]
+      ]
+    },
+    {
+      "id": "simple-03",
+      "group": "simple",
+      "language": "de",
+      "text": "Erkläre mir in zwei Sätzen, was ein Induktionskochfeld ist."
+    },
+    {
+      "id": "simple-04",
+      "group": "simple",
+      "language": "de",
+      "text": "Übersetze ins Englische: „Die Arbeitsplatte ist aus Eiche.“",
+      "expect": [
+        [
+          "worktop",
+          "oak"
+        ]
+      ]
+    },
+    {
+      "id": "simple-05",
+      "group": "simple",
+      "language": "es",
+      "text": "Escribe un saludo corto para un correo a un carpintero."
+    },
+    {
+      "id": "simple-06",
+      "group": "simple",
+      "language": "fr",
+      "text": "Reformule plus poliment : « Envoyez-moi le devis aujourd'hui. »"
+    },
+    {
+      "id": "simple-07",
+      "group": "simple",
+      "language": "tr",
+      "text": "Bir cümleyle açıkla: Fotosentez nedir?"
+    },
+    {
+      "id": "simple-08",
+      "group": "simple",
+      "language": "en",
+      "text": "Give me three names for a kitchen planning checklist."
+    },
+    {
+      "id": "simple-09",
+      "group": "simple",
+      "language": "en",
+      "text": "How many centimetres are 2.48 metres? Answer with the number only.",
+      "expect": [
+        [
+          "248"
+        ]
+      ]
+    },
+    {
+      "id": "simple-10",
+      "group": "simple",
+      "language": "de",
+      "text": "Was ist der Unterschied zwischen „das gleiche“ und „dasselbe“? Kurz."
+    },
+    {
+      "id": "search-01",
+      "group": "search",
+      "language": "en",
+      "text": "What is the latest stable PHP release today, and when was it released?"
+    },
+    {
+      "id": "search-02",
+      "group": "search",
+      "language": "en",
+      "text": "What is the ECB deposit facility rate right now?"
+    },
+    {
+      "id": "search-03",
+      "group": "search",
+      "language": "de",
+      "text": "Welche Bahnstreiks sind für diese Woche in Deutschland angekündigt?"
+    },
+    {
+      "id": "search-04",
+      "group": "search",
+      "language": "de",
+      "text": "Wie hoch ist der aktuelle Mehrwertsteuersatz in Deutschland?",
+      "expect": [
+        [
+          "19"
+        ]
+      ]
+    },
+    {
+      "id": "search-05",
+      "group": "search",
+      "language": "es",
+      "text": "¿Qué tiempo hará mañana en Madrid?"
+    },
+    {
+      "id": "search-06",
+      "group": "search",
+      "language": "fr",
+      "text": "Quel est le dernier modèle de plaque à induction testé par Que Choisir ?"
+    },
+    {
+      "id": "search-07",
+      "group": "search",
+      "language": "tr",
+      "text": "Bugün dolar kaç Türk lirası?"
+    },
+    {
+      "id": "search-08",
+      "group": "search",
+      "language": "en",
+      "text": "Which version of Symfony is the current long-term support release?"
+    },
+    {
+      "id": "files-01",
+      "group": "files",
+      "language": "de",
+      "text": "Welche Angebotsnummer hat das Angebot?",
+      "files": [
+        "offer-mueller.md"
+      ],
+      "expect": [
+        [
+          "KM-2026-0417"
+        ]
+      ]
+    },
+    {
+      "id": "files-02",
+      "group": "files",
+      "language": "de",
+      "text": "Wie lang ist die Lieferzeit in diesem Angebot?",
+      "files": [
+        "offer-nordkueche.md"
+      ],
+      "expect": [
+        [
+          "9 Wochen"
+        ]
+      ]
+    },
+    {
+      "id": "files-03",
+      "group": "files",
+      "language": "en",
+      "text": "How wide is the cut-out for the hob?",
+      "files": [
+        "measurements.txt"
+      ],
+      "expect": [
+        [
+          "78"
+        ]
+      ]
+    },
+    {
+      "id": "files-04",
+      "group": "files",
+      "language": "en",
+      "text": "Which of the two offers has the lower listed total price, and by how many euros?",
+      "files": [
+        "offer-mueller.md",
+        "offer-nordkueche.md"
+      ],
+      "expect": [
+        [
+          "530"
+        ]
+      ]
+    },
+    {
+      "id": "files-05",
+      "group": "files",
+      "language": "en",
+      "text": "What was decided about the fronts, and when does the electrician come?",
+      "files": [
+        "meeting-notes.md"
+      ],
+      "expect": [
+        [
+          "handle-less"
+        ],
+        [
+          "3 December"
+        ]
+      ]
+    },
+    {
+      "id": "files-06",
+      "group": "files",
+      "language": "es",
+      "text": "¿De qué material es la encimera en esta oferta?",
+      "files": [
+        "offer-mueller.md"
+      ],
+      "expect": [
+        [
+          "roble"
+        ]
+      ]
+    },
+    {
+      "id": "files-07",
+      "group": "files",
+      "language": "fr",
+      "text": "Quelle est la hauteur sous plafond de la pièce ?",
+      "files": [
+        "measurements.txt"
+      ],
+      "expect": [
+        [
+          "48"
+        ]
+      ]
+    },
+    {
+      "id": "files-08",
+      "group": "files",
+      "language": "tr",
+      "text": "Bu teklifte tezgâh kaç milimetre kalınlığında?",
+      "files": [
+        "offer-nordkueche.md"
+      ],
+      "expect": [
+        [
+          "20"
+        ]
+      ]
+    },
+    {
+      "id": "multi-01",
+      "group": "multi_step",
+      "language": "en",
+      "text": "Read both offers and the measurements. Which offer has a hob that fits the existing cut-out? Then list three questions I should ask that supplier.",
+      "files": [
+        "offer-mueller.md",
+        "offer-nordkueche.md",
+        "measurements.txt"
+      ],
+      "expect": [
+        [
+          "Müller"
+        ]
+      ]
+    },
+    {
+      "id": "multi-02",
+      "group": "multi_step",
+      "language": "de",
+      "text": "Vergleiche die beiden Angebote in einer Tabelle (Preis, Arbeitsplatte, Lieferzeit) und schreibe danach eine kurze E-Mail an den günstigeren Anbieter mit der Bitte um einen Termin.",
+      "files": [
+        "offer-mueller.md",
+        "offer-nordkueche.md"
+      ],
+      "expect": [
+        [
+          "12.480"
+        ],
+        [
+          "11.950"
+        ]
+      ]
+    },
+    {
+      "id": "multi-03",
+      "group": "multi_step",
+      "language": "en",
+      "text": "Search for current test results of 80 cm induction hobs, pick three models, and put price, power and test verdict into a table."
+    },
+    {
+      "id": "multi-04",
+      "group": "multi_step",
+      "language": "en",
+      "text": "Check the notes: which offer breaks a decision we made? Then say whether each offer stays under the budget ceiling once assembly is included.",
+      "files": [
+        "meeting-notes.md",
+        "offer-mueller.md",
+        "offer-nordkueche.md"
+      ],
+      "expect": [
+        [
+          "Nordküche"
+        ]
+      ]
+    },
+    {
+      "id": "multi-05",
+      "group": "multi_step",
+      "language": "de",
+      "text": "Suche, was eine geölte Eichenarbeitsplatte an Pflege braucht, und was Quarzkomposit braucht. Fasse beides in je drei Stichpunkten zusammen und gib eine Empfehlung für einen Haushalt mit kleinen Kindern."
+    },
+    {
+      "id": "multi-06",
+      "group": "multi_step",
+      "language": "es",
+      "text": "Busca tres tiendas en línea que vendan placas de inducción de 80 cm, compara el precio del modelo más barato de cada una y dime cuál elegirías."
+    },
+    {
+      "id": "multi-07",
+      "group": "multi_step",
+      "language": "fr",
+      "text": "Lis les mesures, calcule la surface de la pièce en mètres carrés, puis propose deux implantations de cuisine qui tiennent dans cette pièce.",
+      "files": [
+        "measurements.txt"
+      ],
+      "expect": [
+        [
+          "10"
+        ]
+      ]
+    },
+    {
+      "id": "multi-08",
+      "group": "multi_step",
+      "language": "tr",
+      "text": "İki teklifi oku, teslim süresi daha kısa olanı bul ve o tedarikçiye teslim tarihini soran kısa bir mesaj yaz.",
+      "files": [
+        "offer-mueller.md",
+        "offer-nordkueche.md"
+      ],
+      "expect": [
+        [
+          "Müller"
+        ]
+      ]
+    },
+    {
+      "id": "research-01",
+      "group": "research",
+      "researchItem": "corpus-hard.json#hard-01"
+    },
+    {
+      "id": "research-02",
+      "group": "research",
+      "researchItem": "corpus-hard.json#hard-02"
+    },
+    {
+      "id": "research-03",
+      "group": "research",
+      "researchItem": "corpus-hard.json#hard-03"
+    },
+    {
+      "id": "research-04",
+      "group": "research",
+      "researchItem": "corpus-hard.json#hard-05"
+    },
+    {
+      "id": "research-05",
+      "group": "research",
+      "researchItem": "corpus-hard.json#hard-06"
+    },
+    {
+      "id": "research-06",
+      "group": "research",
+      "researchItem": "corpus-hard.json#hard-10"
+    }
+  ]
+}

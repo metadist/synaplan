@@ -30,12 +30,15 @@ final readonly class OidcCloud
     public const ALL_CAPABILITIES = ['deliveries', 'pickups', 'read_scope', 'source_events', 'watches'];
 
     /**
-     * What each cloud app takes besides lifecycle notices. The OpenCloud app
-     * takes nothing else yet, so Synaplan offers it no copies or pickups
-     * that would wait for an answer forever.
+     * What each cloud app takes besides lifecycle notices. The configured
+     * cloud cannot report this itself, so the list follows the current app
+     * of each type: the OpenCloud app takes copies and pickups from 1.2.0
+     * on. An older app leaves an offered copy or pickup waiting for an
+     * answer; the app reporting what it takes is
+     * https://github.com/metadist/synaplan/issues/3161.
      */
     public const CAPABILITIES = [
-        PlatformInstance::CLIENT_OPENCLOUD => [],
+        PlatformInstance::CLIENT_OPENCLOUD => self::ALL_CAPABILITIES,
         PlatformInstance::CLIENT_NEXTCLOUD => self::ALL_CAPABILITIES,
     ];
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useDialog } from '@/composables/useDialog'
 import type { Approval } from '@/services/api/approvalsApi'
 
@@ -19,6 +20,14 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const dialog = useDialog()
+const router = useRouter()
+
+const isMcpTool = computed(() => props.approval.tool.startsWith('mcp:'))
+const connection = computed(() => props.approval.connection ?? null)
+
+const openPermissions = () => {
+  if (connection.value) void router.push(connection.value.permissions_path)
+}
 
 const expiresIn = computed(() => {
   const remaining = props.approval.expiresAt * 1000 - Date.now()
@@ -40,7 +49,19 @@ const showAlwaysAllow = computed(
     props.approval.sideEffect !== 'destructive'
 )
 
-const showApprove = computed(() => canDecide.value && props.approval.sideEffect !== 'destructive')
+// For an MCP tool, always allow sets the tool to Auto on its connection, for
+// every chat and agent, not just this one.
+const alwaysAllowLabel = computed(() =>
+  props.approval.tool.startsWith('mcp:')
+    ? 'approvals.alwaysAllowConnection'
+    : 'approvals.alwaysAllow'
+)
+
+// A connection's destructive tool set to Approve asks here; the person decides
+// on the card. Other destructive tools are never approved from a card.
+const showApprove = computed(
+  () => canDecide.value && (isMcpTool.value || props.approval.sideEffect !== 'destructive')
+)
 
 const showReject = computed(() => canDecide.value)
 
@@ -93,6 +114,9 @@ const onReject = async () => {
     >
       {{ $t('approvals.waitingForAnotherAdmin') }}
     </p>
+    <p v-if="connection" class="text-xs txt-secondary" data-testid="approval-connection">
+      {{ $t('approvals.onConnection', { connection: connection.name }) }}
+    </p>
     <p v-if="!isPublishReview" class="text-xs txt-secondary" data-testid="approval-expires">
       {{ expiresIn }}
     </p>
@@ -122,7 +146,16 @@ const onReject = async () => {
         data-testid="approval-always-allow"
         @click="onAlwaysAllow"
       >
-        {{ $t('approvals.alwaysAllow') }}
+        {{ $t(alwaysAllowLabel) }}
+      </button>
+      <button
+        v-if="connection"
+        type="button"
+        class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+        data-testid="approval-change-permission"
+        @click="openPermissions"
+      >
+        {{ $t('approvals.changePermission') }}
       </button>
       <button
         v-if="showOpenContext"

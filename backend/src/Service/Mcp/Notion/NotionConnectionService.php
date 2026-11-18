@@ -20,9 +20,8 @@ use Doctrine\ORM\EntityManagerInterface;
 /**
  * The Notion app: one hosted MCP connection per user, plus the chat opt-in.
  *
- * Writing is one switch. It sets both the server write opt-in (`allow_write`)
- * and the chat approval skip (`write_auto`). Delete, move and overwrite stay
- * blocked by tool annotations and {@see NotionWriteGuard}, not by this switch.
+ * What the AI may do with each Notion tool is the connection's tool
+ * permissions (McpToolPermissions); this service only connects and shares.
  */
 final readonly class NotionConnectionService
 {
@@ -63,7 +62,7 @@ final readonly class NotionConnectionService
     }
 
     /**
-     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
+     * @return array{success: bool, status: string, server_id: int|null, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
      *
      * @throws NotionAppUnavailableException
      */
@@ -85,7 +84,7 @@ final readonly class NotionConnectionService
     /**
      * An admin shares their own connection with everyone, read-only.
      *
-     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
+     * @return array{success: bool, status: string, server_id: int|null, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
      *
      * @throws NotionAppUnavailableException
      * @throws NotionConnectionMissingException
@@ -140,27 +139,6 @@ final readonly class NotionConnectionService
             'authorize_url' => $url,
             'server_id' => (int) $server->getId(),
         ];
-    }
-
-    /**
-     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
-     *
-     * @throws NotionAppUnavailableException
-     * @throws NotionConnectionMissingException
-     */
-    public function setWriting(int $userId, bool $allow, bool $isAdmin = false): array
-    {
-        $this->assertAvailable($userId);
-        $server = $this->notionServer($userId);
-        if (null === $server) {
-            throw new NotionConnectionMissingException('Connect Notion first. Nothing was changed.');
-        }
-
-        $server->setAllowWrite($allow);
-        $server->setWriteAuto($allow);
-        $this->servers->save($server);
-
-        return $this->status($userId, $isAdmin);
     }
 
     /**
@@ -226,7 +204,7 @@ final readonly class NotionConnectionService
     }
 
     /**
-     * @return array{success: bool, status: string, server_id: int|null, allow_write: bool, write_auto: bool}
+     * @return array{success: bool, status: string, server_id: int|null}
      */
     private function present(?McpServerConfig $server): array
     {
@@ -235,8 +213,6 @@ final readonly class NotionConnectionService
                 'success' => true,
                 'status' => McpOAuthState::STATUS_NOT_CONNECTED,
                 'server_id' => null,
-                'allow_write' => false,
-                'write_auto' => false,
             ];
         }
 
@@ -249,8 +225,6 @@ final readonly class NotionConnectionService
             'success' => true,
             'status' => $status,
             'server_id' => $server->getId(),
-            'allow_write' => $server->allowsWrite(),
-            'write_auto' => $server->isWriteAuto(),
         ];
     }
 }

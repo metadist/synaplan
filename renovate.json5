@@ -1,171 +1,211 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  // `:separateMultipleMajorReleases` is kept on purpose: one PR per intervening
-  // major is what lets us step a dependency up a version at a time when the
-  // upgrade has a compatibility chain. The known cost is that a dependency which
-  // lagged several majors arrives as several PRs at once -- `github.com/docker/docker`
-  // sat on v23 and produced four (#1903 v25, #1904 v26, #1918 v27, #1919 v28),
-  // which filled `prConcurrentLimit` and stalled the rest of the queue until they
-  // were triaged. That is rare and accepted; merging the newest major autocloses
-  // the lower branches. Renovate has no "close superseded majors" option, and
-  // `separateMultipleMajor` may NOT be set in a packageRule that also has
-  // `matchUpdateTypes` (validator: "cannot combine both") -- it belongs here.
-  "extends": [
-    "config:best-practices",
-    "docker:enableMajor",
-    ":separateMultipleMajorReleases"
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:best-practices',
+    'docker:enableMajor',
+    ':separateMultipleMajorReleases',
   ],
-  "enabled": true,
-  "timezone": "Europe/Berlin",
+  enabled: true,
+  timezone: 'Europe/Berlin',
   // npm 12 refuses registry tarballs of packages that declare
   // bundleDependencies during --package-lock-only (npm/cli#9800), and
   // @tailwindcss/oxide-wasm32-wasi in the frontend tree is one of them.
   // allow-remote=all is npm 11's default; allow-git stays at npm 12's "none".
   // Renovate writes this npmrc only for its own npm runs, so CI and local
   // installs keep npm's defaults. npmrcMerge keeps a future repo .npmrc.
-  "npmrc": "allow-remote=all",
-  "npmrcMerge": true,
-  "constraints": {
-    "npm": "<13"
+  npmrc: 'allow-remote=all',
+  npmrcMerge: true,
+  constraints: {
+    npm: '<13',
   },
-  "prHourlyLimit": 2,
-  // Make the implicit Renovate default (10) explicit. Grouping already collapses
-  // minor/patch into ~6 buckets plus one for Docker digests, so this is a backlog
-  // cap, not a per-dependency knob.
-  "prConcurrentLimit": 10,
-  "prCreation": "immediate",
-  "dependencyDashboard": true,
-  "labels": ["dependencies"],
-  "ignorePaths": ["_devextras/mail-handler-test/**"],
-  // Security fixes (GitHub advisories) bypass the stability gate below and are
-  // labelled so they stand out from routine updates.
-  "vulnerabilityAlerts": {
-    "labels": ["dependencies", "security"]
+  prHourlyLimit: 2,
+  prConcurrentLimit: 10,
+  prCreation: 'immediate',
+  dependencyDashboard: {
+    enabled: true,
   },
-  "packageRules": [
+  labels: [
+    'dependencies',
+  ],
+  ignorePaths: [
+    '_devextras/mail-handler-test/**',
+  ],
+  vulnerabilityAlerts: {
+    labels: [
+      'dependencies',
+      'security',
+    ],
+  },
+  packageRules: [
     {
-      "description": "Stability gate: let fresh releases prove themselves before we open a PR (supply-chain + broken-release protection). Security fixes bypass this.",
-      "matchDatasources": ["*"],
-      "minimumReleaseAge": "3 days",
-      // Docker/registry sources without a reliable publish timestamp would otherwise
-      // hang forever; treat missing timestamps as "passed" for them.
-      "minimumReleaseAgeBehaviour": "timestamp-optional",
-      "internalChecksFilter": "strict"
-    },
-    {
-      "description": "Catch-all composer patch/minor FIRST — later rules override groupName for Framework/QA",
-      "groupName": "Backend Dependencies",
-      "matchManagers": ["composer"],
-      "matchUpdateTypes": ["minor", "patch"]
-    },
-    {
-      "description": "Framework updates isolated — historically broke CI (#669)",
-      "groupName": "PHP Framework",
-      "matchManagers": ["composer"],
-      "matchPackageNames": ["symfony/**", "doctrine/**", "api-platform/**"],
-      "matchUpdateTypes": ["minor", "patch"]
-    },
-    {
-      "description": "Catch-all npm patch/minor — later rules override for Frontend Core and QA",
-      "groupName": "Frontend Dependencies",
-      "matchManagers": ["npm"],
-      "matchUpdateTypes": ["minor", "patch"]
-    },
-    {
-      "description": "Frontend core frameworks grouped separately",
-      "groupName": "Frontend Core",
-      "matchManagers": ["npm"],
-      "matchPackageNames": [
-        "vue", "vue-router", "vue-i18n", "pinia", "@vue/**",
-        "vite", "@vitejs/**",
-        "typescript", "@typescript-eslint/**", "vue-tsc",
-        "tailwindcss", "@tailwindcss/**"
+      description: 'Stability gate: let fresh releases prove themselves before we open a PR (supply-chain + broken-release protection). Security fixes bypass this.',
+      matchDatasources: [
+        '*',
       ],
-      "matchUpdateTypes": ["minor", "patch"]
+      minimumReleaseAge: '3 days',
+      minimumReleaseAgeBehaviour: 'timestamp-optional',
+      internalChecksFilter: 'strict',
     },
     {
-      "description": "QA tools isolated — MUST come after npm catch-all so groupName wins (#580)",
-      "groupName": "QA & Dev Tools",
-      "matchPackageNames": [
-        "phpunit/phpunit", "phpstan/phpstan", "phpstan/phpstan-doctrine",
-        "friendsofphp/php-cs-fixer", "dg/bypass-finals",
-        "@playwright/test", "vitest", "@vitest/**", "happy-dom"
+      description: 'Catch-all composer patch/minor FIRST — later rules override groupName for Framework/QA',
+      groupName: 'Backend Dependencies',
+      matchManagers: [
+        'composer',
       ],
-      "matchUpdateTypes": ["minor", "patch"]
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
     },
     {
-      "description": "Go sidecar dependencies grouped — `gomod` matched no group rule, so every update opened its own PR",
-      "groupName": "Go Sidecar Dependencies",
-      "matchManagers": ["gomod"],
-      "matchUpdateTypes": ["minor", "patch"]
+      description: 'Framework updates isolated — historically broke CI (#669)',
+      groupName: 'PHP Framework',
+      matchManagers: [
+        'composer',
+      ],
+      matchPackageNames: [
+        'symfony/**',
+        'doctrine/**',
+        'api-platform/**',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
     },
     {
-      "description": "Docker image updates grouped",
-      "groupName": "Docker Images",
-      "matchManagers": ["dockerfile", "docker-compose"],
-      "matchUpdateTypes": ["minor", "patch"]
+      description: 'Catch-all npm patch/minor — later rules override for Frontend Core and QA',
+      groupName: 'Frontend Dependencies',
+      matchManagers: [
+        'npm',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
     },
     {
-      // Digest bumps matched NO rule above (every group is minor/patch only), so
-      // each one opened its own PR: ~12 per month, each replaying the full CI
-      // pipeline because ci.yml has no path filters. They also sort FIRST in
-      // Renovate's creation order (pinDigest > pin > digest > patch > minor >
-      // major), so they were consuming the prHourlyLimit ahead of the real
-      // dependency updates. There is nothing to review per package either -- a
-      // digest has no changelog, it is classified by its tag
-      // (docs/DEPENDENCY_UPDATES.md §7).
-      "description": "Docker digest bumps grouped -- no changelog exists, review is tag-based",
-      "groupName": "Docker Digests",
-      "matchManagers": ["dockerfile", "docker-compose"],
-      "matchUpdateTypes": ["digest", "pinDigest"]
+      description: 'Frontend core frameworks grouped separately',
+      groupName: 'Frontend Core',
+      matchManagers: [
+        'npm',
+      ],
+      matchPackageNames: [
+        'vue',
+        'vue-router',
+        'vue-i18n',
+        'pinia',
+        '@vue/**',
+        'vite',
+        '@vitejs/**',
+        'typescript',
+        '@typescript-eslint/**',
+        'vue-tsc',
+        'tailwindcss',
+        '@tailwindcss/**',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
     },
     {
-      // Separates our own release artifacts from the third-party batch above: a
-      // digest move on one of our images is a deployment event, not upstream
-      // noise. Relies on the same "last match wins" ordering as the groups above.
-      //
-      // Do NOT express this as an exclusion on the rule above. Renovate rejects
-      // `matchPackageNames: ["*", "!ghcr.io/metadist/**"]` -- the check is
-      // `(matchers.includes('*') || matchers.includes('**')) && length > 1`, so a
-      // bare `*` may never share the array. It broke Renovate entirely once
-      // (#1729), and `renovate-config-validator` does NOT catch it: the error
-      // surfaces only at runtime, on the default branch, after merge.
-      "description": "Digests of our own images kept out of the third-party batch",
-      "groupName": "Synaplan Image Digests",
-      "matchManagers": ["dockerfile", "docker-compose"],
-      "matchUpdateTypes": ["digest", "pinDigest"],
-      "matchPackageNames": ["ghcr.io/metadist/**"]
+      description: 'QA tools isolated — MUST come after npm catch-all so groupName wins (#580)',
+      groupName: 'QA & Dev Tools',
+      matchPackageNames: [
+        'phpunit/phpunit',
+        'phpstan/phpstan',
+        'phpstan/phpstan-doctrine',
+        'friendsofphp/php-cs-fixer',
+        'dg/bypass-finals',
+        '@playwright/test',
+        'vitest',
+        '@vitest/**',
+        'happy-dom',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
     },
     {
-      // github-actions digests matched no rule above: every group is either
-      // minor/patch or a docker manager. Each pin opened its own PR and, like
-      // the docker digests before they were grouped, sorted ahead of real
-      // dependency updates (pinDigest > pin > digest) and consumed
-      // prHourlyLimit. There is no changelog; a green CI run on the new SHA
-      // is the review (docs/DEPENDENCY_UPDATES.md §7). Majors stay individual:
-      // this rule matches digest types only, and the major rule below sets
-      // no groupName.
-      "description": "GitHub Actions digest bumps grouped -- no changelog, CI is the review",
-      "groupName": "GitHub Actions Digests",
-      "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["digest", "pinDigest"]
+      description: 'Go sidecar dependencies grouped — `gomod` matched no group rule, so every update opened its own PR',
+      groupName: 'Go Sidecar Dependencies',
+      matchManagers: [
+        'gomod',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
     },
     {
-      "description": "Major updates: always individual, manual review",
-      "matchUpdateTypes": ["major"],
-      "automerge": false,
-      "labels": ["dependencies", "breaking"]
-    }
-    // PLANNED (not enabled yet): auto-merge dev/QA tooling once we trust the
-    // stability gate. Dev-only deps are fully covered by CI; runtime deps, the
-    // PHP Framework and all majors would stay manual. Requires branch protection
-    // (required status checks) + platformAutomerge before switching on. Enable by
-    // uncommenting and adding a comma after the "Major updates" rule above:
-    // {
-    //   "description": "Auto-merge dev/QA tooling once the stability gate and CI both pass",
-    //   "matchDepTypes": ["devDependencies", "require-dev"],
-    //   "matchUpdateTypes": ["minor", "patch"],
-    //   "automerge": true
-    // }
-  ]
+      description: 'Docker image updates grouped',
+      groupName: 'Docker Images',
+      matchManagers: [
+        'dockerfile',
+        'docker-compose',
+      ],
+      matchUpdateTypes: [
+        'minor',
+        'patch',
+      ],
+    },
+    {
+      description: 'Docker digest bumps grouped -- no changelog exists, review is tag-based',
+      groupName: 'Docker Digests',
+      matchManagers: [
+        'dockerfile',
+        'docker-compose',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'pinDigest',
+      ],
+    },
+    {
+      description: 'Digests of our own images kept out of the third-party batch',
+      groupName: 'Synaplan Image Digests',
+      matchManagers: [
+        'dockerfile',
+        'docker-compose',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'pinDigest',
+      ],
+      matchPackageNames: [
+        'ghcr.io/metadist/**',
+      ],
+    },
+    {
+      description: 'GitHub Actions digest bumps grouped -- no changelog, CI is the review',
+      groupName: 'GitHub Actions Digests',
+      matchManagers: [
+        'github-actions',
+      ],
+      matchUpdateTypes: [
+        'digest',
+        'pinDigest',
+      ],
+    },
+    {
+      description: 'Major updates: always individual, manual review',
+      matchUpdateTypes: [
+        'major',
+      ],
+      automerge: false,
+      labels: [
+        'dependencies',
+        'breaking',
+      ],
+    },
+    {
+      description: 'Hold vue-router on v4: v5 ships its file-routing build plugin (unplugin, picomatch, vite) as runtime dependencies, and picomatch <= 4.0.7 (GHSA-fc5q-39xc-vjpf) has no patched release, so v5 fails the production npm audit. Lift this once a patched picomatch is out.',
+      matchPackageNames: [
+        'vue-router',
+      ],
+      allowedVersions: '<5',
+    },
+  ],
 }

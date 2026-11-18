@@ -1,0 +1,20 @@
+{
+  "id": "stub-tool-fails",
+  "kind": "tool_stub",
+  "description": "Gate G5. Every web_fetch call fails. A run on it must end in a wrap-up with reason \"circling\" after exactly one nudge, with an answer.",
+  "turn": {
+    "language": "en",
+    "text": "Open https://example.org/hobs/test-2026 and summarise the test results on that page."
+  },
+  "stub": {
+    "tool": "web_fetch",
+    "behaviour": "always_fails",
+    "error": "The page could not be read (HTTP 503)."
+  },
+  "expect": {
+    "status": "completed",
+    "wrapup": "circling",
+    "nudges": 1,
+    "answer": true
+  }
+}

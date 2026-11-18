@@ -428,9 +428,63 @@
       "unknown": "No se pudo iniciar sesión. Inténtelo de nuevo o pregunte a quien gestiona el servidor."
     },
     "savedSignInNotStarted": "Se guardó «{name}». El inicio de sesión no comenzó: {reason}",
-    "allowWriteLabel": "Permitir acciones de escritura (crear/actualizar)",
-    "allowWriteHint": "Cuando está activado, la IA puede crear o actualizar contenido en este sistema cuando se lo pidas. Las acciones de borrado nunca están permitidas.",
-    "writeBadge": "Escritura permitida"
+    "permissions": {
+      "open": "Permisos",
+      "hide": "Ocultar permisos",
+      "overviewTab": "Resumen",
+      "permissionsTab": "Permisos",
+      "title": "Permisos de las herramientas",
+      "intro": "Elige cuándo puede la IA usar estas herramientas. Las tareas guardadas y los flujos siguen preguntando antes de escribir, salvo que el paso lo permita.",
+      "category": {
+        "read": "Herramientas de lectura",
+        "write": "Herramientas de escritura",
+        "destructive": "Herramientas destructivas",
+        "unavailable": "No disponibles"
+      },
+      "outcome": {
+        "auto": "Automático",
+        "approve": "Aprobar",
+        "block": "Bloquear",
+        "mixed": "Mixto"
+      },
+      "outcomeHint": {
+        "auto": "Se ejecuta sin preguntar",
+        "approve": "Te pregunta antes",
+        "block": "Nunca se ejecuta"
+      },
+      "categoryLabel": "Cambiar todas: {category}",
+      "toolLabel": "Permiso para {tool}",
+      "changed": "Cambiado",
+      "new": "Nuevo",
+      "showMore": "Ver más",
+      "showLess": "Ver menos",
+      "inputs": "Admite 1 entrada | Admite {count} entradas",
+      "inputNames": "Entradas: {names}",
+      "noHints": "El servidor no indica qué cambia esta herramienta.",
+      "locked": {
+        "group_policy": "La política de un administrador bloquea esta herramienta.",
+        "shared": "Compartida contigo. Solo su propietario puede cambiar estos permisos.",
+        "unavailable": "No funciona mediante una llamada de herramienta en el chat."
+      },
+      "saved": "{tool} cambiada a {outcome}.",
+      "categorySaved": "{count} herramienta cambiada a {outcome}. | {count} herramientas cambiadas a {outcome}.",
+      "undo": "Deshacer",
+      "saveFailed": "El permiso no se guardó. No se cambió nada. Inténtalo de nuevo.",
+      "confirmTitle": "¿Dejar que la IA elimine sin preguntar?",
+      "confirmMessage": "La IA eliminará o sobrescribirá en {connection} sin preguntarte. ¿Continuar?",
+      "confirmAction": "Cambiar a Automático",
+      "loading": "Cargando herramientas…",
+      "loadFailed": "No se pudieron cargar las herramientas de esta conexión. No se cambió nada.",
+      "retry": "Reintentar",
+      "empty": "Esta conexión aún no ofrece herramientas. Comprueba que haya iniciado sesión y recarga.",
+      "clientOff": "Las llamadas MCP están desactivadas, así que aquí no hay nada que ajustar. Actívalas para gestionar los permisos.",
+      "notice": "La IA ahora puede usar herramientas de escritura en esta conexión sin preguntar. Las herramientas destructivas siguen preguntando.",
+      "noticeReview": "Revisar permisos",
+      "noticeDismiss": "Entendido",
+      "tabsLabel": "Secciones de la conexión",
+      "reset": "Restablecer al valor predeterminado ({outcome})",
+      "undone": "Cambio deshecho."
+    }
   },
   "messagesGateway": {
     "title": "Conecta tu herramienta de programación",
@@ -1056,12 +1110,6 @@
       "connectedAs": "Sesión iniciada en el espacio de trabajo de Notion {workspace} como {account}.",
       "connectedAsAccount": "Sesión iniciada en Notion como {account}.",
       "scope": "La IA solo ve lo que esta cuenta de Notion puede ver.",
-      "writeLabel": "La IA puede cambiar Notion",
-      "writeOn": "La IA puede crear y editar páginas en Notion sin preguntar cada vez. No puede borrar, mover ni sobrescribir páginas.",
-      "writeOff": "La IA puede leer Notion. No cambiará nada.",
-      "writeSavedOn": "La IA ya puede crear y editar páginas de Notion sin preguntar. Sigue sin poder borrar, mover ni sobrescribir páginas.",
-      "writeSavedOff": "Escribir está desactivado. La IA puede seguir leyendo Notion y no cambiará nada.",
-      "writeFailed": "No se guardó el ajuste. Notion no cambió. Inténtalo de nuevo.",
       "examplesTitle": "Prueba una de estas frases en el chat",
       "exampleRead": "Resume mi página Hoja de ruta",
       "exampleWrite": "Crea una página llamada Notas de la reunión",

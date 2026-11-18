@@ -7,31 +7,6 @@
       <p class="txt-secondary text-sm mt-1">{{ $t('apps.notion.scope') }}</p>
     </div>
 
-    <div>
-      <label class="inline-flex items-center gap-3 cursor-pointer">
-        <span class="text-sm font-medium txt-primary">{{ $t('apps.notion.writeLabel') }}</span>
-        <span class="relative inline-flex">
-          <input
-            type="checkbox"
-            class="sr-only peer"
-            :checked="status.allow_write"
-            :disabled="saving"
-            data-testid="toggle-notion-write"
-            @change="onWrite"
-          />
-          <span
-            class="w-11 h-6 bg-gray-300 dark:bg-gray-700 rounded-full peer-checked:bg-[var(--brand)] peer-disabled:opacity-50 peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--brand)] transition-colors"
-          ></span>
-          <span
-            class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"
-          ></span>
-        </span>
-      </label>
-      <p class="txt-secondary text-sm mt-2" data-testid="text-notion-write-consequence">
-        {{ status.allow_write ? $t('apps.notion.writeOn') : $t('apps.notion.writeOff') }}
-      </p>
-    </div>
-
     <NotionShareToggle
       v-if="status.sharing.can_share"
       :shared="status.sharing.shared_on"
@@ -57,16 +32,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useNotification } from '@/composables/useNotification'
-import { userFacingError } from '@/utils/userFacingError'
 import NotionShareToggle from './NotionShareToggle.vue'
-import {
-  notionAppApi,
-  type NotionAppAccount,
-  type NotionAppStatus,
-} from '@/services/api/notionAppApi'
+import type { NotionAppAccount, NotionAppStatus } from '@/services/api/notionAppApi'
 
 const props = defineProps<{
   status: NotionAppStatus
@@ -79,8 +48,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const { success, error } = useNotification()
-const saving = ref(false)
 
 const examples = computed(() => [
   { id: 'read', text: t('apps.notion.exampleRead') },
@@ -98,20 +65,4 @@ const accountLine = computed(() => {
   if (who) return t('apps.notion.connectedAsAccount', { account: who })
   return t('apps.notion.connected')
 })
-
-const onWrite = async (event: Event) => {
-  const input = event.target
-  if (!(input instanceof HTMLInputElement)) return
-  const next = input.checked
-  saving.value = true
-  try {
-    emit('update:status', await notionAppApi.setWriting(next))
-    success(next ? t('apps.notion.writeSavedOn') : t('apps.notion.writeSavedOff'))
-  } catch (err) {
-    input.checked = !next
-    error(userFacingError(err, t('apps.notion.writeFailed')))
-  } finally {
-    saving.value = false
-  }
-}
 </script>

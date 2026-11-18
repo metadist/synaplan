@@ -171,6 +171,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "projects": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "research": {
                     "configured": "bool",
                     "gated": "bool"
@@ -414,6 +418,10 @@
                     "configured": "bool",
                     "gated": "bool"
                 },
+                "projects": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
                 "research": {
                     "configured": "bool",
                     "gated": "bool"
@@ -654,6 +662,10 @@
                     "gated": "bool"
                 },
                 "piper_tts": {
+                    "configured": "bool",
+                    "gated": "bool"
+                },
+                "projects": {
                     "configured": "bool",
                     "gated": "bool"
                 },

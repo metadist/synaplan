@@ -16,6 +16,7 @@ use App\Service\Mcp\Notion\NotionImageAttach;
 use App\Service\Mcp\Notion\NotionImagePlan;
 use App\Service\Mcp\Notion\NotionReadPlan;
 use App\Service\Mcp\Notion\NotionToolHints;
+use App\Service\Mcp\Permissions\McpToolPermissions;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\TaskRunner;
@@ -33,6 +34,7 @@ use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
 use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
+use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
 use App\Service\Tool\ToolSource;
@@ -65,6 +67,8 @@ final readonly class McpFetchRunner implements TaskRunner
 
     private ToolInvokerSlot $toolInvoker;
 
+    private McpToolPermissions $permissions;
+
     public function __construct(
         private McpClient $client,
         private McpToolRegistry $toolRegistry,
@@ -78,6 +82,7 @@ final readonly class McpFetchRunner implements TaskRunner
         private NotionImageAttach $images,
     ) {
         $this->toolInvoker = new ToolInvokerSlot();
+        $this->permissions = new McpToolPermissions();
     }
 
     #[Required]
@@ -185,8 +190,9 @@ final readonly class McpFetchRunner implements TaskRunner
         $gateName = sprintf('mcp:%d:%s', $serverId, $tool);
         $runId = is_numeric($context->options['saved_task_run_id'] ?? null) ? (int) $context->options['saved_task_run_id'] : 0;
         $unattended = $runId > 0 || true === ($context->options['saved_task'] ?? false);
-        // Only a saved-task run can resume the waiting step. A chat label
-        // would run the fetch in the chat continuation and leave the step waiting.
+        // A tool set to Approve waits for a person in chat too. The approval
+        // is labelled with the chat message; once approved, the tool runs in
+        // the approval handler and the answer lands in the thread.
         $requestedBy = $runId > 0
             ? sprintf('task_run:%d:%s', $runId, $node->id)
             : 'chat:'.(int) $context->message->getId();
@@ -356,7 +362,8 @@ final readonly class McpFetchRunner implements TaskRunner
 
             $tools = [];
             foreach ($entry['tools'] as $tool) {
-                if ($this->isMutatingTool($tool['annotations'])) {
+                if ($this->isMutatingTool($tool['annotations'])
+                    || PolicyOutcome::Block === $this->permissions->outcome($server, $tool['name'], SideEffect::Read)) {
                     continue;
                 }
                 $tools[] = $tool['name'].$this->renderArgumentHint($tool['inputSchema'])

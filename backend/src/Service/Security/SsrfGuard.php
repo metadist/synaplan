@@ -66,9 +66,12 @@ final readonly class SsrfGuard
 
     /**
      * True when the host (name or literal IP) is a blocked target, including
-     * after DNS resolution.
+     * after DNS resolution. With $allowOperatorNetwork the operator's own
+     * ranges ({@see isOperatorNetworkIp}) pass, as in {@see pinnedIps}: for a
+     * host the operator named in this installation's configuration, never
+     * for one a caller supplied.
      */
-    public function isBlockedHost(string $host): bool
+    public function isBlockedHost(string $host, bool $allowOperatorNetwork = false): bool
     {
         $host = strtolower(trim($host, "[] \t"));
         if ('' === $host) {
@@ -81,13 +84,13 @@ final readonly class SsrfGuard
 
         // Literal IP (v4 or v6)?
         if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
-            return $this->isBlockedIp($host);
+            return $this->isBlockedIp($host, $allowOperatorNetwork);
         }
 
         // Hostname → resolve every A/AAAA record; ANY private/reserved answer
         // blocks the target (DNS-rebinding style setups often mix records).
         foreach ($this->resolveIps($host) as $ip) {
-            if ($this->isBlockedIp($ip)) {
+            if ($this->isBlockedIp($ip, $allowOperatorNetwork)) {
                 return true;
             }
         }

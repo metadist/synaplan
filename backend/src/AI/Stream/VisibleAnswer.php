@@ -52,6 +52,16 @@ final class VisibleAnswer
     }
 
     /**
+     * The provider's safety system stopped the answer: Anthropic `refusal`,
+     * OpenAI `content_filter`, Gemini `SAFETY` and its siblings. The text
+     * streamed before the stop, often nothing at all, is not an answer.
+     */
+    public static function wasRefused(?string $finishReason): bool
+    {
+        return in_array($finishReason, ['refusal', 'content_filter', 'SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII', 'RECITATION'], true);
+    }
+
+    /**
      * A `{` / `[` payload that never became JSON — the shape a token limit
      * leaves when it cuts a plan or a tool call mid-object.
      */

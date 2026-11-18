@@ -200,6 +200,11 @@ final readonly class ChatSystemPromptAssembler
             ]);
         }
 
+        $projectInstructions = $options['project_instructions'] ?? null;
+        if (is_string($projectInstructions) && '' !== trim($projectInstructions)) {
+            $prompt .= ChatPromptBlocks::projectInstructions(is_string($options['project_name'] ?? null) ? $options['project_name'] : '', $projectInstructions);
+        }
+
         $memoriesContext = $turn->personal->memories['context'] ?? '';
         if (!empty($memoriesContext)) {
             $prompt .= $memoriesContext;

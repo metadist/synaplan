@@ -7,14 +7,16 @@ namespace App\Service\Mcp\Notion;
 use App\Entity\McpServerConfig;
 
 /**
- * Decides which tools of the hosted Notion server Synaplan may offer.
+ * Classifies the tools of the hosted Notion server as read, write or
+ * destructive.
  *
  * Notion ships new tools often and does not always annotate them. A missing
  * `readOnlyHint` would put a write on the read path, so this is an
- * allow-list: known read tools read, known write tools need "The AI may
- * change Notion", an unknown tool stays only when Notion itself declares it
- * read-only and not destructive, and everything else is marked destructive,
- * which hides it from every planner catalog and refuses it at run time.
+ * allow-list: known tools get their class from the lists below, an unknown
+ * tool stays a read only when Notion itself declares it read-only and not
+ * destructive, and everything else counts as destructive. The connection's
+ * permissions (McpToolPermissions) decide what each class may do; only the
+ * tools that cannot work through a tool call are fixed to block.
  * Applies only to `mcp.notion.com`.
  */
 final class NotionToolHints
@@ -25,6 +27,7 @@ final class NotionToolHints
     private const READ = [
         'search',
         'fetch',
+        'connector-search',
         'get-file-download-urls',
         'get-comments',
         'get-users',
@@ -33,6 +36,9 @@ final class NotionToolHints
         'get-self',
         'get-tool-access',
         'get-async-task',
+        'get-version-changes',
+        'view-version',
+        'get-suggested-edit',
         'query-data-sources',
         'query-multiple-data-sources',
         'query-meeting-notes',
@@ -41,6 +47,21 @@ final class NotionToolHints
         'list-shared-pages',
         'list-private-pages',
         'list-page-backlinks',
+        'calendar-list-calendars',
+        'calendar-list-events',
+        'calendar-list-coworkers-events',
+        'calendar-list-calendar-resources',
+        'calendar-list-contacts',
+        'search-agents',
+        'get-session-status',
+        'wait-session',
+        'query-sessions',
+        'search-sessions',
+        'list-session-events',
+        'read-session-event',
+        'get-enabled-skills',
+        'download-skill',
+        'memory-search',
     ];
 
     /** @var list<string> */
@@ -57,56 +78,45 @@ final class NotionToolHints
         'create-view',
         'update-view',
         'create-folder',
+        'update-folder',
         'restore-pages',
+        'create-suggested-edit',
+        'resolve-suggested-edit',
+        'calendar-create-events',
+        'calendar-update-events',
+        'spawn-session',
+        'send-message-to-session',
+        'upload-skill',
+        'convert-page-to-skill',
+        'update-enabled-skills',
     ];
 
-    /**
-     * Never offered, even when Notion calls them harmless: they delete or
-     * move content, need a file transfer outside the tool call, or belong to
-     * Notion Calendar, Notion's own agents, skills and memory, which the
-     * "The AI may change Notion" switch does not describe.
-     *
-     * @var list<string>
-     */
-    private const BLOCKED = [
+    /** @var list<string> Delete, move to trash, cancel or overwrite. */
+    private const DESTRUCTIVE = [
         'delete-pages',
         'delete-databases',
         'delete-comment',
         'move-pages',
-        'update-folder',
+        'restore-version',
+        'calendar-cancel-events',
+        'stop-session',
+    ];
+
+    /**
+     * Cannot work through a tool call: they need a file transfer outside the
+     * call. Always blocked and not changeable by the person.
+     *
+     * @var list<string>
+     */
+    private const UNUSABLE = [
         'create-file-upload',
         'create-attachment',
         'download-attachment',
-        'calendar-list-calendars',
-        'calendar-list-events',
-        'calendar-list-coworkers-events',
-        'calendar-list-calendar-resources',
-        'calendar-list-contacts',
-        'calendar-create-events',
-        'calendar-update-events',
-        'calendar-cancel-events',
-        'search-agents',
-        'spawn-session',
-        'send-message-to-session',
-        'stop-session',
-        'wait-session',
-        'get-session-status',
-        'query-sessions',
-        'search-sessions',
-        'list-session-events',
-        'read-session-event',
-        'get-enabled-skills',
-        'download-skill',
-        'upload-skill',
-        'convert-page-to-skill',
-        'update-enabled-skills',
-        'memory-search',
-        'show-advanced-analysis-next-steps',
     ];
 
     private const READ_HINTS = ['readOnlyHint' => true, 'destructiveHint' => false];
     private const WRITE_HINTS = ['readOnlyHint' => false, 'destructiveHint' => false];
-    private const BLOCKED_HINTS = ['readOnlyHint' => false, 'destructiveHint' => true];
+    private const DESTRUCTIVE_HINTS = ['readOnlyHint' => false, 'destructiveHint' => true];
 
     /**
      * @param list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}> $tools
@@ -132,6 +142,15 @@ final class NotionToolHints
         return self::HOST === strtolower((string) parse_url($url, PHP_URL_HOST));
     }
 
+    /**
+     * A Notion tool that cannot work through a tool call. Never true for
+     * another server.
+     */
+    public static function isUnusable(string $serverUrl, string $tool): bool
+    {
+        return self::isNotion($serverUrl) && in_array(self::bare($tool), self::UNUSABLE, true);
+    }
+
     public static function bare(string $name): string
     {
         $name = strtolower($name);
@@ -150,12 +169,13 @@ final class NotionToolHints
         $bare = self::bare((string) $tool['name']);
 
         // Notion marks update-page destructive for its replace_content mode.
-        // NotionWriteGuard refuses that mode, so the tool only edits here.
+        // The tool itself is a write; calls whose arguments delete content
+        // are escalated to an approval by NotionWriteGuard.
         if (NotionPageWrite::UPDATE_TOOL === $bare) {
             return $this->with($tool, self::WRITE_HINTS);
         }
-        if (in_array($bare, self::BLOCKED, true)) {
-            return $this->with($tool, self::BLOCKED_HINTS);
+        if (in_array($bare, self::UNUSABLE, true) || in_array($bare, self::DESTRUCTIVE, true)) {
+            return $this->with($tool, self::DESTRUCTIVE_HINTS);
         }
 
         $known = in_array($bare, self::READ, true) || in_array($bare, self::WRITE, true);
@@ -164,9 +184,11 @@ final class NotionToolHints
             return $hinted ? $tool : $this->with($tool, in_array($bare, self::READ, true) ? self::READ_HINTS : self::WRITE_HINTS);
         }
 
+        // An unknown tool stays a read only when Notion itself declares it
+        // read-only and not destructive. Anything else counts as destructive.
         $declaredRead = true === ($annotations['readOnlyHint'] ?? null) && true !== ($annotations['destructiveHint'] ?? null);
 
-        return $declaredRead ? $tool : $this->with($tool, self::BLOCKED_HINTS);
+        return $declaredRead ? $tool : $this->with($tool, self::DESTRUCTIVE_HINTS);
     }
 
     /**

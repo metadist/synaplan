@@ -61,6 +61,14 @@ final class OidcCloudTest extends WebTestCase
         self::assertSame('http://opencloud-synaplan.cloud.svc:9106/api/synaplan/inbound', $second->getDeliveryUrl());
     }
 
+    public function testACloudInTheOperatorNetworkGetsItsRow(): void
+    {
+        $this->seed('https://10.20.30.40', 'http://synaplan-opencloud:9106');
+
+        self::assertSame(PlatformInstance::STATUS_ACTIVE, $this->row()->getStatus());
+        self::assertSame('10.20.30.40', $this->row()->getHost());
+    }
+
     public function testWithoutTheConfigurationNothingIsWritten(): void
     {
         $seeder = new OidcCloudSeeder(new OidcCloud('', '', ''), $this->instances(), static::getContainer()->get(RedirectUriPolicy::class), static::getContainer()->get(AuditLogWriter::class), static::getContainer()->get(PlatformInstanceSupersession::class));
@@ -109,15 +117,18 @@ final class OidcCloudTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
-    public function testTheCloudIsOfferedOnlyWhatItsAppTakes(): void
+    public function testTheCloudIsOfferedWhatItsAppTakes(): void
     {
         $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
-        self::assertSame([], $this->row()->getAppCapabilities(), 'the OpenCloud app takes lifecycle notices only');
-        self::assertFalse($this->row()->canReceiveCopies());
+        self::assertSame(OidcCloud::ALL_CAPABILITIES, $this->row()->getAppCapabilities(), 'the OpenCloud app takes copies and pickups from 1.2.0 on');
+        self::assertTrue($this->row()->canReceiveCopies());
+        self::assertTrue($this->row()->reports('pickups'));
 
         $this->seed('https://cloud.example.com', 'http://nextcloud', 'nextcloud');
         self::assertSame(OidcCloud::ALL_CAPABILITIES, $this->row()->getAppCapabilities());
         self::assertTrue($this->row()->canReceiveCopies());
+
+        self::assertSame([], (new OidcCloud('owncloud', 'https://cloud.example.com', 'zero-setup-people'))->capabilities, 'a type without a configured app is offered nothing');
     }
 
     private function seed(string $url, string $internalUrl, string $type = 'opencloud'): OidcCloud

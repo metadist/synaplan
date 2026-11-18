@@ -663,6 +663,14 @@
     "apiKeys": {
       "title": "API Anahtarları",
       "description": "API'ye erişim için API anahtarları oluşturun ve yönetin.",
+      "usage": {
+        "title": "Bu API'yi kullanın",
+        "intro": "Bu sayfada bir anahtar oluşturun. Authorization: Bearer olarak gönderin. İstemcinizin istediği adresi kopyalayın.",
+        "openai": "OpenAI temel URL'si",
+        "chat": "Sohbet tamamlamaları",
+        "mcp": "MCP",
+        "copy": "{label} kopyala"
+      },
       "docsTitle": "API Dokümantasyonu",
       "docsDesc": "Tüm mevcut uç noktaları, istek formatlarını ve kimlik doğrulama yöntemlerini inceleyin.",
       "createKey": "API Anahtarı Oluştur",

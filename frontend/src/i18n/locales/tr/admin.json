@@ -1651,6 +1651,9 @@
     "research": {
       "label": "Araştırma"
     },
+    "projects": {
+      "label": "Projeler"
+    },
     "freeapi": {
       "label": "Synaplan Demo"
     },

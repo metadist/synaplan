@@ -1094,6 +1094,7 @@
     "waitingForAnotherAdmin": "Une autre personne avec un accès administrateur doit accepter. Vous ne pouvez pas approuver votre propre agent.",
     "sharingOff": "Le partage avec tout le monde est désactivé, donc rien n’a été partagé.",
     "alwaysAllow": "Toujours autoriser pour cet agent",
+    "alwaysAllowConnection": "Toujours autoriser sur cette connexion",
     "rejectReason": "Pourquoi refusez-vous ceci ?",
     "rejectReasonPlaceholder": "Note facultative",
     "expired": "Cette demande a expiré",
@@ -1120,7 +1121,9 @@
       "executed": "Terminé",
       "failed": "Échoué"
     },
-    "openTasks": "Ouvrir les tâches"
+    "openTasks": "Ouvrir les tâches",
+    "onConnection": "Sur {connection}",
+    "changePermission": "Modifier l’autorisation"
   },
   "knowledgeSources": {
     "title": "Sources",

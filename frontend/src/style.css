@@ -659,6 +659,13 @@
     color: #ffffff !important;
   }
 
+  /* Rendered mermaid diagrams keep their own label ink: the nodes are light,
+     so the forced white above would make the labels unreadable. */
+  .bubble-user .markdown-content .mermaid-rendered p {
+    color: inherit !important;
+    text-shadow: none;
+  }
+
   .bubble-user .markdown-content a {
     color: #ffffff !important;
     text-decoration: underline;

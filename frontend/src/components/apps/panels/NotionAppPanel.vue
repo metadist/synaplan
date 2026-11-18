@@ -90,45 +90,76 @@
     </div>
 
     <div v-else class="space-y-4" data-testid="section-notion-connected">
-      <div class="surface-card rounded-2xl p-4 sm:p-5 space-y-5">
-        <NotionConnectedSection v-model:status="status" :account="account" @try="tryPrompt" />
-        <div class="flex flex-wrap gap-3">
-          <button
-            type="button"
-            class="btn-primary px-4 py-2.5 text-sm font-medium"
-            data-testid="btn-notion-try-chat"
-            @click="tryPrompt('')"
-          >
-            {{ $t('apps.notion.tryChat') }}
-          </button>
-          <button
-            type="button"
-            class="btn-danger rounded-lg px-4 py-2.5 text-sm font-medium"
-            data-testid="btn-notion-disconnect"
-            @click="disconnect"
-          >
-            {{ $t('apps.notion.disconnect') }}
-          </button>
+      <TabNav
+        :model-value="tab"
+        :tabs="tabs"
+        :aria-label="$t('mcpServers.permissions.tabsLabel')"
+        testid="tabs-notion"
+        mobile-trigger-testid="tabs-notion-mobile-trigger"
+        @update:model-value="selectTab"
+      />
+      <div
+        v-if="tab === 'permissions' && status?.server_id != null"
+        class="surface-card rounded-2xl p-4 sm:p-5"
+        data-testid="section-notion-permissions"
+      >
+        <McpToolPermissions
+          :server-id="status.server_id"
+          server-name="Notion"
+          @notice-dismissed="notice = false"
+        />
+      </div>
+      <template v-else>
+        <McpPermissionsNotice
+          v-if="notice"
+          :show-review="true"
+          :busy="noticeBusy"
+          @review="tab = 'permissions'"
+          @dismiss="dismissNotice"
+        />
+        <div class="surface-card rounded-2xl p-4 sm:p-5 space-y-5">
+          <NotionConnectedSection v-model:status="status" :account="account" @try="tryPrompt" />
+          <div class="flex flex-wrap gap-3">
+            <button
+              type="button"
+              class="btn-primary px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-notion-try-chat"
+              @click="tryPrompt('')"
+            >
+              {{ $t('apps.notion.tryChat') }}
+            </button>
+            <button
+              type="button"
+              class="btn-danger rounded-lg px-4 py-2.5 text-sm font-medium"
+              data-testid="btn-notion-disconnect"
+              @click="disconnect"
+            >
+              {{ $t('apps.notion.disconnect') }}
+            </button>
+          </div>
         </div>
-      </div>
-      <div class="surface-card rounded-2xl p-4 sm:p-5">
-        <NotionWatches />
-      </div>
-      <div class="surface-card rounded-2xl p-4 sm:p-5">
-        <NotionRecentChanges />
-      </div>
+        <div class="surface-card rounded-2xl p-4 sm:p-5">
+          <NotionWatches />
+        </div>
+        <div class="surface-card rounded-2xl p-4 sm:p-5">
+          <NotionRecentChanges />
+        </div>
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 import { mcpServersApi } from '@/services/api/mcpServersApi'
 import { userFacingError } from '@/utils/userFacingError'
+import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
+import McpPermissionsNotice from '@/components/config/mcp/McpPermissionsNotice.vue'
+import McpToolPermissions from '@/components/config/mcp/McpToolPermissions.vue'
 import NotionConnectedSection from './notion/NotionConnectedSection.vue'
 import NotionRecentChanges from './notion/NotionRecentChanges.vue'
 import NotionWatches from './notion/NotionWatches.vue'
@@ -148,6 +179,27 @@ const loading = ref(true)
 const loadError = ref(false)
 const connecting = ref(false)
 const usingShared = ref(false)
+type NotionTab = 'overview' | 'permissions'
+const tab = ref<NotionTab>(route.query.tab === 'permissions' ? 'permissions' : 'overview')
+/** Keeps the tab in the URL so a reload or a shared link opens the same tab. */
+const selectTab = (next: string) => {
+  tab.value = next === 'permissions' ? 'permissions' : 'overview'
+  const query = { ...route.query }
+  if (tab.value === 'permissions') query.tab = 'permissions'
+  else delete query.tab
+  void router.replace({ query })
+}
+const tabs = computed<TabNavItem[]>(() => [
+  { id: 'overview', label: t('mcpServers.permissions.overviewTab'), testid: 'tab-notion-overview' },
+  {
+    id: 'permissions',
+    label: t('mcpServers.permissions.permissionsTab'),
+    testid: 'tab-notion-permissions',
+    badge: notice.value ? 1 : undefined,
+  },
+])
+const notice = ref(false)
+const noticeBusy = ref(false)
 const status = ref<NotionAppStatus | null>(null)
 const account = ref<NotionAppAccount | null>(null)
 
@@ -159,13 +211,37 @@ const loadAccount = async () => {
   }
 }
 
+const loadNotice = async (id: number) => {
+  try {
+    notice.value = (await mcpServersApi.toolPermissions(id)).notice
+  } catch {
+    notice.value = false
+  }
+}
+
+const dismissNotice = async () => {
+  const id = status.value?.server_id
+  if (id == null) return
+  noticeBusy.value = true
+  try {
+    notice.value = (await mcpServersApi.dismissToolNotice(id)).notice
+  } catch (err) {
+    error(userFacingError(err, t('mcpServers.permissions.saveFailed')))
+  } finally {
+    noticeBusy.value = false
+  }
+}
+
 const load = async () => {
   loading.value = true
   loadError.value = false
   account.value = null
   try {
     status.value = await notionAppApi.status()
-    if (status.value.status === 'connected') void loadAccount()
+    if (status.value.status === 'connected') {
+      void loadAccount()
+      if (status.value.server_id != null) void loadNotice(status.value.server_id)
+    }
   } catch {
     loadError.value = true
     status.value = null

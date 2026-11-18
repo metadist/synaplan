@@ -219,10 +219,10 @@ jobs:
             # unknown query parameter silently, so the commit is matched again
             # on the returned runs.
             green="$(
-              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&status=success&per_page=100" |
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&per_page=100" |
                 jq --arg sha "$sha" --arg tag "$tag" \
                   '[.workflow_runs[]
-                    | select(.name == "CI" and .event == "push"
+                    | select(.name == "CI" and .event == "push" and .conclusion == "success"
                              and .head_sha == $sha and .head_branch == $tag)] | length'
             )"
 

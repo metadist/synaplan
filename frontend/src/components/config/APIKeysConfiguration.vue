@@ -7,6 +7,8 @@
       data-testid="section-header"
     />
 
+    <ApiUsageIntro />
+
     <!-- Error Alert -->
     <div
       v-if="error"
@@ -451,6 +453,7 @@ import {
   CommandLineIcon,
 } from '@heroicons/vue/24/outline'
 import PageHeader from '@/components/PageHeader.vue'
+import ApiUsageIntro from '@/components/config/ApiUsageIntro.vue'
 import {
   listApiKeys,
   createApiKey,

@@ -71,23 +71,37 @@ final class NotionToolHintsTest extends TestCase
         self::assertSame([], $other[0]['annotations']);
     }
 
-    public function testBlocksCalendarAgentAndDeleteToolsEvenWhenNotionCallsThemHarmless(): void
+    public function testDeleteMoveAndCancelToolsAreDestructiveEvenWhenNotionCallsThemHarmless(): void
     {
-        $names = [
-            'notion-delete-databases',
-            'notion-delete-comment',
-            'notion-calendar-create-events',
-            'notion-calendar-list-events',
-            'notion-spawn-session',
-            'notion-create-attachment',
-            'notion-update-folder',
-            'notion-memory-search',
-        ];
+        $names = ['notion-delete-pages', 'notion-delete-databases', 'notion-delete-comment', 'notion-move-pages', 'notion-restore-version', 'notion-calendar-cancel-events', 'notion-stop-session', 'notion-create-attachment'];
         $tools = array_map(fn (string $name): array => $this->tool($name, ['readOnlyHint' => true]), $names);
 
         foreach ($this->hints->apply($this->server('https://mcp.notion.com/mcp'), $tools) as $index => $tool) {
             self::assertTrue($tool['annotations']['destructiveHint'], $names[$index]);
             self::assertFalse($tool['annotations']['readOnlyHint'], $names[$index]);
+        }
+    }
+
+    public function testCalendarAgentSkillAndMemoryToolsFollowTheirClass(): void
+    {
+        $read = ['notion-calendar-list-events', 'notion-search-agents', 'notion-get-session-status', 'notion-memory-search', 'notion-connector-search', 'notion-view-version', 'notion-get-suggested-edit'];
+        $write = ['notion-calendar-create-events', 'notion-calendar-update-events', 'notion-spawn-session', 'notion-send-message-to-session', 'notion-upload-skill', 'notion-update-folder', 'notion-create-suggested-edit', 'notion-resolve-suggested-edit'];
+        $tools = array_map(fn (string $name): array => $this->tool($name), [...$read, ...$write]);
+
+        foreach ($this->hints->apply($this->server('https://mcp.notion.com/mcp'), $tools) as $index => $tool) {
+            self::assertSame($index < count($read), $tool['annotations']['readOnlyHint'], $tool['name']);
+            self::assertFalse($tool['annotations']['destructiveHint'], $tool['name']);
+        }
+    }
+
+    public function testOnlyTheFileTransferToolsAreUnusable(): void
+    {
+        foreach (['create-file-upload', 'notion-create-attachment', 'notion-download-attachment'] as $name) {
+            self::assertTrue(NotionToolHints::isUnusable('https://mcp.notion.com/mcp', $name), $name);
+            self::assertFalse(NotionToolHints::isUnusable('https://crm.example.com/mcp', $name), $name);
+        }
+        foreach (['notion-delete-pages', 'notion-search', 'notion-update-page', 'notion-brand-new'] as $name) {
+            self::assertFalse(NotionToolHints::isUnusable('https://mcp.notion.com/mcp', $name), $name);
         }
     }
 

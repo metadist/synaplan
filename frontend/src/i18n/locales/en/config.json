@@ -910,6 +910,14 @@
     "apiKeys": {
       "title": "API Keys",
       "description": "Create and manage API keys for accessing the API.",
+      "usage": {
+        "title": "Use this API",
+        "intro": "Create a key on this page. Send it as Authorization: Bearer. Copy the address your client asks for.",
+        "openai": "OpenAI base URL",
+        "chat": "Chat completions",
+        "mcp": "MCP",
+        "copy": "Copy {label}"
+      },
       "docsTitle": "API Documentation",
       "docsDesc": "Explore all available endpoints, request formats, and authentication methods.",
       "createKey": "Create API Key",

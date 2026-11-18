@@ -6,7 +6,10 @@ import {
   PatchApiMcpServersUpdateResponseSchema,
   DeleteApiMcpServersDeleteResponseSchema,
   PostApiMcpServersTestResponseSchema,
-  GetApiMcpServersToolsResponseSchema,
+  GetApiMcpToolPermissionsListResponseSchema,
+  PutApiMcpToolPermissionsUpdateResponseSchema,
+  PostApiMcpToolPermissionsSeenResponseSchema,
+  PostApiMcpToolPermissionsDismissNoticeResponseSchema,
 } from '@/generated/api-schemas'
 
 /**
@@ -24,6 +27,16 @@ export type McpTool = NonNullable<
   z.infer<typeof PostApiMcpServersTestResponseSchema>['tools']
 >[number]
 
+/** `default` removes the override and the tool follows its category default. */
+export type ToolPermissionChoice = 'auto' | 'approve' | 'block' | 'default'
+
+export type McpToolPermissionList = z.infer<typeof GetApiMcpToolPermissionsListResponseSchema>
+export type McpToolPermission = McpToolPermissionList['tools'][number]
+
+export type ToolPermissionBody =
+  | { tools: Record<string, ToolPermissionChoice> }
+  | { category: 'read' | 'write' | 'destructive'; outcome: ToolPermissionChoice }
+
 export interface McpServerPayload {
   name?: string
   url?: string
@@ -31,8 +44,6 @@ export interface McpServerPayload {
   /** Absent = keep the stored secret; empty string = clear it. */
   auth_token?: string
   enabled?: boolean
-  /** Opt-in: let the AI call mutating tools (create/update) on this server. */
-  allow_write?: boolean
   auth_mode?: 'none' | 'bearer' | 'oauth'
 }
 
@@ -106,9 +117,38 @@ export const mcpServersApi = {
   async tools(id: number): Promise<McpTool[]> {
     const data = await httpClient(`/api/v1/mcp-servers/${id}/tools`, {
       method: 'GET',
-      schema: GetApiMcpServersToolsResponseSchema,
+      schema: GetApiMcpToolPermissionsListResponseSchema,
     })
     return data.tools ?? []
+  },
+
+  async toolPermissions(id: number) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tools`, {
+      method: 'GET',
+      schema: GetApiMcpToolPermissionsListResponseSchema,
+    })
+  },
+
+  async setToolPermissions(id: number, body: ToolPermissionBody) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tool-permissions`, {
+      method: 'PUT',
+      body: JSON.stringify(body),
+      schema: PutApiMcpToolPermissionsUpdateResponseSchema,
+    })
+  },
+
+  async markToolsSeen(id: number) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tool-permissions/seen`, {
+      method: 'POST',
+      schema: PostApiMcpToolPermissionsSeenResponseSchema,
+    })
+  },
+
+  async dismissToolNotice(id: number) {
+    return httpClient(`/api/v1/mcp-servers/${id}/tool-permissions/notice/dismiss`, {
+      method: 'POST',
+      schema: PostApiMcpToolPermissionsDismissNoticeResponseSchema,
+    })
   },
 
   async startOAuth(id: number): Promise<string> {

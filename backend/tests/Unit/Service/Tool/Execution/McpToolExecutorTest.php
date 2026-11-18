@@ -16,7 +16,9 @@ use App\Service\Mcp\McpToolRegistry;
 use App\Service\Mcp\Notion\NotionSharing;
 use App\Service\Security\EncryptionService;
 use App\Service\Tool\Execution\McpToolExecutor;
+use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolChannel;
+use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\ToolSource;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -47,6 +49,24 @@ final class McpToolExecutorTest extends TestCase
         );
 
         self::assertSame('MCP server is not available.', $result->text);
+    }
+
+    public function testOnlyAnApprovedCallMayDeleteContent(): void
+    {
+        $seen = [];
+        $client = $this->createMock(McpClient::class);
+        $client->method('callTool')->willReturnCallback(static function ($server, string $tool, array $args, bool $approved = false) use (&$seen): array {
+            $seen[] = $approved;
+
+            return ['content' => [], 'isError' => false];
+        });
+        $executor = new McpToolExecutor($client, $this->servers($this->server()));
+        $descriptor = $this->descriptor(ToolSource::Mcp, 'update', ['serverId' => 1, 'tool' => 'update']);
+
+        $executor->execute($descriptor, $this->invocation(ToolChannel::MESSAGES, 'update'));
+        $executor->execute($descriptor, new ToolInvocation('update', [], new ToolCaller(7, ToolChannel::MESSAGES, approvalId: 5)));
+
+        self::assertSame([false, true], $seen);
     }
 
     public function testATransportFailureKeepsTheClientMessage(): void

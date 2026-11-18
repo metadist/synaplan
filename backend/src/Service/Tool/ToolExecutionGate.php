@@ -6,8 +6,11 @@ namespace App\Service\Tool;
 
 use App\Entity\Approval;
 use App\Entity\User;
+use App\Service\Mcp\Notion\NotionWriteGuard;
+use App\Service\Mcp\Permissions\McpPermissionsPath;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
 use App\Service\Tool\Policy\ApprovalPolicy;
+use App\Service\Tool\Policy\McpToolMeta;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;
 
@@ -67,7 +70,6 @@ final readonly class ToolExecutionGate
         ?array $resolvedRequest = null,
         bool $alreadyApproved = false,
         ?string $forcedRefusal = null,
-        bool $canPause = true,
     ): array {
         $descriptor = $this->registry->get($userId, $toolName);
         if (null === $descriptor && null !== $forcedRefusal && '' !== $forcedRefusal) {
@@ -78,15 +80,17 @@ final readonly class ToolExecutionGate
         }
 
         if (null !== $forcedRefusal && '' !== $forcedRefusal) {
-            return [
-                'outcome' => PolicyOutcome::Block,
-                'descriptor' => $descriptor,
-                'approval' => null,
-                'refusal' => $forcedRefusal,
-            ];
+            return $this->refused($descriptor, $forcedRefusal);
         }
 
         $nodeOverride = PolicyOutcome::tryFrom((string) $nodeApproval);
+
+        // An MCP connection's Block holds in every path, also with approvals
+        // off and for a call a person approved earlier.
+        $standing = $this->mcpStandingRefusal($descriptor, $args, $userId, $alreadyApproved);
+        if (null !== $standing) {
+            return $this->refused($descriptor, $standing);
+        }
 
         if ($alreadyApproved || !$this->toolsConfig->isApprovalsEnabled($userId)) {
             $blocked = PolicyOutcome::Block === $nodeOverride;
@@ -99,6 +103,8 @@ final readonly class ToolExecutionGate
             ];
         }
 
+        $deletesContent = $this->deletesContent($descriptor, $args);
+        $descriptor = $this->classedForCall($descriptor, $deletesContent);
         $outcome = $this->approvalPolicy->decide(
             $descriptor,
             $userId,
@@ -107,24 +113,13 @@ final readonly class ToolExecutionGate
             $allowUnattended,
             $assistantKey,
             $nodeOverride,
+            $deletesContent,
         );
         if ($requireApproval && PolicyOutcome::Auto === $outcome) {
             $outcome = PolicyOutcome::Approve;
         }
-        // A chat plan cannot be resumed after a pause. Opening an approval
-        // there would run the tool in the chat continuation and leave the
-        // step waiting. Block still refuses.
-        if (!$canPause && PolicyOutcome::Approve === $outcome) {
-            $outcome = PolicyOutcome::Auto;
-        }
-
         if (PolicyOutcome::Block === $outcome) {
-            return [
-                'outcome' => $outcome,
-                'descriptor' => $descriptor,
-                'approval' => null,
-                'refusal' => 'I cannot do that. An administrator has turned this off.',
-            ];
+            return $this->refused($descriptor, 'I cannot do that. An administrator has turned this off.');
         }
 
         if (PolicyOutcome::Approve === $outcome) {
@@ -144,5 +139,95 @@ final readonly class ToolExecutionGate
             'approval' => null,
             'refusal' => null,
         ];
+    }
+
+    /**
+     * @return array{outcome: PolicyOutcome, descriptor: ToolDescriptor, approval: Approval|null, refusal: string|null}
+     */
+    private function refused(ToolDescriptor $descriptor, string $refusal): array
+    {
+        return [
+            'outcome' => PolicyOutcome::Block,
+            'descriptor' => $descriptor,
+            'approval' => null,
+            'refusal' => $refusal,
+        ];
+    }
+
+    /**
+     * A call that deletes content is a destructive call, whatever the tool's
+     * class: policy, approval and audit see it as such, and its approval
+     * offers no "always allow".
+     */
+    private function classedForCall(ToolDescriptor $descriptor, bool $deletesContent): ToolDescriptor
+    {
+        if (!$deletesContent || SideEffect::Destructive === $descriptor->sideEffect) {
+            return $descriptor;
+        }
+
+        return new ToolDescriptor(
+            $descriptor->name,
+            $descriptor->title,
+            $descriptor->description,
+            $descriptor->inputSchema,
+            SideEffect::Destructive,
+            $descriptor->source,
+            $descriptor->ownerId,
+            $descriptor->policyException,
+            $descriptor->meta,
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     */
+    private function mcpStandingRefusal(ToolDescriptor $descriptor, array $args, int $userId, bool $alreadyApproved): ?string
+    {
+        $connection = $this->approvalPolicy->connectionOutcome($descriptor);
+        if (null === $connection) {
+            return null;
+        }
+        $label = is_string($descriptor->meta['tool'] ?? null) ? $descriptor->meta['tool'] : $descriptor->title;
+        if (PolicyOutcome::Block === $connection) {
+            return sprintf('I cannot do that. The tool "%s" is blocked in the permissions of this connection.', $label).$this->permissionsHint($descriptor);
+        }
+        $asks = PolicyOutcome::Approve === $connection || $this->deletesContent($descriptor, $args);
+        if ($asks && !$alreadyApproved && !$this->toolsConfig->isApprovalsEnabled($userId)) {
+            return sprintf('I cannot do that. The tool "%s" needs your approval and approvals are turned off on this instance.', $label).$this->permissionsHint($descriptor);
+        }
+
+        return null;
+    }
+
+    /**
+     * A markdown link to the connection's permissions, so a refusal says where
+     * to change it. Empty when the descriptor does not name its connection.
+     */
+    private function permissionsHint(ToolDescriptor $descriptor): string
+    {
+        $serverId = $descriptor->meta['serverId'] ?? null;
+        $url = $descriptor->meta[McpToolMeta::SERVER_URL] ?? null;
+        if (!is_int($serverId) || $serverId <= 0 || !is_string($url)) {
+            return '';
+        }
+
+        return sprintf(' [Change permission](%s)', McpPermissionsPath::for($serverId, $url));
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     */
+    private function deletesContent(ToolDescriptor $descriptor, array $args): bool
+    {
+        if (ToolSource::Mcp !== $descriptor->source) {
+            return false;
+        }
+        $url = $descriptor->meta[McpToolMeta::SERVER_URL] ?? null;
+        $tool = $descriptor->meta['tool'] ?? null;
+        if (!is_string($url) || !is_string($tool)) {
+            return false;
+        }
+
+        return null !== NotionWriteGuard::contentDeletion($url, $tool, $args);
     }
 }

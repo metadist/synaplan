@@ -1035,6 +1035,7 @@
     "waitingForAnotherAdmin": "Yönetici erişimi olan başka bir kişi onaylamalı. Kendi ajanınızı onaylayamazsınız.",
     "sharingOff": "Herkesle paylaşma kapalı, bu yüzden hiçbir şey paylaşılmadı.",
     "alwaysAllow": "Bu ajan için her zaman izin ver",
+    "alwaysAllowConnection": "Bu bağlantıda her zaman izin ver",
     "rejectReason": "Bunu neden reddediyorsun?",
     "rejectReasonPlaceholder": "İsteğe bağlı not",
     "expired": "Bu istek süresi doldu",
@@ -1061,7 +1062,9 @@
       "executed": "Tamamlandı",
       "failed": "Başarısız"
     },
-    "openTasks": "Görevleri aç"
+    "openTasks": "Görevleri aç",
+    "onConnection": "{connection} üzerinde",
+    "changePermission": "İzni değiştir"
   },
   "knowledgeSources": {
     "title": "Kaynaklar",

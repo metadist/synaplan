@@ -502,9 +502,63 @@
       "unknown": "La connexion n’a pas pu démarrer. Réessayez ou demandez à la personne qui gère le serveur."
     },
     "savedSignInNotStarted": "« {name} » est enregistré. La connexion n’a pas démarré : {reason}",
-    "allowWriteLabel": "Autoriser les actions d’écriture (créer/mettre à jour)",
-    "allowWriteHint": "Lorsqu’elles sont activées, l’IA peut créer ou mettre à jour du contenu dans ce système lorsque vous le demandez. Les actions de suppression ne sont jamais autorisées.",
-    "writeBadge": "Écritures autorisées"
+    "permissions": {
+      "open": "Autorisations",
+      "hide": "Masquer les autorisations",
+      "overviewTab": "Aperçu",
+      "permissionsTab": "Autorisations",
+      "title": "Autorisations des outils",
+      "intro": "Choisissez quand l'IA peut utiliser ces outils. Les tâches enregistrées et les workflows demandent toujours avant d'écrire, sauf si l'étape l'autorise.",
+      "category": {
+        "read": "Outils de lecture",
+        "write": "Outils d'écriture",
+        "destructive": "Outils destructeurs",
+        "unavailable": "Indisponibles"
+      },
+      "outcome": {
+        "auto": "Auto",
+        "approve": "Approbation",
+        "block": "Bloqué",
+        "mixed": "Mixte"
+      },
+      "outcomeHint": {
+        "auto": "S'exécute sans demander",
+        "approve": "Vous demande d'abord",
+        "block": "Ne s'exécute jamais"
+      },
+      "categoryLabel": "Tout régler : {category}",
+      "toolLabel": "Autorisation pour {tool}",
+      "changed": "Modifié",
+      "new": "Nouveau",
+      "showMore": "Afficher plus",
+      "showLess": "Afficher moins",
+      "inputs": "Prend 1 entrée | Prend {count} entrées",
+      "inputNames": "Entrées : {names}",
+      "noHints": "Le serveur n'indique pas ce que cet outil modifie.",
+      "locked": {
+        "group_policy": "La politique d'un administrateur bloque cet outil.",
+        "shared": "Partagée avec vous. Seul son propriétaire peut modifier ces autorisations.",
+        "unavailable": "Ne fonctionne pas via un appel d'outil dans le chat."
+      },
+      "saved": "{tool} réglé sur {outcome}.",
+      "categorySaved": "{count} outil réglé sur {outcome}. | {count} outils réglés sur {outcome}.",
+      "undo": "Annuler",
+      "saveFailed": "L'autorisation n'a pas été enregistrée. Rien n'a été modifié. Réessayez.",
+      "confirmTitle": "Laisser l'IA supprimer sans demander ?",
+      "confirmMessage": "L'IA supprimera ou écrasera dans {connection} sans vous demander. Continuer ?",
+      "confirmAction": "Régler sur Auto",
+      "loading": "Chargement des outils…",
+      "loadFailed": "Les outils de cette connexion n'ont pas pu être chargés. Rien n'a été modifié.",
+      "retry": "Réessayer",
+      "empty": "Cette connexion n'offre pas encore d'outils. Vérifiez qu'elle est connectée, puis rechargez.",
+      "clientOff": "Les appels MCP sont désactivés, il n'y a donc rien à régler ici. Activez-les pour gérer les autorisations.",
+      "notice": "L’IA peut désormais utiliser des outils d’écriture sur cette connexion sans demander. Les outils destructeurs demandent toujours.",
+      "noticeReview": "Vérifier les autorisations",
+      "noticeDismiss": "Compris",
+      "tabsLabel": "Sections de la connexion",
+      "reset": "Rétablir la valeur par défaut ({outcome})",
+      "undone": "Modification annulée."
+    }
   },
   "messagesGateway": {
     "title": "Connecter votre outil de code",
@@ -1130,12 +1184,6 @@
       "connectedAs": "Connecté à l'espace de travail Notion {workspace} en tant que {account}.",
       "connectedAsAccount": "Connecté à Notion en tant que {account}.",
       "scope": "L'IA ne voit que ce que ce compte Notion peut voir.",
-      "writeLabel": "L'IA peut modifier Notion",
-      "writeOn": "L'IA peut créer et modifier des pages dans Notion sans demander à chaque fois. Elle ne peut ni supprimer, ni déplacer, ni écraser de pages.",
-      "writeOff": "L'IA peut lire Notion. Elle ne changera rien.",
-      "writeSavedOn": "L'IA peut maintenant créer et modifier des pages Notion sans demander. Elle ne peut toujours ni supprimer, ni déplacer, ni écraser de pages.",
-      "writeSavedOff": "L'écriture est désactivée. L'IA peut encore lire Notion et ne changera rien.",
-      "writeFailed": "Le réglage n'a pas été enregistré. Notion n'a pas été modifié. Réessayez.",
       "examplesTitle": "Essayez l'une de ces phrases dans le chat",
       "exampleRead": "Résumez ma page Feuille de route",
       "exampleWrite": "Créez une page appelée Notes de réunion",

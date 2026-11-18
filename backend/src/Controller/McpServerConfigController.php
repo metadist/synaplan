@@ -262,55 +262,6 @@ final class McpServerConfigController extends AbstractController
         return $this->json(['success' => true]);
     }
 
-    #[Route('/{id}/tools', name: 'tools', requirements: ['id' => '\d+'], methods: ['GET'])]
-    #[OA\Get(
-        path: '/api/v1/mcp-servers/{id}/tools',
-        summary: 'List the tools discovered on a connected MCP server (cached)',
-        security: [['Bearer' => []]],
-        tags: ['MCP Servers'],
-        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
-        responses: [
-            new OA\Response(
-                response: 200,
-                description: 'Discovered tools',
-                content: new OA\JsonContent(
-                    properties: [
-                        new OA\Property(property: 'success', type: 'boolean', example: true),
-                        new OA\Property(property: 'error', type: 'string', nullable: true, example: null),
-                        new OA\Property(property: 'tools', type: 'array', items: new OA\Items(
-                            properties: [
-                                new OA\Property(property: 'name', type: 'string', example: 'search_customers'),
-                                new OA\Property(property: 'description', type: 'string', example: 'Find customers by name'),
-                            ],
-                            type: 'object'
-                        )),
-                    ]
-                )
-            ),
-            new OA\Response(response: 404, description: 'Not found'),
-        ]
-    )]
-    public function tools(int $id, #[CurrentUser] ?User $user): JsonResponse
-    {
-        if (!$user) {
-            return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        $server = $this->repository->findByIdAndUser($id, $user->getId());
-        if (null === $server) {
-            return $this->json(['success' => false, 'error' => 'Server not found'], Response::HTTP_NOT_FOUND);
-        }
-
-        if (!$this->clientConfig->isClientEnabled($user->getId())) {
-            return $this->json(['success' => false, 'error' => 'The outbound MCP client is disabled', 'tools' => []]);
-        }
-
-        return $this->json([
-            'success' => true,
-            'tools' => $this->publicTools($this->toolRegistry->toolsFor($server)),
-        ]);
-    }
-
     #[Route('/{id}/test', name: 'test', requirements: ['id' => '\d+'], methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/mcp-servers/{id}/test',

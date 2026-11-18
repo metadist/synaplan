@@ -387,6 +387,9 @@
             @ask-user="emit('askUser', $event)"
           />
 
+          <div v-if="$slots.approvals" class="px-4 pb-3 space-y-3" data-testid="chat-approvals">
+            <slot name="approvals" />
+          </div>
           <!-- Background async media job (Release 4.0 — e.g. detached video render) -->
           <div v-if="showMediaJobBanner" class="px-4 pt-3">
             <MediaJobStatus

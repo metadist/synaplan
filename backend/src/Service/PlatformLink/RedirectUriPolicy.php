@@ -44,6 +44,25 @@ final readonly class RedirectUriPolicy
      */
     public function normalizeHost(string $raw): string
     {
+        return $this->normalize($raw, operatorNetwork: false);
+    }
+
+    /**
+     * Normalize the host of a cloud the operator named in this installation's
+     * own configuration (PLATFORM_LINKS_OIDC_CLOUD_URL). Same form and checks
+     * as {@see normalizeHost}, except that the host may resolve into the
+     * operator's own network: a cloud next to Synaplan, in the same cluster
+     * or behind the same private ingress. Loopback, link-local and other
+     * reserved addresses stay refused, as {@see DeliveryOriginPolicy} refuses
+     * them for this cloud. Never for a host a caller supplied.
+     */
+    public function normalizeOperatorHost(string $raw): string
+    {
+        return $this->normalize($raw, operatorNetwork: true);
+    }
+
+    private function normalize(string $raw, bool $operatorNetwork): string
+    {
         $raw = trim($raw);
         if ('' === $raw) {
             throw new PlatformLinkValidationException('Host is required.');
@@ -69,7 +88,7 @@ final readonly class RedirectUriPolicy
             $host = $this->canonicalizeHost((string) $parsed['host']);
             $port = isset($parsed['port']) ? (int) $parsed['port'] : null;
             $this->assertAllowedScheme($scheme, $host);
-            $this->assertHostAllowed($host);
+            $this->assertHostAllowed($host, $operatorNetwork);
 
             return $this->formatHost($host, $port);
         }
@@ -85,7 +104,7 @@ final readonly class RedirectUriPolicy
             $port = (int) $m[2];
         }
         $host = $this->canonicalizeHost($host);
-        $this->assertHostAllowed($host);
+        $this->assertHostAllowed($host, $operatorNetwork);
 
         return $this->formatHost($host, $port);
     }
@@ -300,7 +319,7 @@ final readonly class RedirectUriPolicy
         throw new PlatformLinkValidationException('Host and redirect URIs must use https.');
     }
 
-    private function assertHostAllowed(string $host): void
+    private function assertHostAllowed(string $host, bool $operatorNetwork): void
     {
         if ('' === $host || str_ends_with($host, '.') || str_contains($host, '..')) {
             throw new PlatformLinkValidationException('Host is not a valid hostname.');
@@ -311,9 +330,29 @@ final readonly class RedirectUriPolicy
         if ($this->isDev() && $this->isLocalDevHost($host)) {
             return;
         }
-        if ($this->ssrfGuard->isBlockedHost($host)) {
+        if ($this->ssrfGuard->isBlockedHost($host, $operatorNetwork)) {
             throw new PlatformLinkValidationException('Host is not allowed.');
         }
+        if ($operatorNetwork && $this->resolvesToLoopbackOrLinkLocal($host)) {
+            throw new PlatformLinkValidationException('Host is not allowed.');
+        }
+    }
+
+    /**
+     * The operator's network includes loopback, but a cloud on this machine's
+     * own loopback is no cloud next to Synaplan: refuse it, whether named as
+     * a literal IP or resolved from a hostname.
+     */
+    private function resolvesToLoopbackOrLinkLocal(string $host): bool
+    {
+        $ips = false !== filter_var($host, \FILTER_VALIDATE_IP) ? [$host] : $this->ssrfGuard->resolvedIps($host);
+        foreach ($ips as $ip) {
+            if (DeliveryOriginPolicy::ipIsLoopbackOrLinkLocal($ip)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public function isLocalDevHost(string $host): bool

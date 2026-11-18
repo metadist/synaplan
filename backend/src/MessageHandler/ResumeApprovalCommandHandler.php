@@ -53,6 +53,7 @@ use Symfony\Contracts\Service\Attribute\Required;
 final readonly class ResumeApprovalCommandHandler
 {
     private const RESULT_PREVIEW_CHARS = 2000;
+    private const RESULT_ANSWER_CHARS = 12000;
 
     private ToolInvokerSlot $toolInvoker;
 
@@ -113,7 +114,7 @@ final readonly class ResumeApprovalCommandHandler
         }
 
         try {
-            [$resultRef, $summary] = ToolSource::Custom === $descriptor->source
+            [$resultRef, $summary, $full] = ToolSource::Custom === $descriptor->source
                 ? $this->executeCustom($approval, $descriptor)
                 : $this->executeMcp($approval, $descriptor);
         } catch (\Throwable $e) {
@@ -127,7 +128,7 @@ final readonly class ResumeApprovalCommandHandler
             return;
         }
 
-        $announce = $this->continuation->continueChat($approval, ChatApprovalContinuationService::OUTCOME_EXECUTED, $summary);
+        $announce = $this->continuation->continueChat($approval, ChatApprovalContinuationService::OUTCOME_EXECUTED, $summary, $full);
         $approval->markExecuted($resultRef);
         $this->approvals->save($approval);
         $this->realtime->executed($approval, $summary);
@@ -162,7 +163,7 @@ final readonly class ResumeApprovalCommandHandler
     }
 
     /**
-     * @return array{0: string, 1: string|null}
+     * @return array{0: string, 1: string|null, 2: string|null}
      */
     private function executeCustom(Approval $approval, ToolDescriptor $descriptor): array
     {
@@ -170,7 +171,7 @@ final readonly class ResumeApprovalCommandHandler
     }
 
     /**
-     * @return array{0: string, 1: string|null}
+     * @return array{0: string, 1: string|null, 2: string|null}
      */
     private function executeMcp(Approval $approval, ToolDescriptor $descriptor): array
     {
@@ -191,7 +192,7 @@ final readonly class ResumeApprovalCommandHandler
     }
 
     /**
-     * @return array{0: string, 1: string|null}
+     * @return array{0: string, 1: string|null, 2: string|null}
      */
     private function finish(ToolOutcome $outcome): array
     {
@@ -204,6 +205,7 @@ final readonly class ResumeApprovalCommandHandler
         return [
             is_string($ref) ? $ref : '',
             $this->clip(is_string($summary) ? $summary : ''),
+            $this->clip(is_string($summary) ? $summary : '', self::RESULT_ANSWER_CHARS),
         ];
     }
 
@@ -227,15 +229,15 @@ final readonly class ResumeApprovalCommandHandler
         }
     }
 
-    private function clip(string $text): ?string
+    private function clip(string $text, int $limit = self::RESULT_PREVIEW_CHARS): ?string
     {
         $text = trim($text);
         if ('' === $text) {
             return null;
         }
 
-        return mb_strlen($text) > self::RESULT_PREVIEW_CHARS
-            ? mb_substr($text, 0, self::RESULT_PREVIEW_CHARS).'…'
+        return mb_strlen($text) > $limit
+            ? mb_substr($text, 0, $limit).'…'
             : $text;
     }
 }

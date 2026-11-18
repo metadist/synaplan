@@ -13,6 +13,7 @@ use App\Realtime\Publisher\RealtimePublisherInterface;
 use App\Repository\ChatRepository;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Service\Tool\ChatApprovalAnswer;
 use App\Service\Tool\ChatApprovalContinuationService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -163,6 +164,43 @@ final class ChatApprovalContinuationServiceTest extends TestCase
         );
         self::assertIsCallable($announce);
         $announce();
+    }
+
+    public function testAnApprovedMcpToolAnswersInThePausedBubbleWithoutASecondMessage(): void
+    {
+        $answer = $this->createMock(ChatApprovalAnswer::class);
+        $answer->expects(self::once())->method('complete')->willReturn(true);
+        [$service, $messages, $publisher, $chats, $users] = $this->service($answer);
+        $messages->method('find')->willReturn($this->trigger(userId: 7, chatId: 5));
+        $this->wiresChatAndOwner($chats, $users);
+        $messages->expects(self::never())->method('save');
+        $publisher->expects(self::once())->method('publish');
+
+        $announce = $service->continueChat(
+            $this->approval('chat:11', tool: 'mcp:1:search'),
+            ChatApprovalContinuationService::OUTCOME_EXECUTED,
+            'short',
+            'full result'
+        );
+        self::assertIsCallable($announce);
+        $announce();
+    }
+
+    public function testAnMcpToolFallsBackToTheFollowUpWhenTheAnswerCannotBeWrittenInPlace(): void
+    {
+        $answer = $this->createMock(ChatApprovalAnswer::class);
+        $answer->method('complete')->willReturn(false);
+        [$service, $messages, , $chats, $users] = $this->service($answer);
+        $messages->method('find')->willReturn($this->trigger(userId: 7, chatId: 5));
+        $this->wiresChatAndOwner($chats, $users);
+        $messages->expects(self::once())->method('save');
+
+        self::assertIsCallable($service->continueChat(
+            $this->approval('chat:11', tool: 'mcp:1:search'),
+            ChatApprovalContinuationService::OUTCOME_EXECUTED,
+            'short',
+            'full result'
+        ));
     }
 
     public function testExecutedWithoutDetailUsesShortTemplate(): void
@@ -337,7 +375,7 @@ final class ChatApprovalContinuationServiceTest extends TestCase
     /**
      * @return array{0: ChatApprovalContinuationService, 1: MessageRepository&MockObject, 2: RealtimePublisherInterface&MockObject, 3: ChatRepository&MockObject, 4: UserRepository&MockObject, 5: TranslatorInterface&MockObject}
      */
-    private function service(): array
+    private function service(?ChatApprovalAnswer $answer = null): array
     {
         $messages = $this->createMock(MessageRepository::class);
         $chats = $this->createMock(ChatRepository::class);
@@ -351,7 +389,7 @@ final class ChatApprovalContinuationServiceTest extends TestCase
         $publisher = $this->createMock(RealtimePublisherInterface::class);
 
         return [
-            new ChatApprovalContinuationService($messages, $chats, $users, $translator, $publisher),
+            new ChatApprovalContinuationService($messages, $chats, $users, $translator, $publisher, $answer ?? $this->createMock(ChatApprovalAnswer::class)),
             $messages,
             $publisher,
             $chats,

@@ -295,7 +295,22 @@
               @media-job-update="onMediaJobUpdate(message, $event)"
               @media-job-completed="handleMediaJobCompleted(message, $event)"
               @media-job-cancel="mediaJobsStore.cancel($event)"
-            />
+            >
+              <template
+                v-if="isApprovalsEnabled() && approvalsByMessage.has(message.id)"
+                #approvals
+              >
+                <ApprovalCard
+                  v-for="row in approvalsByMessage.get(message.id)"
+                  :key="row.id"
+                  :approval="row"
+                  :can-always-allow="row.canAlwaysAllow"
+                  @approved="onChatApprovalApproved"
+                  @rejected="onChatApprovalRejected"
+                  @always-allow="onChatApprovalAlwaysAllow"
+                />
+              </template>
+            </ChatMessage>
           </template>
         </div>
       </div>
@@ -348,21 +363,6 @@
         :can-continue="chatsStore.conversationAccess === 'use'"
         @continue="continueSharedConversation"
       />
-      <div
-        v-if="isApprovalsEnabled() && chatPendingApprovals.length > 0"
-        class="mx-4 mb-3 space-y-3"
-        data-testid="chat-approvals"
-      >
-        <ApprovalCard
-          v-for="row in chatPendingApprovals"
-          :key="row.id"
-          :approval="row"
-          :can-always-allow="row.canAlwaysAllow"
-          @approved="onChatApprovalApproved"
-          @rejected="onChatApprovalRejected"
-          @always-allow="onChatApprovalAlwaysAllow"
-        />
-      </div>
       <!-- Read-only viewers of a shared chat get no composer, but still see
            the chat's files (open only, no attach or delete). -->
       <div
@@ -713,6 +713,7 @@ import { useAiConfigStore } from '@/stores/aiConfig'
 import { useAuthStore } from '@/stores/auth'
 import { useMediaJobsStore } from '@/stores/mediaJobs'
 import { useApprovalsStore } from '@/stores/approvals'
+import { placeApprovals } from '@/utils/approvalPlacement'
 import { useRealtimeStore } from '@/stores/realtime'
 import ApprovalCard from '@/components/chat/ApprovalCard.vue'
 import ConversationFilesBar from '@/components/chat/ConversationFilesBar.vue'
@@ -741,7 +742,7 @@ import ModelMixControl from '@/components/chat/ModelMixControl.vue'
 import ModelMixPanel from '@/components/chat/ModelMixPanel.vue'
 import ServiceReadinessPill from '@/components/chat/ServiceReadinessPill.vue'
 import { useModelMixStore } from '@/stores/modelMix'
-import type { IncognitoHistoryEntry } from '@/services/api/chatApi'
+import { incognitoHistory } from '@/utils/incognitoHistory'
 import type { StreamUpdatePayload } from '@/types/chatStream'
 import {
   cloneTimelineModel,
@@ -983,6 +984,11 @@ const chatPendingApprovals = computed(() =>
   approvalsStore.pending.filter(
     (row) => row.requestedBy.kind === 'chat' && row.requestedBy.chatId === chatsStore.activeChatId
   )
+)
+
+/** Each pending approval of this chat, keyed by the answer bubble it sits in. */
+const approvalsByMessage = computed(() =>
+  placeApprovals(historyStore.messages, chatPendingApprovals.value)
 )
 
 async function onChatApprovalApproved(id: number): Promise<void> {
@@ -2918,32 +2924,6 @@ const handleSendMessage = async (
 }
 
 /**
- * Snapshot the in-memory incognito transcript for the backend: prior turns
- * only (the current user message travels as `message`, the freshly created
- * assistant placeholder is still streaming). The backend caps the payload at
- * ~30 entries / 15k chars, so no client-side cap is needed.
- */
-function buildIncognitoHistorySnapshot(): IncognitoHistoryEntry[] {
-  const entries: IncognitoHistoryEntry[] = []
-  for (const m of historyStore.messages) {
-    if (m.isStreaming) continue
-    const text = m.parts
-      .filter((p) => p.type === 'text' && p.content)
-      .map((p) => p.content as string)
-      .join('\n')
-      .trim()
-    if (!text) continue
-    entries.push({ role: m.role, content: text })
-  }
-  // Drop the current turn's user message (it was just appended by
-  // handleSendMessage and is sent separately).
-  if (entries.length > 0 && entries[entries.length - 1].role === 'user') {
-    entries.pop()
-  }
-  return entries
-}
-
-/**
  * The stream starts and returns before the server has saved the new answer.
  * Linking immediately used the previous answer's id and rejected the request
  * ("An answer cannot be a version of itself"), which crashed the chat.
@@ -3256,7 +3236,7 @@ function memberStreamRequest(
     trackId: turn.trackId,
     chatId: turn.chatId,
     incognito,
-    history: incognito ? buildIncognitoHistorySnapshot() : [],
+    history: incognito ? incognitoHistory(historyStore.messages) : [],
     disableMemories: incognito && !incognitoStore.useSavedContext,
     disableKnowledge: incognito && !incognitoStore.useSavedContext,
     includeReasoning: options?.includeReasoning ?? false,
