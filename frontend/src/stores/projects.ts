@@ -9,6 +9,9 @@ import {
 import { featureNotConfigured } from '@/services/api/featureNotConfigured'
 import { useProjectChatsStore } from '@/stores/projectChats'
 
+const newestFirst = (list: ProjectItem[]): ProjectItem[] =>
+  [...list].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+
 /**
  * Projects of the signed-in person. `available` is false when the module is
  * off: the project routes answer 404 `feature_not_configured`, and the UI
@@ -22,9 +25,6 @@ export const useProjectsStore = defineStore('projects', () => {
   const loading = ref(false)
   const loadFailed = ref(false)
   let loadSeq = 0
-
-  const newestFirst = (list: ProjectItem[]): ProjectItem[] =>
-    [...list].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
 
   function projectById(projectId: string): ProjectItem | undefined {
     return projects.value.find((p) => p.id === projectId)
