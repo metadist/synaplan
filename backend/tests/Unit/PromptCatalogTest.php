@@ -130,6 +130,30 @@ final class PromptCatalogTest extends TestCase
         $this->assertStringNotContainsString('images, videos and audio', $description);
     }
 
+    /**
+     * "zeige ein bild" after a text answer was rewritten into a style-only
+     * sentence. The image model never sees the thread, so the text-to-image
+     * instructions must put the previous turn's subject into that sentence.
+     * An edit of a picture already in the conversation stays the other rule.
+     */
+    public function testMediamakerImagePromptDepictsPreviousTurnWhenNoSubject(): void
+    {
+        $prompt = $this->catalogPrompt('mediamaker');
+
+        $this->assertStringContainsString(
+            'A picture request that names no subject must depict the subject of the previous turn.',
+            $prompt,
+        );
+        $this->assertStringContainsString('the image model never sees the thread', $prompt);
+        $this->assertStringContainsString('A style-only sentence', $prompt);
+        $this->assertStringContainsString(
+            'it does not apply when a reference image is attached or already in the conversation',
+            $prompt,
+        );
+        $this->assertStringContainsString('previous answer explained a canal lock; this message names no subject', $prompt);
+        $this->assertStringContainsString('Bild einer Kanalschleuse', $prompt);
+    }
+
     private function catalogShortDescription(string $topic): string
     {
         foreach (PromptCatalog::all() as $entry) {
