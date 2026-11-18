@@ -12,7 +12,7 @@ to them.
 | TP3 | merged (#3158) | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
 | TP4 | merged (#3159) | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
 | TP5 | merged (#3164) | — | E2E `mcp-tool-permissions.spec.ts` (J-TP-1…4, notice, read-only), docs; J-TP-5/7 and J-TP-6 see TP5 notes |
-| TP6 | phase 1 merged (#3174), phase 2 in review | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 drops both columns (release 5.8.8 contains phase 1) |
+| TP6 | phase 1 merged (#3174), phase 2 in review | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 unmaps both (5.8.8 still maps them); phase 3 drops them, see TP6 notes |
 
 ## TP1 notes
 
@@ -65,13 +65,14 @@ to them.
 
 - Deviation from the plan (decision #14 read as one migration): `docs/MIGRATIONS.md` requires two phases for a column the shipped release still maps (v5.8.6 does). A `DROP COLUMN` now would break nodes still on the old entity during the rolling deploy, and unmapping alone fails `doctrine:schema:validate`.
 - Phase 1 (this change, no DDL): removed `allowsWrite()/setAllowWrite()/isWriteAuto()/setWriteAuto()`, the `allow_write` field of the MCP server API (create, update, list, OpenAPI, Zod), the `allowWrite` field of the bundle export and the `writeOff` preview row (key removed in five locales). The entity keeps both columns mapped as `@deprecated` fields with default 0, like `BPROMPTS.BKEYWORDS`.
-- Phase 2 (next release, ask first: schema): `ALTER TABLE BMCPSERVERS DROP COLUMN IF EXISTS BWRITEAUTO` and `BALLOWWRITE` (idempotent raw SQL) plus removing the two mapped fields and the open item in `docs/MIGRATIONS.md`. `Version20261117160000` reads `BALLOWWRITE` and stays valid because it runs before the drop.
+- Phase 2 (no DDL): the entity no longer maps either column. v5.8.8 still maps them, so its nodes SELECT both during the rolling deploy and a DROP in the same release would break them. `App\Doctrine\RetiredColumnsSchemaListener` declares both columns to the schema tool, so `doctrine:schema:validate` stays in sync without a mapping. The columns keep `NOT NULL DEFAULT 0`, so INSERTs from the new entity work.
+- Phase 3 (the release after phase 2, ask first: schema): `ALTER TABLE BMCPSERVERS DROP COLUMN IF EXISTS BWRITEAUTO` and `BALLOWWRITE` (idempotent raw SQL), remove the `BMCPSERVERS` entry from `RetiredColumnsSchemaListener` and the open item in `docs/MIGRATIONS.md`. `Version20261117160000` reads `BALLOWWRITE` and stays valid because it runs before the drop.
 - Review follow-up: dropping the `allowsWrite()` check left `save_to_notion` honouring only Block, and only after the file upload. The runner now reads the `create-pages` permission first (`NotionGateway::permission()`): Block refuses before any upload and hides the planner note, Approve goes through `StepApprovalGate` with an ask refusal (saved task waits even with `allow_unattended`, chat reply refuses with a Change permission link).
 
 ## Follow-ups
 
 - Approval answer limits: `ChatApprovalAnswer` checks the `MESSAGES` limit and the cost budget of the approval owner before its extra model call. Over a limit, or an owner that cannot be loaded, falls back to the short follow-up message with no model call. The call was already metered as `MULTITASK` through `AiChatUsageMeter`.
-- TP6 phase 2 waited for a release that contains phase 1 (v5.8.8 does).
+- TP6 phase 3 (DROP COLUMN) waits for a release that contains phase 2 (the unmapping).
 - Blocked tools named to the planner: the `mcp_fetch` sub-catalog lists each connection's blocked tools ("blocked by the owner, never plan these: …", at most 10 names), so the model can say a tool is blocked in Permissions instead of answering vaguely. The gateway tool loops still just omit a blocked tool.
 - Member view (J-TP-6): the Notion status carries `sharing.shared_server_id`; a member of a shared connection sees "See what the AI may do" and the read-only list (`NotionSharedPermissions.vue`, E2E in `notion-app.spec.ts`).
 - In-place answer, more plan shapes: any number of pending steps now, as long as each only writes text (chat, summarize, translate, rag_query, compose_reply or the hidden compose node). A pending step that would save, send or generate no longer gets marked done without running: it falls back to the follow-up message. (Before this, up to two pending steps of any kind were marked done.)
