@@ -34,8 +34,9 @@ export const useProjectChatsStore = defineStore('projectChats', () => {
   }
 
   function forget(projectId: string): void {
-    const { [projectId]: _gone, ...rest } = byProject.value
-    byProject.value = rest
+    byProject.value = Object.fromEntries(
+      Object.entries(byProject.value).filter(([id]) => id !== projectId)
+    )
   }
 
   async function create(projectId: string, title?: string): Promise<ProjectChatItem> {
