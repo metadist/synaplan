@@ -74,6 +74,7 @@ prompting flow.
 | [`20261109-coding-backend/`](./20261109-coding-backend/00_master_plan.md) | Developer backend: editor chooses (default) or one model per account, on its own Apps page, with the window and setup for every editor on the two APIs, and usage by model, editor, and who paid (CB0–CB6) | not started (row 45) — plan revised 2026-11-09, §8 unticked |
 | [`20261116-projects-and-shared-chats/`](./20261116-projects-and-shared-chats/00_master_plan.md) | Projects with sources and instructions; a chat turn on the one loop that works as long as it needs (cost limit, circle detection, notes, question card); shared chats and projects (who wrote, who pays, memory, apps per person); push through a relay (PJ0–PJ28) | phase 0 started (row 46) — PJ1 corpus and runner 2026-11-16; §0 partly decided |
 | [`20261117-mcp-tool-permissions/`](./20261117-mcp-tool-permissions/00_master_plan.md) | MCP tool permissions: every tool of a connection with its description and one choice per tool and per category (Auto, Approve, Block), stored per connection | not started (row 47) — plan 2026-11-17, §0 partly decided |
+| [`20261118-coolify-service/`](./20261118-coolify-service/00_master_plan.md) | Coolify one-click service: a Coolify-ready compose file and guide in `deploy/coolify/`, tested on a Coolify instance, then the template and docs pull requests upstream once Coolify reopens external contributions (CF0–CF9) | not started (row 48) — plan 2026-11-18, §0 partly decided; upstream pull request blocked by Coolify's contribution pause |
 
 ## Archive
 
