@@ -103,6 +103,23 @@ export const test = base.extend<
     { scope: 'worker' },
   ],
 
+  // The "Using AI well" reminder is an app-wide overlay that an admin switch
+  // turns on for the whole organisation. A dev stack with it on would cover
+  // the controls of every spec, so each test starts with nothing due. A spec
+  // that is about the card registers its own route, which wins over this one.
+  page: async ({ page }, use) => {
+    await page.route('**/api/v1/me/ai-literacy', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: true, required: false, version: 'e2e', due: false }),
+          })
+        : route.fallback()
+    )
+    await use(page)
+  },
+
   storageState: async ({ workerStorageState }, use) => {
     await use(workerStorageState)
   },

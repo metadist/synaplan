@@ -66,6 +66,8 @@ If the dev stack's Ollama already occupies host port 11434, remap the stub
 (`OLLAMA_STUB_URL=http://localhost:11435` plus a compose port override) — the
 backend reaches it container-to-container either way.
 
+The shared `page` fixture (`tests/e2e/test-setup.ts`) answers `GET /api/v1/me/ai-literacy` with "nothing due", so a dev stack with the organisation-wide "Using AI well" reminder switched on does not cover the controls. A spec about the card registers its own route, which wins.
+
 ### Known local-only failures
 
 These fail on the local dev stack and pass in CI. Confirm the failure matches
@@ -96,17 +98,17 @@ fixtures) is fixed instead.
 chromium-ollama, chromium-minimal) — a test
 without `@ci` in its title chain does not run in CI, period. Other tags:
 
-| Tag | Meaning |
-|-----|---------|
-| `@noci` | Excluded via project `grepInvert` even when the surrounding describe is `@ci`. Local/nightly only. |
-| `@crossbrowser` | Also runs in the **firefox** project. Firefox only runs `@crossbrowser` tests (AND-ed with `@ci` in CI) — see convention below. |
-| `@layout` | Layout guard — runs in chromium desktop + chromium-mobile only. |
-| `@visual` | Snapshot tests — separate CI-only project (baselines from the ubuntu runner). |
-| `@oidc`, `@oidc-redirect` | OIDC jobs only (dedicated matrix entries with Keycloak). |
-| `@ollama` | Own **chromium-ollama** project and CI job, and excluded from the sharded chromium run. The tagged spec repoints the CHAT default model for the whole installation, so it needs a test stack to itself — see below. |
-| `@minimal` | Own **chromium-minimal** project and CI job on the `docker-compose.minimal.yml` overlay. Proves every optional feature module is absent (chat + text upload still work; gated WhatsApp answers the uniform 404). Excluded from the sharded chromium run. |
-| `@busy` | Own **chromium-busy** project and CI job on the `docker-compose.busy.yml` overlay. One stream worker, a one-second wait: the second slow chat stream is `server_busy` and `/api/health` still answers. Excluded from the sharded chromium run, which stays in classic mode. |
-| `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering. |
+| Tag                          | Meaning                                                                                                                                                                                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@noci`                      | Excluded via project `grepInvert` even when the surrounding describe is `@ci`. Local/nightly only.                                                                                                                                                                          |
+| `@crossbrowser`              | Also runs in the **firefox** project. Firefox only runs `@crossbrowser` tests (AND-ed with `@ci` in CI) — see convention below.                                                                                                                                             |
+| `@layout`                    | Layout guard — runs in chromium desktop + chromium-mobile only.                                                                                                                                                                                                             |
+| `@visual`                    | Snapshot tests — separate CI-only project (baselines from the ubuntu runner).                                                                                                                                                                                               |
+| `@oidc`, `@oidc-redirect`    | OIDC jobs only (dedicated matrix entries with Keycloak).                                                                                                                                                                                                                    |
+| `@ollama`                    | Own **chromium-ollama** project and CI job, and excluded from the sharded chromium run. The tagged spec repoints the CHAT default model for the whole installation, so it needs a test stack to itself — see below.                                                         |
+| `@minimal`                   | Own **chromium-minimal** project and CI job on the `docker-compose.minimal.yml` overlay. Proves every optional feature module is absent (chat + text upload still work; gated WhatsApp answers the uniform 404). Excluded from the sharded chromium run.                    |
+| `@busy`                      | Own **chromium-busy** project and CI job on the `docker-compose.busy.yml` overlay. One stream worker, a one-second wait: the second slow chat stream is `server_busy` and `/api/health` still answers. Excluded from the sharded chromium run, which stays in classic mode. |
+| `@smoke`, `@auth`, `@api`, … | Informational grouping — no CI effect, historically inconsistent. Don't rely on them for filtering.                                                                                                                                                                         |
 
 When adding a test, decide explicitly: `@ci` (stable, deterministic, runs on
 every PR) or `@noci` (needs real providers/keys or is nightly-grade).
@@ -150,7 +152,7 @@ posted with `global: true`, e.g. the default CHAT model — therefore changes th
 under every test running beside it, which then talks to the wrong model and
 fails.
 
-Playwright decides *which* files share a shard, and it does so by file (the
+Playwright decides _which_ files share a shard, and it does so by file (the
 config sets no `fullyParallel`). So "it passes today" only means the collision
 has not been scheduled yet: adding a spec file or changing the shard count
 reshuffles the assignment. This is not theoretical — it took down four tests at
@@ -170,15 +172,15 @@ the API allows it. A dedicated job costs a runner and ~2 min.
 
 ## 1. Style
 
-* Prioritize readability over brevity — when in doubt, write the more explicit version.
-* Only add logic that the test actually needs.
-* No unnecessary TypeScript tricks (mapped types, conditional types, template literal types in test code).
-* Act like a user: navigate via UI (nav/buttons/links), not programmatic routing.
-* DO NOT target hidden inputs unless the user can interact with them the same way.
+- Prioritize readability over brevity — when in doubt, write the more explicit version.
+- Only add logic that the test actually needs.
+- No unnecessary TypeScript tricks (mapped types, conditional types, template literal types in test code).
+- Act like a user: navigate via UI (nav/buttons/links), not programmatic routing.
+- DO NOT target hidden inputs unless the user can interact with them the same way.
   Exception: `setInputFiles()` is allowed for file uploads.
-* Setup/teardown and external systems (e.g. MailHog) may bypass UI only when there is no UI path.
-* When in doubt, choose simpler inline logic over a helper/abstraction.
-* If a helper becomes complex, inline the logic into the test instead.
+- Setup/teardown and external systems (e.g. MailHog) may bypass UI only when there is no UI path.
+- When in doubt, choose simpler inline logic over a helper/abstraction.
+- If a helper becomes complex, inline the logic into the test instead.
 
 ---
 
@@ -186,24 +188,25 @@ the API allows it. A dedicated job costs a runner and ~2 min.
 
 ### DO
 
-* Locate elements fresh every time — never store a locator in a variable and reuse across navigations or state changes:
+- Locate elements fresh every time — never store a locator in a variable and reuse across navigations or state changes:
 
   ```ts
-  await page.locator(selectors.chat.sendBtn).click()
+  await page.locator(selectors.chat.sendBtn).click();
   ```
-* Prefer `data-testid` → `getByRole`/`getByLabel` → CSS selector (in that order).
-* Define ALL `data-testid` patterns in `helpers/selectors.ts` — including prefix-match patterns (`^=`).
-* Use container-scoped locators (scope counts and selections to the same container).
-* Capture state first (e.g. `previousCount`) and assert relative change.
-* `filter({ hasText })` is OK to narrow a list by unique test data (e.g. finding a card by its generated name).
+
+- Prefer `data-testid` → `getByRole`/`getByLabel` → CSS selector (in that order).
+- Define ALL `data-testid` patterns in `helpers/selectors.ts` — including prefix-match patterns (`^=`).
+- Use container-scoped locators (scope counts and selections to the same container).
+- Capture state first (e.g. `previousCount`) and assert relative change.
+- `filter({ hasText })` is OK to narrow a list by unique test data (e.g. finding a card by its generated name).
 
 ### DON'T
 
-* No inline `[data-testid="..."]` strings in test files — always use `selectors.*`.
-* No CSS class selectors (`[class*="..."]`, `.my-class`) — classes are implementation details.
-* No `i18n`/label/`hasText` for critical controls (buttons, inputs that have a testid).
-* No `.first()` / `.last()` unless ordering is guaranteed. When only one element exists, omit `.first()`.
-* No assumptions about implicit UI ordering, empty states, or default counts.
+- No inline `[data-testid="..."]` strings in test files — always use `selectors.*`.
+- No CSS class selectors (`[class*="..."]`, `.my-class`) — classes are implementation details.
+- No `i18n`/label/`hasText` for critical controls (buttons, inputs that have a testid).
+- No `.first()` / `.last()` unless ordering is guaranteed. When only one element exists, omit `.first()`.
+- No assumptions about implicit UI ordering, empty states, or default counts.
 
 ---
 
@@ -213,13 +216,13 @@ the API allows it. A dedicated job costs a runner and ~2 min.
 
 Import from `config/config.ts`:
 
-| Constant | Value | Use for |
-|----------|-------|---------|
-| `TIMEOUTS.SHORT` | 5 s | UI reaction (click, dropdown, toggle) |
-| `TIMEOUTS.STANDARD` | 10 s | Page navigation, API response |
-| `TIMEOUTS.LONG` | 15 s | First AI token, file upload |
-| `TIMEOUTS.VERY_LONG` | 30 s | Full AI stream, heavy processing |
-| `TIMEOUTS.EXTREME` | 60 s | Only with explicit justification |
+| Constant             | Value | Use for                               |
+| -------------------- | ----- | ------------------------------------- |
+| `TIMEOUTS.SHORT`     | 5 s   | UI reaction (click, dropdown, toggle) |
+| `TIMEOUTS.STANDARD`  | 10 s  | Page navigation, API response         |
+| `TIMEOUTS.LONG`      | 15 s  | First AI token, file upload           |
+| `TIMEOUTS.VERY_LONG` | 30 s  | Full AI stream, heavy processing      |
+| `TIMEOUTS.EXTREME`   | 60 s  | Only with explicit justification      |
 
 `playwright.config.ts` sets global budgets: an action without its own timeout
 fails after `TIMEOUTS.LONG`, a navigation after `TIMEOUTS.VERY_LONG`, and the
@@ -232,32 +235,33 @@ every request. A test that needs the service worker opts in with
 
 ### DO
 
-* Default to `SHORT` / `STANDARD` (fail fast).
-* Maximum one long wait per test, only for real async work.
-* After every state-changing action (click, submit, navigation), wait for the resulting state to be visible before the next action:
+- Default to `SHORT` / `STANDARD` (fail fast).
+- Maximum one long wait per test, only for real async work.
+- After every state-changing action (click, submit, navigation), wait for the resulting state to be visible before the next action:
 
   ```ts
-  await page.locator(selectors.widgets.simpleForm.createButton).click()
+  await page.locator(selectors.widgets.simpleForm.createButton).click();
   await page.waitForSelector(selectors.widgets.successModal.modal, {
     timeout: TIMEOUTS.STANDARD,
-  })
+  });
   ```
-* Wait for a single, well-scoped terminal condition (not multiple sequential waits that add up).
+
+- Wait for a single, well-scoped terminal condition (not multiple sequential waits that add up).
 
 ### DON'T
 
-* **No `waitForTimeout`.** Ever — as a synchronization mechanism. Wait for a DOM condition instead. (Sole exception: fixed-cadence *measurement sampling* loops that never gate correctness on the delay, e.g. `stableBoundingBox` in `layout.spec.ts` and the bubble-height sampler in `chat-bubble-monotonic.spec.ts`.)
-* **No `networkidle`** on SSE/widget pages (SSE keeps connections open → never resolves or silently times out).
-* No text-stabilization polling in tests. (Helpers like `ChatHelper.waitForAnswer` may poll internally — that is the single permitted place.)
-* No chaining multiple clicks without verifying intermediate states (e.g. wizard step transitions).
-* No stacking sequential waits that together behave like a long timeout.
+- **No `waitForTimeout`.** Ever — as a synchronization mechanism. Wait for a DOM condition instead. (Sole exception: fixed-cadence _measurement sampling_ loops that never gate correctness on the delay, e.g. `stableBoundingBox` in `layout.spec.ts` and the bubble-height sampler in `chat-bubble-monotonic.spec.ts`.)
+- **No `networkidle`** on SSE/widget pages (SSE keeps connections open → never resolves or silently times out).
+- No text-stabilization polling in tests. (Helpers like `ChatHelper.waitForAnswer` may poll internally — that is the single permitted place.)
+- No chaining multiple clicks without verifying intermediate states (e.g. wizard step transitions).
+- No stacking sequential waits that together behave like a long timeout.
 
 ### Deterministic Terminal State (non-negotiable)
 
 Every async operation must expose exactly one terminal state:
 
-* **success** → `[data-testid="message-done"]`
-* **error** → `[data-testid="chat-error-notice"]`
+- **success** → `[data-testid="message-done"]`
+- **error** → `[data-testid="chat-error-notice"]`
 
 Tests must race for exactly one of them. No implicit completion detection.
 
@@ -265,22 +269,24 @@ Pattern (see `ChatHelper.waitForAnswer` in `helpers/chat.ts` for the real implem
 
 ```ts
 const result = await Promise.race([
-  bubble.locator(selectors.chat.messageDone)
-    .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-    .then(() => 'done' as const),
-  bubble.locator(selectors.chat.chatError)
-    .waitFor({ state: 'visible', timeout: TIMEOUTS.VERY_LONG })
-    .then(() => 'error' as const),
-])
-if (result === 'error') {
-  throw new Error('Assistant message ended in error state')
+  bubble
+    .locator(selectors.chat.messageDone)
+    .waitFor({ state: "visible", timeout: TIMEOUTS.VERY_LONG })
+    .then(() => "done" as const),
+  bubble
+    .locator(selectors.chat.chatError)
+    .waitFor({ state: "visible", timeout: TIMEOUTS.VERY_LONG })
+    .then(() => "error" as const),
+]);
+if (result === "error") {
+  throw new Error("Assistant message ended in error state");
 }
 ```
 
 ### Fast-Fail on Error
 
-* If success is expected: deterministic ERROR state appears → fail immediately.
-* If error is expected: deterministic ERROR state appears → pass immediately.
+- If success is expected: deterministic ERROR state appears → fail immediately.
+- If error is expected: deterministic ERROR state appears → pass immediately.
 
 Only use deterministic UI hooks (`data-testid`), never text scanning.
 
@@ -288,14 +294,14 @@ Only use deterministic UI hooks (`data-testid`), never text scanning.
 
 Assert the **stable terminal DOM**, never an intermediate signal the app discards or that loading shares with another state. Three failures that passed on `retries: 1`:
 
-* **Transient deep-link URLs.** `ChatView` reads `/?chat=<id>` from Saved Tasks "Run now" / "Show results" and immediately `router.replace`-strips the query. `toHaveURL(/[?&]chat=\d+/)` races that window (CI saw `/channels/tasks` then `/` with the chat already on screen). Wait for `selectors.pages.chat` + `ChatHelper.waitForAnswer`, not the query string.
-* **Loading that unmounts the same nodes as empty.** Admin user search sets `usersLoading` and replaces the table with a spinner — `select-user-level-*` count drops to 0 while the request is still in flight. `toHaveCount(0)` then passes, the next `fill('')` overlaps, and a stale empty response overwrites the restored list ("No users found" with an empty search box). Wait for a dedicated empty-state testid that only renders **after** loading finishes (`admin-users-empty`), never for "zero of the loaded rows".
-* **Keep-alive against stub control APIs.** A `beforeAll` Playwright `APIRequestContext` reused against `ollama-stub` `/__requests` after the chat (~6s idle) hits Node's default `keepAliveTimeout` (5s) → `socket hang up`. The chat UI had already succeeded. Retry once on that error in the stub helper; keep the stub's `keepAliveTimeout` above the longest chat wait. Do not treat a long-lived context as a live connection to a Node stub.
-* **No global model-default mutations from a parallel `@ci` spec.** `POST /api/v1/config/models/defaults` with `global: true` is process-wide. `afterAll` restore is not isolation — other workers already raced. Pin defaults in `globalSetup` only (TestProvider). Per-spec provider switches must be user-scoped or a dedicated serial job.
-* **Impersonation exit: banner hidden ≠ admin page mounted.** `refreshUser()` clears `impersonator` (banner hides) before `onExit` can `router.push({ name: 'admin' })`. Awaiting config reload / realtime inside `stopImpersonation` delayed that push; CI then sat on `/` for 15s waiting for `view-admin`. Return from stop as soon as the session is restored, and wait for `selectors.pages.admin`, not a pause after the banner.
-* **Two loads of the same chat history.** `ChatView`'s mount and its `activeChatId` watcher both loaded the selected chat's messages. The stale-response guard dropped the first answer, so "Loading messages…" stayed up until the slower request returned and `state-empty` missed its wait. A selection triggers one load; the mount joins the watcher's load instead of starting its own.
-* **A loading flag held by an unrelated request.** The sidebar's `data-chats-loading` waited for the incoming-shares lookup as well as the chat list. A loading marker covers only the data its section shows.
-* **Upgrade reminder over a UI login.** `LOGGED_OUT` contexts used to start with empty `localStorage`, so the daily paywall reminder (`synaplan.paywallLastShownAt`) was due. When `auth.spec.ts` logged in as a worker account that earlier tests had filled with chats, the paywall covered the page and swallowed the user-menu click. Both storage states in `test-setup.ts` now carry the throttle; a spec that tests the reminder clears it itself.
+- **Transient deep-link URLs.** `ChatView` reads `/?chat=<id>` from Saved Tasks "Run now" / "Show results" and immediately `router.replace`-strips the query. `toHaveURL(/[?&]chat=\d+/)` races that window (CI saw `/channels/tasks` then `/` with the chat already on screen). Wait for `selectors.pages.chat` + `ChatHelper.waitForAnswer`, not the query string.
+- **Loading that unmounts the same nodes as empty.** Admin user search sets `usersLoading` and replaces the table with a spinner — `select-user-level-*` count drops to 0 while the request is still in flight. `toHaveCount(0)` then passes, the next `fill('')` overlaps, and a stale empty response overwrites the restored list ("No users found" with an empty search box). Wait for a dedicated empty-state testid that only renders **after** loading finishes (`admin-users-empty`), never for "zero of the loaded rows".
+- **Keep-alive against stub control APIs.** A `beforeAll` Playwright `APIRequestContext` reused against `ollama-stub` `/__requests` after the chat (~6s idle) hits Node's default `keepAliveTimeout` (5s) → `socket hang up`. The chat UI had already succeeded. Retry once on that error in the stub helper; keep the stub's `keepAliveTimeout` above the longest chat wait. Do not treat a long-lived context as a live connection to a Node stub.
+- **No global model-default mutations from a parallel `@ci` spec.** `POST /api/v1/config/models/defaults` with `global: true` is process-wide. `afterAll` restore is not isolation — other workers already raced. Pin defaults in `globalSetup` only (TestProvider). Per-spec provider switches must be user-scoped or a dedicated serial job.
+- **Impersonation exit: banner hidden ≠ admin page mounted.** `refreshUser()` clears `impersonator` (banner hides) before `onExit` can `router.push({ name: 'admin' })`. Awaiting config reload / realtime inside `stopImpersonation` delayed that push; CI then sat on `/` for 15s waiting for `view-admin`. Return from stop as soon as the session is restored, and wait for `selectors.pages.admin`, not a pause after the banner.
+- **Two loads of the same chat history.** `ChatView`'s mount and its `activeChatId` watcher both loaded the selected chat's messages. The stale-response guard dropped the first answer, so "Loading messages…" stayed up until the slower request returned and `state-empty` missed its wait. A selection triggers one load; the mount joins the watcher's load instead of starting its own.
+- **A loading flag held by an unrelated request.** The sidebar's `data-chats-loading` waited for the incoming-shares lookup as well as the chat list. A loading marker covers only the data its section shows.
+- **Upgrade reminder over a UI login.** `LOGGED_OUT` contexts used to start with empty `localStorage`, so the daily paywall reminder (`synaplan.paywallLastShownAt`) was due. When `auth.spec.ts` logged in as a worker account that earlier tests had filled with chats, the paywall covered the page and swallowed the user-menu click. Both storage states in `test-setup.ts` now carry the throttle; a spec that tests the reminder clears it itself.
 
 ---
 
@@ -303,25 +309,25 @@ Assert the **stable terminal DOM**, never an intermediate signal the app discard
 
 ### DO
 
-* Normalize text before comparing (`.trim()`, `.toLowerCase()`) unless exact copy is required.
-* Exact text assertions only for legal/pricing/onboarding copy.
-* Use `expect.soft(...)` in loops to collect all failures rather than stop at the first.
+- Normalize text before comparing (`.trim()`, `.toLowerCase()`) unless exact copy is required.
+- Exact text assertions only for legal/pricing/onboarding copy.
+- Use `expect.soft(...)` in loops to collect all failures rather than stop at the first.
 
 ### DON'T
 
-* No regex unless strictly necessary.
+- No regex unless strictly necessary.
 
 ### AI-Specific Assertions
 
-* **Real (non-deterministic) AI providers** — never assert on specific AI-generated words. Valid assertions:
+- **Real (non-deterministic) AI providers** — never assert on specific AI-generated words. Valid assertions:
   1. Assistant message exists.
   2. Terminal `done` state reached.
   3. No deterministic error.
   4. Final text is non-empty.
 
-* **Stub responses** (e.g. `ollama-stub`) — the response text is controlled by test infrastructure and identical in every run. Asserting on stub text (e.g. `expect(text).toContain('ollama stub response')`) **is allowed and encouraged**.
+- **Stub responses** (e.g. `ollama-stub`) — the response text is controlled by test infrastructure and identical in every run. Asserting on stub text (e.g. `expect(text).toContain('ollama stub response')`) **is allowed and encouraged**.
 
-* Error detection must use deterministic hooks (`data-testid`), not text content scanning.
+- Error detection must use deterministic hooks (`data-testid`), not text content scanning.
 
 ---
 
@@ -338,21 +344,23 @@ Use standard `for` loops. Each iteration must:
 No implicit ordering assumptions.
 
 ```ts
-const { options, optionCount } = await chat.openLatestAgainDropdown()
+const { options, optionCount } = await chat.openLatestAgainDropdown();
 
 for (let i = 0; i < optionCount; i++) {
   // Re-open dropdown fresh each iteration (DOM may have changed)
-  const { options: freshOptions } = await chat.openLatestAgainDropdown()
-  const option = freshOptions.nth(i)
-  await option.waitFor({ state: 'visible', timeout: TIMEOUTS.STANDARD })
+  const { options: freshOptions } = await chat.openLatestAgainDropdown();
+  const option = freshOptions.nth(i);
+  await option.waitFor({ state: "visible", timeout: TIMEOUTS.STANDARD });
 
-  const label = (await option.innerText()).trim()
-  if (label.includes('ollama')) continue  // skip known-unavailable
+  const label = (await option.innerText()).trim();
+  if (label.includes("ollama")) continue; // skip known-unavailable
 
-  const countBefore = await chat.conversationBubbles().count()
-  await option.click()
-  const answer = await chat.waitForAnswer(countBefore)
-  expect.soft(answer.length, `Model ${label} should respond`).toBeGreaterThan(0)
+  const countBefore = await chat.conversationBubbles().count();
+  await option.click();
+  const answer = await chat.waitForAnswer(countBefore);
+  expect
+    .soft(answer.length, `Model ${label} should respond`)
+    .toBeGreaterThan(0);
 }
 ```
 
@@ -362,15 +370,15 @@ for (let i = 0; i < optionCount; i++) {
 
 ### DO
 
-* Let failures propagate — do not wrap Playwright calls in try/catch unless the catch takes a meaningful recovery action.
-* Helpers may contain `expect` only for deterministic contracts (e.g. `ChatHelper.waitForAnswer` asserts no-error).
-* Keep at most one long wait per helper (e.g. stream completion).
+- Let failures propagate — do not wrap Playwright calls in try/catch unless the catch takes a meaningful recovery action.
+- Helpers may contain `expect` only for deterministic contracts (e.g. `ChatHelper.waitForAnswer` asserts no-error).
+- Keep at most one long wait per helper (e.g. stream completion).
 
 ### DON'T
 
-* No global defensive wrappers.
-* **No silent `.catch(() => {})`** on critical paths — this hides real failures and makes debugging impossible.
-* No hidden waits inside helpers that callers don't know about.
+- No global defensive wrappers.
+- **No silent `.catch(() => {})`** on critical paths — this hides real failures and makes debugging impossible.
+- No hidden waits inside helpers that callers don't know about.
 
 ---
 
@@ -378,44 +386,45 @@ for (let i = 0; i < optionCount; i++) {
 
 ### DO
 
-* Generate unique data per test (timestamps, UUIDs, or `test.info().title`).
-* **Resources owned by the worker user clean themselves up**: the worker
+- Generate unique data per test (timestamps, UUIDs, or `test.info().title`).
+- **Resources owned by the worker user clean themselves up**: the worker
   fixture deletes its user on teardown, and `UserDeletionService` cascades
   chats, messages, files, widgets, prompts, memories, handlers, etc. Explicit
   cleanup is still required for anything created under OTHER accounts (admin,
   provisioned one-off users) or outside user scope.
-* **Webhook senders must be unique per test** (`uniqueWaSender()`,
+- **Webhook senders must be unique per test** (`uniqueWaSender()`,
   `uniqueEmailSender()`): the backend maps each sender to an auto-created
   ANONYMOUS user whose MESSAGES limit is a lifetime total — a fixed sender
   works on a fresh CI database but starts failing with 429 on any long-lived
   local test DB.
-* **Cleanup is mandatory** for tests that create persistent resources (handlers, widgets, prompts, etc.). Use `test.afterEach` with API calls to delete any resources matching the test's name prefix — this ensures cleanup even when the test fails mid-way:
+- **Cleanup is mandatory** for tests that create persistent resources (handlers, widgets, prompts, etc.). Use `test.afterEach` with API calls to delete any resources matching the test's name prefix — this ensures cleanup even when the test fails mid-way:
 
   ```ts
   test.afterEach(async ({ request }) => {
-    const headers = await getAuthHeaders(request)
+    const headers = await getAuthHeaders(request);
     await request.delete(`${getApiUrl()}/api/v1/widgets/${widgetId}`, {
       headers,
-    })
-  })
+    });
+  });
   ```
-* Validate the final result via UI.
-* Define readiness by a stable UI state (not timing).
+
+- Validate the final result via UI.
+- Define readiness by a stable UI state (not timing).
 
 ### DON'T
 
-* No backend API calls for the action under test — API is only for setup/teardown.
-* No assumptions about empty history or `count = 0`.
+- No backend API calls for the action under test — API is only for setup/teardown.
+- No assumptions about empty history or `count = 0`.
 
 ---
 
 ## 8. Test Scope & Isolation
 
-* E2E tests only for critical user flows. Prefer component/unit tests for UI details.
-* Fewer stable smoke tests > many fragile ones.
-* **Tests must be independent** — never rely on execution order or state from a previous test.
-* The CI test stack has no `centrifugo` (realtime push) and no `collabora` (office conversion). A spec must not depend on either; check that something arrived via reload or navigation.
-* Use `test.describe.configure({ mode: 'serial' })` only when tests share expensive setup (e.g. login + data creation) and document why.
+- E2E tests only for critical user flows. Prefer component/unit tests for UI details.
+- Fewer stable smoke tests > many fragile ones.
+- **Tests must be independent** — never rely on execution order or state from a previous test.
+- The CI test stack has no `centrifugo` (realtime push) and no `collabora` (office conversion). A spec must not depend on either; check that something arrived via reload or navigation.
+- Use `test.describe.configure({ mode: 'serial' })` only when tests share expensive setup (e.g. login + data creation) and document why.
 
 ---
 
@@ -424,24 +433,24 @@ for (let i = 0; i < optionCount; i++) {
 Use `test.step` to separate phases (Arrange → Act → Assert):
 
 ```ts
-test('user sends message and gets AI response', async ({ page }) => {
-  const chat = new ChatHelper(page)
+test("user sends message and gets AI response", async ({ page }) => {
+  const chat = new ChatHelper(page);
 
-  await test.step('Arrange: login and open chat', async () => {
-    await login(page)
-    await chat.startNewChat()
-  })
+  await test.step("Arrange: login and open chat", async () => {
+    await login(page);
+    await chat.startNewChat();
+  });
 
-  let previousCount: number
-  await test.step('Act: send message', async () => {
-    previousCount = await chat.sendMessage('Hello')
-  })
+  let previousCount: number;
+  await test.step("Act: send message", async () => {
+    previousCount = await chat.sendMessage("Hello");
+  });
 
-  await test.step('Assert: AI responds without error', async () => {
-    const answer = await chat.waitForAnswer(previousCount!)
-    expect(answer.length).toBeGreaterThan(0)
-  })
-})
+  await test.step("Assert: AI responds without error", async () => {
+    const answer = await chat.waitForAnswer(previousCount!);
+    expect(answer.length).toBeGreaterThan(0);
+  });
+});
 ```
 
 ---
@@ -450,13 +459,13 @@ test('user sends message and gets AI response', async ({ page }) => {
 
 These are already configured in `playwright.config.ts` — do not duplicate or override:
 
-| Setting | Value | Meaning |
-|---------|-------|---------|
-| `trace` | `'retain-on-failure'` | Traces auto-captured; no manual screenshots needed. |
-| `video` | `'retain-on-failure'` | Videos auto-captured. |
-| `screenshot` | `'only-on-failure'` | Do not add `page.screenshot()` unless debugging (remove before merge). |
-| `retries` | `1` (CI) / `0` (local) | Safety net, not a fix for flaky tests. |
-| `timeout` | `60_000` | Do not use `test.setTimeout()` unless genuinely needed (document why). |
+| Setting      | Value                  | Meaning                                                                |
+| ------------ | ---------------------- | ---------------------------------------------------------------------- |
+| `trace`      | `'retain-on-failure'`  | Traces auto-captured; no manual screenshots needed.                    |
+| `video`      | `'retain-on-failure'`  | Videos auto-captured.                                                  |
+| `screenshot` | `'only-on-failure'`    | Do not add `page.screenshot()` unless debugging (remove before merge). |
+| `retries`    | `1` (CI) / `0` (local) | Safety net, not a fix for flaky tests.                                 |
+| `timeout`    | `60_000`               | Do not use `test.setTimeout()` unless genuinely needed (document why). |
 
 The CI stack (`docker-compose.test.ci.yml`) runs the test environment with
 `APP_DEBUG=0` and without OPcache timestamp checks, like prod. Debug mode and
@@ -470,24 +479,24 @@ under `when@test`).
 
 Tests import `test` from `../test-setup`, which provides worker-scoped auth:
 
-* **Each worker gets its own user** — created via the admin provisioning API
+- **Each worker gets its own user** — created via the admin provisioning API
   (instantly verified, no MailHog) and deleted on worker teardown. Available
   as the `credentials` fixture.
-* **Every test context starts pre-authenticated** — one API login per worker
+- **Every test context starts pre-authenticated** — one API login per worker
   is injected via `storageState` (cookies + the `sh` session hint). Do NOT run
   a UI login as Arrange; call `openApp(page)` instead, which loads `/` and
   waits for the chat surface plus the initial chat-list response.
-* **Specs that must start logged out** (login, registration, guest flows) opt
+- **Specs that must start logged out** (login, registration, guest flows) opt
   out with `test.use(LOGGED_OUT)` at file level. This also applies to
   API specs asserting 401 for unauthenticated requests — the `request` fixture
   inherits the worker cookies otherwise.
-* `login(page, creds)` (UI login) is reserved for tests whose SUBJECT is the
+- `login(page, creds)` (UI login) is reserved for tests whose SUBJECT is the
   login flow, and for admin-account steps (`CREDENTIALS.getAdminCredentials()`).
-* Use `loginViaApi()` / `getAuthHeaders()` for API-only setup/teardown; use
+- Use `loginViaApi()` / `getAuthHeaders()` for API-only setup/teardown; use
   `provisionUser()` when a test needs a disposable extra user (delete it in
   a `finally`/`afterEach`).
-* Never hardcode user IDs — look them up via API or use `config/credentials.ts`.
-* **OIDC specs are exempt from all of this**: they import the base
+- Never hardcode user IDs — look them up via API or use `config/credentials.ts`.
+- **OIDC specs are exempt from all of this**: they import the base
   `@playwright/test`, run in dedicated CI jobs against Keycloak, and their
   login logic must not be changed as part of general test refactoring.
 
@@ -495,11 +504,11 @@ Tests import `test` from `../test-setup`, which provides worker-scoped auth:
 
 ## 12. Change Discipline
 
-* Do not change application code unless essential for the test. Acceptable: `data-testid` additions, test-only config/fixtures.
-* One PR = one change type. Touch only files listed in the PR scope.
-* If a helper signature changes → update all call sites → run full affected suite.
-* Do not modify unrelated files.
-* Before committing:
+- Do not change application code unless essential for the test. Acceptable: `data-testid` additions, test-only config/fixtures.
+- One PR = one change type. Touch only files listed in the PR scope.
+- If a helper signature changes → update all call sites → run full affected suite.
+- Do not modify unrelated files.
+- Before committing:
 
   ```bash
   make format && make lint && make test
@@ -512,10 +521,10 @@ Tests import `test` from `../test-setup`, which provides worker-scoped auth:
 PHPUnit never calls the live web for research. Two doubles exist only in the
 `test` environment:
 
-* `TestWebSearchAdapter` answers from `backend/tests/Fixtures/research/search/<slug>.json`.
+- `TestWebSearchAdapter` answers from `backend/tests/Fixtures/research/search/<slug>.json`.
   Each file has a `query` and a `results` list. Result URLs use
   `https://fixture.synaplan.test/<page>`. An unknown query is an empty set.
-* `FixtureSourceReader` serves `backend/tests/Fixtures/research/pages/<page>`
+- `FixtureSourceReader` serves `backend/tests/Fixtures/research/pages/<page>`
   for that host and refuses every other host without a network call.
 
 To add a page: drop the HTML or text file in `pages/`, and add a search JSON
