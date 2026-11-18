@@ -10,7 +10,10 @@ use App\Service\Mcp\McpClient;
 use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\McpOAuthState;
 use App\Service\Mcp\McpToolRegistry;
+use App\Service\Mcp\Permissions\McpToolPermissions;
 use App\Service\Security\EncryptionService;
+use App\Service\Tool\Policy\PolicyOutcome;
+use App\Service\Tool\SideEffect;
 
 /**
  * Finds the Notion connection a person may use and calls one Notion tool on
@@ -144,6 +147,22 @@ final readonly class NotionGateway
         }
 
         return false;
+    }
+
+    /**
+     * The connection's own permission for one Notion tool (auto, approve or
+     * block). A tool missing from the catalog counts as a write.
+     */
+    public function permission(McpServerConfig $server, string $bareTool): PolicyOutcome
+    {
+        $permissions = new McpToolPermissions();
+        foreach ($this->tools->toolsFor($server) as $tool) {
+            if (NotionToolHints::bare($tool['name']) === $bareTool) {
+                return $permissions->outcomeForTool($server, $tool);
+            }
+        }
+
+        return $permissions->outcome($server, self::PREFIX.$bareTool, SideEffect::Write);
     }
 
     private function toolName(McpServerConfig $server, string $bareTool): string

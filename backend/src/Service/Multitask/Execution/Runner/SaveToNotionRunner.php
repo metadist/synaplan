@@ -8,6 +8,7 @@ use App\Service\Mcp\McpClientException;
 use App\Service\Mcp\Notion\NotionActionException;
 use App\Service\Mcp\Notion\NotionFileUpload;
 use App\Service\Mcp\Notion\NotionGateway;
+use App\Service\Mcp\Permissions\McpPermissionsPath;
 use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\StepApprovalGate;
@@ -16,6 +17,7 @@ use App\Service\Multitask\MultitaskRoutingConfig;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
 use App\Service\Multitask\Skill\SkillDescriptor;
+use App\Service\Tool\Policy\PolicyOutcome;
 use App\Service\Tool\Source\SkillToolSource;
 use Psr\Log\LoggerInterface;
 
@@ -25,10 +27,15 @@ use Psr\Log\LoggerInterface;
  *
  * Inputs: `text` (`$nX.text`) and `attachments` (`$nX.file`). Params: `page`
  * (Notion link or id of the parent page), optional `title`.
+ *
+ * The Notion connection's own permission for `create-pages` governs the
+ * step: Block refuses before anything is uploaded, Approve makes a saved
+ * task wait for approval and refuses in a chat reply, which cannot ask yet.
  */
 final readonly class SaveToNotionRunner implements TaskRunner
 {
     private const MAX_CONTENT_CHARS = 100000;
+    private const CREATE_TOOL = 'create-pages';
 
     public function __construct(
         private NotionGateway $gateway,
@@ -73,8 +80,16 @@ final readonly class SaveToNotionRunner implements TaskRunner
         if (null === $server) {
             return NodeResult::failed('Notion is not connected — connect it under Apps → Notion. Nothing was saved to Notion');
         }
-        if (!$server->allowsWrite()) {
-            return NodeResult::failed('Notion is read-only — turn on "The AI may change Notion" under Apps → Notion. Nothing was saved to Notion');
+        $permission = $this->gateway->permission($server, self::CREATE_TOOL);
+        $change = sprintf('[Change permission](%s)', McpPermissionsPath::for((int) $server->getId(), $server->getUrl()));
+        if (PolicyOutcome::Block === $permission) {
+            return NodeResult::failed(sprintf('Creating Notion pages is blocked in your Notion permissions. Nothing was saved to Notion. %s', $change));
+        }
+        $askRefusal = PolicyOutcome::Approve === $permission
+            ? sprintf('Creating Notion pages is set to ask first, and a step in a chat reply cannot ask yet. Nothing was saved to Notion. %s', $change)
+            : null;
+        if (null !== $askRefusal && null === $this->approvalGate) {
+            return NodeResult::failed($askRefusal);
         }
 
         $inputs = $context->resolveInputs($node);
@@ -91,7 +106,7 @@ final readonly class SaveToNotionRunner implements TaskRunner
         $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::SaveToNotion), [
             'page' => $page,
             'file_count' => count($files),
-        ]);
+        ], $askRefusal);
         if (null !== $gated) {
             return $gated;
         }
@@ -193,7 +208,8 @@ final readonly class SaveToNotionRunner implements TaskRunner
             return null;
         }
         try {
-            if (true !== $this->gateway->writable($userId)?->allowsWrite()) {
+            $server = $this->gateway->writable($userId);
+            if (null === $server || PolicyOutcome::Block === $this->gateway->permission($server, self::CREATE_TOOL)) {
                 return null;
             }
         } catch (\Throwable) {

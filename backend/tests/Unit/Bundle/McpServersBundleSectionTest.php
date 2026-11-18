@@ -27,7 +27,7 @@ final class McpServersBundleSectionTest extends TestCase
 
     public function testReplaceSkipsAServerWhoseAddressDiffers(): void
     {
-        $existing = $this->existing('https://api.github.example/mcp', allowWrite: false);
+        $existing = $this->existing('https://api.github.example/mcp');
         $repo = $this->repository([$existing]);
         $repo->expects(self::never())->method('save');
 
@@ -42,51 +42,13 @@ final class McpServersBundleSectionTest extends TestCase
         self::assertSame('secret', $existing->getDecryptedAuthToken($this->encryption));
     }
 
-    public function testReplaceAtTheSameAddressKeepsTheWriteSwitchAsThePersonSetIt(): void
-    {
-        $existing = $this->existing('https://api.github.example/mcp', allowWrite: false);
-        $repo = $this->repository([$existing]);
-        $repo->expects(self::once())->method('save')->with($existing);
-
-        $result = $this->section($repo)->apply(
-            [['key' => 'GitHub', 'name' => 'GitHub', 'url' => 'https://api.github.example/mcp', 'authMode' => 'bearer', 'allowWrite' => true]],
-            self::USER_ID,
-            new ImportOptions(ImportOptions::CONFLICT_OVERWRITE),
-        );
-
-        self::assertSame(['GitHub'], $result->toArray()['created']);
-        self::assertFalse($existing->allowsWrite());
-        self::assertTrue($existing->hasAuthToken());
-    }
-
-    public function testANewServerFromAFileHasWriteActionsOff(): void
-    {
-        $saved = null;
-        $repo = $this->repository([]);
-        $repo->expects(self::once())->method('save')->willReturnCallback(
-            static function (McpServerConfig $server) use (&$saved): void {
-                $saved = $server;
-            }
-        );
-
-        $this->section($repo)->apply(
-            [['key' => 'Wiki', 'name' => 'Wiki', 'url' => 'https://wiki.example/mcp', 'allowWrite' => true]],
-            self::USER_ID,
-            new ImportOptions(),
-        );
-
-        self::assertInstanceOf(McpServerConfig::class, $saved);
-        self::assertFalse($saved->allowsWrite());
-    }
-
-    public function testPreviewNamesTheAddressAndTheWriteSwitch(): void
+    public function testPreviewNamesTheAddressThatDiffers(): void
     {
         $repo = $this->createStub(McpServerConfigRepository::class);
-        $repo->method('findByUser')->willReturn([$this->existing('https://api.github.example/mcp', allowWrite: false)]);
+        $repo->method('findByUser')->willReturn([$this->existing('https://api.github.example/mcp')]);
 
         $preview = $this->section($repo)->preview([
             ['key' => 'GitHub', 'name' => 'GitHub', 'url' => 'https://elsewhere.example/mcp', 'authMode' => 'none'],
-            ['key' => 'Wiki', 'name' => 'Wiki', 'url' => 'https://wiki.example/mcp', 'authMode' => 'none', 'allowWrite' => true],
         ], self::USER_ID);
 
         $codes = array_map(
@@ -95,20 +57,6 @@ final class McpServersBundleSectionTest extends TestCase
         );
         self::assertContains('addressDiffers:GitHub', $codes);
         self::assertNotContains('conflict:GitHub', $codes);
-        self::assertContains('writeOff:Wiki', $codes);
-    }
-
-    public function testPreviewDoesNotPromiseOffWhenThePersonAlreadyAllowsWrites(): void
-    {
-        $repo = $this->createStub(McpServerConfigRepository::class);
-        $repo->method('findByUser')->willReturn([$this->existing('https://api.github.example/mcp', allowWrite: true)]);
-
-        $preview = $this->section($repo)->preview([
-            ['key' => 'GitHub', 'name' => 'GitHub', 'url' => 'https://api.github.example/mcp', 'authMode' => 'none', 'allowWrite' => true],
-        ], self::USER_ID);
-
-        $codes = array_column($preview->toArray()['items'], 'code');
-        self::assertNotContains('writeOff', $codes);
     }
 
     /**
@@ -127,14 +75,13 @@ final class McpServersBundleSectionTest extends TestCase
         return new McpServersBundleSection($repo, $this->createStub(ToolsConfig::class));
     }
 
-    private function existing(string $url, bool $allowWrite): McpServerConfig
+    private function existing(string $url): McpServerConfig
     {
         $server = (new McpServerConfig())
             ->setUserId(self::USER_ID)
             ->setName('GitHub')
             ->setUrl($url)
-            ->setAuthHeader('Authorization')
-            ->setAllowWrite($allowWrite);
+            ->setAuthHeader('Authorization');
         $server->setDecryptedAuthToken('secret', $this->encryption);
 
         return $server;

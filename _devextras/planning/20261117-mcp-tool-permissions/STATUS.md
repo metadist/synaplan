@@ -12,7 +12,7 @@ to them.
 | TP3 | merged (#3158) | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
 | TP4 | merged (#3159) | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
 | TP5 | in progress | — | E2E `mcp-tool-permissions.spec.ts` (J-TP-1…4, notice, read-only), docs; J-TP-5/7 and J-TP-6 see TP5 notes |
-| TP6 | not started | — | one release after TP2 |
+| TP6 | phase 1 in review | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 (DROP COLUMN) next release, see TP6 notes |
 
 ## TP1 notes
 
@@ -60,3 +60,10 @@ to them.
 - Docs: `CONNECTIONS.md` (new "Tool permissions" section), `ADMIN.md`, `PLATFORM_REFERENCE.md`, `MULTITASK_DATA_NODES.md`. The repository has no changelog file; the behaviour change of decision #6 is in the CONNECTIONS notice and the PR text.
 - Plan §7 proofs checked: `McpClient::callTool()` refuses a Block tool for every caller (central choke point; `McpClientTest::testAToolTheOwnerBlockedNeverLeavesForAnyCaller`), so `NotionGateway`, `NotionPageWrite`, the linked-page readers and `NotionAccountReader` cannot reach one. Gate side: `ToolExecutionGateMcpTest`; Always allow never lifts Block: `McpApprovalAllowanceTest`.
 - Catalog-size measurement (plan §8): still not measured.
+
+## TP6 notes
+
+- Deviation from the plan (decision #14 read as one migration): `docs/MIGRATIONS.md` requires two phases for a column the shipped release still maps (v5.8.6 does). A `DROP COLUMN` now would break nodes still on the old entity during the rolling deploy, and unmapping alone fails `doctrine:schema:validate`.
+- Phase 1 (this change, no DDL): removed `allowsWrite()/setAllowWrite()/isWriteAuto()/setWriteAuto()`, the `allow_write` field of the MCP server API (create, update, list, OpenAPI, Zod), the `allowWrite` field of the bundle export and the `writeOff` preview row (key removed in five locales). The entity keeps both columns mapped as `@deprecated` fields with default 0, like `BPROMPTS.BKEYWORDS`.
+- Phase 2 (next release, ask first: schema): `ALTER TABLE BMCPSERVERS DROP COLUMN IF EXISTS BWRITEAUTO` and `BALLOWWRITE` (idempotent raw SQL) plus removing the two mapped fields and the open item in `docs/MIGRATIONS.md`. `Version20261117160000` reads `BALLOWWRITE` and stays valid because it runs before the drop.
+- Review follow-up: dropping the `allowsWrite()` check left `save_to_notion` honouring only Block, and only after the file upload. The runner now reads the `create-pages` permission first (`NotionGateway::permission()`): Block refuses before any upload and hides the planner note, Approve goes through `StepApprovalGate` with an ask refusal (saved task waits even with `allow_unattended`, chat reply refuses with a Change permission link).

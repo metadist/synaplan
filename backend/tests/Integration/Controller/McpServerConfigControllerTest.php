@@ -95,7 +95,7 @@ class McpServerConfigControllerTest extends WebTestCase
         ]);
         self::assertSame(Response::HTTP_CREATED, $this->client->getResponse()->getStatusCode());
         self::assertTrue($data['success']);
-        self::assertFalse($data['server']['allow_write'], 'writes are opt-in — a new server is read-only');
+        self::assertArrayNotHasKey('allow_write', $data['server']);
         $serverId = (int) $data['server']['id'];
         $this->createdIds[] = $serverId;
 
@@ -118,12 +118,10 @@ class McpServerConfigControllerTest extends WebTestCase
         $updated = $this->request('PATCH', "/api/v1/mcp-servers/{$serverId}", [
             'name' => 'CRM renamed',
             'enabled' => false,
-            'allow_write' => true,
         ]);
         self::assertTrue($updated['success']);
         self::assertSame('CRM renamed', $updated['server']['name']);
         self::assertFalse($updated['server']['enabled']);
-        self::assertTrue($updated['server']['allow_write'], 'the write opt-in round-trips through PATCH');
         // Auth token untouched when the key is absent from the payload.
         self::assertTrue($updated['server']['has_auth_token']);
 

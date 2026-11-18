@@ -168,6 +168,57 @@ final class StepApprovalGateTest extends TestCase
         self::assertSame(ToolExecutionGate::NODE_BLOCK_REFUSAL, $result->error);
     }
 
+    public function testInteractiveChatRefusesWhenTheConnectionAsksFirst(): void
+    {
+        $executionGate = $this->createMock(ToolExecutionGate::class);
+        $executionGate->expects(self::never())->method('inspect');
+
+        $result = $this->gate($executionGate)->consult(
+            $this->context(),
+            new TaskNode('n3', Capability::SaveToNotion),
+            'skill:save_to_notion',
+            [],
+            'Creating Notion pages is set to ask first.',
+        );
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isSuccessful());
+        self::assertSame('Creating Notion pages is set to ask first.', $result->error);
+    }
+
+    public function testASavedTaskAsksWhenTheConnectionAsksEvenIfUnattendedRunsAreAllowed(): void
+    {
+        $executionGate = $this->createMock(ToolExecutionGate::class);
+        $executionGate->expects(self::once())
+            ->method('inspect')
+            ->with(
+                7,
+                'skill:save_to_notion',
+                [],
+                self::isInstanceOf(User::class),
+                PolicyContext::Unattended,
+                'task_run:9:n3',
+                null,
+                false,
+                null,
+                'approve',
+            )
+            ->willReturn([
+                'outcome' => PolicyOutcome::Auto,
+                'descriptor' => $this->descriptor(),
+                'approval' => null,
+                'refusal' => null,
+            ]);
+
+        self::assertNull($this->gate($executionGate)->consult(
+            $this->context(['saved_task' => true, 'saved_task_run_id' => 9, 'allow_unattended' => true]),
+            new TaskNode('n3', Capability::SaveToNotion),
+            'skill:save_to_notion',
+            [],
+            'asks first',
+        ));
+    }
+
     public function testSkipsWhenTheNodeWasAlreadyApproved(): void
     {
         $executionGate = $this->createMock(ToolExecutionGate::class);

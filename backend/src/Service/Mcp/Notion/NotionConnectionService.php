@@ -163,9 +163,7 @@ final readonly class NotionConnectionService
             ->setName('Notion')
             ->setUrl(self::MCP_URL)
             ->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH)
-            ->setEnabled(true)
-            ->setAllowWrite(false)
-            ->setWriteAuto(false);
+            ->setEnabled(true);
         $this->servers->save($server);
 
         return $server;
