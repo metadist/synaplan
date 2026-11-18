@@ -12,7 +12,7 @@ to them.
 | TP3 | merged (#3158) | — | Permissions UI (Notion tab, MCP page panel); Notion write switch and PATCH removed |
 | TP4 | merged (#3159) | — | Approve asks in chat (#17), card shows connection + Change permission, blocked-tool link, one-time notice |
 | TP5 | merged (#3164) | — | E2E `mcp-tool-permissions.spec.ts` (J-TP-1…4, notice, read-only), docs; J-TP-5/7 and J-TP-6 see TP5 notes |
-| TP6 | phase 1 merged (#3174) | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 (DROP COLUMN) next release, see TP6 notes |
+| TP6 | phase 1 merged (#3174), phase 2 in review | — | phase 1 (no DDL): code stops using `BALLOWWRITE` / `BWRITEAUTO`; phase 2 drops both columns (release 5.8.8 contains phase 1) |
 
 ## TP1 notes
 
@@ -71,7 +71,7 @@ to them.
 ## Follow-ups
 
 - Approval answer limits: `ChatApprovalAnswer` checks the `MESSAGES` limit and the cost budget of the approval owner before its extra model call. Over a limit, or an owner that cannot be loaded, falls back to the short follow-up message with no model call. The call was already metered as `MULTITASK` through `AiChatUsageMeter`.
-- TP6 phase 2 waits for a release that contains phase 1 (latest tag at the time: v5.8.7, which predates #3174).
+- TP6 phase 2 waited for a release that contains phase 1 (v5.8.8 does).
 - Blocked tools named to the planner: the `mcp_fetch` sub-catalog lists each connection's blocked tools ("blocked by the owner, never plan these: …", at most 10 names), so the model can say a tool is blocked in Permissions instead of answering vaguely. The gateway tool loops still just omit a blocked tool.
 - Member view (J-TP-6): the Notion status carries `sharing.shared_server_id`; a member of a shared connection sees "See what the AI may do" and the read-only list (`NotionSharedPermissions.vue`, E2E in `notion-app.spec.ts`).
 - In-place answer, more plan shapes: any number of pending steps now, as long as each only writes text (chat, summarize, translate, rag_query, compose_reply or the hidden compose node). A pending step that would save, send or generate no longer gets marked done without running: it falls back to the follow-up message. (Before this, up to two pending steps of any kind were marked done.)
