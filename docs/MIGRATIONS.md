@@ -252,12 +252,16 @@ bootstrap will try to mark a version that no longer exists as applied, and
 shared Galera DB while web1/web2/web3 roll one node at a time — a `DROP COLUMN`
 instantly breaks every node still running the old entity (its SELECTs name the
 column). Phase 1: stop mapping the column and, until the drop, declare it to the
-schema tool (a `postGenerateSchemaTable` listener that adds the column to the
-table) so `doctrine:schema:validate` stays in sync without a mapping. The column
-needs a default (or `NULL`) so INSERTs from the new entity still work. Phase 2
-(a later release, once the unmapping is deployed everywhere): drop the column
-and remove the listener entry. Unmapping and dropping in the same release is the
-bug this rule prevents. Current open items: `BPROMPTS.BKEYWORDS` +
+schema tool with a `postGenerateSchemaTable` listener that adds the column to the
+table, so `doctrine:schema:validate` stays in sync without a mapping. No such
+listener exists while nothing waits for a drop; copy the last one,
+`App\Doctrine\RetiredColumnsSchemaListener` and its test
+(`git show bf13e9ac9 -- backend/src/Doctrine backend/tests/Unit/Doctrine`). The
+column needs a default (or `NULL`) so INSERTs from the new entity still work.
+Phase 2 (a later release, once the unmapping runs on every node): drop the
+column with `DROP COLUMN IF EXISTS` and remove its listener entry (the listener
+itself once it is empty). Unmapping and dropping in the same release is the bug
+this rule prevents. Current open items: `BPROMPTS.BKEYWORDS` +
 `BPROMPTS.BENABLED` (still mapped, see `Version20260608000000`).
 
 ## Testing the Migration Path Locally
