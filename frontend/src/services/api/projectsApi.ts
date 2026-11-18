@@ -26,8 +26,7 @@ export type ProjectSourceState = ProjectSourceItem['state']
 export type ProjectSourceKind = ProjectSourceItem['kind']
 
 export type ProjectSourceInput =
-  | { type: 'link'; url: string }
-  | { type: 'text'; title: string; text: string }
+  { type: 'link'; url: string } | { type: 'text'; title: string; text: string }
 
 export interface ProjectPatch {
   name?: string

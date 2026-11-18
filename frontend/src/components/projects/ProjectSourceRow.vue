@@ -4,7 +4,11 @@
     :data-testid="`item-project-source-${source.id}`"
     :data-state="source.state"
   >
-    <component :is="kindIcon" class="mt-0.5 h-5 w-5 flex-shrink-0 txt-secondary" aria-hidden="true" />
+    <component
+      :is="kindIcon"
+      class="mt-0.5 h-5 w-5 flex-shrink-0 txt-secondary"
+      aria-hidden="true"
+    />
 
     <div class="min-w-0 flex-1">
       <p class="truncate text-sm font-medium txt-primary" :title="source.name">
@@ -35,8 +39,12 @@
         class="mt-0.5 flex items-center gap-1.5 text-xs txt-secondary"
         data-testid="text-project-source-ready"
       >
-        <CheckCircleIcon class="h-3.5 w-3.5 text-green-600 dark:text-green-400" aria-hidden="true" />
-        {{ $t('projects.source.ready') }}<template v-if="source.size > 0"> · {{ sizeLabel }}</template>
+        <CheckCircleIcon
+          class="h-3.5 w-3.5 text-green-600 dark:text-green-400"
+          aria-hidden="true"
+        />
+        {{ $t('projects.source.ready')
+        }}<template v-if="source.size > 0"> · {{ sizeLabel }}</template>
       </p>
       <div v-else class="mt-0.5" role="alert" data-testid="text-project-source-failed">
         <p class="text-xs font-medium text-red-600 dark:text-red-400">

@@ -60,7 +60,9 @@ test.describe('@ci Projects', () => {
     })
 
     await test.step('Assert: the note settles on "Ready" and survives a reload', async () => {
-      const row = page.locator('[data-testid^="item-project-source-"]').filter({ hasText: noteTitle })
+      const row = page
+        .locator('[data-testid^="item-project-source-"]')
+        .filter({ hasText: noteTitle })
       await expect(row).toHaveAttribute('data-state', 'ready', { timeout: TIMEOUTS.LONG })
       await page.reload()
       await page.locator('[data-testid="tab-project-sources"]:visible').first().click()

@@ -96,7 +96,9 @@ describe('projects store', () => {
 
   it('removing a chat drops it from the index', async () => {
     api.list.mockResolvedValue([project('a', '2026-11-01T10:00:00+00:00')])
-    api.listChats.mockResolvedValue([{ id: 5, title: 'Plan', updatedAt: '2026-11-01T10:00:00+00:00' }])
+    api.listChats.mockResolvedValue([
+      { id: 5, title: 'Plan', updatedAt: '2026-11-01T10:00:00+00:00' },
+    ])
     api.leaveChat.mockResolvedValue(undefined)
     const store = useProjectsStore()
     await store.load()
@@ -106,7 +108,9 @@ describe('projects store', () => {
 
   it('deleting a project forgets it and its chats', async () => {
     api.list.mockResolvedValue([project('a', '2026-11-01T10:00:00+00:00')])
-    api.listChats.mockResolvedValue([{ id: 5, title: 'Plan', updatedAt: '2026-11-01T10:00:00+00:00' }])
+    api.listChats.mockResolvedValue([
+      { id: 5, title: 'Plan', updatedAt: '2026-11-01T10:00:00+00:00' },
+    ])
     api.remove.mockResolvedValue(undefined)
     const store = useProjectsStore()
     await store.load()

@@ -198,7 +198,11 @@
         </ChatHistoryList>
       </div>
     </div>
-    <ChatProjectPickerDialog :open="moveChatId !== null" :chat-id="moveChatId" @close="moveChatId = null" />
+    <ChatProjectPickerDialog
+      :open="moveChatId !== null"
+      :chat-id="moveChatId"
+      @close="moveChatId = null"
+    />
   </div>
 </template>
 
