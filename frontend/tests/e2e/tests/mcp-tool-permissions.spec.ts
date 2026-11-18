@@ -95,7 +95,7 @@ async function mockPermissionsApi(
         success: true,
         status: 'connected',
         server_id: SERVER_ID,
-        sharing: { shared_by: null, can_share: false, shared_on: false },
+        sharing: { shared_by: null, shared_server_id: null, can_share: false, shared_on: false },
       })
     )
   })

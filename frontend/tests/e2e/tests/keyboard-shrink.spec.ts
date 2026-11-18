@@ -65,20 +65,10 @@ async function installBridge(page: Page): Promise<void> {
   })
 }
 
-/** A dev stack with the AI literacy prompt on covers the composer with its card. */
-async function dismissLiteracyCard(page: Page): Promise<void> {
-  const remind = page.getByTestId('btn-literacy-remind')
-  if (await remind.isVisible().catch(() => false)) {
-    await remind.click()
-    await expect(page.getByTestId('card-ai-literacy')).toBeHidden()
-  }
-}
-
 test.describe('Native keyboard shrink — chat', () => {
   test.beforeEach(async ({ page }) => {
     await installBridge(page)
     await openApp(page)
-    await dismissLiteracyCard(page)
   })
 
   test('@ci the composer meets the keyboard, header and drawer stay put', async ({ page }) => {
@@ -146,7 +136,6 @@ test.describe('Native keyboard shrink — chat', () => {
       await route.continue()
     })
     await page.reload()
-    await dismissLiteracyCard(page)
     await input.click()
     await shellAnimatesKeyboard(page, KEYBOARD)
     await expect(sent).toBeAttached({ timeout: 20_000 })

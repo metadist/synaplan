@@ -64,6 +64,7 @@ final readonly class McpFetchRunner implements TaskRunner
 {
     /** Cap on the formatted node output (token control, like url_fetch). */
     private const MAX_OUTPUT_CHARS = 12000;
+    private const MAX_BLOCKED_NAMES = 10;
 
     private ToolInvokerSlot $toolInvoker;
 
@@ -361,22 +362,34 @@ final readonly class McpFetchRunner implements TaskRunner
             }
 
             $tools = [];
+            $blocked = [];
             foreach ($entry['tools'] as $tool) {
-                if ($this->isMutatingTool($tool['annotations'])
-                    || PolicyOutcome::Block === $this->permissions->outcome($server, $tool['name'], SideEffect::Read)) {
+                if (PolicyOutcome::Block === $this->permissions->outcome($server, $tool['name'], SideEffect::Read)) {
+                    // The name comes from the remote server: one line, so it cannot start a new prompt line.
+                    $blocked[] = $this->oneLine($tool['name']);
+                    continue;
+                }
+                if ($this->isMutatingTool($tool['annotations'])) {
                     continue;
                 }
                 $tools[] = $tool['name'].$this->renderArgumentHint($tool['inputSchema'])
                     .$this->notionFetch->argumentHint($server->getUrl(), $tool['name'])
                     .('' !== $tool['description'] ? ' — '.$this->oneLine($tool['description']) : '');
             }
-            if ([] === $tools) {
+            if ([] === $tools && [] === $blocked) {
                 continue;
             }
 
             $lines[] = sprintf('    • server_id %d "%s" — tools:', $serverId, $server->getName());
             foreach ($tools as $toolLine) {
                 $lines[] = '      - '.$toolLine;
+            }
+            if ([] !== $blocked) {
+                $lines[] = sprintf(
+                    '      (blocked by the owner, never plan these: %s. If the request needs one, answer that it is blocked in the connection\'s Permissions.)',
+                    implode(', ', array_slice($blocked, 0, self::MAX_BLOCKED_NAMES))
+                        .(count($blocked) > self::MAX_BLOCKED_NAMES ? sprintf(' and %d more', count($blocked) - self::MAX_BLOCKED_NAMES) : ''),
+                );
             }
         }
 

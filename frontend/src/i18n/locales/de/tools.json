@@ -1175,6 +1175,8 @@
         "savedOff": "Teilen ist aus. Nur du nutzt diese Verbindung jetzt.",
         "failed": "Die Einstellung zum Teilen wurde nicht gespeichert. Es wurde nichts geändert. Versuch es noch einmal.",
         "memberNote": "{owner} teilt eine Notion-Verbindung. Die KI kann damit in Notion lesen, aber nie etwas ändern.",
+        "showPermissions": "Ansehen, was die KI darf",
+        "hidePermissions": "Berechtigungen ausblenden",
         "use": "Im Chat nutzen",
         "connectOwn": "Eigenes Notion verbinden",
         "usingToast": "Der Chat kann Notion jetzt über die geteilte Verbindung lesen.",

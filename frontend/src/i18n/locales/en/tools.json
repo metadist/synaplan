@@ -1252,6 +1252,8 @@
         "savedOff": "Sharing is off. Only you use this connection now.",
         "failed": "The sharing setting was not saved. Nothing was changed. Try again.",
         "memberNote": "{owner} shares a Notion connection. The AI can read Notion with it, but never change anything.",
+        "showPermissions": "See what the AI may do",
+        "hidePermissions": "Hide the permissions",
         "use": "Use it in chat",
         "connectOwn": "Connect your own Notion",
         "usingToast": "Chat can now read Notion through the shared connection.",

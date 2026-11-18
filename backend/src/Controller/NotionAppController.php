@@ -49,9 +49,10 @@ final class NotionAppController extends AbstractController
                         new OA\Property(
                             property: 'sharing',
                             description: 'Organisation-wide sharing. shared_by names the admin whose connection this person can read with when they have none of their own.',
-                            required: ['shared_by', 'can_share', 'shared_on'],
+                            required: ['shared_by', 'shared_server_id', 'can_share', 'shared_on'],
                             properties: [
                                 new OA\Property(property: 'shared_by', type: 'string', nullable: true, example: 'Ada Lovelace'),
+                                new OA\Property(property: 'shared_server_id', type: 'integer', nullable: true, example: 9, description: 'The shared connection a member may inspect (its tools and permissions, read-only). Null when none.'),
                                 new OA\Property(property: 'can_share', type: 'boolean', example: false),
                                 new OA\Property(property: 'shared_on', type: 'boolean', example: false),
                             ],
@@ -182,9 +183,10 @@ final class NotionAppController extends AbstractController
                         new OA\Property(
                             property: 'sharing',
                             description: 'Organisation-wide sharing. shared_by names the admin whose connection this person can read with when they have none of their own.',
-                            required: ['shared_by', 'can_share', 'shared_on'],
+                            required: ['shared_by', 'shared_server_id', 'can_share', 'shared_on'],
                             properties: [
                                 new OA\Property(property: 'shared_by', type: 'string', nullable: true, example: 'Ada Lovelace'),
+                                new OA\Property(property: 'shared_server_id', type: 'integer', nullable: true, example: 9, description: 'The shared connection a member may inspect (its tools and permissions, read-only). Null when none.'),
                                 new OA\Property(property: 'can_share', type: 'boolean', example: false),
                                 new OA\Property(property: 'shared_on', type: 'boolean', example: false),
                             ],

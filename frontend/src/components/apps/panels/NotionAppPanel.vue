@@ -74,6 +74,10 @@
             {{ $t('apps.notion.sharing.connectOwn') }}
           </button>
         </div>
+        <NotionSharedPermissions
+          v-if="status.sharing.shared_server_id != null"
+          :server-id="status.sharing.shared_server_id"
+        />
       </template>
       <template v-else>
         <p class="txt-primary text-sm">{{ $t('apps.notion.notConnected') }}</p>
@@ -162,6 +166,7 @@ import McpPermissionsNotice from '@/components/config/mcp/McpPermissionsNotice.v
 import McpToolPermissions from '@/components/config/mcp/McpToolPermissions.vue'
 import NotionConnectedSection from './notion/NotionConnectedSection.vue'
 import NotionRecentChanges from './notion/NotionRecentChanges.vue'
+import NotionSharedPermissions from './notion/NotionSharedPermissions.vue'
 import NotionWatches from './notion/NotionWatches.vue'
 import {
   notionAppApi,

@@ -66,6 +66,11 @@ If the dev stack's Ollama already occupies host port 11434, remap the stub
 (`OLLAMA_STUB_URL=http://localhost:11435` plus a compose port override) — the
 backend reaches it container-to-container either way.
 
+The shared `page` fixture (`tests/e2e/test-setup.ts`) answers
+`GET /api/v1/me/ai-literacy` with "nothing due", so a dev stack with the
+organisation-wide "Using AI well" reminder switched on does not cover the
+controls. A spec about the card registers its own route, which wins.
+
 ### Known local-only failures
 
 These fail on the local dev stack and pass in CI. Confirm the failure matches

@@ -62,7 +62,7 @@ final readonly class NotionConnectionService
     }
 
     /**
-     * @return array{success: bool, status: string, server_id: int|null, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
+     * @return array{success: bool, status: string, server_id: int|null, sharing: array{shared_by: string|null, shared_server_id: int|null, can_share: bool, shared_on: bool}}
      *
      * @throws NotionAppUnavailableException
      */
@@ -76,6 +76,7 @@ final readonly class NotionConnectionService
 
         return [...$present, 'sharing' => [
             'shared_by' => $connected || null === $shared ? null : $shared['owner_name'],
+            'shared_server_id' => $connected || null === $shared ? null : $shared['server_id'],
             'can_share' => $isAdmin && $connected,
             'shared_on' => null !== $server && $connected && $this->sharing->isShared($server),
         ]];
@@ -84,7 +85,7 @@ final readonly class NotionConnectionService
     /**
      * An admin shares their own connection with everyone, read-only.
      *
-     * @return array{success: bool, status: string, server_id: int|null, sharing: array{shared_by: string|null, can_share: bool, shared_on: bool}}
+     * @return array{success: bool, status: string, server_id: int|null, sharing: array{shared_by: string|null, shared_server_id: int|null, can_share: bool, shared_on: bool}}
      *
      * @throws NotionAppUnavailableException
      * @throws NotionConnectionMissingException

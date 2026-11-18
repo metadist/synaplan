@@ -235,13 +235,13 @@ final readonly class TaskPlanStore
      * All persisted nodes for a message, including hidden assembler nodes.
      * Used to rehydrate a DAG resume.
      *
-     * @return list<array{nodeId: string, status: string, text: ?string, url: ?string, type: ?string, jobKey: ?string, error: ?string}>
+     * @return list<array{nodeId: string, capability: string, status: string, text: ?string, url: ?string, type: ?string, jobKey: ?string, error: ?string}>
      */
     public function loadRows(int $messageId): array
     {
         try {
             $rows = $this->connection->fetchAllAssociative(
-                'SELECT BNODEID, BSTATUS, BRESULTREF, BERROR, BJOBKEY FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
+                'SELECT BNODEID, BCAPABILITY, BSTATUS, BRESULTREF, BERROR, BJOBKEY FROM BMESSAGE_TASKS WHERE BMESSAGEID = ? ORDER BY BID ASC',
                 [$messageId],
             );
         } catch (\Throwable $e) {
@@ -260,6 +260,7 @@ final readonly class TaskPlanStore
             $jobKey = $row['BJOBKEY'] ?? null;
             $out[] = [
                 'nodeId' => (string) $row['BNODEID'],
+                'capability' => (string) ($row['BCAPABILITY'] ?? ''),
                 'status' => (string) $row['BSTATUS'],
                 'text' => is_string($decoded['text'] ?? null) ? $decoded['text'] : null,
                 'url' => is_string($decoded['url'] ?? null) ? $decoded['url'] : null,

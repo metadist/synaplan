@@ -1178,6 +1178,8 @@
         "savedOff": "Paylaşım kapalı. Bu bağlantıyı artık yalnızca siz kullanıyorsunuz.",
         "failed": "Paylaşım ayarı kaydedilmedi. Hiçbir şey değişmedi. Tekrar deneyin.",
         "memberNote": "{owner} bir Notion bağlantısı paylaşıyor. AI bununla Notion’u okuyabilir ama hiçbir şeyi değiştiremez.",
+        "showPermissions": "AI'nın neler yapabileceğini gör",
+        "hidePermissions": "İzinleri gizle",
         "use": "Sohbette kullan",
         "connectOwn": "Kendi Notion’umu bağla",
         "usingToast": "Sohbet artık paylaşılan bağlantı üzerinden Notion’u okuyabilir.",

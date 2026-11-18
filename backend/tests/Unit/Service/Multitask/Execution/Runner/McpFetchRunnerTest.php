@@ -317,6 +317,20 @@ final class McpFetchRunnerTest extends TestCase
         self::assertNull(($descriptor->dynamicNote)(self::USER_ID, ['topic' => 'general', 'topic_metadata' => ['tool_mcp' => true, 'mcp_servers' => '55']]));
     }
 
+    public function testABlockedToolIsNamedToThePlannerAsBlockedNotOffered(): void
+    {
+        $server = $this->server();
+        $server->setToolPolicy('{"tools":{"search_customers":"block"}}');
+        $descriptor = $this->runner(server: $server)->describe()[0];
+
+        $note = ($descriptor->dynamicNote)(self::USER_ID, ['topic' => 'general', 'topic_metadata' => ['tool_mcp' => true]]);
+
+        self::assertIsString($note);
+        self::assertStringNotContainsString('search_customers(', $note, 'a blocked tool is never offered');
+        self::assertStringContainsString('blocked by the owner, never plan these: search_customers', $note);
+        self::assertStringContainsString('Permissions', $note);
+    }
+
     public function testToolErrorIsAReportableFailureAndIsLogged(): void
     {
         $logger = $this->createMock(LoggerInterface::class);
