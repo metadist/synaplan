@@ -25,7 +25,7 @@ final class ChatApprovalAnswerTest extends TestCase
         $trigger = $this->message('IN', 'Find my Minecraft page', 10);
         $waiting = $this->message('OUT', 'Waiting for your approval.', 11);
         $waiting->setMeta('task_plan', '{"reply_node":"n2","cards":[{"nodeId":"n1","state":"waiting_approval"},{"nodeId":"n2","state":"pending"}]}');
-        $rows = [$this->row('n1', 'waiting_approval'), $this->row('n2', 'pending'), $this->row('n3', 'pending')];
+        $rows = [$this->row('n1', 'waiting_approval', 'mcp_fetch'), $this->row('n2', 'pending'), $this->row('n3', 'pending', 'compose_reply')];
 
         $connection = $this->createMock(Connection::class);
         $connection->method('fetchAllAssociative')->willReturn($rows);
@@ -72,9 +72,8 @@ final class ChatApprovalAnswerTest extends TestCase
     {
         $trigger = $this->message('IN', 'q', 10);
         $waiting = $this->message('OUT', 'Waiting', 11);
-        $waiting->setMeta('task_plan', '{"cards":[{"nodeId":"n1","capability":"mcp_fetch","state":"waiting_approval"},{"nodeId":"n2","capability":"save_to_notion","state":"pending"}]}');
         $connection = $this->createMock(Connection::class);
-        $connection->method('fetchAllAssociative')->willReturn([$this->row('n1', 'waiting_approval'), $this->row('n2', 'pending')]);
+        $connection->method('fetchAllAssociative')->willReturn([$this->row('n1', 'waiting_approval', 'mcp_fetch'), $this->row('n2', 'pending', 'save_to_notion')]);
         $connection->expects(self::never())->method('update');
         $messages = $this->createMock(MessageRepository::class);
         $messages->method('findByTrackingId')->willReturn([$trigger, $waiting]);
@@ -89,7 +88,7 @@ final class ChatApprovalAnswerTest extends TestCase
         $trigger = $this->message('IN', 'q', 10);
         $waiting = $this->message('OUT', 'Waiting', 11);
         $waiting->setMeta('task_plan', '{"cards":[{"nodeId":"n1","capability":"mcp_fetch","state":"waiting_approval"},{"nodeId":"n2","capability":"summarize","state":"pending"},{"nodeId":"n3","capability":"translate","state":"pending"},{"nodeId":"n4","capability":"chat","state":"pending"}]}');
-        $rows = [$this->row('n1', 'waiting_approval'), $this->row('n2', 'pending'), $this->row('n3', 'pending'), $this->row('n4', 'pending'), $this->row('n5', 'pending')];
+        $rows = [$this->row('n1', 'waiting_approval', 'mcp_fetch'), $this->row('n2', 'pending', 'summarize'), $this->row('n3', 'pending', 'translate'), $this->row('n4', 'pending', 'chat'), $this->row('n5', 'pending', 'compose_reply')];
         $connection = $this->createMock(Connection::class);
         $connection->method('fetchAllAssociative')->willReturn($rows);
         $messages = $this->createMock(MessageRepository::class);
@@ -99,6 +98,22 @@ final class ChatApprovalAnswerTest extends TestCase
 
         self::assertTrue($this->answer($connection, $messages, $ai)->complete($trigger, $this->approval(), 'result'));
         self::assertSame('Done.', $waiting->getText());
+    }
+
+    public function testAPendingStepWithoutAKnownCapabilityIsTreatedAsActing(): void
+    {
+        $trigger = $this->message('IN', 'q', 10);
+        $waiting = $this->message('OUT', 'Waiting', 11);
+        $waiting->setMeta('task_plan', '{"cards":[{"nodeId":"n1","capability":"mcp_fetch","state":"waiting_approval"}]}');
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchAllAssociative')->willReturn([$this->row('n1', 'waiting_approval', 'mcp_fetch'), $this->row('n2', 'pending', 'email_me')]);
+        $connection->expects(self::never())->method('update');
+        $messages = $this->createMock(MessageRepository::class);
+        $messages->method('findByTrackingId')->willReturn([$trigger, $waiting]);
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects(self::never())->method('chat');
+
+        self::assertFalse($this->answer($connection, $messages, $ai)->complete($trigger, $this->approval(), 'result'));
     }
 
     public function testAFailingModelFallsBackAndChangesNothing(): void
@@ -207,9 +222,9 @@ final class ChatApprovalAnswerTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function row(string $node, string $status): array
+    private function row(string $node, string $status, string $capability = 'chat'): array
     {
-        return ['BNODEID' => $node, 'BSTATUS' => $status, 'BRESULTREF' => null, 'BERROR' => null, 'BJOBKEY' => null];
+        return ['BNODEID' => $node, 'BCAPABILITY' => $capability, 'BSTATUS' => $status, 'BRESULTREF' => null, 'BERROR' => null, 'BJOBKEY' => null];
     }
 
     private function message(string $direction, string $text, int $id, int $userId = 7): Message

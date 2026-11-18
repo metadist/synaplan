@@ -365,7 +365,8 @@ final readonly class McpFetchRunner implements TaskRunner
             $blocked = [];
             foreach ($entry['tools'] as $tool) {
                 if (PolicyOutcome::Block === $this->permissions->outcome($server, $tool['name'], SideEffect::Read)) {
-                    $blocked[] = $tool['name'];
+                    // The name comes from the remote server: one line, so it cannot start a new prompt line.
+                    $blocked[] = $this->oneLine($tool['name']);
                     continue;
                 }
                 if ($this->isMutatingTool($tool['annotations'])) {
@@ -386,7 +387,8 @@ final readonly class McpFetchRunner implements TaskRunner
             if ([] !== $blocked) {
                 $lines[] = sprintf(
                     '      (blocked by the owner, never plan these: %s. If the request needs one, answer that it is blocked in the connection\'s Permissions.)',
-                    implode(', ', array_slice($blocked, 0, self::MAX_BLOCKED_NAMES)),
+                    implode(', ', array_slice($blocked, 0, self::MAX_BLOCKED_NAMES))
+                        .(count($blocked) > self::MAX_BLOCKED_NAMES ? sprintf(' and %d more', count($blocked) - self::MAX_BLOCKED_NAMES) : ''),
                 );
             }
         }

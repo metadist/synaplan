@@ -11,6 +11,7 @@ use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
 use App\Service\ModelConfigService;
+use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\TaskPlanStore;
 use App\Service\RateLimitService;
 use App\Service\Usage\AiChatUsageMeter;
@@ -41,7 +42,13 @@ use Psr\Log\LoggerInterface;
 final readonly class ChatApprovalAnswer
 {
     /** Steps that only write text: the composed answer can stand in for them. */
-    private const ANSWER_STEPS = ['chat', 'summarize', 'translate', 'rag_query', 'compose_reply'];
+    private const ANSWER_STEPS = [
+        Capability::Chat->value,
+        Capability::Summarize->value,
+        Capability::Translate->value,
+        Capability::RagQuery->value,
+        Capability::ComposeReply->value,
+    ];
     private const STEP_TEXT_CHARS = 2000;
     private const PROMPT_RESULT_CHARS = 12000;
 
@@ -66,15 +73,9 @@ final readonly class ChatApprovalAnswer
         if (null === $triggerId || '' === trim($result)) {
             return false;
         }
+        $steps = $this->steps($triggerId);
         $waiting = $this->waitingAnswer($trigger);
-        if (null === $waiting) {
-            return false;
-        }
-        $steps = $this->steps($triggerId, $this->capabilities($waiting));
-        if (null === $steps) {
-            return false;
-        }
-        if (!$this->mayCompose($approval)) {
+        if (null === $steps || null === $waiting || !$this->mayCompose($approval)) {
             return false;
         }
         $answer = $this->compose($trigger, $approval, $result);
@@ -95,18 +96,20 @@ final readonly class ChatApprovalAnswer
     }
 
     /**
-     * @param array<string, string> $capabilities capability by node id, from the step cards
+     * The capability of each step comes from its stored row, not from the
+     * card meta, so a step the client never drew still counts. A pending step
+     * with an unknown capability is treated like one that acts.
      *
      * @return array{waiting: string, pending: list<string>}|null
      */
-    private function steps(int $triggerId, array $capabilities): ?array
+    private function steps(int $triggerId): ?array
     {
         $waiting = [];
         $pending = [];
         foreach ($this->plan->loadRows($triggerId) as $row) {
             match ($row['status']) {
                 'waiting_approval' => $waiting[] = $row['nodeId'],
-                'pending' => $pending[] = $row['nodeId'],
+                'pending' => $pending[] = $row,
                 'done' => null,
                 default => $waiting[] = '',
             };
@@ -114,31 +117,13 @@ final readonly class ChatApprovalAnswer
         if (1 !== count($waiting) || '' === $waiting[0]) {
             return null;
         }
-        foreach ($pending as $nodeId) {
-            // A step without a card is the hidden compose_reply node.
-            if (isset($capabilities[$nodeId]) && !in_array($capabilities[$nodeId], self::ANSWER_STEPS, true)) {
+        foreach ($pending as $row) {
+            if (!in_array($row['capability'], self::ANSWER_STEPS, true)) {
                 return null;
             }
         }
 
-        return ['waiting' => $waiting[0], 'pending' => $pending];
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function capabilities(Message $waiting): array
-    {
-        $raw = $waiting->getMeta('task_plan');
-        $plan = null !== $raw ? json_decode($raw, true) : null;
-        $map = [];
-        foreach (is_array($plan) && is_array($plan['cards'] ?? null) ? $plan['cards'] : [] as $card) {
-            if (is_array($card) && is_string($card['nodeId'] ?? null) && is_string($card['capability'] ?? null)) {
-                $map[$card['nodeId']] = $card['capability'];
-            }
-        }
-
-        return $map;
+        return ['waiting' => $waiting[0], 'pending' => array_column($pending, 'nodeId')];
     }
 
     private function waitingAnswer(Message $trigger): ?Message
