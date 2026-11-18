@@ -200,7 +200,8 @@ async function chooseDeleteMode(name: string, chatCount: number): Promise<Delete
     confirmText: t('projects.deleteKeepChats'),
     extraText: t('projects.deleteAllChats'),
     cancelText: t('common.cancel'),
-    danger: true,
+    // Keeping the chats is the safe default; only "delete chats too" is red.
+    danger: false,
   })
   if (picked === null) return null
   return picked === 'extra' ? 'delete' : 'keep'
