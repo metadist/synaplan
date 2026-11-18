@@ -755,6 +755,18 @@ VALUES (0, 'IAM', 'SHARING_ENABLED', '1')
 ON DUPLICATE KEY UPDATE BVALUE = '1';
 ```
 
+### MCP tool permissions and group policy
+
+Each MCP connection carries its own per-tool choice (Auto, Approve, Block;
+see [Tool permissions](CONNECTIONS.md#tool-permissions-every-mcp-connection)).
+For the tools of a connection that choice **replaces the instance default**
+set under **Features & tools → tools & automation**. Group and assistant
+policies still apply on top and can only tighten: a tool a group blocks is
+locked in the connection's list. With tool approvals switched off
+(`TOOLS.APPROVALS_ENABLED`), Block still holds, Approve tools are refused and
+Auto tools run. Existing connections moved to the new defaults (writes Auto,
+destructive Approve) and show a one-time notice to their owner.
+
 ### Publishing an assistant to a group
 
 1. Turn groups and sharing on (both flags above).

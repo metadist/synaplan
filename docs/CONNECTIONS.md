@@ -178,9 +178,50 @@ connections it may use, does not call Atlassian.
   summarize it", "list my open Jira tickets" — read-only tools feed the
   answer.
 - **Write** (`mcp_action`): "create a Confluence page about X", "open a Jira
-  ticket for this bug" — only after the server's owner enables **allow write
-  actions** on that connection. Tools that declare themselves destructive
-  (deletes) are never allowed.
+  ticket for this bug" — governed by the tool permissions of the connection
+  (below).
+
+## Tool permissions (every MCP connection)
+
+Open a connection's **Permissions** (Notion: **Apps → Notion → Permissions**;
+other connections: **Manage → Connections → MCP Servers →** the row's
+**Permissions** button) to see every tool the server offers, with its
+description. Each tool has one choice:
+
+| Choice | What happens |
+| ------ | ------------ |
+| **Auto** | The AI uses the tool without asking |
+| **Approve** | The chat shows an approval card first. Nothing runs until you approve. Decline and nothing runs |
+| **Block** | The tool is never offered to the AI and is refused on the server |
+
+Tools are grouped as **read**, **write** and **destructive**; a category's
+choice sets all its tools at once. Defaults: read and write **Auto**,
+destructive **Approve**, nothing **Block**. A change shows a toast with
+**Undo**, and a tool set away from its default has **Reset to default**. Auto on
+a destructive tool asks for a confirmation first. A tool the server does not
+declare as read-only is treated as destructive until you choose otherwise.
+
+- **Always allow** on an approval card sets that tool to Auto on your
+  connection. It is offered for write tools only, never for destructive ones,
+  and never lifts a Block.
+- **Saved tasks and unattended runs** keep asking before they write, even for
+  an Auto tool, unless the step explicitly allows it. Auto set in chat does
+  not unlock them.
+- With tool approvals switched off instance-wide (`TOOLS.APPROVALS_ENABLED`),
+  **Block** still holds, **Approve** tools are refused with a message, and
+  **Auto** runs.
+- Arguments that delete page content escalate to **Approve** for that call,
+  whatever the tool is set to.
+- A person using a connection shared by an organisation can read its tools but
+  cannot change them.
+- Connections that existed before this feature let the AI write without
+  asking (the old "allow write" switch is gone). A one-time notice on the
+  connection says so; destructive tools still ask.
+
+**Connection choice vs. group policy.** The choice on the connection replaces
+the instance default for its tools. A group policy and an assistant policy can
+only tighten it: a tool a group blocks shows as locked in the list and cannot
+be raised there.
 
 ## Status of a connection
 
