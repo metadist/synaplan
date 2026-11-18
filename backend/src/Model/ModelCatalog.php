@@ -532,6 +532,12 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-30: base $2/$10, cache $0.10; >272k is
         // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.1-sol).
         'gpt-6.1-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.20],
+        // Official OpenAI pricing 2026-11-18: base $8/$40, cache $0.40; >272k is
+        // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.2-astra).
+        'gpt-6.2-astra' => ['threshold_tokens' => 272000, 'price_in_above' => 16.0, 'price_out_above' => 60.0, 'cache_price_in_above' => 0.80],
+        // Official OpenAI pricing 2026-11-18: base $2/$10, cache $0.10; >272k is
+        // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.2-sol).
+        'gpt-6.2-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.20],
         // Official OpenAI pricing 2026-09-24: base $0.10/$0.50, >272k is 2x input
         // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-luna).
         'gpt-6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.20, 'price_out_above' => 0.75, 'cache_price_in_above' => 0.02],
@@ -2309,6 +2315,152 @@ class ModelCatalog
                     'context_window' => '1050000',
                     'max_output' => '128000',
                     'knowledge_cutoff' => '2026-04-30',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // GPT-6.2 Astra — OpenAI's most capable model for long-running
+        // software, computer-use and document work. Responses API (Chat
+        // Completions is also offered upstream); image input; the API rejects
+        // reasoning.effort `none`. Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6.2-astra
+        // (verified 2026-11-18): $8 in / $40 out, cached input $0.40,
+        // 30-minute cache writes $10 (1.25x). Long-context (>272k) in
+        // CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 437,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.2 Astra',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.2-astra',
+            'priceIn' => 8,
+            'inUnit' => 'per1M',
+            'priceOut' => 40,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.2 Astra - OpenAI\'s most capable model for your hardest projects: building and revising software, using a computer and working with documents. Very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6.2-astra'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.40/1M (0.05x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.40,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'family' => 'openai',
+                    'jurisdiction' => 'US',
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-05-18',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 438,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.2 Astra (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.2-astra',
+            'priceIn' => 8,
+            'inUnit' => 'per1M',
+            'priceOut' => 40,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.2 Astra for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6.2-astra'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.40,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-05-18',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
+        // GPT-6.2 Sol — Responses API (also offered on Chat Completions);
+        // image input; the API rejects reasoning.effort `none`. Pricing per
+        // 1M tokens from https://developers.openai.com/api/docs/models/gpt-6.2-sol
+        // (verified 2026-11-18): $2 in / $10 out, cached input $0.10,
+        // 30-minute cache writes $2.50 (1.25x). Long-context (>272k) in
+        // CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 439,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.2 Sol',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.2-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.2 Sol - fast, cost-efficient model for coding, computer use and professional work. Very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6.2-sol'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.10/1M (0.05x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.10,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'family' => 'openai',
+                    'jurisdiction' => 'US',
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-06-01',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 440,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.2 Sol (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.2-sol',
+            'priceIn' => 2,
+            'inUnit' => 'per1M',
+            'priceOut' => 10,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.2 Sol for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6.2-sol'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.10,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-06-01',
                 ],
             ],
         ],

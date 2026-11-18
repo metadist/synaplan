@@ -611,6 +611,68 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
+     * GPT-6.2 Astra: $8/$40 per 1M, cached input $0.40/1M, >272k tier
+     * (16 / 60, cache 0.80). The API rejects reasoning effort `none`.
+     */
+    public function testGpt62AstraModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $astra = ModelCatalog::find('openai:gpt-6.2-astra');
+
+        $this->assertCount(2, $astra, 'Expected gpt-6.2-astra chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($astra, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6.2-astra:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6.2-astra:pic2text'));
+
+        foreach ($astra as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6.2-astra', $variant['providerId']);
+            $this->assertSame('gpt-6.2-astra', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(8.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(40.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.40, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-6.2-astra');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(16.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(60.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(0.80, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * GPT-6.2 Sol: $2/$10 per 1M, cached input $0.10/1M, >272k tier
+     * (4 / 15, cache 0.20). The API rejects reasoning effort `none`.
+     */
+    public function testGpt62SolModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $sol = ModelCatalog::find('openai:gpt-6.2-sol');
+
+        $this->assertCount(2, $sol, 'Expected gpt-6.2-sol chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($sol, 'tag'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6.2-sol:chat'));
+        $this->assertNotNull(ModelCatalog::findBidByKey('openai:gpt-6.2-sol:pic2text'));
+
+        foreach ($sol as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6.2-sol', $variant['providerId']);
+            $this->assertSame('gpt-6.2-sol', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(2.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(10.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.10, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-6.2-sol');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(15.0, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(0.20, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
      * GPT-6 Luna — released 2026-09-22. Chat + vision share the same upstream
      * id, official $0.10/$0.50 per-1M pricing, $0.01/1M cached input, and the
      * >272k long-context 2x/1.5x tier via CONTEXT_PRICING.
@@ -660,6 +722,8 @@ class ModelCatalogTest extends TestCase
             'gpt-6-astra' => ['openai:gpt-6-astra', 1.00],
             'gpt-6-sol' => ['openai:gpt-6-sol', 0.20],
             'gpt-6.1-sol' => ['openai:gpt-6.1-sol', 0.10],
+            'gpt-6.2-astra' => ['openai:gpt-6.2-astra', 0.40],
+            'gpt-6.2-sol' => ['openai:gpt-6.2-sol', 0.10],
             'gpt-6-luna' => ['openai:gpt-6-luna', 0.01],
             'gpt-5.6-sol' => ['openai:gpt-5.6-sol', 0.40],
             'gpt-5.6-terra' => ['openai:gpt-5.6-terra', 0.20],
@@ -786,7 +850,7 @@ class ModelCatalogTest extends TestCase
      */
     public function testCacheWriteMultiplierIsAuthoredOnlyForChargingFamilies(): void
     {
-        $charging = ['gpt-6-astra', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
+        $charging = ['gpt-6-astra', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
 
         foreach (ModelCatalog::all() as $row) {
             $authored = $row['json']['cache_write_multiplier'] ?? null;
