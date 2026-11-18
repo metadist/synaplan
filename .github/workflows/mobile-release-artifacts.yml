@@ -78,9 +78,9 @@ jobs:
               break
             fi
           done < <(
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${RELEASE_SHA}&status=success&per_page=100" |
+            gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${RELEASE_SHA}&per_page=100" |
               jq -r --arg sha "$RELEASE_SHA" \
-                '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha)]
+                '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success" and .head_sha == $sha)]
                   | .[].id'
           )
           if [ -z "$run_id" ]; then

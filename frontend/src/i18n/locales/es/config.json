@@ -663,6 +663,14 @@
     "apiKeys": {
       "title": "Claves API",
       "description": "Crea y administra claves API para acceder a la API.",
+      "usage": {
+        "title": "Usar esta API",
+        "intro": "Crea una clave en esta página. Envíala como Authorization: Bearer. Copia la dirección que pide tu cliente.",
+        "openai": "URL base de OpenAI",
+        "chat": "Chat completions",
+        "mcp": "MCP",
+        "copy": "Copiar {label}"
+      },
       "docsTitle": "Documentación de la API",
       "docsDesc": "Explora todos los endpoints disponibles, formatos de solicitud y métodos de autenticación.",
       "createKey": "Crear Clave API",

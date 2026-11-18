@@ -118,9 +118,9 @@ jobs:
 
           if [[ "$REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             source_run_id="$(
-              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&status=success&per_page=100" |
+              gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${SHA}&per_page=100" |
                 jq -r --arg sha "$SHA" --arg branch "$DEFAULT_BRANCH" \
-                  '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .head_sha == $sha and .head_branch == $branch)]
+                  '[.workflow_runs[] | select(.name == "CI" and .event == "push" and .conclusion == "success" and .head_sha == $sha and .head_branch == $branch)]
                     | first | .id // empty'
             )"
             if [ -n "$source_run_id" ]; then

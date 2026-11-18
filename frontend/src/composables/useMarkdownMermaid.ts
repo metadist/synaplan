@@ -11,6 +11,7 @@
  */
 
 import DOMPurify from 'dompurify'
+import type { MermaidConfig } from 'mermaid'
 
 let mermaidInitialized = false
 let mermaidModule: typeof import('mermaid') | null = null
@@ -21,13 +22,40 @@ let mermaidModule: typeof import('mermaid') | null = null
  * Mermaid already sanitizes with `securityLevel: 'strict'`, but assigning the
  * raw string to innerHTML is flagged by static analysis (CodeQL: "DOM text
  * reinterpreted as HTML"). This is defense-in-depth: DOMPurify with the SVG
- * (+ SVG filters + HTML for foreignObject labels) profiles strips scripts and
- * event handlers while preserving everything mermaid needs to render.
+ * (+ SVG filters + HTML) profiles strips scripts and event handlers while
+ * preserving everything mermaid needs to render.
+ *
+ * Mermaid draws node and edge labels as HTML inside `<foreignObject>`, which
+ * the SVG profile drops by default and which leaves every box empty. Allow it
+ * as an HTML integration point so its children are sanitized as HTML, and
+ * forbid form controls, which no diagram label needs.
  */
-function sanitizeSvg(svg: string): string {
+export function sanitizeMermaidSvg(svg: string): string {
   return DOMPurify.sanitize(svg, {
     USE_PROFILES: { svg: true, svgFilters: true, html: true },
+    ADD_TAGS: ['foreignObject'],
+    HTML_INTEGRATION_POINTS: { foreignobject: true },
+    FORBID_TAGS: ['form', 'input', 'button', 'textarea', 'select'],
   })
+}
+
+/**
+ * Shared mermaid configuration.
+ *
+ * Mermaid 12 switched the default layout to ELK and the default look to
+ * `neo`, which re-lays out and recolours every diagram. `layout: 'dagre'` and
+ * `look: 'classic'` keep diagrams in existing chats rendering as before.
+ */
+function mermaidConfig(theme: 'light' | 'dark'): MermaidConfig {
+  return {
+    startOnLoad: false,
+    theme: theme === 'dark' ? 'dark' : 'default',
+    layout: 'dagre',
+    look: 'classic',
+    securityLevel: 'strict',
+    fontFamily: 'inherit',
+    suppressErrorRendering: true, // Don't render error messages in DOM
+  }
 }
 
 /**
@@ -43,13 +71,7 @@ async function initMermaid(): Promise<typeof import('mermaid')> {
   const mermaid = mermaidModule.default
 
   if (!mermaidInitialized) {
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'strict',
-      fontFamily: 'inherit',
-      suppressErrorRendering: true, // Don't render error messages in DOM
-    })
+    mermaid.initialize(mermaidConfig('light'))
     mermaidInitialized = true
   }
 
@@ -133,13 +155,7 @@ export async function renderMermaidBlocks(
     const { default: mermaid } = await initMermaid()
 
     // Update theme if needed
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: theme === 'dark' ? 'dark' : 'default',
-      securityLevel: 'strict',
-      fontFamily: 'inherit',
-      suppressErrorRendering: true, // Don't render error messages in DOM
-    })
+    mermaid.initialize(mermaidConfig(theme))
 
     for (const block of mermaidBlocks) {
       const codeElement = block.querySelector('code.language-mermaid')
@@ -164,7 +180,7 @@ export async function renderMermaidBlocks(
       try {
         const id = `mermaid-${Math.random().toString(36).slice(2, 11)}`
         const { svg } = await mermaid.render(id, diagramCode)
-        const safeSvg = sanitizeSvg(svg)
+        const safeSvg = sanitizeMermaidSvg(svg)
 
         if (inPlace) {
           // Keep the <pre> element (stable identity for morphdom) and swap its

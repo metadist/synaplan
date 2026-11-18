@@ -908,6 +908,14 @@
     "apiKeys": {
       "title": "Clés API",
       "description": "Créez et gérez des clés API pour accéder à l’API.",
+      "usage": {
+        "title": "Utiliser cette API",
+        "intro": "Créez une clé sur cette page. Envoyez-la dans Authorization: Bearer. Copiez l’adresse demandée par votre client.",
+        "openai": "URL de base OpenAI",
+        "chat": "Chat completions",
+        "mcp": "MCP",
+        "copy": "Copier {label}"
+      },
       "docsTitle": "Documentation API",
       "docsDesc": "Explorez tous les points de terminaison disponibles, les formats de requête et les méthodes d’authentification.",
       "createKey": "Créer une clé API",
