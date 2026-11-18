@@ -55,11 +55,15 @@ final class DraftSentences
                 $inSources = 1 === preg_match(self::SOURCES, $trimmed);
                 continue;
             }
-            if ($inSources || '' === $trimmed || self::isTableRule($trimmed) || self::isTableRule(trim($lines[$index + 1] ?? ''))) {
+            if ($inSources || '' === $trimmed || self::isTableRule($trimmed)) {
                 continue;
             }
+            // A row stays a row when a dividing line follows it directly.
             if (isset($rows[$index])) {
                 $out[] = $trimmed;
+                continue;
+            }
+            if (self::isTableRule(trim($lines[$index + 1] ?? ''))) {
                 continue;
             }
             $trimmed = preg_replace(self::LIST_MARKER, '', $trimmed) ?? $trimmed;
@@ -130,7 +134,8 @@ final class DraftSentences
      * row. Under a header and a rule line a row may leave the outer pipes
      * out ("Song | Notes" over "--- | ---"); such a table ends at a blank
      * line, at a line without a pipe, or where another block starts: a
-     * heading, a list item, a quote, a code fence.
+     * heading, a list item, a quote, a code fence. Inside a table a line
+     * of dashes under a row is a dividing line, so that row is no header.
      *
      * @param list<string> $lines
      *
@@ -146,8 +151,7 @@ final class DraftSentences
                 $inTable = str_contains($trimmed, '|') && str_contains($lines[$index - 1] ?? '', '|');
                 continue;
             }
-            if (self::isTableRule(trim($lines[$index + 1] ?? ''))) {
-                $inTable = false;
+            if (!$inTable && self::isTableRule(trim($lines[$index + 1] ?? ''))) {
                 continue;
             }
             if (!self::isTableRow($trimmed)) {

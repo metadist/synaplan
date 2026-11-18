@@ -23,7 +23,7 @@ use App\Service\Research\Run\Stage\CitationMarks;
 final class ReaderReport
 {
     private const CITATION_GROUP = '/(?:[ \t]*\[\s*e\d+(?:\s*,\s*e\d+)*\s*\])+/i';
-    private const HEADING = '/^\s*(#{1,6})\s+\S/u';
+    private const HEADING = '/^ {0,3}(#{1,6})\s+\S/u';
     private const DIVIDER = '/^ {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*$/';
     private const FENCE = '/^ {0,3}(`{3,}|~{3,})/';
     private const FENCE_END = '/^ {0,3}(`{3,}|~{3,})[ \t]*$/';

@@ -282,7 +282,8 @@ final class CheckReport
     /**
      * A table header whose rule line is followed by no row. A table may
      * leave out its outer pipes ("Song | Notes" over "--- | ---"); then
-     * the pipe in the rule line tells it from a line of dashes.
+     * the pipe in the rule line tells it from a line of dashes. A row is
+     * never a header, even with a dividing line right under it.
      *
      * @param list<string>     $lines
      * @param array<int, true> $rows  the lines that are table rows
@@ -291,7 +292,7 @@ final class CheckReport
     {
         $header = $lines[$index] ?? '';
         $rule = trim($lines[$index + 1] ?? '');
-        if ($index < 0 || 1 !== preg_match(DraftSentences::TABLE_RULE, $rule)) {
+        if ($index < 0 || isset($rows[$index]) || 1 !== preg_match(DraftSentences::TABLE_RULE, $rule)) {
             return false;
         }
         if (!DraftSentences::isTableRow($header) && !(str_contains($header, '|') && str_contains($rule, '|'))) {

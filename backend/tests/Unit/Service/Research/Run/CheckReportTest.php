@@ -172,6 +172,20 @@ final class CheckReportTest extends TestCase
         self::assertStringStartsWith("## Next | step\n\nText. [e2]", $report);
     }
 
+    public function testTheLastRowAboveADividingLineIsCheckedLikeTheOthers(): void
+    {
+        $sentences = DraftSentences::split("| Song | Year |\n|---|---|\n| Empire | 2009 [e1] |\n| Made up | 2011 |\n---\n\nSong | Year\n--- | ---\nOther | 2001 [e2]\n---");
+
+        self::assertSame(['| Empire | 2009 [e1] |', '| Made up | 2011 |', 'Other | 2001 [e2]'], $sentences);
+    }
+
+    public function testASupportedLastRowAboveADividingLineStays(): void
+    {
+        $report = $this->removing("| Song | Year |\n|---|---|\n| Empire | 2009. Six weeks. [e1] |\n| Kept | 2011 [e2] |\n---\n\nText. [e3]", '| Empire | 2009. Six weeks. [e1] |');
+
+        self::assertStringStartsWith("| Song | Year |\n|---|---|\n| Kept | 2011 [e2] |\n---\n\nText. [e3]", $report);
+    }
+
     public function testARowCitedOnlyByAPlanPointIsOneStatement(): void
     {
         $plan = CitationMarks::planBares("Product | Notes\n--- | ---\nProduct | Talks remain unspecified. Further talks continue. [p1]");

@@ -98,6 +98,13 @@ final class ReaderReportTest extends TestCase
         self::assertSame("## Example\n\n".$code, $reader['markdown']);
     }
 
+    public function testAHashInIndentedCodeIsNoHeading(): void
+    {
+        $reader = ReaderReport::from("## Setup\n\n    # install first\n\n## Outlook", $this->ledger());
+
+        self::assertSame("## Setup\n\n    # install first", $reader['markdown']);
+    }
+
     public function testAFileSourceLinksToTheFile(): void
     {
         $ledger = new EvidenceLedger();
