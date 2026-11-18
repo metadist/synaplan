@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\Service\Research\Run\Stage\CheckReport;
+use App\Service\Research\Run\Stage\CitationMarks;
 use App\Service\Research\Run\Stage\DraftSentences;
 use PHPUnit\Framework\TestCase;
 
@@ -131,6 +132,51 @@ final class CheckReportTest extends TestCase
         $report = $this->removing("## Songs\n\nSong | Notes\n--- | ---\n".$row."\n\nText. [e2]", $row);
 
         self::assertStringStartsWith("## Songs\n\nText. [e2]", $report);
+    }
+
+    public function testTheEmphasisThatClosesBeforeTheNextSentenceIsRemovedWithItsOwn(): void
+    {
+        $draft = '**The fee is 99 EUR. [e1]** The warranty is two years. [e2]';
+
+        self::assertSame(['**The fee is 99 EUR. [e1]**', 'The warranty is two years. [e2]'], DraftSentences::split($draft));
+        self::assertStringStartsWith('The warranty is two years. [e2]', $this->removing($draft, DraftSentences::split($draft)[0]));
+    }
+
+    public function testEmphasisThatOpensAfterAMarkerBelongsToTheNextSentence(): void
+    {
+        $sentences = DraftSentences::split('The fee is 99 EUR. [e1] **The warranty is two years.** [e2]');
+
+        self::assertSame(['The fee is 99 EUR. [e1]', '**The warranty is two years.** [e2]'], $sentences);
+    }
+
+    public function testAMarkerInsideAnOpenBracketDoesNotSplitTheSentence(): void
+    {
+        $line = 'The fee (introduced in 2024. [e1] Extended in 2025) is 90 EUR. [e2]';
+
+        self::assertSame([$line], DraftSentences::split($line));
+    }
+
+    public function testAListItemAfterATableIsNotARowOfIt(): void
+    {
+        $sentences = DraftSentences::split("Song | Notes\n--- | ---\nA | B. Still B. [e1]\n- Cost | one. Two more. [e2]");
+
+        self::assertSame(['A | B. Still B. [e1]', 'Cost | one.', 'Two more. [e2]'], $sentences);
+    }
+
+    public function testAnEmptiedTableIsDroppedBeforeAHeadingThatHoldsAPipe(): void
+    {
+        $row = 'A | B. Still B. [e1]';
+
+        $report = $this->removing("Song | Notes\n--- | ---\n".$row."\n## Next | step\n\nText. [e2]", $row);
+
+        self::assertStringStartsWith("## Next | step\n\nText. [e2]", $report);
+    }
+
+    public function testARowCitedOnlyByAPlanPointIsOneStatement(): void
+    {
+        $plan = CitationMarks::planBares("Product | Notes\n--- | ---\nProduct | Talks remain unspecified. Further talks continue. [p1]");
+
+        self::assertSame(['product | talks remain unspecified. further talks continue.'], array_keys($plan));
     }
 
     public function testFeatDoesNotEndASentence(): void

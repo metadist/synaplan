@@ -125,9 +125,10 @@ final class CheckReport
         }
         $claims = [];
         $kept = [];
+        $rows = DraftSentences::tableRows($lines);
         for ($i = $section['start']; $i < $section['end']; ++$i) {
             $line = $lines[$i];
-            if ($i !== $section['start'] && !DraftSentences::isTableRow($line) && CitationMarks::cites($line)) {
+            if ($i !== $section['start'] && !isset($rows[$i]) && CitationMarks::cites($line)) {
                 $claims[] = $line;
                 continue;
             }
@@ -253,11 +254,12 @@ final class CheckReport
     private static function tidy(string $report): string
     {
         $lines = self::lines($report);
+        $rows = DraftSentences::tableRows($lines);
         $kept = [];
         foreach ($lines as $index => $line) {
             $line = rtrim($line);
             // The header of a table without rows, or the rule line under it.
-            if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index) || self::headerOfEmptyTable($lines, $index - 1)) {
+            if (1 === preg_match(self::EMPTY_LIST_ITEM, $line) || self::headerOfEmptyTable($lines, $index, $rows) || self::headerOfEmptyTable($lines, $index - 1, $rows)) {
                 continue;
             }
             $kept[] = $line;
@@ -271,9 +273,10 @@ final class CheckReport
      * leave out its outer pipes ("Song | Notes" over "--- | ---"); then
      * the pipe in the rule line tells it from a line of dashes.
      *
-     * @param list<string> $lines
+     * @param list<string>     $lines
+     * @param array<int, true> $rows  the lines that are table rows
      */
-    private static function headerOfEmptyTable(array $lines, int $index): bool
+    private static function headerOfEmptyTable(array $lines, int $index, array $rows): bool
     {
         $header = $lines[$index] ?? '';
         $rule = trim($lines[$index + 1] ?? '');
@@ -284,7 +287,7 @@ final class CheckReport
             return false;
         }
 
-        return !str_contains($lines[$index + 2] ?? '', '|');
+        return !isset($rows[$index + 2]);
     }
 
     /**
