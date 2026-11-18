@@ -173,7 +173,12 @@
       leave-to-class="opacity-0 scale-95"
     >
       <div v-if="menuChatId !== null" class="fixed inset-0 z-[150]" @click="menuChatId = null">
-        <div class="fixed w-44 dropdown-panel origin-top-right" :style="menuStyle" @click.stop>
+        <div
+          ref="menuPanel"
+          class="fixed w-44 dropdown-panel origin-top-right"
+          :style="menuStyle"
+          @click.stop
+        >
           <button
             v-if="shareAllowed"
             type="button"
@@ -325,6 +330,8 @@ const moveAllowed = computed(() => props.allowMove === true)
 
 const menuChatId = ref<number | null>(null)
 const menuStyle = ref<Record<string, string>>({})
+const menuPanel = ref<HTMLElement | null>(null)
+const MENU_EDGE_GAP = 8
 const previewChatId = ref<number | null>(null)
 const previewStyle = ref<Record<string, string>>({})
 const marqueeChatId = ref<number | null>(null)
@@ -524,13 +531,23 @@ const toggleMenu = (chatId: number, event: MouseEvent) => {
   const btn = (event.currentTarget ?? event.target) as HTMLElement | null
   if (!(btn instanceof HTMLElement)) return
   const rect = btn.getBoundingClientRect()
-  const menuHeight = moveAllowed.value ? 216 : 176
   const menuWidth = 176
-  const spaceBelow = window.innerHeight - rect.bottom
-  const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4
-  const left = Math.max(8, rect.right - menuWidth)
-  menuStyle.value = { top: `${top}px`, left: `${left}px` }
+  const left = Math.max(MENU_EDGE_GAP, rect.right - menuWidth)
+  menuStyle.value = { top: `${rect.bottom + 4}px`, left: `${left}px` }
   menuChatId.value = chatId
+  void nextTick(() => placeMenu(rect))
+}
+
+/** Flip or clamp the open menu by its rendered height, so every item stays on screen. */
+const placeMenu = (anchor: DOMRect) => {
+  const panel = menuPanel.value
+  if (!panel) return
+  const height = panel.offsetHeight
+  const below = anchor.bottom + 4
+  const above = anchor.top - height - 4
+  const maxTop = window.innerHeight - height - MENU_EDGE_GAP
+  const top = below <= maxTop ? below : Math.max(MENU_EDGE_GAP, Math.min(above, maxTop))
+  menuStyle.value = { ...menuStyle.value, top: `${top}px` }
 }
 
 const onMove = () => {
