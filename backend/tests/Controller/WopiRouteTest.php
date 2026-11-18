@@ -70,6 +70,39 @@ final class WopiRouteTest extends WebTestCase
         self::assertSame(OfficeEditorModule::ID, $body['module'] ?? null);
     }
 
+    /**
+     * Collabora sends the access_token as a Bearer header as well. The call
+     * must reach the controller, which is the one that knows the token.
+     */
+    public function testCollaborasBearerHeaderDoesNotStopTheCallAtTheFirewall(): void
+    {
+        self::ensureKernelShutdown();
+        $this->restore('OFFICE_PUBLIC_URL', 'https://office.example.com');
+        $this->restore('OFFICE_WOPI_URL', 'http://backend');
+
+        $client = static::createClient();
+        $em = static::getContainer()->get(EntityManagerInterface::class);
+        $setting = ModuleGateConfig::settingFor(OfficeEditorModule::ID);
+        $row = $em->getRepository(Config::class)->findOneBy([
+            'ownerId' => 0,
+            'group' => ModuleGateConfig::GROUP,
+            'setting' => $setting,
+        ]);
+        if (!$row instanceof Config) {
+            $row = (new Config())->setOwnerId(0)->setGroup(ModuleGateConfig::GROUP)->setSetting($setting);
+            $em->persist($row);
+        }
+        $row->setValue('1');
+        $em->flush();
+        static::getContainer()->get(ModuleGateConfig::class)->reset();
+
+        $client->request('GET', '/api/v1/wopi/files/1?access_token=not.a-token', server: ['HTTP_AUTHORIZATION' => 'Bearer not.a-token']);
+
+        self::assertSame(401, $client->getResponse()->getStatusCode(), (string) $client->getResponse()->getContent());
+        $body = json_decode($client->getResponse()->getContent(), true);
+        self::assertSame('Invalid access token', $body['error'] ?? null, 'the controller refused the token, not the session firewall');
+    }
+
     public function testEditSessionRequiresALogin(): void
     {
         $client = static::createClient();
