@@ -34,6 +34,6 @@ final readonly class PlanLimitEnforcement
 
         $stored = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_WITHOUT_BILLING);
 
-        return null !== $stored && true === filter_var($stored, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE);
+        return null !== $stored && filter_var($stored, \FILTER_VALIDATE_BOOL);
     }
 }

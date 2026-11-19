@@ -63,6 +63,15 @@ const config = {
     get enabled(): boolean {
       return getConfigSync().billing?.enabled ?? false
     },
+    /**
+     * Whether the plan limits apply. Always with billing; without billing
+     * only where the administrator switched them on (new installations).
+     * A server that predates the flag enforces them exactly with billing.
+     */
+    get planLimits(): boolean {
+      const billing = getConfigSync().billing
+      return billing?.planLimits ?? billing?.enabled ?? false
+    },
   },
 
   /**
