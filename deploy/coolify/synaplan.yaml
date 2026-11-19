@@ -191,7 +191,7 @@ services:
       start_period: 60s
 
   qdrant:
-    image: qdrant/qdrant:v1.20.1
+    image: qdrant/qdrant:v1.20.2
     volumes:
       - synaplan-qdrant:/qdrant/storage
     healthcheck:
