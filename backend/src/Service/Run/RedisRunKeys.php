@@ -43,6 +43,13 @@ end
 return 0
 LUA;
 
+    private const SET_IF_ABSENT = <<<'LUA'
+if redis.call('SET', KEYS[1], ARGV[1], 'EX', tonumber(ARGV[2]), 'NX') then
+  return 1
+end
+return 0
+LUA;
+
     private const CLAIM = <<<'LUA'
 if redis.call('SET', KEYS[1], ARGV[1], 'PX', tonumber(ARGV[2]), 'NX') then
   redis.call('ZADD', KEYS[2], tonumber(ARGV[3]), ARGV[4])
@@ -108,9 +115,15 @@ LUA;
         return true;
     }
 
+    /**
+     * Through a script, because the plain client answers false both for a
+     * held key and for a store that did not answer.
+     */
     public function setIfAbsent(string $key, string $value, int $ttlSeconds): bool
     {
-        return $this->redis->setIfAbsent($key, $value, $ttlSeconds);
+        $result = $this->redis->eval(self::SET_IF_ABSENT, [$key], [$value, (string) max(1, $ttlSeconds)]);
+
+        return 1 === $this->requiredInteger($result);
     }
 
     public function claim(string $claimKey, string $token, int $ttlMillis, string $indexKey, int $score, string $member): bool

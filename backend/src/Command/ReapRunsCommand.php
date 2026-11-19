@@ -6,6 +6,7 @@ namespace App\Command;
 
 use App\Service\Chat\Run\StreamRedis;
 use App\Service\Run\RunReaper;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -27,6 +28,7 @@ final class ReapRunsCommand extends Command
      */
     public function __construct(
         private readonly StreamRedis $redis,
+        private readonly LoggerInterface $logger,
         #[AutowireIterator('app.run_reaper')]
         private readonly iterable $kernelReapers = [],
     ) {
@@ -38,8 +40,17 @@ final class ReapRunsCommand extends Command
         $failed = $this->redis->reap(time());
         $output->writeln('Failed '.$failed.' run'.(1 === $failed ? '' : 's').'.');
 
+        $status = Command::SUCCESS;
         foreach ($this->kernelReapers as $reaper) {
-            $counts = $reaper->reap();
+            // One kind whose store is down must not keep the other kinds from being recovered.
+            try {
+                $counts = $reaper->reap();
+            } catch (\Throwable $e) {
+                $this->logger->error('Kernel run reaper failed: {error}', ['error' => $e->getMessage(), 'exception' => $e]);
+                $output->writeln('<error>Kernel runs: one reaper failed; see the log.</error>');
+                $status = Command::FAILURE;
+                continue;
+            }
             $output->writeln(sprintf(
                 'Kernel runs: %d redispatched, %d interrupted, %d moved on after waiting.',
                 $counts['redispatched'],
@@ -48,6 +59,6 @@ final class ReapRunsCommand extends Command
             ));
         }
 
-        return Command::SUCCESS;
+        return $status;
     }
 }

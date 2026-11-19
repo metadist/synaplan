@@ -25,6 +25,27 @@ final class RunEventLogTest extends RunKernelCase
         self::assertSame([], $log->replay($run->id, 3));
     }
 
+    public function testAStoredLineWithAForeignNameIsNotReplayed(): void
+    {
+        $log = $this->log();
+        $run = $this->openRun();
+        $log->append($run->id, 'progress', []);
+        $this->keys->appendEvent(
+            $this->keyspace->eventSeq($run->id),
+            $this->keyspace->events($run->id),
+            $this->keyspace->state($run->id),
+            '{"event":"done\\ndata: injected","data":{}}',
+        );
+
+        self::assertSame([['seq' => 1, 'event' => 'progress', 'data' => []]], $log->replay($run->id, 0));
+    }
+
+    public function testANameThatCouldBreakAStreamLineIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new RunEventLog($this->keys, $this->keyspace, ["done\nid: 9"]);
+    }
+
     public function testAnUnknownNameIsRefused(): void
     {
         $run = $this->openRun();

@@ -21,6 +21,8 @@ interface RunKeys
     /**
      * Store the value only when the key is free. False when it already holds
      * a value, so two identical starts share one run.
+     *
+     * @throws RunStoreUnavailable when Redis did not answer, so a dead store never reads as a held key
      */
     public function setIfAbsent(string $key, string $value, int $ttlSeconds): bool;
 

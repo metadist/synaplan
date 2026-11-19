@@ -49,4 +49,17 @@ class RunRepository extends ServiceEntityRepository
             ->getQuery()
             ->execute();
     }
+
+    /** Runs in other accounts that $userId started keep running, without the starter's id. */
+    public function clearStartedBy(int $userId): int
+    {
+        return (int) $this->createQueryBuilder('r')
+            ->update()
+            ->set('r.startedBy', ':none')
+            ->where('r.startedBy = :userId')
+            ->setParameter('none', null)
+            ->setParameter('userId', $userId)
+            ->getQuery()
+            ->execute();
+    }
 }

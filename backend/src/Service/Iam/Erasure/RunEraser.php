@@ -13,9 +13,10 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
 /**
- * A deleted account takes its runs with it, before its assistants. The rows
- * go in the transaction; the Redis keys go after the commit, because Redis is
- * not part of it.
+ * A deleted account takes its runs with it, before its assistants, and its id
+ * leaves the runs it started in other accounts. The rows go in the
+ * transaction; the Redis keys go after the commit, because Redis is not part
+ * of it.
  */
 #[AsTaggedItem(priority: 155)]
 final readonly class RunEraser implements UserDataEraserInterface
@@ -33,6 +34,7 @@ final readonly class RunEraser implements UserDataEraserInterface
         $keyspace = RunKeyspace::runs();
         $uuids = array_values(array_filter($this->runs->uuidsForUser($userId), $keyspace->isValid(...)));
         $this->runs->deleteForUser($userId);
+        $this->runs->clearStartedBy($userId);
         if ([] === $uuids) {
             return;
         }

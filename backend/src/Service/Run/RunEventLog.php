@@ -13,6 +13,9 @@ namespace App\Service\Run;
  */
 final readonly class RunEventLog
 {
+    /** An event name ends up on an SSE `event:` line, so it carries no line break. */
+    private const NAME_PATTERN = '/^[a-z][a-z0-9_.-]{0,47}$/D';
+
     /**
      * @param list<non-empty-string> $names the event names this kind of run may record
      */
@@ -23,6 +26,11 @@ final readonly class RunEventLog
     ) {
         if ([] === $names) {
             throw new \InvalidArgumentException('A run event log needs the names it may record.');
+        }
+        foreach ($names as $name) {
+            if (1 !== preg_match(self::NAME_PATTERN, $name)) {
+                throw new \InvalidArgumentException('A run event name is a short lowercase word.');
+            }
         }
     }
 
@@ -66,7 +74,8 @@ final readonly class RunEventLog
         $out = [];
         foreach ($this->keys->range($this->keyspace->events($runId), 0, -1) as $line) {
             $row = RunEventRecord::parse($line);
-            if (null === $row || $row['seq'] <= $after) {
+            // Only names this kind records reach a stream; a foreign line cannot open an SSE frame.
+            if (null === $row || $row['seq'] <= $after || !\in_array($row['event'], $this->names, true)) {
                 continue;
             }
             $out[] = $row;

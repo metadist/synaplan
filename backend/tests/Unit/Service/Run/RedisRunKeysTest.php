@@ -58,6 +58,25 @@ final class RedisRunKeysTest extends TestCase
         (new RedisRunKeys($redis))->members('run:active');
     }
 
+    public function testRedisSilenceIsNotAHeldKey(): void
+    {
+        $redis = $this->createStub(RedisService::class);
+        $redis->method('eval')->willReturn(null);
+
+        $this->expectException(RunStoreUnavailable::class);
+        (new RedisRunKeys($redis))->setIfAbsent('run:delivered:x', '1', 60);
+    }
+
+    public function testAHeldKeyIsNotTakenAgain(): void
+    {
+        $redis = $this->createMock(RedisService::class);
+        $redis->expects($this->once())->method('eval')
+            ->with(self::anything(), ['run:delivered:x'], ['1', '60'])
+            ->willReturn(0);
+
+        self::assertFalse((new RedisRunKeys($redis))->setIfAbsent('run:delivered:x', '1', 60));
+    }
+
     public function testADeletionRedisDidNotConfirmIsNotReportedAsDone(): void
     {
         $redis = $this->createStub(RedisService::class);
