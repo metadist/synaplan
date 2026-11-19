@@ -2,8 +2,8 @@
 
 // Writes a published release version into the files that decide which version a
 // NEW deployment installs: the Elestio manifest, the self-hosting example
-// configuration, the Umbrel App Store package, the AWS Packer build, and the
-// one-file quickstart compose.
+// configuration, the Umbrel App Store package, the AWS Packer build, the
+// one-file quickstart compose, and the Coolify service file.
 //
 // Existing deployments are untouched by design. They keep the version their
 // operator pinned, and change it only by following docs/UPDATE_ELESTIO.md,
@@ -458,6 +458,11 @@ const TARGETS = [
     path: 'deploy/quickstart/compose.lite.yaml',
     apply: (text, version) =>
       applyQuickstartComposeVersion(text, version, 'deploy/quickstart/compose.lite.yaml'),
+  },
+  {
+    path: 'deploy/coolify/synaplan.yaml',
+    apply: (text, version) =>
+      applyQuickstartComposeVersion(text, version, 'deploy/coolify/synaplan.yaml'),
   },
   {
     path: 'server.json',

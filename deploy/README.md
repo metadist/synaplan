@@ -357,8 +357,16 @@ matching pre-update backup.
 
 Platform-specific adapters must call the scripts in this directory rather than
 reimplementing operations. `deploy/elestio/` is the first thin adapter. Future
-Coolify, CapRover, or Railway definitions should preserve the same role,
-persistence, backup, restore, and health contracts.
+CapRover or Railway definitions should preserve the same role, persistence,
+backup, restore, and health contracts.
+
+`deploy/coolify/` is the Coolify service file, installed as a Docker Compose
+Empty resource until Coolify's catalog lists it. Like Umbrel it cannot call
+these scripts: Coolify generates the secrets as environment variables, routes
+the generated domain to the web role through its own Traefik, and keeps the
+data in named volumes. Install, secrets, update and backup are in
+[`coolify/README.md`](coolify/README.md). Its release pin is raised by
+`scripts/set-release-version.mjs` with the others.
 
 `deploy/aws/` is the AWS Marketplace AMI adapter and follows the same rule one
 layer further out: there is no managed platform on an EC2 instance, so systemd

@@ -23,6 +23,7 @@ Synaplan has separate development and production deployment contracts. Pick the 
 | **Production Self-Hosting** | `deploy/compose.yaml` + `deploy/.env` | `127.0.0.1:8000` (behind reverse proxy or `local-tls`) | `deploy/data/` bind mounts + `deploy/data/secrets.env` | Linux servers, closed networks, scripted backups, and pinned releases |
 | **Local Development** | Root `docker-compose.yml` (`make up`) | `:5173` (UI), `:8000` (API) | Dev Docker volumes + source bind mounts | Developing Synaplan, running tests, and inspecting MailHog / phpMyAdmin |
 | **Managed Cloud / Appliance** | `elestio.yml`, `deploy/aws/`, `deploy/umbrel/` | Platform HTTPS | Platform volume | One-click Elestio pipelines, AWS Marketplace AMI, or Umbrel OS |
+| **Coolify** | `deploy/coolify/synaplan.yaml` | Coolify domain (HTTPS) | Named Docker volumes | A server you already run with Coolify; paste the file into a Docker Compose Empty resource |
 
 - **Local development:** use the root `docker-compose.yml` or
   `docker-compose-minimal.yml`. These files build from source and include
@@ -35,6 +36,9 @@ Synaplan has separate development and production deployment contracts. Pick the 
   [Published image, no git checkout](PLATFORM_REFERENCE.md#published-image-no-git-checkout).
 - **Production self-hosting:** use `deploy/compose.yaml` with a pinned Synaplan
   image version and secrets supplied through `deploy/.env`.
+- **Coolify:** paste `deploy/coolify/synaplan.yaml` into a Docker Compose
+  Empty resource and deploy. Coolify generates the secrets and the domain. See
+  [deploy/coolify/README.md](../deploy/coolify/README.md).
 - **Elestio evaluation:** import the repository as a custom Docker Compose
   CI/CD pipeline. The root `elestio.yml` delegates to the same production
   contract under `deploy/`.

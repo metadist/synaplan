@@ -366,6 +366,9 @@ test('the shipped files name one and the same released version', () => {
   const casaos = readCasaosComposeVersion(
     readFileSync(join(ROOT, 'deploy', 'casaos', 'Synaplan', 'docker-compose.yml'), 'utf8')
   )
+  const coolify = readQuickstartComposeVersion(
+    readFileSync(join(ROOT, 'deploy', 'coolify', 'synaplan.yaml'), 'utf8')
+  )
   const serverJson = readServerJsonVersion(readFileSync(join(ROOT, 'server.json'), 'utf8'))
 
   assert.equal(
@@ -422,6 +425,8 @@ test('the shipped files name one and the same released version', () => {
     quickstartLite.appVersion,
     'The lite quickstart APP_VERSION must match Elestio'
   )
+  assert.equal(elestio, coolify.image, 'The Coolify image default must match Elestio')
+  assert.equal(elestio, coolify.appVersion, 'The Coolify APP_VERSION must match Elestio')
   assert.equal(elestio, casaos.image, 'The CasaOS image tag must match Elestio')
   assert.equal(elestio, casaos.appVersion, 'The CasaOS APP_VERSION must match Elestio')
   assert.equal(elestio, casaos.storeVersion, 'The CasaOS store version must match Elestio')
