@@ -10,6 +10,7 @@ import { GetApiChatsListResponseSchema } from '@/generated/api-schemas'
 import { useIncognitoStore } from '@/stores/incognito'
 import { useHistoryStore } from '@/stores/history'
 import { useIncomingStore } from '@/stores/incoming'
+import { useProjectChatsStore } from '@/stores/projectChats'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { authService } from '@/services/authService'
 import { hasSessionHint } from '@/services/sessionHint'
@@ -937,6 +938,7 @@ export const useChatsStore = defineStore('chats', () => {
     const historyStore = useHistoryStore()
     const emptyChats = chats.value.filter((chat) => {
       if (!isChatEmpty(chat)) return false
+      if (useProjectChatsStore().projectIdOfChat.has(chat.id)) return false // never reuse a project chat
       if (chat.id === activeChatId.value && historyStore.messages.length > 0) {
         return false
       }

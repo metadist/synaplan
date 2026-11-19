@@ -17,12 +17,13 @@ nelmio_api_doc:
                 # Projects: a name, instructions and sources (ProjectPresenter).
                 Project:
                     type: object
-                    required: [id, name, description, instructions, createdAt, updatedAt]
+                    required: [id, name, description, instructions, pinned, createdAt, updatedAt]
                     properties:
                         id: {type: string, format: uuid, example: 7b0f4c1e-6a4e-4a4b-9d0e-3a5b7c9d1e2f}
                         name: {type: string, example: New kitchen}
                         description: {type: string, nullable: true}
                         instructions: {type: string, nullable: true}
+                        pinned: {type: boolean, description: Pinned projects are listed first}
                         createdAt: {type: string, format: date-time}
                         updatedAt: {type: string, format: date-time}
                 ProjectSource:

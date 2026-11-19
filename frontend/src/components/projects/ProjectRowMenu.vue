@@ -1,0 +1,235 @@
+<template>
+  <div class="project-row-menu absolute inset-y-0 right-0 flex items-stretch">
+    <button
+      type="button"
+      class="project-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5"
+      :aria-label="project.pinned ? $t('projects.unpin') : $t('projects.pin')"
+      :aria-pressed="project.pinned"
+      data-testid="btn-sidebar-project-pin"
+      @click="actions.togglePin(project)"
+    >
+      <Icon
+        :icon="project.pinned ? 'ph:push-pin-fill' : 'ph:push-pin'"
+        class="h-4 w-4"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      class="project-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5"
+      :aria-label="$t('projects.menu.label', { name: project.name })"
+      :aria-expanded="open"
+      aria-haspopup="menu"
+      data-testid="btn-sidebar-project-menu"
+      @click="toggle"
+    >
+      <EllipsisHorizontalIcon class="h-5 w-5" aria-hidden="true" />
+    </button>
+  </div>
+
+  <Teleport to="#app">
+    <div v-if="open" class="fixed inset-0 z-[150]" @click="open = false">
+      <div
+        ref="panel"
+        role="menu"
+        class="fixed w-max min-w-44 max-w-[calc(100vw-16px)] whitespace-nowrap dropdown-panel origin-top-left"
+        :style="style"
+        @click.stop
+        @keydown="onPanelKeydown"
+      >
+        <button
+          type="button"
+          role="menuitem"
+          class="dropdown-item"
+          data-testid="btn-sidebar-project-new-chat"
+          @click="run(actions.newProjectChat)"
+        >
+          <ChatBubbleLeftIcon class="h-4 w-4" aria-hidden="true" />
+          {{ $t('projects.chats.new') }}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          class="dropdown-item"
+          data-testid="btn-sidebar-project-rename"
+          @click="run(actions.renameProject)"
+        >
+          <PencilSquareIcon class="h-4 w-4" aria-hidden="true" />
+          {{ $t('common.rename') }}
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          class="dropdown-item dropdown-item--danger"
+          data-testid="btn-sidebar-project-delete"
+          @click="run(actions.deleteProject)"
+        >
+          <TrashIcon class="h-4 w-4" aria-hidden="true" />
+          {{ $t('common.delete') }}
+        </button>
+      </div>
+    </div>
+  </Teleport>
+</template>
+
+<script setup lang="ts">
+import { nextTick, onUnmounted, ref, watch } from 'vue'
+import { Icon } from '@iconify/vue'
+import {
+  ChatBubbleLeftIcon,
+  EllipsisHorizontalIcon,
+  PencilSquareIcon,
+  TrashIcon,
+} from '@heroicons/vue/24/outline'
+import type { ProjectItem } from '@/services/api/projectsApi'
+import { useProjectActions } from '@/composables/useProjectActions'
+
+const SIDE_GAP = 6
+const EDGE_GAP = 8
+
+const props = defineProps<{ project: ProjectItem }>()
+
+const actions = useProjectActions()
+const open = ref(false)
+const panel = ref<HTMLElement | null>(null)
+const style = ref<Record<string, string>>({})
+let trigger: HTMLElement | null = null
+
+function toggle(event: MouseEvent): void {
+  if (open.value) {
+    open.value = false
+    return
+  }
+  const button = event.currentTarget as HTMLElement
+  trigger = button
+  const anchor = button.getBoundingClientRect()
+  const row = button.closest<HTMLElement>('li')?.getBoundingClientRect() ?? anchor
+  style.value = { top: `${row.top}px`, left: `${row.right + SIDE_GAP}px` }
+  open.value = true
+  void nextTick(() => {
+    place(anchor, row)
+    menuItems()[0]?.focus()
+  })
+}
+
+function menuItems(): HTMLElement[] {
+  return [...(panel.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
+}
+
+function onPanelKeydown(event: KeyboardEvent): void {
+  const items = menuItems()
+  const at = items.indexOf(document.activeElement as HTMLElement)
+  if (event.key === 'ArrowDown') items[(at + 1) % items.length]?.focus()
+  else if (event.key === 'ArrowUp') items[(at - 1 + items.length) % items.length]?.focus()
+  else if (event.key === 'Home') items[0]?.focus()
+  else if (event.key === 'End') items[items.length - 1]?.focus()
+  else return
+  event.preventDefault()
+}
+
+/** To the right of the row, as wide as its longest item; below the button when there is no room. */
+function place(anchor: DOMRect, row: DOMRect): void {
+  const width = panel.value?.offsetWidth ?? 0
+  const height = panel.value?.offsetHeight ?? 0
+  const maxTop = window.innerHeight - height - EDGE_GAP
+  const right = row.right + SIDE_GAP
+  if (right + width <= window.innerWidth - EDGE_GAP) {
+    style.value = { top: `${Math.max(EDGE_GAP, Math.min(row.top, maxTop))}px`, left: `${right}px` }
+    return
+  }
+  const left = Math.max(
+    EDGE_GAP,
+    Math.min(anchor.right - width, window.innerWidth - width - EDGE_GAP)
+  )
+  const below = anchor.bottom + 4
+  const top =
+    below <= maxTop ? below : Math.max(EDGE_GAP, Math.min(anchor.top - height - 4, maxTop))
+  style.value = { top: `${top}px`, left: `${left}px` }
+}
+
+function run(action: (project: ProjectItem) => Promise<void>): void {
+  open.value = false
+  void action(props.project)
+}
+
+function onKeydown(event: KeyboardEvent): void {
+  if (event.key !== 'Escape') return
+  open.value = false
+  trigger?.focus()
+}
+
+function close(): void {
+  open.value = false
+}
+
+/** Every project row has a menu; only the open one listens to the page. */
+function listen(on: boolean): void {
+  if (on) {
+    document.addEventListener('keydown', onKeydown)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return
+  }
+  document.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('scroll', close, true)
+  window.removeEventListener('resize', close)
+}
+
+watch(open, listen)
+onUnmounted(() => listen(false))
+</script>
+
+<style scoped>
+.project-row-menu {
+  /* Same plate as the chat rows: the title fades out under the buttons. */
+  --project-row-plate: #ccd6e5;
+  padding-left: 0.5rem;
+  background: linear-gradient(to right, transparent, var(--project-row-plate) 0.5rem);
+  opacity: 1;
+  pointer-events: none;
+}
+
+.dark .project-row-menu {
+  --project-row-plate: #0c101a;
+}
+
+.project-row-menu-btn.icon-ghost {
+  pointer-events: auto;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  color: var(--txt-secondary);
+  opacity: 0.72;
+}
+
+.project-row-menu-btn.icon-ghost:hover,
+.project-row-menu-btn.icon-ghost:focus-visible {
+  color: var(--txt-primary);
+  opacity: 1;
+}
+
+.project-row-menu-btn.icon-ghost:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .project-row-menu {
+    opacity: 0;
+  }
+
+  .project-row-menu-btn.icon-ghost {
+    pointer-events: none;
+  }
+
+  .group\/project:hover .project-row-menu-btn.icon-ghost,
+  .group\/project:focus-within .project-row-menu-btn.icon-ghost {
+    pointer-events: auto;
+  }
+
+  .group\/project:hover .project-row-menu,
+  .group\/project:focus-within .project-row-menu {
+    opacity: 1;
+  }
+}
+</style>

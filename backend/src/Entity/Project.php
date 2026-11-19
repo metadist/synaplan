@@ -41,6 +41,10 @@ class Project
     #[ORM\Column(name: 'BGROUPKEY', type: 'string', length: 64)]
     private string $groupKey;
 
+    /** Set while the owner has pinned the project to the top of the list. */
+    #[ORM\Column(name: 'BPINNEDAT', type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeInterface $pinnedAt = null;
+
     #[ORM\Column(name: 'BCREATED', type: 'datetime_immutable')]
     private \DateTimeInterface $created;
 
@@ -103,6 +107,20 @@ class Project
     {
         $this->instructions = $instructions;
         $this->touch();
+    }
+
+    public function isPinned(): bool
+    {
+        return null !== $this->pinnedAt;
+    }
+
+    /** Pinning is a view preference: it does not count as a change of the project. */
+    public function pin(bool $pinned): void
+    {
+        if ($pinned === $this->isPinned()) {
+            return;
+        }
+        $this->pinnedAt = $pinned ? new \DateTimeImmutable() : null;
     }
 
     public function getGroupKey(): string

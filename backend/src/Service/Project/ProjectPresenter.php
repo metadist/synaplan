@@ -22,6 +22,7 @@ final readonly class ProjectPresenter
             'name' => $project->getName(),
             'description' => $project->getDescription(),
             'instructions' => $project->getInstructions(),
+            'pinned' => $project->isPinned(),
             'createdAt' => $project->getCreated()->format('c'),
             'updatedAt' => $project->getUpdated()->format('c'),
         ];

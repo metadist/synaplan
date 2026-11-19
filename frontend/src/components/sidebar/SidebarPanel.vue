@@ -65,7 +65,11 @@
       @scroll="onPanelScroll"
     >
       <SidebarPanelSettings v-if="onSettings" />
-      <SidebarPanelChats v-else-if="activeKey === 'chats'" ref="chatsPanel" />
+      <SidebarPanelChats
+        v-else-if="activeKey === 'chats'"
+        ref="chatsPanel"
+        :chat-highlighted="route.name === 'chat'"
+      />
       <SidebarPanelLibrary v-else-if="activeKey === 'library'" />
       <SidebarPanelLinks v-else :groups="activeGroups" :section-path="activeSectionPath" />
     </div>

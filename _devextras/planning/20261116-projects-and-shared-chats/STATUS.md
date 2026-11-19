@@ -10,7 +10,8 @@ to them.
 | PJ1 | merged | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
 | PJ2 | merged | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
 | PJ3 | merged | #3152 | Projects with sources and instructions (API). Deviation from §10: a chat joins a project through `POST /projects/{uuid}/chats` and `PUT/DELETE /projects/{uuid}/chats/{chatId}`, so `POST /chats` and `PATCH /chats/{id}` are unchanged (no growth of the oversized `ChatController`). The flag is checked in the controller as well as by the module gate. Walked on the stack with a real model: a project chat answered from a text source with its marker, and the instructions shaped the answer. Create takes name and description; instructions go through PATCH. |
-| PJ4–PJ28 | not started | — | every other ☐ and Ask row of §0 still waits; #21 is confirmed by the PJ2 spike, its tick is the owner's |
+| PJ4 | in review | — | Project page `/projects/:id` (Chats, Sources, Instructions), a "Projects" section in the Chats panel, the Add-source dialog (file, link, text), the project name above the composer of a project chat, and move in/out of a project from the chat menu. A flag-off module answers 404 `feature_not_configured` and the UI shows nothing. `PROJECTS_ENABLED=1` is set in `backend/.env.test` so the E2E spec can run. |
+| PJ5–PJ28 | not started | — | every other ☐ and Ask row of §0 still waits; #21 is confirmed by the PJ2 spike, its tick is the owner's |
 
 ---
 

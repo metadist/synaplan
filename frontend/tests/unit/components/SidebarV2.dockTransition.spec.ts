@@ -73,6 +73,8 @@ describe('SidebarV2 at/above the dock width', () => {
       global: {
         plugins: [pinia, router],
         stubs: {
+          ProjectsSidebarSection: true,
+          ChatProjectPickerDialog: true,
           Icon: true,
           ChatShareModal: true,
           ShareDialog: true,

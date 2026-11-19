@@ -512,6 +512,12 @@ const router = createRouter({
       meta: { requiresAuth: true, titleKey: 'pageTitles.plugins', i18n: ['tools'] },
     },
     {
+      path: '/projects/:id',
+      name: 'project',
+      component: () => import('@/views/ProjectView.vue'),
+      meta: { requiresAuth: true, titleKey: 'pageTitles.projects', i18n: ['chat'] },
+    },
+    {
       path: '/files',
       name: 'files',
       component: () => import('@/views/FilesView.vue'),

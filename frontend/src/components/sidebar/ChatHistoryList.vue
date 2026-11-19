@@ -156,6 +156,16 @@
         <span class="min-w-0 break-words">{{ originOf(previewChat).label }}</span>
       </p>
       <p
+        v-if="projectNameOf?.(previewChat)"
+        class="mt-1 flex items-center gap-1.5 text-[13px] txt-secondary"
+        data-testid="text-chat-preview-project"
+      >
+        <FolderIcon class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+        <span class="min-w-0 break-words">{{
+          $t('projects.composer.inProject', { name: projectNameOf(previewChat) })
+        }}</span>
+      </p>
+      <p
         v-if="previewChat.incoming && (previewChat.ownerName || previewChat.permission)"
         class="mt-1 text-[13px] txt-secondary break-words"
         data-testid="text-chat-preview-access"
@@ -173,7 +183,12 @@
       leave-to-class="opacity-0 scale-95"
     >
       <div v-if="menuChatId !== null" class="fixed inset-0 z-[150]" @click="menuChatId = null">
-        <div class="fixed w-44 dropdown-panel origin-top-right" :style="menuStyle" @click.stop>
+        <div
+          ref="menuPanel"
+          class="fixed w-max min-w-44 max-w-[calc(100vw-16px)] whitespace-nowrap dropdown-panel origin-top-left"
+          :style="menuStyle"
+          @click.stop
+        >
           <button
             v-if="shareAllowed"
             type="button"
@@ -201,6 +216,16 @@
           >
             <Icon icon="mdi:tag" class="w-4 h-4" />
             {{ $t('chat.tags') }}
+          </button>
+          <button
+            v-if="moveAllowed"
+            type="button"
+            class="dropdown-item"
+            data-testid="btn-chat-v2-move-project"
+            @click="onMove"
+          >
+            <Icon icon="mdi:folder-move-outline" class="w-4 h-4" />
+            {{ $t('projects.move.menu') }}
           </button>
           <button
             type="button"
@@ -239,7 +264,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
+import { EllipsisHorizontalIcon, FolderIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { canExportChats, canShareChats } from '@/composables/useChatWelcome'
@@ -267,6 +292,10 @@ const props = defineProps<{
   listTestId?: string
   /** Label of the date group a row belongs to. Rows must arrive sorted, so groups stay contiguous. */
   groupOf?: (chat: HistoryChat) => string | null
+  /** Offer "Move to project" in the row menu (own chats only). */
+  allowMove?: boolean
+  /** Name of the project a chat belongs to, shown in the hover preview. */
+  projectNameOf?: (chat: HistoryChat) => string | undefined
 }>()
 
 const rowsTestId = computed(() => props.listTestId ?? 'list-chat-manager-rows')
@@ -302,15 +331,20 @@ const emit = defineEmits<{
   pin: [chatId: number]
   archive: [chatId: number]
   export: [chatId: number]
+  move: [chatId: number]
 }>()
 
 const { t } = useI18n()
 const chatsStore = useChatsStore()
 const shareAllowed = computed(() => canShareChats())
 const exportAllowed = computed(() => canExportChats())
+const moveAllowed = computed(() => props.allowMove === true)
 
 const menuChatId = ref<number | null>(null)
 const menuStyle = ref<Record<string, string>>({})
+const menuPanel = ref<HTMLElement | null>(null)
+const MENU_EDGE_GAP = 8
+const MENU_SIDE_GAP = 6
 const previewChatId = ref<number | null>(null)
 const previewStyle = ref<Record<string, string>>({})
 const marqueeChatId = ref<number | null>(null)
@@ -458,7 +492,7 @@ const placePreview = (chat: HistoryChat, row: HTMLElement) => {
     left = Math.max(PREVIEW_GAP, rect.left - PREVIEW_WIDTH - PREVIEW_GAP)
   }
   let top = rect.top
-  const estimatedHeight = 96
+  const estimatedHeight = props.projectNameOf?.(chat) ? 124 : 96
   if (top + estimatedHeight > window.innerHeight - PREVIEW_GAP) {
     top = Math.max(PREVIEW_GAP, window.innerHeight - estimatedHeight - PREVIEW_GAP)
   }
@@ -510,13 +544,40 @@ const toggleMenu = (chatId: number, event: MouseEvent) => {
   const btn = (event.currentTarget ?? event.target) as HTMLElement | null
   if (!(btn instanceof HTMLElement)) return
   const rect = btn.getBoundingClientRect()
-  const menuHeight = 176
-  const menuWidth = 176
-  const spaceBelow = window.innerHeight - rect.bottom
-  const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4
-  const left = Math.max(8, rect.right - menuWidth)
-  menuStyle.value = { top: `${top}px`, left: `${left}px` }
+  const row = btn.closest<HTMLElement>('[role="listitem"]')?.getBoundingClientRect() ?? rect
+  menuStyle.value = { top: `${row.top}px`, left: `${row.right + MENU_SIDE_GAP}px` }
   menuChatId.value = chatId
+  void nextTick(() => placeMenu(rect, row))
+}
+
+/**
+ * The menu opens to the right of the row, as wide as its longest item. Without room on the
+ * right it drops below the button instead. Either way it is moved so every item stays on screen.
+ */
+const placeMenu = (anchor: DOMRect, row: DOMRect) => {
+  const panel = menuPanel.value
+  if (!panel) return
+  const { offsetWidth: width, offsetHeight: height } = panel
+  const maxTop = window.innerHeight - height - MENU_EDGE_GAP
+  const right = row.right + MENU_SIDE_GAP
+  if (right + width <= window.innerWidth - MENU_EDGE_GAP) {
+    const top = Math.max(MENU_EDGE_GAP, Math.min(row.top, maxTop))
+    menuStyle.value = { top: `${top}px`, left: `${right}px` }
+    return
+  }
+  const left = Math.max(
+    MENU_EDGE_GAP,
+    Math.min(anchor.right - width, window.innerWidth - width - MENU_EDGE_GAP)
+  )
+  const below = anchor.bottom + 4
+  const above = anchor.top - height - 4
+  const top = below <= maxTop ? below : Math.max(MENU_EDGE_GAP, Math.min(above, maxTop))
+  menuStyle.value = { top: `${top}px`, left: `${left}px` }
+}
+
+const onMove = () => {
+  const id = takeMenuId()
+  if (id !== null) emit('move', id)
 }
 
 const takeMenuId = (): number | null => {

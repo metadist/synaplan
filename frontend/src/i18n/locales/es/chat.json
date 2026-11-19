@@ -1211,5 +1211,116 @@
       "stopped": "Detenida",
       "failed": "No terminó"
     }
+  },
+  "projects": {
+    "title": "Proyectos",
+    "new": "Nuevo proyecto",
+    "newMessage": "Ponle un nombre al proyecto. Podrás añadir fuentes e instrucciones en la página siguiente.",
+    "namePlaceholder": "Por ejemplo: Cocina nueva",
+    "create": "Crear",
+    "createFailed": "No se pudo crear el proyecto.",
+    "sidebarEmpty": "Aún no hay proyectos.",
+    "unavailable": "Los proyectos no están disponibles aquí.",
+    "notFound": "Este proyecto no existe.",
+    "loadFailed": "No se pudo cargar el proyecto.",
+    "nameLabel": "Nombre del proyecto",
+    "rename": "Cambiar el nombre del proyecto",
+    "renameMessage": "Elige un nuevo nombre para el proyecto.",
+    "pin": "Fijar proyecto",
+    "unpin": "Soltar proyecto",
+    "pinFailed": "No se pudo fijar el proyecto.",
+    "pinned": "Fijado",
+    "renameFailed": "No se pudo cambiar el nombre del proyecto.",
+    "delete": "Eliminar proyecto",
+    "deleteTitle": "¿Eliminar «{name}»?",
+    "deleteEmpty": "Se eliminarán el proyecto y sus fuentes. No se puede deshacer.",
+    "deleteWithChats": "Se eliminarán el proyecto y sus fuentes. ¿Qué pasa con su chat? | ¿Qué pasa con sus {n} chats?",
+    "deleteKeepChats": "Conservar los chats",
+    "deleteAllChats": "Eliminar también los chats",
+    "deleteFailed": "No se pudo eliminar el proyecto.",
+    "tabs": {
+      "chats": "Chats",
+      "sources": "Fuentes",
+      "instructions": "Instrucciones"
+    },
+    "source": {
+      "reading": "Leyendo…",
+      "ready": "Listo",
+      "failed": "No se pudo leer",
+      "retry": "Reintentar",
+      "remove": "Quitar fuente"
+    },
+    "sources": {
+      "intro": "Archivos, enlaces y notas que pueden usar los chats de este proyecto.",
+      "add": "Añadir fuente",
+      "empty": "Aún no hay fuentes. Añade un archivo, un enlace o una nota.",
+      "loadFailed": "No se pudieron cargar las fuentes.",
+      "retryFailed": "No se pudo volver a leer la fuente.",
+      "removeTitle": "¿Quitar la fuente?",
+      "removeMessage": "«{name}» dejará de estar disponible para los chats de este proyecto.",
+      "removeFailed": "No se pudo quitar la fuente.",
+      "added": "Se añadió una fuente | Se añadieron {n} fuentes"
+    },
+    "addSource": {
+      "title": "Añadir fuente",
+      "kind": {
+        "file": "Archivo",
+        "link": "Enlace",
+        "text": "Nota"
+      },
+      "fileLabel": "Elegir archivos",
+      "fileHint": "PDF, texto, imágenes y otros documentos.",
+      "linkLabel": "Dirección web",
+      "linkHint": "Las páginas que requieren inicio de sesión no se pueden leer.",
+      "textTitleLabel": "Título",
+      "textLabel": "Texto",
+      "submit": "Añadir",
+      "adding": "Añadiendo…",
+      "errorRate": "Demasiadas fuentes en poco tiempo. Inténtalo de nuevo en un minuto.",
+      "errorLimit": "El proyecto ha alcanzado su límite de fuentes.",
+      "errorInvalid": "Revisa lo que has escrito.",
+      "errorGeneric": "No se pudo añadir la fuente."
+    },
+    "chats": {
+      "intro": "Los chats de este proyecto responden a partir de sus fuentes y siguen sus instrucciones.",
+      "new": "Nuevo chat",
+      "empty": "Aún no hay chats en este proyecto.",
+      "createFailed": "No se pudo crear el chat.",
+      "leave": "Quitar del proyecto",
+      "leaveTitle": "¿Quitar el chat del proyecto?",
+      "leaveMessage": "El chat se conserva, pero ya no ve las fuentes ni las instrucciones del proyecto.",
+      "left": "Chat quitado del proyecto.",
+      "leaveFailed": "No se pudo quitar el chat."
+    },
+    "instructions": {
+      "intro": "Indica a los chats de este proyecto cómo trabajar, por ejemplo el tono o el formato de las respuestas.",
+      "label": "Instrucciones",
+      "placeholder": "Responde con brevedad y cita la fuente.",
+      "saved": "Guardado",
+      "saveFailed": "No se pudieron guardar las instrucciones."
+    },
+    "composer": {
+      "inProject": "En el proyecto: {name}"
+    },
+    "picker": {
+      "label": "Proyecto: {name}",
+      "none": "Sin proyecto",
+      "open": "Abrir proyecto",
+      "empty": "Aún no tienes proyectos. Crea uno en el panel de chats.",
+      "row": "Proyecto"
+    },
+    "move": {
+      "menu": "Mover a un proyecto…",
+      "title": "Mover el chat a un proyecto",
+      "none": "Aún no tienes proyectos.",
+      "current": "Proyecto actual",
+      "out": "Quitar del proyecto",
+      "moved": "Chat movido.",
+      "removed": "Chat quitado del proyecto.",
+      "failed": "No se pudo mover el chat."
+    },
+    "menu": {
+      "label": "Menú del proyecto: {name}"
+    }
   }
 }

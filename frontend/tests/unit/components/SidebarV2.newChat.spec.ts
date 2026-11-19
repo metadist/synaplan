@@ -90,6 +90,8 @@ const mountSidebar = async ({
     global: {
       plugins: [pinia, router],
       stubs: {
+        ProjectsSidebarSection: true,
+        ChatProjectPickerDialog: true,
         Icon: true,
         ChatShareModal: true,
         ShareDialog: true,

@@ -1270,5 +1270,116 @@
       "stopped": "Stopped",
       "failed": "Could not finish"
     }
+  },
+  "projects": {
+    "title": "Projects",
+    "new": "New project",
+    "newMessage": "Give the project a name. You can add sources and instructions on the next page.",
+    "namePlaceholder": "For example: New kitchen",
+    "create": "Create",
+    "createFailed": "The project could not be created.",
+    "sidebarEmpty": "No projects yet.",
+    "unavailable": "Projects are not available here.",
+    "notFound": "This project does not exist.",
+    "loadFailed": "The project could not be loaded.",
+    "nameLabel": "Project name",
+    "rename": "Rename project",
+    "renameMessage": "Choose a new name for the project.",
+    "pin": "Pin project",
+    "unpin": "Unpin project",
+    "pinFailed": "The project could not be pinned.",
+    "pinned": "Pinned",
+    "renameFailed": "The project could not be renamed.",
+    "delete": "Delete project",
+    "deleteTitle": "Delete \"{name}\"?",
+    "deleteEmpty": "The project and its sources will be deleted. This cannot be undone.",
+    "deleteWithChats": "The project and its sources will be deleted. What happens to its chat? | What happens to its {n} chats?",
+    "deleteKeepChats": "Keep chats",
+    "deleteAllChats": "Delete chats too",
+    "deleteFailed": "The project could not be deleted.",
+    "tabs": {
+      "chats": "Chats",
+      "sources": "Sources",
+      "instructions": "Instructions"
+    },
+    "source": {
+      "reading": "Reading…",
+      "ready": "Ready",
+      "failed": "Could not be read",
+      "retry": "Try again",
+      "remove": "Remove source"
+    },
+    "sources": {
+      "intro": "Files, links and notes the chats in this project can use.",
+      "add": "Add source",
+      "empty": "No sources yet. Add a file, a link or a note.",
+      "loadFailed": "The sources could not be loaded.",
+      "retryFailed": "The source could not be read again.",
+      "removeTitle": "Remove source?",
+      "removeMessage": "\"{name}\" will no longer be available to the chats in this project.",
+      "removeFailed": "The source could not be removed.",
+      "added": "One source added | {n} sources added"
+    },
+    "addSource": {
+      "title": "Add source",
+      "kind": {
+        "file": "File",
+        "link": "Link",
+        "text": "Note"
+      },
+      "fileLabel": "Choose files",
+      "fileHint": "PDF, text, images and other documents.",
+      "linkLabel": "Web address",
+      "linkHint": "Pages that need a login cannot be read.",
+      "textTitleLabel": "Title",
+      "textLabel": "Text",
+      "submit": "Add",
+      "adding": "Adding…",
+      "errorRate": "Too many sources in a short time. Try again in a minute.",
+      "errorLimit": "The project has reached its limit of sources.",
+      "errorInvalid": "Please check your input.",
+      "errorGeneric": "The source could not be added."
+    },
+    "chats": {
+      "intro": "Chats in this project answer from its sources and follow its instructions.",
+      "new": "New chat",
+      "empty": "No chats in this project yet.",
+      "createFailed": "The chat could not be created.",
+      "leave": "Remove from project",
+      "leaveTitle": "Remove chat from project?",
+      "leaveMessage": "The chat stays, but no longer sees the project's sources or instructions.",
+      "left": "Chat removed from the project.",
+      "leaveFailed": "The chat could not be removed."
+    },
+    "instructions": {
+      "intro": "Tell the chats in this project how to work, for example the tone or the format of answers.",
+      "label": "Instructions",
+      "placeholder": "Answer briefly and name the source.",
+      "saved": "Saved",
+      "saveFailed": "The instructions could not be saved."
+    },
+    "composer": {
+      "inProject": "In project: {name}"
+    },
+    "picker": {
+      "label": "Project: {name}",
+      "none": "No project",
+      "open": "Open project",
+      "empty": "You have no projects yet. Create one in the Chats panel.",
+      "row": "Project"
+    },
+    "move": {
+      "menu": "Move to project…",
+      "title": "Move chat to a project",
+      "none": "You have no projects yet.",
+      "current": "Current project",
+      "out": "Remove from project",
+      "moved": "Chat moved.",
+      "removed": "Chat removed from the project.",
+      "failed": "The chat could not be moved."
+    },
+    "menu": {
+      "label": "Project menu: {name}"
+    }
   }
 }

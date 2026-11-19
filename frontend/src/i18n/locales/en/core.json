@@ -112,7 +112,8 @@
     "appDetail": "App",
     "adminUsage": "Cost board",
     "start": "Start",
-    "welcome": "Welcome"
+    "welcome": "Welcome",
+    "projects": "Project"
   },
   "welcome": "Welcome",
   "welcomeUser": "Welcome, {name}",

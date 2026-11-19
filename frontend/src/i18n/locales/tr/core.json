@@ -111,7 +111,8 @@
     "appDetail": "Uygulama",
     "adminUsage": "Maliyet panosu",
     "start": "Başla",
-    "welcome": "Hoş geldiniz"
+    "welcome": "Hoş geldiniz",
+    "projects": "Proje"
   },
   "welcome": "Hoş Geldiniz",
   "welcomeUser": "Hoş geldin, {name}",

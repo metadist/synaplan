@@ -111,7 +111,8 @@
     "appDetail": "App",
     "adminUsage": "Panel de costes",
     "start": "Empezar",
-    "welcome": "Bienvenida"
+    "welcome": "Bienvenida",
+    "projects": "Proyecto"
   },
   "welcome": "Bienvenido",
   "welcomeUser": "Bienvenido, {name}",

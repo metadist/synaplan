@@ -70,7 +70,7 @@
           v-else
           :chats="incomingChatList"
           list-test-id="list-chat-v2-incoming"
-          :active-chat-id="chatsStore.activeChatId"
+          :active-chat-id="highlightedChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
@@ -85,6 +85,8 @@
         />
       </div>
     </div>
+
+    <ProjectsSidebarSection v-if="!archiveStore.viewingArchived" />
 
     <div v-if="pinnedChats.length > 0" class="mt-5" data-testid="section-sidebar-pinned">
       <div class="group/section relative">
@@ -105,7 +107,9 @@
         <ChatHistoryList
           :chats="pinnedChats"
           list-test-id="list-chat-v2-pinned"
-          :active-chat-id="chatsStore.activeChatId"
+          :allow-move="projectsStore.loaded && projectsStore.available"
+          :project-name-of="projectNameOf"
+          :active-chat-id="highlightedChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
@@ -117,6 +121,7 @@
           @archive="archiveChat"
           @export="exportChat"
           @pin="toggleChatPin"
+          @move="openMoveDialog"
         />
       </div>
     </div>
@@ -150,12 +155,14 @@
       <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-2">
         <ChatHistoryList
           :chats="unpinnedChats"
-          :active-chat-id="chatsStore.activeChatId"
+          :active-chat-id="highlightedChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
           :answer-ready="isAnswerReady"
           :group-of="dateGroupLabel"
+          :allow-move="projectsStore.loaded && projectsStore.available"
+          :project-name-of="projectNameOf"
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -163,6 +170,7 @@
           @archive="archiveChat"
           @export="exportChat"
           @pin="toggleChatPin"
+          @move="openMoveDialog"
         >
           <template #empty>
             <p
@@ -192,6 +200,11 @@
         </ChatHistoryList>
       </div>
     </div>
+    <ChatProjectPickerDialog
+      :open="moveChatId !== null"
+      :chat-id="moveChatId"
+      @close="moveChatId = null"
+    />
   </div>
 </template>
 
@@ -206,6 +219,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ChatHistoryList from './ChatHistoryList.vue'
+import ProjectsSidebarSection from '@/components/projects/ProjectsSidebarSection.vue'
+import { useProjectsStore } from '@/stores/projects'
+import ChatProjectPickerDialog from '@/components/projects/ChatProjectPickerDialog.vue'
 import { chatDateGroup } from './chatDateGroups'
 import { listOverflows, scrollerGrewWithContent } from './chatHistoryPaging'
 import { chatsPanelRefresh } from '@/composables/useNavSections'
@@ -261,6 +277,14 @@ const rememberExpanded = (key: string, open: boolean) => {
   }
 }
 
+const props = withDefaults(defineProps<{ chatHighlighted?: boolean }>(), { chatHighlighted: true })
+
+/** The open chat is only marked while the chat itself is on screen, not on a project page. */
+const highlightedChatId = computed(() => (props.chatHighlighted ? chatsStore.activeChatId : null))
+
+const projectNameOf = (chat: { id: number }): string | undefined =>
+  projectsStore.available ? projectsStore.projectOfChat(chat.id)?.name : undefined
+
 const sectionToggleClass =
   'sidebar-section-label mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-4 py-1 text-left text-[15px] font-semibold hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'
 
@@ -313,6 +337,12 @@ const isGuest = computed(() => !authStore.isAuthenticated)
 
 function startGuestTour(): void {
   startTour(GUEST_CHATS_TOUR_ID)
+}
+
+const projectsStore = useProjectsStore()
+const moveChatId = ref<number | null>(null)
+const openMoveDialog = (chatId: number) => {
+  moveChatId.value = chatId
 }
 
 const chatsExpanded = ref(readExpanded(CHATS_EXPANDED_KEY))
