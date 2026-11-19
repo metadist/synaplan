@@ -30,7 +30,7 @@ dann **AH8a**, **AH8b**, dann PJ5 (siehe Abschnitt 9).
 | PJ3 Projekte mit Quellen und Instruktionen (API) | fertig, gemergt | #3152 |
 | PJ4 Projektseite, Projekte im Chats-Panel | fertig, gemergt | #3186 |
 | AU26 ein Agent-Loop (Zeile 22) | im Review, Branch `refactor/one-agent-loop` | — |
-| PJ5–PJ28 | nicht begonnen; zuerst AU26, AH8a, AH8b | — |
+| PJ5–PJ28 | nicht begonnen; zuerst AH8a (im Review), AH8b; AU26 gemergt (#3193) | — |
 
 ## 2. Bisherige Implementierungen
 
@@ -251,22 +251,18 @@ Ask-first laut `AGENTS.md`: Schemaänderungen, neue Abhängigkeit, Docker/CI/Bui
 neuer AI-Provider. Freigegeben sind nur die Migrationen von PJ3 und die `BRUNS`-Migration von
 AH8a (Zeile 25 §0 #9, hier §0 #63).
 
-## 9. Exakt nächster Schritt: AU26 (umgesetzt, im Review; danach AH8a)
+## 9. Exakt nächster Schritt: AH8b (AU26 gemergt als #3193, AH8a im Review)
 
-1. `git checkout main && git pull --ff-only`, Branch `refactor/one-agent-loop`.
-2. Brief: `../20261021-architecture-update/S4_one_tool_path.md` Abschnitt AU26, Contract
-   `../20261021-architecture-update/03_contracts.md` §4 (Loop und Adapter).
-3. Tests zuerst: `ToolLoopCharacterizationTest` und `tool_loops.json` bleiben unverändert;
-   neuer Unit-Test: Loop ohne Iterationsgrenze und ohne Deadline endet erst bei einer
-   Antwort ohne Tool.
-4. `AgentToolLoop` mit drei Adaptern (`DocumentToolLoopAdapter`, `MessagesCompleteAdapter`
-   und `MessagesStreamAdapter`, `OpenAiToolLoopAdapter`); Grenzen als `ToolLoopLimits` übergeben, `ToolLimits` liefert die
-   heutigen Defaults; die drei Kopien der Schleife und der Konstanten sind weg;
-   `GatewayToolLoop` verlässt den Size-Ledger (nur Entfernungen).
-5. Gate: `make ci-local` ungefiltert, `make test-e2e` (Chat betroffen), commit
-   `refactor(tools): one agent loop for document chat and both gateways`, PR, auf Copilot und
-   `All Checks Passed` warten, Threads beantworten, nicht mergen.
-6. `STATUS.md` der Zeile 22 und dieses Ordners im selben PR aktualisieren.
+1. Nach dem Merge von AH8a: `git checkout main && git pull --ff-only`, Branch
+   `refactor/research-on-run-kernel`.
+2. Brief: `../20261023-agent-handling/04_sprints.md` AH8b; Kernel und Schlüssel-Layout in
+   `../20261023-agent-handling/03_contracts.md` §2.2, Stand in dessen `STATUS.md` (2026-11-19).
+3. Tests zuerst: die bestehenden Research-Tests (`tests/Unit/Service/Research/Run`) bleiben
+   unverändert grün; `ResearchState` implementiert `RunState`/`RunStateCodec`, Lease, Reaper und
+   Unit-Worker von Research werden durch `RunUnit`, `RunReaper` und eine `RunReapPolicy` ersetzt.
+4. Gate wie gehabt (`make ci-local`, `make test-e2e` wegen Research-UI), Commit
+   `refactor(research): research runs on the run kernel`, PR, Copilot und
+   `All Checks Passed`, Threads beantworten, nicht mergen.
 
 ## 10. Anforderungen und Entscheidungen des Owners
 
