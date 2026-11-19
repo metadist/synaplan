@@ -185,7 +185,7 @@
       <div v-if="menuChatId !== null" class="fixed inset-0 z-[150]" @click="menuChatId = null">
         <div
           ref="menuPanel"
-          class="fixed w-44 dropdown-panel origin-top-right"
+          class="fixed w-max min-w-44 max-w-[calc(100vw-16px)] whitespace-nowrap dropdown-panel origin-top-left"
           :style="menuStyle"
           @click.stop
         >
@@ -344,6 +344,7 @@ const menuChatId = ref<number | null>(null)
 const menuStyle = ref<Record<string, string>>({})
 const menuPanel = ref<HTMLElement | null>(null)
 const MENU_EDGE_GAP = 8
+const MENU_SIDE_GAP = 6
 const previewChatId = ref<number | null>(null)
 const previewStyle = ref<Record<string, string>>({})
 const marqueeChatId = ref<number | null>(null)
@@ -543,23 +544,35 @@ const toggleMenu = (chatId: number, event: MouseEvent) => {
   const btn = (event.currentTarget ?? event.target) as HTMLElement | null
   if (!(btn instanceof HTMLElement)) return
   const rect = btn.getBoundingClientRect()
-  const menuWidth = 176
-  const left = Math.max(MENU_EDGE_GAP, rect.right - menuWidth)
-  menuStyle.value = { top: `${rect.bottom + 4}px`, left: `${left}px` }
+  const row = btn.closest<HTMLElement>('[role="listitem"]')?.getBoundingClientRect() ?? rect
+  menuStyle.value = { top: `${row.top}px`, left: `${row.right + MENU_SIDE_GAP}px` }
   menuChatId.value = chatId
-  void nextTick(() => placeMenu(rect))
+  void nextTick(() => placeMenu(rect, row))
 }
 
-/** Flip or clamp the open menu by its rendered height, so every item stays on screen. */
-const placeMenu = (anchor: DOMRect) => {
+/**
+ * The menu opens to the right of the row, as wide as its longest item. Without room on the
+ * right it drops below the button instead. Either way it is moved so every item stays on screen.
+ */
+const placeMenu = (anchor: DOMRect, row: DOMRect) => {
   const panel = menuPanel.value
   if (!panel) return
-  const height = panel.offsetHeight
+  const { offsetWidth: width, offsetHeight: height } = panel
+  const maxTop = window.innerHeight - height - MENU_EDGE_GAP
+  const right = row.right + MENU_SIDE_GAP
+  if (right + width <= window.innerWidth - MENU_EDGE_GAP) {
+    const top = Math.max(MENU_EDGE_GAP, Math.min(row.top, maxTop))
+    menuStyle.value = { top: `${top}px`, left: `${right}px` }
+    return
+  }
+  const left = Math.max(
+    MENU_EDGE_GAP,
+    Math.min(anchor.right - width, window.innerWidth - width - MENU_EDGE_GAP)
+  )
   const below = anchor.bottom + 4
   const above = anchor.top - height - 4
-  const maxTop = window.innerHeight - height - MENU_EDGE_GAP
   const top = below <= maxTop ? below : Math.max(MENU_EDGE_GAP, Math.min(above, maxTop))
-  menuStyle.value = { ...menuStyle.value, top: `${top}px` }
+  menuStyle.value = { top: `${top}px`, left: `${left}px` }
 }
 
 const onMove = () => {

@@ -32,7 +32,7 @@
       <div
         ref="panel"
         role="menu"
-        class="fixed w-52 dropdown-panel origin-top-right"
+        class="fixed w-max min-w-44 max-w-[calc(100vw-16px)] whitespace-nowrap dropdown-panel origin-top-left"
         :style="style"
         @click.stop
       >
@@ -83,7 +83,7 @@ import {
 import type { ProjectItem } from '@/services/api/projectsApi'
 import { useProjectActions } from '@/composables/useProjectActions'
 
-const MENU_WIDTH = 208
+const SIDE_GAP = 6
 const EDGE_GAP = 8
 
 const props = defineProps<{ project: ProjectItem }>()
@@ -98,24 +98,32 @@ function toggle(event: MouseEvent): void {
     open.value = false
     return
   }
-  const anchor = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  const left = Math.max(
-    EDGE_GAP,
-    Math.min(anchor.right - MENU_WIDTH, window.innerWidth - MENU_WIDTH - EDGE_GAP)
-  )
-  style.value = { top: `${anchor.bottom + 4}px`, left: `${left}px` }
+  const button = event.currentTarget as HTMLElement
+  const anchor = button.getBoundingClientRect()
+  const row = button.closest<HTMLElement>('li')?.getBoundingClientRect() ?? anchor
+  style.value = { top: `${row.top}px`, left: `${row.right + SIDE_GAP}px` }
   open.value = true
-  void nextTick(() => place(anchor))
+  void nextTick(() => place(anchor, row))
 }
 
-/** Flip above the button when the menu would run off the bottom of the window. */
-function place(anchor: DOMRect): void {
+/** To the right of the row, as wide as its longest item; below the button when there is no room. */
+function place(anchor: DOMRect, row: DOMRect): void {
+  const width = panel.value?.offsetWidth ?? 0
   const height = panel.value?.offsetHeight ?? 0
   const maxTop = window.innerHeight - height - EDGE_GAP
+  const right = row.right + SIDE_GAP
+  if (right + width <= window.innerWidth - EDGE_GAP) {
+    style.value = { top: `${Math.max(EDGE_GAP, Math.min(row.top, maxTop))}px`, left: `${right}px` }
+    return
+  }
+  const left = Math.max(
+    EDGE_GAP,
+    Math.min(anchor.right - width, window.innerWidth - width - EDGE_GAP)
+  )
   const below = anchor.bottom + 4
   const top =
     below <= maxTop ? below : Math.max(EDGE_GAP, Math.min(anchor.top - height - 4, maxTop))
-  style.value = { ...style.value, top: `${top}px` }
+  style.value = { top: `${top}px`, left: `${left}px` }
 }
 
 function run(action: (project: ProjectItem) => Promise<void>): void {
