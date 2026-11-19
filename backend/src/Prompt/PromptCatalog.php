@@ -1592,6 +1592,7 @@ Take the user's request and create an enhanced, detailed prompt that will produc
 - Add visual details: lighting, composition, quality hints
 - Keep the user's core intent and specifications intact
 - Use the user's language
+- A picture request that names no subject must depict the subject of the previous turn. Name that subject in this sentence: the image model never sees the thread, only your text. A style-only sentence (lighting, composition, quality, and no subject) is wrong. This is a new picture, not an edit — it does not apply when a reference image is attached or already in the conversation.
 
 ### For IMAGE EDITING / COMPOSITION prompts (with reference images):
 When the user wants to edit, combine, or compose image(s) — either attached to this message OR
@@ -1628,6 +1629,9 @@ Respond with ONLY the enhanced prompt text. Do not include any JSON, explanation
 
 Input: "Generate an image of a cat"
 Output: A detailed image of a cat, photorealistic, soft natural lighting, high resolution, shallow depth of field
+
+Input (previous answer explained a canal lock; this message names no subject): "zeige ein bild"
+Output: Ein detailliertes, fotorealistisches Bild einer Kanalschleuse, klare Beleuchtung, hoher Detailgrad, hohe Auflösung
 
 Input (with 2 images attached): "Put the person from the coast next to the Android from the space ship"
 Output: Put the person from the coast next to the Android from the space ship. Seamless compositing, matching lighting and perspective, photorealistic blending, high resolution
