@@ -85,18 +85,17 @@ test.describe('@ci Projects', () => {
       await expect(page.locator('[data-testid="row-chat-v2"][class*="--brand"]')).toHaveCount(0)
     })
 
-    await test.step('Act: pin the project from its menu in the panel', async () => {
+    await test.step('Act: pin the project from its row in the panel', async () => {
       const row = page.locator('[data-testid="list-sidebar-projects"] li').filter({ hasText: name })
       await row.hover()
-      await row.locator('[data-testid="btn-sidebar-project-menu"]').click()
-      await page.locator('[data-testid="btn-sidebar-project-pin"]').click()
+      await row.locator('[data-testid="btn-sidebar-project-pin"]').click()
     })
 
     await test.step('Assert: the pin shows and survives a reload', async () => {
       const marker = page
         .locator('[data-testid="list-sidebar-projects"] li')
         .filter({ hasText: name })
-        .locator('[role="img"]')
+        .locator('[data-testid="icon-sidebar-project-pinned"]')
       await expect(marker).toBeVisible({ timeout: TIMEOUTS.STANDARD })
       await page.reload()
       await expect(marker).toBeVisible({ timeout: TIMEOUTS.STANDARD })

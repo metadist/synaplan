@@ -47,6 +47,7 @@
             <Icon
               v-if="project.pinned"
               icon="mdi:pin"
+              data-testid="icon-sidebar-project-pinned"
               class="mr-1.5 h-3.5 w-3.5 flex-shrink-0 txt-secondary"
               :aria-label="$t('projects.pinned')"
               role="img"
@@ -139,7 +140,8 @@ onMounted(() => void store.loadOnce())
 }
 
 .project-row-link {
-  padding: 0.3125rem 0.375rem;
+  /* Room for the pin and menu buttons; on a mouse they only take it while shown. */
+  padding: 0.3125rem 4rem 0.3125rem 0.375rem;
   font-weight: 400;
   color: #3b4353;
 }
@@ -148,6 +150,17 @@ onMounted(() => void store.loadOnce())
   font-weight: 500;
   color: var(--brand);
   background-color: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .project-row-link {
+    padding-right: 0.375rem;
+  }
+
+  .group\/project:hover .project-row-link,
+  .group\/project:focus-within .project-row-link {
+    padding-right: 4rem;
+  }
 }
 
 .dark .sidebar-section-label {

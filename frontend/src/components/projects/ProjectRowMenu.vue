@@ -3,6 +3,20 @@
     <button
       type="button"
       class="project-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5"
+      :aria-label="project.pinned ? $t('projects.unpin') : $t('projects.pin')"
+      :aria-pressed="project.pinned"
+      data-testid="btn-sidebar-project-pin"
+      @click="actions.togglePin(project)"
+    >
+      <Icon
+        :icon="project.pinned ? 'ph:push-pin-fill' : 'ph:push-pin'"
+        class="h-4 w-4"
+        aria-hidden="true"
+      />
+    </button>
+    <button
+      type="button"
+      class="project-row-menu-btn icon-ghost inline-flex h-full items-center justify-center px-1.5"
       :aria-label="$t('projects.menu.label', { name: project.name })"
       :aria-expanded="open"
       aria-haspopup="menu"
@@ -22,19 +36,6 @@
         :style="style"
         @click.stop
       >
-        <button
-          type="button"
-          role="menuitem"
-          class="dropdown-item"
-          data-testid="btn-sidebar-project-pin"
-          @click="run(actions.togglePin)"
-        >
-          <Icon
-            :icon="project.pinned ? 'mdi:pin-off-outline' : 'mdi:pin-outline'"
-            class="h-4 w-4"
-          />
-          {{ project.pinned ? $t('projects.unpin') : $t('projects.pin') }}
-        </button>
         <button
           type="button"
           role="menuitem"
@@ -142,10 +143,20 @@ onUnmounted(() => {
 
 <style scoped>
 .project-row-menu {
+  /* Same plate as the chat rows: the title fades out under the buttons. */
+  --project-row-plate: #ccd6e5;
+  padding-left: 0.5rem;
+  background: linear-gradient(to right, transparent, var(--project-row-plate) 0.5rem);
   opacity: 1;
+  pointer-events: none;
+}
+
+.dark .project-row-menu {
+  --project-row-plate: #0c101a;
 }
 
 .project-row-menu-btn.icon-ghost {
+  pointer-events: auto;
   background: transparent;
   box-shadow: none;
   border-radius: 0;
@@ -167,6 +178,15 @@ onUnmounted(() => {
 @media (hover: hover) and (pointer: fine) {
   .project-row-menu {
     opacity: 0;
+  }
+
+  .project-row-menu-btn.icon-ghost {
+    pointer-events: none;
+  }
+
+  .group\/project:hover .project-row-menu-btn.icon-ghost,
+  .group\/project:focus-within .project-row-menu-btn.icon-ghost {
+    pointer-events: auto;
   }
 
   .group\/project:hover .project-row-menu,
