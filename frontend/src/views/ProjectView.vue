@@ -47,7 +47,9 @@
               <h1
                 v-else
                 class="h-11 truncate border border-transparent px-3 text-2xl font-semibold leading-[2.625rem] txt-primary"
+                :title="$t('projects.rename')"
                 data-testid="text-project-name"
+                @dblclick="startRename"
               >
                 {{ project.name }}
               </h1>
