@@ -1,7 +1,18 @@
 <template>
   <section class="surface-card rounded-lg p-4 mb-6" data-testid="research-admin-auto">
-    <h2 class="text-lg font-semibold txt-primary">{{ t('adminSetup.research.auto.title') }}</h2>
-    <p class="text-sm txt-secondary mt-1">{{ t('adminSetup.research.auto.help') }}</p>
+    <div class="flex items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h2 class="text-lg font-semibold txt-primary">{{ t('adminSetup.research.auto.title') }}</h2>
+        <p class="text-sm txt-secondary mt-1">{{ t('adminSetup.research.auto.help') }}</p>
+      </div>
+      <GatewaySettingToggle
+        :model-value="autoEnabled"
+        :label="t('adminSetup.research.auto.title')"
+        :disabled="!researchOn || switching"
+        testid="research-admin-auto-switch"
+        @update:model-value="setAuto"
+      />
+    </div>
 
     <p
       v-if="!researchOn"
@@ -25,16 +36,6 @@
       {{ t('adminSetup.research.auto.noWeb') }}
     </p>
 
-    <button
-      type="button"
-      :class="autoEnabled ? 'btn-secondary' : 'btn-primary'"
-      class="px-4 py-2.5 text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
-      :data-testid="autoEnabled ? 'research-admin-auto-turn-off' : 'research-admin-auto-turn-on'"
-      :disabled="!researchOn || switching"
-      @click="toggle"
-    >
-      {{ autoEnabled ? t('adminSetup.research.turnOff') : t('adminSetup.research.turnOn') }}
-    </button>
     <p v-if="errorText" class="text-sm text-red-600 dark:text-red-400 mt-3" role="alert">
       {{ errorText }}
     </p>
@@ -44,6 +45,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import GatewaySettingToggle from '@/components/config/messagesGateway/GatewaySettingToggle.vue'
 import { saveResearchAdmin, type ResearchAdmin } from '@/services/api/researchAdminApi'
 import { useResearchStore } from '@/stores/research'
 import { REFUSAL_KEYS, researchRefusal } from './researchAdminErrors'
@@ -70,11 +72,12 @@ const researchStore = useResearchStore()
 const switching = ref(false)
 const errorText = ref('')
 
-async function toggle(): Promise<void> {
+async function setAuto(enabled: boolean): Promise<void> {
+  if (enabled === props.autoEnabled || !props.researchOn) return
   switching.value = true
   errorText.value = ''
   try {
-    const view = await saveResearchAdmin({ autoEnabled: !props.autoEnabled })
+    const view = await saveResearchAdmin({ autoEnabled: enabled })
     researchStore.forgetCapabilities()
     emit('saved', view)
   } catch (error) {

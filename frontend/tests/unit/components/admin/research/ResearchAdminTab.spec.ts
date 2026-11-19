@@ -35,6 +35,22 @@ const off = () => ({
 const refusal = (status: number, code: string, field: string | null = null) =>
   new ApiError(status, 'refused', undefined, { error: { code, field, message: 'English only' } })
 
+function accept<T extends ReturnType<typeof off>>(base: T, body: Record<string, unknown>): T {
+  const next = structuredClone(base)
+  const budgets = next.budgets as Record<string, Record<string, number>>
+  if (body.budgets && typeof body.budgets === 'object') {
+    for (const [depth, row] of Object.entries(
+      body.budgets as Record<string, Record<string, number>>
+    )) {
+      budgets[depth] = { ...(budgets[depth] ?? {}), ...row }
+    }
+  }
+  if (body.limits && typeof body.limits === 'object') {
+    next.limits = { ...next.limits, ...(body.limits as T['limits']) }
+  }
+  return next
+}
+
 describe('ResearchAdminTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -59,12 +75,16 @@ describe('ResearchAdminTab', () => {
       wrapper.get('[data-testid="research-admin-sample"]').attributes('disabled')
     ).toBeDefined()
 
-    await wrapper.get('[data-testid="research-admin-turn-on"]').trigger('click')
+    const toggle = wrapper.get('[data-testid="research-admin-enabled"]')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+    await toggle.trigger('click')
     await flushPromises()
 
     expect(saveResearchAdmin).toHaveBeenCalledWith({ enabled: true })
     expect(wrapper.text()).toContain('People can no longer start research')
-    expect(wrapper.find('[data-testid="research-admin-turn-off"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="research-admin-enabled"]').attributes('aria-checked')).toBe(
+      'true'
+    )
   })
 
   it('shows a translated refusal next to the switch only', async () => {
@@ -72,7 +92,7 @@ describe('ResearchAdminTab', () => {
     const wrapper = mount(ResearchAdminTab)
     await flushPromises()
 
-    await wrapper.get('[data-testid="research-admin-turn-on"]').trigger('click')
+    await wrapper.get('[data-testid="research-admin-enabled"]').trigger('click')
     await flushPromises()
 
     const status = wrapper.get('[data-testid="research-admin-status"]').text()
@@ -82,20 +102,46 @@ describe('ResearchAdminTab', () => {
     expect(useNotification().notifications.value).toHaveLength(0)
   })
 
-  it('shows a save bar as soon as a limit changes, and discard puts it back', async () => {
+  it('keeps the save row in place, discards a typed limit, and stores it on blur', async () => {
+    let state = off()
+    saveResearchAdmin.mockImplementation(async (body: Record<string, unknown>) => {
+      state = accept(state, body)
+      return state
+    })
     const wrapper = mount(ResearchAdminTab)
     await flushPromises()
 
     expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="research-admin-save"]').exists()).toBe(false)
     const input = wrapper.get('[data-testid="research-admin-standard-costCap"]')
-    await input.setValue('2.5')
+    ;(input.element as HTMLInputElement).value = '2.5'
+    await input.trigger('input')
 
-    expect(wrapper.get('[data-testid="btn-unsaved-save"]').text()).toContain('Save Changes')
-    await wrapper.get('[data-testid="btn-unsaved-discard"]').trigger('click')
-
-    expect((input.element as HTMLInputElement).value).toBe('1')
-    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
     expect(saveResearchAdmin).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="research-admin-save-status"]').text()).toContain(
+      'Leave the field'
+    )
+    expect(wrapper.get('[data-testid="research-admin-tab"]').classes()).not.toContain('pb-40')
+
+    await input.trigger('change')
+    await flushPromises()
+
+    const body = saveResearchAdmin.mock.calls.at(-1)?.[0] as {
+      budgets: { standard: { costCap: number } }
+    }
+    expect(body.budgets.standard.costCap).toBe(2.5)
+    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="research-admin-save-status"]').text()).toBe('Saved')
+
+    const runs = wrapper.get('[data-testid="research-admin-maxActiveRuns"]')
+    await runs.setValue('8')
+    await flushPromises()
+    const limits = saveResearchAdmin.mock.calls.at(-1)?.[0] as {
+      limits: { maxActiveRuns: number }
+    }
+    expect(limits.limits.maxActiveRuns).toBe(8)
+    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
   })
 
   it('refuses an out-of-range value without calling the server', async () => {
@@ -103,7 +149,6 @@ describe('ResearchAdminTab', () => {
     await flushPromises()
 
     await wrapper.get('[data-testid="research-admin-standard-searches"]').setValue('500')
-    await wrapper.get('[data-testid="btn-unsaved-save"]').trigger('click')
     await flushPromises()
 
     expect(saveResearchAdmin).not.toHaveBeenCalled()
@@ -117,23 +162,24 @@ describe('ResearchAdminTab', () => {
   })
 
   it('sends a model only when it changed', async () => {
-    fetchResearchAdmin.mockResolvedValue({
+    const view = {
       ...off(),
       budgets: {
         ...off().budgets,
         auto: { searches: 10, sources: 15, minutes: 6, costCap: 1 },
       },
+    }
+    fetchResearchAdmin.mockResolvedValue(view)
+    let state = view
+    saveResearchAdmin.mockImplementation(async (body: Record<string, unknown>) => {
+      state = accept(state, body)
+      return state
     })
-    saveResearchAdmin.mockImplementation(async (body: Record<string, unknown>) => ({
-      ...off(),
-      budgets: body.budgets,
-    }))
     const wrapper = mount(ResearchAdminTab)
     await flushPromises()
 
     expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
     await wrapper.get('[data-testid="research-admin-quick-costCap"]').setValue('0.2')
-    await wrapper.get('[data-testid="btn-unsaved-save"]').trigger('click')
     await flushPromises()
 
     const body = saveResearchAdmin.mock.calls[0]?.[0] as {
@@ -150,7 +196,13 @@ describe('ResearchAdminTab', () => {
   })
 
   it('does not start a sample until the saved cost is accepted', async () => {
-    fetchResearchAdmin.mockResolvedValue({ ...off(), enabled: true })
+    const view = { ...off(), enabled: true }
+    fetchResearchAdmin.mockResolvedValue(view)
+    let state = view
+    saveResearchAdmin.mockImplementation(async (body: Record<string, unknown>) => {
+      state = accept(state, body)
+      return state
+    })
     const wrapper = mount(ResearchAdminTab)
     await flushPromises()
 
@@ -160,9 +212,16 @@ describe('ResearchAdminTab', () => {
     await wrapper.get('[data-testid="research-admin-sample-confirm"]').setValue(true)
     expect(button.attributes('disabled')).toBeUndefined()
 
-    await wrapper.get('[data-testid="research-admin-quick-costCap"]').setValue('3')
+    const cap = wrapper.get('[data-testid="research-admin-quick-costCap"]')
+    ;(cap.element as HTMLInputElement).value = '3'
+    await cap.trigger('input')
     expect(wrapper.find('[data-testid="research-admin-sample-dirty"]').exists()).toBe(true)
     expect(button.attributes('disabled')).toBeDefined()
+    expect(startResearchSample).not.toHaveBeenCalled()
+
+    await cap.trigger('change')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="research-admin-sample-dirty"]').exists()).toBe(false)
     expect(startResearchSample).not.toHaveBeenCalled()
   })
 

@@ -6,6 +6,7 @@ defineProps<{
   modelValue: boolean
   label: string
   disabled?: boolean
+  testid?: string
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +31,7 @@ function toggle(current: boolean, disabled: boolean | undefined) {
       role="switch"
       :aria-checked="modelValue"
       :aria-label="label"
+      :data-testid="testid"
       :disabled="disabled"
       :class="[
         'relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--brand)] focus:ring-offset-2',
