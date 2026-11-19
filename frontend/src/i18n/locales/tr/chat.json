@@ -1300,8 +1300,13 @@
       "saveFailed": "Talimatlar kaydedilemedi."
     },
     "composer": {
-      "inProject": "Projede: {name}",
-      "title": "{name} projesini aç"
+      "inProject": "Projede: {name}"
+    },
+    "picker": {
+      "label": "Proje: {name}",
+      "none": "Proje yok",
+      "open": "Projeyi aç",
+      "empty": "Henüz projeniz yok. Sohbetler panelinden bir tane oluşturun."
     },
     "move": {
       "menu": "Projeye taşı…",

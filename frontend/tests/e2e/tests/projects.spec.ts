@@ -72,13 +72,24 @@ test.describe('@ci Projects', () => {
     })
 
     await test.step('Assert: the composer names the project', async () => {
-      await expect(page.locator('[data-testid="badge-chat-project"]')).toContainText(name, {
+      await expect(page.locator('[data-testid="btn-chat-project"]')).toContainText(name, {
         timeout: TIMEOUTS.STANDARD,
       })
     })
 
+    await test.step('Act: take the chat out of the project and back in with the picker', async () => {
+      const picker = page.locator('[data-testid="btn-chat-project"]')
+      await picker.click()
+      await page.locator('[data-testid="btn-chat-project-none"]').click()
+      await expect(picker).not.toContainText(name, { timeout: TIMEOUTS.STANDARD })
+      await picker.click()
+      await page.locator('[data-testid^="btn-chat-project-"]').filter({ hasText: name }).click()
+      await expect(picker).toContainText(name, { timeout: TIMEOUTS.STANDARD })
+    })
+
     await test.step('Assert: a project page does not leave a chat marked in the panel', async () => {
-      await page.locator('[data-testid="badge-chat-project"]').click()
+      await page.locator('[data-testid="btn-chat-project"]').click()
+      await page.locator('[data-testid="link-chat-project-open"]').click()
       await expect(page.locator('[data-testid="text-project-name"]')).toHaveText(name, {
         timeout: TIMEOUTS.STANDARD,
       })

@@ -1359,8 +1359,13 @@
       "saveFailed": "Les instructions n’ont pas pu être enregistrées."
     },
     "composer": {
-      "inProject": "Dans le projet : {name}",
-      "title": "Ouvrir le projet {name}"
+      "inProject": "Dans le projet : {name}"
+    },
+    "picker": {
+      "label": "Projet : {name}",
+      "none": "Aucun projet",
+      "open": "Ouvrir le projet",
+      "empty": "Vous n’avez pas encore de projet. Créez-en un dans le panneau des conversations."
     },
     "move": {
       "menu": "Déplacer vers un projet…",

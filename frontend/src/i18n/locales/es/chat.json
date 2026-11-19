@@ -1300,8 +1300,13 @@
       "saveFailed": "No se pudieron guardar las instrucciones."
     },
     "composer": {
-      "inProject": "En el proyecto: {name}",
-      "title": "Abrir el proyecto {name}"
+      "inProject": "En el proyecto: {name}"
+    },
+    "picker": {
+      "label": "Proyecto: {name}",
+      "none": "Sin proyecto",
+      "open": "Abrir proyecto",
+      "empty": "Aún no tienes proyectos. Crea uno en el panel de chats."
     },
     "move": {
       "menu": "Mover a un proyecto…",

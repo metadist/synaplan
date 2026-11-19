@@ -413,9 +413,6 @@
       />
       <div v-if="!needsProviderSetup && canComposeSharedChat" class="relative">
         <ScrollToBottomButton :visible="showJumpToBottom && !liveStage" @jump="jumpToBottom" />
-        <div class="mx-auto mb-1 flex max-w-4xl px-4 empty:hidden">
-          <ProjectChatBadge :chat-id="chatsStore.activeChatId" />
-        </div>
         <ChatInput
           ref="chatInputRef"
           :is-streaming="isStreaming"
@@ -437,6 +434,7 @@
           <!-- The shared chat stays selected during incognito, so its files must
              not become attachable or deletable from this session. -->
           <template #beside-plus>
+            <ChatProjectPicker :enabled="projectPickerEnabled" />
             <ConversationFilesBar
               v-if="!incognitoStore.active"
               :files="conversationFiles"
@@ -674,7 +672,7 @@ import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ScrollToBottomButton from '@/components/chat/ScrollToBottomButton.vue'
-import ProjectChatBadge from '@/components/projects/ProjectChatBadge.vue'
+import ChatProjectPicker from '@/components/projects/ChatProjectPicker.vue'
 import ChatAccessErrorBanner from '@/components/ChatAccessErrorBanner.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
@@ -927,6 +925,11 @@ const sharedConversationAccess = computed(() =>
 const sharedConversationOwnerName = computed(
   () => chatsStore.conversationSource?.owner?.name?.trim() || null
 )
+/** Own chats of a signed-in person, outside incognito; the server checks ownership again. */
+const projectPickerEnabled = computed(
+  () => !isGuestMode.value && !incognitoStore.active && canComposeSharedChat.value
+)
+
 const canComposeSharedChat = computed(() =>
   canComposeChat({
     guest: isGuestMode.value,

@@ -1357,8 +1357,13 @@
       "saveFailed": "Die Anweisungen konnten nicht gespeichert werden."
     },
     "composer": {
-      "inProject": "Im Projekt: {name}",
-      "title": "Projekt {name} öffnen"
+      "inProject": "Im Projekt: {name}"
+    },
+    "picker": {
+      "label": "Projekt: {name}",
+      "none": "Kein Projekt",
+      "open": "Projekt öffnen",
+      "empty": "Du hast noch keine Projekte. Lege eines im Chats-Bereich an."
     },
     "move": {
       "menu": "In Projekt verschieben…",

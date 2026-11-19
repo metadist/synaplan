@@ -1359,8 +1359,13 @@
       "saveFailed": "The instructions could not be saved."
     },
     "composer": {
-      "inProject": "In project: {name}",
-      "title": "Open project {name}"
+      "inProject": "In project: {name}"
+    },
+    "picker": {
+      "label": "Project: {name}",
+      "none": "No project",
+      "open": "Open project",
+      "empty": "You have no projects yet. Create one in the Chats panel."
     },
     "move": {
       "menu": "Move to project…",
