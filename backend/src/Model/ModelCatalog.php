@@ -4975,13 +4975,20 @@ class ModelCatalog
             ],
         ],
         [
+            // Pinned to the Large 3 id. `mistral-large-latest` is an API name
+            // of Large 4 as of 2026-11-19 ($0.70 / $0.07 / $2.10), so sending
+            // the alias from this row undercharged every call.
+            // https://docs.mistral.ai/models/mistral-large-3-25-12
+            // https://docs.mistral.ai/models/mistral-large-4-0
+            // Large 3 stays $0.50 in / $0.05 cached / $1.50 out. Deprecated
+            // 2026-10-31, retirement 2027-04-30. Large 4 is BID 387.
             'id' => 245,
             'service' => 'Mistral',
             'name' => 'Mistral Large 3',
             'tag' => 'chat',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'mistral-large-latest',
+            'providerId' => 'mistral-large-2512',
             'priceIn' => 0.50,
             'inUnit' => 'per1M',
             'priceOut' => 1.50,
@@ -4991,17 +4998,19 @@ class ModelCatalog
             'json' => [
                 'description' => 'Mistral Large 3 - state-of-the-art, open-weight, general-purpose multimodal model. OpenAI-compatible chat endpoint.',
                 'max_tokens' => 8192,
-                'params' => ['model' => 'mistral-large-latest'],
-                // Cached input, Standard tier —
-                // https://docs.mistral.ai/inference/pricing (2026-09-24).
+                'params' => ['model' => 'mistral-large-2512'],
+                // Cached input, Standard tier — 10% of input. The Large 3 card
+                // lists $0.50 / $1.50 (2026-11-19); LiteLLM's pinned id agrees
+                // on cache at $0.05. https://docs.mistral.ai/models/mistral-large-3-25-12
                 'cache_read_price_per_1M' => 0.05,
                 'meta' => ['context_window' => '262144', 'max_output' => '8192'],
                 'features' => ['tool_use'],
             ],
         ],
         [
-            // Pinned id (not mistral-large-latest, which still resolves to
-            // Large 3 / mistral-large-2512). Alias: mistral-large-4-0.
+            // Pinned id. `mistral-large-latest` and `mistral-large-4-0` are
+            // aliases of this model (Large 4) as of 2026-11-19. Large 3 is
+            // BID 245 on `mistral-large-2512`.
             // GA list rate, read 2026-11-15: $0.70 in / $0.07 cached / $2.10 out.
             // https://docs.mistral.ai/inference/pricing
             // https://docs.mistral.ai/models/mistral-large-4-0

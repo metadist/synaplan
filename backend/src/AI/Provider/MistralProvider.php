@@ -58,14 +58,17 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
     private const CHAT_TIMEOUT_SECONDS = 180;
 
     /**
-     * Models that accept `reasoning_effort`. Large 3 (`mistral-large-latest`)
-     * rejects the parameter with HTTP 400, so it must not be sent there.
+     * Models that accept `reasoning_effort`. Large 3's pinned id
+     * (`mistral-large-2512`) rejects the parameter with HTTP 400, so it must
+     * not be sent there. `mistral-large-latest` is Large 4 as of 2026-11-19
+     * and accepts it, the same as the pinned Large 4 ids.
      *
      * @var list<string>
      */
     private const REASONING_EFFORT_MODELS = [
         'mistral-large-4',
         'mistral-large-4-0',
+        'mistral-large-latest',
     ];
 
     private const TIMEOUT_AUDIO_SECONDS = 120;
@@ -692,7 +695,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
         }
 
         // Thinking off. Only models that accept the parameter get it —
-        // mistral-large-latest returns 400 "reasoning_effort is not enabled".
+        // mistral-large-2512 returns 400 "reasoning_effort is not enabled".
         $model = is_string($options['model'] ?? null) ? $options['model'] : '';
         if ($this->acceptsReasoningEffort($model) && array_key_exists('reasoning', $options) && !$options['reasoning']) {
             $requestOptions['reasoning_effort'] = 'none';
