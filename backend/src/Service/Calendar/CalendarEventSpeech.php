@@ -215,7 +215,11 @@ final class CalendarEventSpeech
             }
         }
 
-        $replyText = implode("\n\n", array_map(static fn (string $id): string => '$'.$id.'.text', self::confirmingIds($tasks)));
+        // Every calendar step is named: which of them writes is only known
+        // when they run. A step that had nothing to add returns no text, and
+        // the reply step leaves it out of a list.
+        $references = array_map(static fn (string $id): string => '$'.$id.'.text', $calendarIds);
+        $replyText = 1 === count($references) ? $references[0] : $references;
         foreach ($tasks as $i => $task) {
             if (!is_array($task) || ($task['capability'] ?? '') !== 'compose_reply') {
                 continue;
@@ -260,39 +264,6 @@ final class CalendarEventSpeech
             if (self::isCalendarEvent($task) && is_string($task['id'] ?? null)) {
                 $ids[] = $task['id'];
             }
-        }
-
-        return $ids;
-    }
-
-    /**
-     * The calendar steps whose sentence the reply shows. A step with a start
-     * confirms its own event. Steps that read confirm everything they read,
-     * so of several that read from the same steps only the first speaks: the
-     * runner enters a text once, and the others return nothing.
-     *
-     * @param list<mixed> $tasks
-     *
-     * @return list<string>
-     */
-    private static function confirmingIds(array $tasks): array
-    {
-        $ids = [];
-        $readFrom = [];
-        foreach ($tasks as $task) {
-            if (!self::isCalendarEvent($task) || !is_string($task['id'] ?? null)) {
-                continue;
-            }
-            if ('' === self::plannedStart($task)) {
-                $dependsOn = is_array($task['depends_on'] ?? null) ? array_filter($task['depends_on'], 'is_string') : [];
-                sort($dependsOn);
-                $key = implode(',', $dependsOn);
-                if (isset($readFrom[$key])) {
-                    continue;
-                }
-                $readFrom[$key] = true;
-            }
-            $ids[] = $task['id'];
         }
 
         return $ids;

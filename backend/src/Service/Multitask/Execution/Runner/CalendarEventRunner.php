@@ -125,12 +125,12 @@ final readonly class CalendarEventRunner implements TaskRunner
         $language = $this->utteranceLanguage($context, $messageText);
         $ownerId = (int) ($context->userId ?? $context->message->getUserId());
 
-        // A resumed step writes the entries its owner approved, not a second reading.
+        // A resumed step writes the entries its owner approved, not a second
+        // reading. Every approval states its entries (none for an event the
+        // plan named), so what is found here is what the owner was shown.
         $approved = $context->isApproved($node->id) ? $this->approvedEntries($params) : [];
         if ([] !== $approved) {
-            $zone = is_string($params['timezone'] ?? null) ? $params['timezone'] : $approved[0]['start']->getTimezone()->getName();
-
-            return $this->writeEvents($node, $context, $approved, $zone, $language, $ownerId, $params, true);
+            return $this->writeApprovedEntries($node, $context, $approved, $params, $language, $ownerId);
         }
 
         $startStr = is_string($params['start'] ?? null) ? trim($params['start']) : '';
@@ -185,8 +185,9 @@ final readonly class CalendarEventRunner implements TaskRunner
         int $ownerId,
     ): NodeResult {
         $source = $this->entrySource;
-        if (null === $source || $source->alreadyEntered($context, $readText)) {
-            return NodeResult::ok(null, [], ['calendar_event' => ['created' => false, 'reason' => 'already_entered']]);
+        [$channel] = $this->destination($params, $context, $ownerId);
+        if (null === $source || $source->alreadyEntered($context, $readText, $channel)) {
+            return self::alreadyEntered();
         }
 
         $resolved = $this->resolveTimezone($params, (string) $context->message->getText(), $ownerId);
@@ -202,7 +203,7 @@ final readonly class CalendarEventRunner implements TaskRunner
             return $extraction;
         }
 
-        $metadata = $extraction->usage + [CalendarEntrySource::META_READ => CalendarEntrySource::key($readText)];
+        $metadata = $extraction->usage + [CalendarEntrySource::META_READ => CalendarEntrySource::key($readText, $channel)];
         $events = $this->eventsFromEntries($extraction->entries, $params, $tz);
         if ([] === $events) {
             return NodeResult::ok(CalendarEventSpeech::nothingToEnter($language), [], $metadata + [
@@ -211,6 +212,63 @@ final readonly class CalendarEventRunner implements TaskRunner
         }
 
         return $this->writeEvents($node, $context, $events, $tzName, $language, $ownerId, $params, true, $metadata);
+    }
+
+    /**
+     * The entries an approval was given for. They carry what was read and
+     * where it goes, like the step that asked, so a second step with the same
+     * text and the same calendar still enters nothing. Should such a step
+     * have finished already, this one has nothing left to write.
+     *
+     * @param non-empty-list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, location: ?string, description: ?string, attendees: list<string>, organizer_email: ?string}> $approved
+     * @param array<string, mixed>                                                                                                                                                                 $params
+     */
+    private function writeApprovedEntries(
+        TaskNode $node,
+        NodeContext $context,
+        array $approved,
+        array $params,
+        string $language,
+        int $ownerId,
+    ): NodeResult {
+        $metadata = [];
+        $readText = $this->entrySource?->readText($node, $context, CalendarTurnEvidence::ofTurn($context->message, $context->thread)) ?? '';
+        if (null !== $this->entrySource && '' !== $readText) {
+            [$channel] = $this->destination($params, $context, $ownerId);
+            if ($this->entrySource->enteredByAFinishedStep($context, $readText, $channel)) {
+                return self::alreadyEntered();
+            }
+            $metadata[CalendarEntrySource::META_READ] = CalendarEntrySource::key($readText, $channel);
+        }
+
+        $zone = is_string($params['timezone'] ?? null) ? $params['timezone'] : $approved[0]['start']->getTimezone()->getName();
+
+        return $this->writeEvents($node, $context, $approved, $zone, $language, $ownerId, $params, true, $metadata);
+    }
+
+    private static function alreadyEntered(): NodeResult
+    {
+        return NodeResult::ok(null, [], ['calendar_event' => ['created' => false, 'reason' => 'already_entered']]);
+    }
+
+    /**
+     * The calendar channel this step delivers to and whether the person
+     * asked for a calendar: the channel the plan names, else the person's
+     * default calendar when they asked for one. Empty: the file alone.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return array{0: string, 1: bool}
+     */
+    private function destination(array $params, NodeContext $context, int $ownerId): array
+    {
+        $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
+        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
+        if ('' === $channel && $userAsked) {
+            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
+        }
+
+        return [$channel, $userAsked];
     }
 
     /**
@@ -305,11 +363,7 @@ final readonly class CalendarEventRunner implements TaskRunner
         bool $read,
         array $metadata = [],
     ): NodeResult {
-        $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
-        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
-        if ('' === $channel && $userAsked) {
-            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
-        }
+        [$channel, $userAsked] = $this->destination($params, $context, $ownerId);
 
         $gated = $this->approvalGate?->consult(
             $context,
@@ -318,7 +372,7 @@ final readonly class CalendarEventRunner implements TaskRunner
             $this->approvalArguments($events, $tzName, $channel, $read),
         );
         if (null !== $gated) {
-            return $gated;
+            return $this->rememberingWhatWasRead($gated, $metadata);
         }
 
         $first = $events[0];
@@ -368,9 +422,36 @@ final readonly class CalendarEventRunner implements TaskRunner
     }
 
     /**
+     * A step that waits for its approval has read its text already. It says
+     * so, or a second calendar step of the same run would read that text
+     * again and ask for the same entries a second time.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    private function rememberingWhatWasRead(NodeResult $gated, array $metadata): NodeResult
+    {
+        $read = $metadata[CalendarEntrySource::META_READ] ?? null;
+        if (!$gated->isWaitingApproval() || !is_string($read)) {
+            return $gated;
+        }
+
+        return new NodeResult(
+            $gated->status,
+            $gated->text,
+            $gated->files,
+            $gated->metadata + [CalendarEntrySource::META_READ => $read],
+            $gated->error,
+        );
+    }
+
+    /**
      * What an approval is asked for. A planned event keeps its fields at the
      * top level. Entries that were read are listed, with one line that names
      * them: the approval preview shows scalar values only.
+     *
+     * `entries` is always stated, empty for a planned event. The approved
+     * arguments replace the step's own, so a list the plan itself carried
+     * cannot be written on the strength of an approval that showed one event.
      *
      * @param non-empty-list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, location: ?string, description: ?string, attendees: list<string>, organizer_email: ?string}> $events
      *
@@ -391,6 +472,7 @@ final readonly class CalendarEventRunner implements TaskRunner
                 'description' => $event['description'],
                 'attendees' => $event['attendees'],
                 'organizer_email' => $event['organizer_email'],
+                'entries' => [],
             ];
         }
 

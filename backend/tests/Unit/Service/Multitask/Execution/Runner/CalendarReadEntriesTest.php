@@ -14,6 +14,7 @@ use App\Service\Calendar\CalendarEntry;
 use App\Service\Calendar\CalendarEntryExtraction;
 use App\Service\Calendar\CalendarEntryExtractor;
 use App\Service\Calendar\CalendarEventService;
+use App\Service\Calendar\CalendarEventSpeech;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Destination\DestinationProvider;
 use App\Service\Destination\DestinationRegistry;
@@ -25,6 +26,7 @@ use App\Service\Multitask\Execution\NodeContext;
 use App\Service\Multitask\Execution\NodeResult;
 use App\Service\Multitask\Execution\Runner\CalendarEntrySource;
 use App\Service\Multitask\Execution\Runner\CalendarEventRunner;
+use App\Service\Multitask\Execution\Runner\ComposeReplyRunner;
 use App\Service\Multitask\Execution\StepApprovalGate;
 use App\Service\Multitask\Plan\Capability;
 use App\Service\Multitask\Plan\TaskNode;
@@ -390,6 +392,215 @@ final class CalendarReadEntriesTest extends TestCase
         self::assertStringContainsString('DTSTART:20270312T054500Z', $this->stored[0]['content']);
     }
 
+    /**
+     * The first step waits for its approval. A second step that would read
+     * the same text does not read it again and asks for nothing.
+     */
+    public function testWhileAStepWaitsForApprovalASecondStepAsksForNothing(): void
+    {
+        $asked = 0;
+        $gate = $this->createStub(StepApprovalGate::class);
+        $gate->method('consult')->willReturnCallback(static function (NodeContext $context, TaskNode $node, string $tool, array $arguments) use (&$asked): NodeResult {
+            ++$asked;
+
+            return NodeResult::waitingApproval(5, $arguments, ['tool' => $tool]);
+        });
+        $runner = $this->runner($this->flights(), gate: $gate);
+        $context = $this->context($this->message(self::REQUEST));
+        $context->setResult('n1', NodeResult::ok(self::BOOKING));
+
+        $waiting = $runner->run($this->readingNode('n2'), $context);
+        $context->setResult('n2', $waiting);
+        $second = $runner->run($this->readingNode('n3'), $context);
+
+        self::assertTrue($waiting->isWaitingApproval());
+        self::assertSame(5, $waiting->metadata['approval_id'], 'the approval itself is untouched');
+        self::assertSame('skill:calendar_event', $waiting->metadata['tool']);
+        self::assertSame(CalendarEntrySource::key(self::BOOKING), $waiting->metadata[CalendarEntrySource::META_READ]);
+
+        self::assertTrue($second->isSuccessful());
+        self::assertSame('already_entered', $second->metadata['calendar_event']['reason']);
+        self::assertSame(1, $asked, 'one approval for the entries, not one per step');
+        self::assertCount(1, $this->readCalls);
+        self::assertSame(0, $this->storedCount());
+    }
+
+    /**
+     * An approval that showed one event is an approval for that event. A
+     * list the plan itself carried is not written on the strength of it.
+     */
+    public function testAnApprovalForOneEventNeverWritesAListThePlanCarried(): void
+    {
+        $asked = null;
+        $gate = $this->createStub(StepApprovalGate::class);
+        $gate->method('consult')->willReturnCallback(static function (NodeContext $context, TaskNode $node, string $tool, array $arguments) use (&$asked): ?NodeResult {
+            if ($context->isApproved($node->id)) {
+                return null;
+            }
+            $asked = $arguments;
+
+            return NodeResult::waitingApproval(5, $arguments);
+        });
+        $planned = [
+            'title' => 'Zahnarzt',
+            'start' => '2027-03-12T15:00:00',
+            'timezone' => 'Europe/Berlin',
+            'entries' => [
+                ['title' => 'Nicht gezeigt', 'start' => '2027-03-20T08:00:00+01:00', 'end' => '2027-03-20T09:00:00+01:00'],
+                ['title' => 'Auch nicht', 'start' => '2027-03-21T08:00:00+01:00', 'end' => '2027-03-21T09:00:00+01:00'],
+            ],
+        ];
+        $runner = $this->runner($this->flights(), gate: $gate);
+        $context = $this->context($this->message('Trag morgen um 15 Uhr den Zahnarzt ein'));
+
+        $waiting = $runner->run(new TaskNode('n1', Capability::CalendarEvent, [], [], $planned), $context);
+
+        self::assertTrue($waiting->isWaitingApproval());
+        self::assertIsArray($asked);
+        self::assertSame('Zahnarzt', $asked['title']);
+        self::assertSame([], $asked['entries'], 'the approval states that it is for this one event');
+
+        // DagExecutor::resume(): the step's own params, replaced by the approved arguments.
+        $context->markApproved('n1');
+        $result = $runner->run(new TaskNode('n1', Capability::CalendarEvent, [], [], array_merge($planned, $asked)), $context);
+
+        self::assertTrue($result->isSuccessful(), (string) $result->error);
+        self::assertSame(1, substr_count($this->stored[0]['content'], 'BEGIN:VEVENT'));
+        self::assertStringContainsString('SUMMARY:Zahnarzt', $this->stored[0]['content']);
+        self::assertStringNotContainsString('Nicht gezeigt', $this->stored[0]['content']);
+        self::assertSame([], $this->readCalls);
+    }
+
+    /**
+     * The resumed step carries what it entered, like the step that asked.
+     * A step that reads the same text for the same calendar afterwards
+     * enters nothing.
+     */
+    public function testAResumedStepStillStandsForWhatItEntered(): void
+    {
+        $gate = $this->createStub(StepApprovalGate::class);
+        $gate->method('consult')->willReturnCallback(static fn (NodeContext $context, TaskNode $node, string $tool, array $arguments): ?NodeResult => $context->isApproved($node->id) ? null : NodeResult::waitingApproval(5, $arguments));
+        $runner = $this->runner($this->flights(), gate: $gate);
+        $context = $this->context($this->message(self::REQUEST));
+        $context->setResult('n1', NodeResult::ok(self::BOOKING));
+
+        $waiting = $runner->run($this->readingNode('n2'), $context);
+        $context->markApproved('n2');
+        $resumed = new TaskNode('n2', Capability::CalendarEvent, ['n1'], ['source' => '$n1.text'], ['timezone' => 'Europe/Berlin'] + $waiting->metadata['approved_args']);
+        $written = $runner->run($resumed, $context);
+        $context->setResult('n2', $written);
+        $later = $runner->run($this->readingNode('n3'), $context);
+
+        self::assertTrue($written->isSuccessful(), (string) $written->error);
+        self::assertSame(CalendarEntrySource::key(self::BOOKING), $written->metadata[CalendarEntrySource::META_READ]);
+        self::assertSame('already_entered', $later->metadata['calendar_event']['reason']);
+        self::assertSame(1, $this->storedCount());
+        self::assertCount(1, $this->readCalls);
+    }
+
+    /**
+     * Two approvals for the same entries can exist from a run before this
+     * rule. The second one to resume finds the entries written.
+     */
+    public function testAResumedStepWritesNothingAFinishedStepAlreadyEntered(): void
+    {
+        $gate = $this->createStub(StepApprovalGate::class);
+        $gate->method('consult')->willReturn(null);
+        $runner = $this->runner($this->flights(), gate: $gate);
+        $context = $this->context($this->message(self::REQUEST));
+        $context->setResult('n1', NodeResult::ok(self::BOOKING));
+        $context->setResult('n2', $runner->run($this->readingNode('n2'), $context));
+        self::assertSame(1, $this->storedCount());
+
+        $context->markApproved('n3');
+        $approved = ['timezone' => 'Europe/Berlin', 'entries' => [
+            ['title' => 'Flug Hamburg (HAM) → Wien (VIE)', 'start' => '2027-03-12T06:45:00+01:00', 'end' => '2027-03-12T08:20:00+01:00'],
+        ]];
+        $second = $runner->run(new TaskNode('n3', Capability::CalendarEvent, ['n1'], ['source' => '$n1.text'], $approved), $context);
+
+        self::assertTrue($second->isSuccessful());
+        self::assertSame('already_entered', $second->metadata['calendar_event']['reason']);
+        self::assertSame(1, $this->storedCount(), 'no second file');
+    }
+
+    /**
+     * "Into Outlook and into my Nextcloud calendar": two steps read the same
+     * booking, each for its own calendar. Both deliver.
+     */
+    public function testTheSameBookingGoesIntoTwoCalendarsOnceEach(): void
+    {
+        $outlook = $this->calendarProvider('m365_calendar', 3);
+        $caldav = $this->calendarProvider('caldav', 3);
+        $runner = $this->runner($this->flights(), delivery: $this->twoCalendars($outlook, $caldav));
+        $context = $this->context($this->message('Trage die Flüge in Outlook und in meinen Nextcloud-Kalender ein'));
+        $context->setResult('n1', NodeResult::ok(self::BOOKING));
+        $node = static fn (string $id, string $channel): TaskNode => new TaskNode($id, Capability::CalendarEvent, ['n1'], ['source' => '$n1.text'], ['timezone' => 'Europe/Berlin', 'channel' => $channel]);
+
+        $first = $runner->run($node('n2', 'outlook'), $context);
+        $context->setResult('n2', $first);
+        $second = $runner->run($node('n3', 'calendar'), $context);
+        $context->setResult('n3', $second);
+        $repeat = $runner->run($node('n4', 'Outlook'), $context);
+
+        self::assertSame(1, $outlook->sent);
+        self::assertSame(1, $caldav->sent);
+        self::assertStringStartsWith('Ich habe 3 Kalendereinträge in Outlook hinzugefügt:', (string) $first->text);
+        self::assertStringStartsWith('Ich habe 3 Kalendereinträge in deinen Kalender hinzugefügt:', (string) $second->text);
+        self::assertNotSame($first->metadata[CalendarEntrySource::META_READ], $second->metadata[CalendarEntrySource::META_READ]);
+        self::assertSame('already_entered', $repeat->metadata['calendar_event']['reason'], 'the same calendar a second time');
+    }
+
+    /**
+     * Two steps that depend on the same two reading steps read the same
+     * text, whichever order each lists them in.
+     */
+    public function testTheOrderOfTheStepsReadDoesNotMakeASecondReading(): void
+    {
+        $runner = $this->runner($this->flights());
+        $context = $this->context($this->message(self::REQUEST));
+        $context->setResult('n1', NodeResult::ok(self::BOOKING));
+        $context->setResult('n2', NodeResult::ok('Hotel Wien, Check-in 15:00'));
+        $node = static fn (string $id, array $dependsOn): TaskNode => new TaskNode($id, Capability::CalendarEvent, $dependsOn, [], ['timezone' => 'Europe/Berlin']);
+
+        $context->setResult('n3', $runner->run($node('n3', ['n1', 'n2']), $context));
+        $second = $runner->run($node('n4', ['n2', 'n1']), $context);
+
+        self::assertCount(1, $this->readCalls);
+        self::assertSame('already_entered', $second->metadata['calendar_event']['reason']);
+        self::assertSame(1, $this->storedCount());
+    }
+
+    /**
+     * The reply names every calendar step. The one that entered the flights
+     * speaks; the one that had nothing to add leaves no gap.
+     */
+    public function testTheReplyShowsTheStepThatWroteAndSkipsTheOneThatDidNot(): void
+    {
+        $runner = $this->runner($this->flights());
+        $context = $this->context($this->message(self::REQUEST));
+        $context->setResult('n1', NodeResult::ok(self::BOOKING));
+        $context->setResult('n2', $runner->run($this->readingNode('n2'), $context));
+        $context->setResult('n3', $runner->run($this->readingNode('n3'), $context));
+
+        $plan = CalendarEventSpeech::adjustPlan([
+            'language' => 'de',
+            'reply_node' => 'n4',
+            'tasks' => [
+                ['id' => 'n1', 'capability' => 'file_analysis', 'depends_on' => []],
+                ['id' => 'n2', 'capability' => 'calendar_event', 'depends_on' => ['n1'], 'inputs' => ['source' => '$n1.text']],
+                ['id' => 'n3', 'capability' => 'calendar_event', 'depends_on' => ['n1'], 'inputs' => ['source' => '$n1.text']],
+                ['id' => 'n4', 'capability' => 'compose_reply', 'depends_on' => ['n2', 'n3'], 'inputs' => ['text' => 'Fertig.']],
+            ],
+        ], self::REQUEST);
+        $reply = (new ComposeReplyRunner())->run(
+            new TaskNode('n4', Capability::ComposeReply, ['n2', 'n3'], $plan['tasks'][3]['inputs'], []),
+            $context,
+        );
+
+        self::assertSame(['$n2.text', '$n3.text'], $plan['tasks'][3]['inputs']['text']);
+        self::assertSame($context->getResult('n2')?->text, $reply->text);
+    }
+
     private function storedCount(): int
     {
         return count($this->stored);
@@ -520,22 +731,65 @@ final class CalendarReadEntriesTest extends TestCase
     }
 
     /**
+     * An Outlook calendar and a CalDAV calendar, as the channels "outlook"
+     * and "calendar".
+     */
+    private function twoCalendars(DestinationProvider $outlook, DestinationProvider $caldav): RequestedCalendarDelivery
+    {
+        $m365 = new Connection(self::USER_ID, Connection::TYPE_M365, 'ada@contoso.com');
+        $m365->setStatus(Connection::STATUS_CONNECTED);
+        $m365->setConfig(['channel' => 'm365', 'channel_calendar' => 'outlook']);
+        $m365->setScopes(['Calendars.ReadWrite']);
+        (new \ReflectionProperty(Connection::class, 'id'))->setValue($m365, 3);
+
+        $nextcloud = new Connection(self::USER_ID, 'caldav', 'Nextcloud');
+        $nextcloud->setStatus(Connection::STATUS_CONNECTED);
+        $nextcloud->setConfig(['channel' => 'calendar']);
+        (new \ReflectionProperty(Connection::class, 'id'))->setValue($nextcloud, 4);
+
+        $connections = $this->createStub(ConnectionRepository::class);
+        $connections->method('findByOwner')->willReturn([$m365, $nextcloud]);
+        $connections->method('findByIdAndOwner')->willReturnCallback(
+            static fn (int $id): ?Connection => match ($id) {
+                3 => $m365,
+                4 => $nextcloud,
+                default => null,
+            },
+        );
+
+        return new RequestedCalendarDelivery(
+            $connections,
+            new DestinationRegistry([$outlook, $caldav]),
+            new PlannerChannelCatalog($connections),
+            new NullLogger(),
+        );
+    }
+
+    /**
      * @return DestinationProvider&object{sent: int, lastContent: string|null}
      */
     private function outlookProvider(int $created): DestinationProvider
     {
-        return new class($created) implements DestinationProvider {
+        return $this->calendarProvider('m365_calendar', $created);
+    }
+
+    /**
+     * @return DestinationProvider&object{sent: int, lastContent: string|null}
+     */
+    private function calendarProvider(string $id, int $created): DestinationProvider
+    {
+        return new class($id, $created) implements DestinationProvider {
             public int $sent = 0;
 
             public ?string $lastContent = null;
 
-            public function __construct(private readonly int $created)
+            public function __construct(private readonly string $id, private readonly int $created)
             {
             }
 
             public function id(): string
             {
-                return 'm365_calendar';
+                return $this->id;
             }
 
             public function send(ShareableFile $file, array $params): DestinationResult

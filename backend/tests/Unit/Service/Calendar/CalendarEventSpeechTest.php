@@ -195,14 +195,16 @@ final class CalendarEventSpeechTest extends TestCase
 
         $out = CalendarEventSpeech::adjustPlan($plan, 'Flights on 12 Mar 06:45, 13 Mar 19:30 and 17 Mar 14:00');
 
-        self::assertSame("\$n1.text\n\n\$n2.text\n\n\$n3.text", $out['tasks'][3]['inputs']['text']);
+        self::assertSame(['$n1.text', '$n2.text', '$n3.text'], $out['tasks'][3]['inputs']['text']);
     }
 
     /**
      * The planner sometimes plans one step per flight it expects. Each reads
-     * the same text; the runner enters it once, and one step speaks.
+     * the same text and the runner enters it once. Which step that is shows
+     * only when they run, so the reply names all of them: a step that had
+     * nothing to add returns no text.
      */
-    public function testAdjustPlanLetsOneOfSeveralReadingStepsConfirm(): void
+    public function testAdjustPlanNamesEveryReadingStepInTheReply(): void
     {
         $plan = $this->flightPlan();
         $plan['reply_node'] = 'n5';
@@ -217,7 +219,7 @@ final class CalendarEventSpeechTest extends TestCase
         $out = CalendarEventSpeech::adjustPlan($plan, 'Trage bitte die 3 Flüge in mein Outlook Calender');
 
         self::assertCount(5, $out['tasks']);
-        self::assertSame('$n2.text', $out['tasks'][4]['inputs']['text']);
+        self::assertSame(['$n2.text', '$n3.text', '$n4.text'], $out['tasks'][4]['inputs']['text']);
     }
 
     public function testSeveralEntriesAreConfirmedWithOneLineEach(): void

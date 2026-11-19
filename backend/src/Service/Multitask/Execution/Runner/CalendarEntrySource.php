@@ -23,12 +23,12 @@ use Psr\Log\LoggerInterface;
  * The step reads what the steps it depends on returned (a file analysis, a
  * mail search, a fetched page). Without such a step it reads the files of
  * the turn: those attached to this message, else those attached earlier in
- * the conversation. A text that was already entered by an earlier calendar
- * step of the same turn is not entered twice.
+ * the conversation. A text that an earlier calendar step of the same turn
+ * already entered into the same calendar is not entered twice.
  */
 final readonly class CalendarEntrySource
 {
-    /** Result metadata key: which text a calendar step entered from. */
+    /** Result metadata key: which text a calendar step entered, and where. */
     public const META_READ = 'calendar_read';
 
     private const MAX_READ_CHARS = 24000;
@@ -42,11 +42,16 @@ final readonly class CalendarEntrySource
 
     /**
      * The text this step may take entries from; empty when nothing was read.
+     * The steps are taken in one fixed order, so two calendar steps that
+     * depend on the same steps read the same text, however each lists them.
      */
     public function readText(TaskNode $node, NodeContext $context, CalendarTurnEvidence $evidence): string
     {
+        $dependencies = $node->dependsOn;
+        sort($dependencies);
+
         $texts = [];
-        foreach ($node->dependsOn as $dependency) {
+        foreach ($dependencies as $dependency) {
             $result = $context->getResult($dependency);
             $text = null !== $result && $result->isSuccessful() ? trim((string) $result->text) : '';
             if ('' !== $text) {
@@ -60,20 +65,43 @@ final readonly class CalendarEntrySource
         return mb_substr(implode("\n\n---\n\n", $texts), 0, self::MAX_READ_CHARS);
     }
 
-    public static function key(string $readText): string
+    /**
+     * What was read and where it goes. The same booking may go into two
+     * calendars, once into each.
+     *
+     * @param string $channel the calendar channel the entries go to; empty for the file alone
+     */
+    public static function key(string $readText, string $channel = ''): string
     {
-        return sha1($readText);
+        return sha1($readText).'|'.mb_strtolower(trim($channel));
     }
 
     /**
      * The planner sometimes plans one calendar step per entry it expects.
-     * Each would read the same text and enter everything again.
+     * Each would read the same text and enter everything again. A step that
+     * waits for its approval counts: it has asked for these entries.
      */
-    public function alreadyEntered(NodeContext $context, string $readText): bool
+    public function alreadyEntered(NodeContext $context, string $readText, string $channel = ''): bool
     {
-        $key = self::key($readText);
+        return $this->claimed($context, self::key($readText, $channel), false);
+    }
+
+    /**
+     * For a step that resumes after its approval. A step that only waits has
+     * written nothing, so it does not stand in the way of this one.
+     */
+    public function enteredByAFinishedStep(NodeContext $context, string $readText, string $channel = ''): bool
+    {
+        return $this->claimed($context, self::key($readText, $channel), true);
+    }
+
+    private function claimed(NodeContext $context, string $key, bool $finishedOnly): bool
+    {
         foreach ($context->allResults() as $result) {
-            if ($key === ($result->metadata[self::META_READ] ?? null)) {
+            if ($key !== ($result->metadata[self::META_READ] ?? null)) {
+                continue;
+            }
+            if (!$finishedOnly || $result->isSuccessful()) {
                 return true;
             }
         }
