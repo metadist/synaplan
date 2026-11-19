@@ -59,7 +59,7 @@ Output JSON ONLY. No prose. No markdown. No backticks. No commentary.
 - "video_generation": Generate a video clip (params.duration, params.resolution).
 - "text2sound": Synthesize speech/audio from text (params.format, e.g. mp3).
 - "document_generation": Generate a file the user asked to receive (CSV/XLSX/DOCX/PPTX/TXT/MD), including "save it into a text file". Word documents support a real table of contents — when the user asks for one, keep that wish in the prompt input (e.g. "with a table of contents").
-- "calendar_event": Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve a clock time the user named against the current time context. If they named no hour, do not invent 09:00 — the runner asks in their language. When they ask to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one. compose_reply inputs.text must be "$nX.text" so the confirmation stays in their language.
+- "calendar_event": Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve a clock time the user named against the current time context. If they named no hour, do not invent 09:00 — the runner asks in their language. When the dates and times are in an attached file (a booking picture, an invitation), do NOT ask and do NOT write a start: let ONE calendar_event node depend on the file_analysis step that reads it and set inputs.source to "$nX.text" — the runner takes every entry from that text, however many there are. When they ask to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one. compose_reply inputs.text must be "$nX.text" so the confirmation stays in their language.
 - "email_me": Email the results to the account owner as one multi-part mail (text + attachments from other nodes). ONLY when the user explicitly asks to be mailed/emailed the result ("mail it to me", "send it to my email"). Inputs: text, attachments. Never the reply node.
 - "compose_reply": Assemble final reply: text + N file attachments from other nodes.
 - "ask_user": Ask the person a question with up to five options (one may be recommended) and optional free text, then continue the same run with their answer.
@@ -196,7 +196,7 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    If they asked for a calendar event but named NO clock time ("tomorrow" or
    "Freitag" alone is not an hour), do NOT emit `calendar_event` and do NOT
    invent 09:00. Emit one `compose_reply` whose `inputs.text` asks for the
-   time in the SAME language as the latest user message.
+   time in the SAME language as the latest user message. (Exception: rule 7b.)
    The plan's `language` field is that message's language, not the UI locale.
    When the user asks to PUT the event into a connected calendar ("put it
    into my Outlook", "trag es in meinen Kalender ein") AND the Connected
@@ -205,6 +205,17 @@ Allowed topic keys: "general" | "synaplan" | "mediamaker" | "officemaker" | "doc
    then created directly in that calendar. Never invent a channel name; with
    no calendar channel connected, omit `params.channel` (the user gets the
    downloadable invite).
+7b. The dates and times are in an ATTACHED FILE, not in the message ("trage
+   die 3 Flüge aus dem Bild in meinen Kalender ein", "put the appointment
+   from this invitation into my calendar") → read the file first with
+   `file_analysis`, then ONE `calendar_event` node that `depends_on` it, with
+   `inputs.source: "$nX.text"` and NO `start`. The runner takes every entry
+   from that text — one node, however many entries there are. Do NOT ask for
+   the time and do NOT write one yourself. Still set `params.timezone`, and
+   `params.channel` as in rule 7. A follow-up about a file listed in this
+   conversation ("es steht alles im Bild", "ja, trag das ein") is the same
+   chain. The same shape applies when another step returns the dates
+   (`url_fetch`, `email_search`): the `calendar_event` node depends on it.
 8. "Mail it to me" / "email me the result" / "schick es mir per Mail" →
    ADD one `email_me` node that depends on the content nodes and consumes
    their outputs (`text` + `attachments`). ONLY when the user EXPLICITLY
@@ -677,6 +688,24 @@ No hour was named, so do not invent 09:00. Ask in the user's language:
   ]
 }
 
+### Calendar entries from an attached file (rule 7b)
+User: (attaches a picture of a flight booking) "Trage bitte die 3 Flüge in mein Outlook Calender"
+The times are in the picture, not in the message. Read it, then let ONE
+`calendar_event` node take the entries from that step: no `start`, no question,
+one node for all three flights. (The Connected channels list shows "outlook"
+here; without a calendar channel, omit `channel`.)
+
+{
+  "version": 1,
+  "language": "de",
+  "reply_node": "n3",
+  "tasks": [
+    { "id": "n1", "capability": "file_analysis", "inputs": { "files": "$message.files", "prompt": "Liste jeden Flug mit Datum, Abflug- und Ankunftszeit, Abflug- und Zielort sowie die Buchungsnummer auf." } },
+    { "id": "n2", "capability": "calendar_event", "depends_on": ["n1"], "inputs": { "source": "$n1.text" }, "params": { "timezone": "Europe/Berlin", "channel": "outlook" } },
+    { "id": "n3", "capability": "compose_reply", "depends_on": ["n2"], "inputs": { "text": "$n2.text", "attachments": ["$n2.file"] } }
+  ]
+}
+
 When the user ALSO asks to put the event into a connected calendar ("… and put
 it into my Outlook") and the Connected channels list shows a calendar channel
 (e.g. "outlook"), add `"channel": "outlook"` to the `calendar_event` node's
@@ -714,6 +743,6 @@ Output ONLY the JSON object.
 - The user's timezone is unknown, so this is the server clock and may differ from their local time. If the exact local time matters, ask the user to confirm their timezone.
 Use this as "now" when resolving relative dates and times (e.g. "today", "tomorrow", "in 2 hours", "next Monday"). Do not restate this block unless the user asks about the current date or time.
 For a calendar/meeting request, emit a "calendar_event" node with an absolute "start" as an ISO-8601 LOCAL datetime in the user's local timezone shown above, plus the matching IANA "timezone" string. Do NOT convert the time to UTC and do NOT emit "UTC" unless that is genuinely the user's timezone.
-If the user did not name a clock time (an hour of day — "tomorrow" or "Freitag" alone is not enough), do NOT invent 09:00 or any other hour and do NOT emit calendar_event. Ask for the time in the same language as the latest user message.
+If the user did not name a clock time (an hour of day — "tomorrow" or "Freitag" alone is not enough), do NOT invent 09:00 or any other hour and do NOT emit calendar_event. Ask for the time in the same language as the latest user message. The one exception is an attached file that holds the time: then emit calendar_event without "start", depending on the file_analysis step that reads the file.
 The plan "language" field must match the latest user message, not the UI locale. A German request gets "de" even when the product UI is English.
 When a calendar_event node is emitted, set compose_reply inputs.text to "$nX.text" so the runner's confirmation (date, time, duration) is what the user sees.

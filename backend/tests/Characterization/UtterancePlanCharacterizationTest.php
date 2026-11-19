@@ -227,6 +227,43 @@ final class UtterancePlanCharacterizationTest extends TestCase
                 ],
             ],
 
+            // The times are in the attached booking picture, not in the
+            // message. The plan reads the picture and one calendar step takes
+            // every flight from that text: no `start`, because the planner
+            // has not seen the picture, and no question about the time.
+            'calendar_entries_from_attached_picture' => [
+                'utterance' => 'Trage bitte die 3 Flüge in mein Outlook Calender',
+                'plan' => [
+                    'version' => 1,
+                    'language' => 'de',
+                    'tasks' => [
+                        [
+                            'id' => 'n1',
+                            'capability' => 'file_analysis',
+                            'depends_on' => [],
+                            'inputs' => [
+                                'files' => '$message.files',
+                                'prompt' => 'Liste jeden Flug mit Datum, Abflug- und Ankunftszeit, Abflug- und Zielort sowie die Buchungsnummer auf.',
+                            ],
+                        ],
+                        [
+                            'id' => 'n2',
+                            'capability' => 'calendar_event',
+                            'depends_on' => ['n1'],
+                            'inputs' => ['source' => '$n1.text'],
+                            'params' => ['timezone' => 'Europe/Berlin', 'channel' => 'outlook'],
+                        ],
+                        [
+                            'id' => 'n3',
+                            'capability' => 'compose_reply',
+                            'depends_on' => ['n2'],
+                            'inputs' => ['text' => '$n2.text', 'attachments' => ['$n2.file']],
+                        ],
+                    ],
+                    'reply_node' => 'n3',
+                ],
+            ],
+
             // An attached PDF edit is file work. The sandbox still cannot change
             // PDF text in place; the step exists so the reply can say that.
             'pdf_edit_attached_file' => [

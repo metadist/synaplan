@@ -112,4 +112,66 @@ final class CalendarEventServiceTest extends TestCase
             self::assertLessThanOrEqual(75, strlen($line), 'Each content line must be <= 75 octets');
         }
     }
+
+    /**
+     * The flights of one booking travel in one file: one calendar wrapper,
+     * one event block per flight, each with its own id. A connected calendar
+     * reads the blocks and creates one event for each.
+     */
+    public function testSeveralEntriesShareOneCalendarFile(): void
+    {
+        $zone = new \DateTimeZone('Europe/Berlin');
+        $ics = $this->service->buildIcsForEntries([
+            [
+                'title' => 'Flug Hamburg (HAM) → Wien (VIE)',
+                'start' => new \DateTimeImmutable('2027-03-12T06:45:00', $zone),
+                'end' => new \DateTimeImmutable('2027-03-12T08:20:00', $zone),
+                'location' => 'Hamburg Flughafen (HAM)',
+                'description' => 'Buchungsnummer 4471-205-918',
+            ],
+            [
+                'title' => 'Flug Wien (VIE) → Lissabon (LIS)',
+                'start' => new \DateTimeImmutable('2027-03-13T19:30:00', $zone),
+                'end' => new \DateTimeImmutable('2027-03-13T22:15:00', $zone),
+            ],
+            [
+                'title' => 'Flug Lissabon (LIS) → Hamburg (HAM)',
+                'start' => new \DateTimeImmutable('2027-03-17T14:00:00', $zone),
+                'end' => new \DateTimeImmutable('2027-03-17T17:00:00', $zone),
+            ],
+        ], 'Europe/Berlin');
+
+        self::assertSame(1, substr_count($ics, 'BEGIN:VCALENDAR'));
+        self::assertSame(1, substr_count($ics, 'END:VCALENDAR'));
+        self::assertSame(3, substr_count($ics, 'BEGIN:VEVENT'));
+        self::assertSame(3, substr_count($ics, 'END:VEVENT'));
+        self::assertStringEndsWith("END:VEVENT\r\nEND:VCALENDAR\r\n", $ics);
+
+        // Mid-March is CET (UTC+1).
+        self::assertStringContainsString('DTSTART:20270312T054500Z', $ics);
+        self::assertStringContainsString('DTEND:20270312T072000Z', $ics);
+        self::assertStringContainsString('DTSTART:20270313T183000Z', $ics);
+        self::assertStringContainsString('DTSTART:20270317T130000Z', $ics);
+        self::assertStringContainsString('LOCATION:Hamburg Flughafen (HAM)', $ics);
+        self::assertStringContainsString('Buchungsnummer 4471-205-918', $ics);
+
+        preg_match_all('/^UID:(.+)$/m', $ics, $uids);
+        self::assertCount(3, array_unique($uids[1]));
+    }
+
+    public function testASingleEventKeepsItsShape(): void
+    {
+        $ics = $this->service->buildIcs(
+            'Sync',
+            new \DateTimeImmutable('2026-06-09T15:00:00', new \DateTimeZone('UTC')),
+            new \DateTimeImmutable('2026-06-09T16:00:00', new \DateTimeZone('UTC')),
+        );
+
+        $lines = explode("\r\n", rtrim($ics));
+        self::assertSame(['BEGIN:VCALENDAR', 'VERSION:2.0'], array_slice($lines, 0, 2));
+        self::assertSame('CALSCALE:GREGORIAN', $lines[3]);
+        self::assertSame('METHOD:PUBLISH', $lines[4]);
+        self::assertSame('BEGIN:VEVENT', $lines[5]);
+        self::assertSame(['STATUS:CONFIRMED', 'END:VEVENT', 'END:VCALENDAR'], array_slice($lines, -3));
+    }
 }

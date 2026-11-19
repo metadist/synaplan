@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Destination;
 
 use App\Entity\Connection;
 use App\Repository\ConnectionRepository;
+use App\Service\Calendar\CalendarEventService;
 use App\Service\Destination\CalendarDeliveryId;
 use App\Service\Destination\DestinationFailureCode;
 use App\Service\Destination\OutlookCalendarDestinationProvider;
@@ -99,6 +100,58 @@ final class OutlookCalendarDestinationProviderTest extends TestCase
             @unlink($prague);
             @unlink($malta);
         }
+    }
+
+    public function testTheFileWrittenForSeveralEntriesBecomesOneOutlookEventEach(): void
+    {
+        $berlin = new \DateTimeZone('Europe/Berlin');
+        $flight = static fn (string $title, string $start, string $end, string $from): array => [
+            'title' => $title,
+            'start' => new \DateTimeImmutable($start, $berlin),
+            'end' => new \DateTimeImmutable($end, $berlin),
+            'description' => 'Buchungsnummer 4471-205-918, bestätigt; zwei Erwachsene, Gepäck laut Buchung',
+            'location' => $from,
+        ];
+        file_put_contents($this->tempFile, (new CalendarEventService())->buildIcsForEntries([
+            $flight('Flug Hamburg (HAM) → Wien (VIE)', '2027-03-12 06:45', '2027-03-12 08:20', 'Hamburg Flughafen (HAM)'),
+            $flight('Flug Wien (VIE) → Lissabon (LIS)', '2027-03-13 19:30', '2027-03-13 22:15', 'Wien (VIE)'),
+            $flight('Flug Lissabon (LIS) → Hamburg (HAM)', '2027-03-17 14:00', '2027-03-17 17:00', 'Lissabon (LIS)'),
+        ], 'Europe/Berlin'));
+
+        $captured = [];
+        $provider = $this->provider([
+            new MockResponse(json_encode(['id' => 'evt-0', 'webLink' => 'https://outlook.office.com/evt-0']), ['http_code' => 201]),
+            new MockResponse(json_encode(['id' => 'evt-1', 'webLink' => 'https://outlook.office.com/evt-1']), ['http_code' => 201]),
+            new MockResponse(json_encode(['id' => 'evt-2', 'webLink' => 'https://outlook.office.com/evt-2']), ['http_code' => 201]),
+        ], $captured);
+
+        $result = $provider->send($this->file(), ['connection_id' => 7, 'message_id' => 41]);
+
+        self::assertTrue($result->ok);
+        self::assertSame('3', $result->context['created']);
+        self::assertCount(3, $captured);
+
+        $events = array_map(static fn (array $request): array => json_decode($request['body'], true), $captured);
+        self::assertSame(
+            ['Flug Hamburg (HAM) → Wien (VIE)', 'Flug Wien (VIE) → Lissabon (LIS)', 'Flug Lissabon (LIS) → Hamburg (HAM)'],
+            array_column($events, 'subject'),
+        );
+        // Berlin is UTC+1 in mid-March: the printed 06:45 is 05:45 UTC.
+        self::assertSame(
+            ['2027-03-12T05:45:00', '2027-03-13T18:30:00', '2027-03-17T13:00:00'],
+            array_map(static fn (array $event): string => $event['start']['dateTime'], $events),
+        );
+        self::assertSame(
+            ['2027-03-12T07:20:00', '2027-03-13T21:15:00', '2027-03-17T16:00:00'],
+            array_map(static fn (array $event): string => $event['end']['dateTime'], $events),
+        );
+        self::assertSame('Hamburg Flughafen (HAM)', $events[0]['location']['displayName']);
+        // The description is longer than one folded line; it arrives whole.
+        self::assertStringContainsString(
+            "Buchungsnummer 4471-205-918, bestätigt; zwei Erwachsene, Gepäck laut Buchung\nTime zone: Europe/Berlin",
+            $events[0]['body']['content'],
+        );
+        self::assertCount(3, array_unique(array_column($events, 'transactionId')));
     }
 
     public function testRedeliveryCountsConflictsAsSkippedNotFailed(): void

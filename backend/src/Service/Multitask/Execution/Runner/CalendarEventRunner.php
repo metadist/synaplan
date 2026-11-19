@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Execution\Runner;
 
+use App\Entity\Message;
 use App\Repository\UserRepository;
+use App\Service\Calendar\CalendarEntry;
 use App\Service\Calendar\CalendarEventService;
 use App\Service\Calendar\CalendarEventSpeech;
-use App\Service\Calendar\UserNamedClockTime;
+use App\Service\Calendar\CalendarTurnEvidence;
+use App\Service\Calendar\EventTimezone;
 use App\Service\Destination\RequestedCalendarDelivery;
 use App\Service\File\FileStorageService;
 use App\Service\Multitask\Execution\NodeContext;
@@ -47,19 +50,23 @@ use Psr\Log\LoggerInterface;
  *                      e.g. "outlook", "calendar" — delivers the event into
  *                      that connected calendar)
  *
- * Clock time: if the user named no hour of day, the runner asks instead of
- * writing — the planner's favourite 09:00 is not a substitute.
+ * Clock time: a start the plan carries is used only when the person named
+ * it, in the latest message or as that very hour and minute earlier in the
+ * conversation ({@see CalendarTurnEvidence}). The planner's favourite 09:00
+ * is not a substitute.
  *
- * Timezone precedence (a wall-clock time is meaningless without its zone):
- *   1. A zone the user named outright in THIS message (IANA identifier or
- *      bare UTC/GMT token) — wins for this event, even over a stored profile
- *      zone and whatever the planner emitted.
- *   2. A planner zone corroborated by the user's own words (e.g. the city it
- *      is named after, "10 New York").
- *   3. The stored profile timezone — authoritative, beats any planner guess.
- *   4. The planner timezone, when valid and not UTC (country inference).
- *   5. Otherwise the event is NOT written: the runner asks for the timezone
- *      instead of stamping silent server UTC (#2010).
+ * Entries from what was read: without such a start the runner takes its
+ * entries from the steps it depends on, else from the files of the turn
+ * ({@see CalendarEntrySource}) — "put the three flights of this booking
+ * into my calendar" names no hour, the picture does. Every entry found is
+ * written in one step and into one .ics; an entry counts only when the read
+ * text names its time. With nothing to read the runner asks for the time.
+ *
+ * Timezone: a wall-clock time is meaningless without its zone. The
+ * precedence (a zone the person named, the stored profile zone, a planner
+ * zone that is not UTC) is {@see EventTimezone}. When no zone can be trusted
+ * the event is NOT written: the runner asks for the timezone instead of
+ * stamping silent server UTC (#2010).
  */
 final readonly class CalendarEventRunner implements TaskRunner
 {
@@ -71,6 +78,7 @@ final readonly class CalendarEventRunner implements TaskRunner
         private LoggerInterface $logger,
         private string $uploadDir = '/var/www/backend/var/uploads',
         private ?StepApprovalGate $approvalGate = null,
+        private ?CalendarEntrySource $entrySource = null,
     ) {
     }
 
@@ -87,11 +95,15 @@ final readonly class CalendarEventRunner implements TaskRunner
         return [
             new SkillDescriptor(
                 Capability::CalendarEvent,
-                'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve a clock time the user named against the current time context. If they named no hour, do not invent 09:00 — the runner asks in their language. When they ask to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one. compose_reply inputs.text must be "$nX.text" so the confirmation stays in their language.',
-                planAdjuster: static function (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic): array {
+                'Create a calendar meeting/invite as a downloadable .ics file. params: title, start (ISO-8601 local datetime, e.g. "2026-06-09T15:00:00"), end (ISO-8601) or duration_minutes, timezone (IANA, e.g. "Europe/Berlin"), location, description, attendees (list of names/emails). Resolve a clock time the user named against the current time context. If they named no hour, do not invent 09:00 — the runner asks in their language. When the dates and times are in an attached file (a booking picture, an invitation), do NOT ask and do NOT write a start: let ONE calendar_event node depend on the file_analysis step that reads it and set inputs.source to "$nX.text" — the runner takes every entry from that text, however many there are. When they ask to put the event INTO a connected calendar and the Connected channels list has a calendar channel, also set params.channel to that channel name (e.g. "outlook") — never invent one. compose_reply inputs.text must be "$nX.text" so the confirmation stays in their language.',
+                planAdjuster: static function (array $payload, string $messageText, ?int $userId, ?array $allowed, string $topic, ?Message $message = null, array $thread = []): array {
                     unset($userId, $allowed, $topic);
 
-                    return CalendarEventSpeech::adjustPlan($payload, $messageText);
+                    return CalendarEventSpeech::adjustPlan(
+                        $payload,
+                        $messageText,
+                        null !== $message ? CalendarTurnEvidence::ofTurn($message, $thread) : null,
+                    );
                 },
             ),
         ];
@@ -113,14 +125,27 @@ final readonly class CalendarEventRunner implements TaskRunner
         $language = $this->utteranceLanguage($context, $messageText);
         $ownerId = (int) ($context->userId ?? $context->message->getUserId());
 
-        $ask = $this->askInsteadOfWriting($messageText, $language, $title, $params, $ownerId);
-        if (null !== $ask) {
-            return $ask;
+        // A resumed step writes the entries its owner approved, not a second reading.
+        $approved = $context->isApproved($node->id) ? $this->approvedEntries($params) : [];
+        if ([] !== $approved) {
+            $zone = is_string($params['timezone'] ?? null) ? $params['timezone'] : $approved[0]['start']->getTimezone()->getName();
+
+            return $this->writeEvents($node, $context, $approved, $zone, $language, $ownerId, $params, true);
         }
 
         $startStr = is_string($params['start'] ?? null) ? trim($params['start']) : '';
-        if ('' === $startStr) {
-            return NodeResult::failed('calendar event: missing start time');
+        $evidence = CalendarTurnEvidence::ofTurn($context->message, $context->thread);
+        if ('' === $startStr || !$evidence->backsStart($startStr)) {
+            // The hour is not the person's. Take the entries from what was read.
+            $readText = $this->entrySource?->readText($node, $context, $evidence) ?? '';
+            if ('' !== $readText) {
+                return $this->enterWhatWasRead($node, $context, $params, $readText, $title, $language, $ownerId);
+            }
+        }
+
+        $ask = $this->askInsteadOfWriting($evidence, $startStr, $messageText, $language, $title, $params, $ownerId);
+        if (null !== $ask) {
+            return $ask;
         }
 
         $resolved = $this->resolveTimezone($params, $messageText, $ownerId)
@@ -128,46 +153,192 @@ final readonly class CalendarEventRunner implements TaskRunner
         [$tz, $tzName, $stripExplicitOffset] = $resolved;
 
         try {
-            $start = $this->parseInZone($startStr, $tz, $stripExplicitOffset);
+            $start = EventTimezone::parse($startStr, $tz, $stripExplicitOffset);
         } catch (\Throwable $e) {
             return NodeResult::failed('calendar event: invalid start time: '.$e->getMessage());
         }
 
-        $end = $this->resolveEnd($params, $start, $tz, $stripExplicitOffset);
-
-        $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
-        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar($messageText);
-        if ('' === $channel && $userAsked) {
-            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
-        }
-
-        $gated = $this->approvalGate?->consult($context, $node, SkillToolSource::nameFor(Capability::CalendarEvent), [
+        return $this->writeEvents($node, $context, [[
             'title' => $title,
-            'start' => $start->format(\DateTimeInterface::ATOM),
-            'end' => $end->format(\DateTimeInterface::ATOM),
-            'timezone' => $tzName,
-            'channel' => $channel,
+            'start' => $start,
+            'end' => $this->resolveEnd($params, $start, $tz, $stripExplicitOffset),
             'location' => is_string($params['location'] ?? null) ? $params['location'] : null,
             'description' => is_string($params['description'] ?? null) ? $params['description'] : null,
             'attendees' => $this->normalizeAttendees($params['attendees'] ?? null),
             'organizer_email' => is_string($params['organizer_email'] ?? null) ? $params['organizer_email'] : null,
-        ]);
+        ]], $tzName, $language, $ownerId, $params, false);
+    }
+
+    /**
+     * The plan names no hour the person gave, and something was read: write
+     * every entry that text holds. One step, one file, one confirmation.
+     *
+     * @param array<string, mixed> $params
+     */
+    private function enterWhatWasRead(
+        TaskNode $node,
+        NodeContext $context,
+        array $params,
+        string $readText,
+        string $title,
+        string $language,
+        int $ownerId,
+    ): NodeResult {
+        $source = $this->entrySource;
+        if (null === $source || $source->alreadyEntered($context, $readText)) {
+            return NodeResult::ok(null, [], ['calendar_event' => ['created' => false, 'reason' => 'already_entered']]);
+        }
+
+        $resolved = $this->resolveTimezone($params, (string) $context->message->getText(), $ownerId);
+        if (null === $resolved) {
+            return NodeResult::ok(CalendarEventSpeech::unknownTimezone($language, $title), [], [
+                'calendar_event' => ['title' => $title, 'created' => false, 'reason' => 'unknown_timezone'],
+            ]);
+        }
+        [$tz, $tzName] = $resolved;
+
+        $extraction = $source->read($context, $readText, $tz, $language);
+        if ($extraction instanceof NodeResult) {
+            return $extraction;
+        }
+
+        $metadata = $extraction->usage + [CalendarEntrySource::META_READ => CalendarEntrySource::key($readText)];
+        $events = $this->eventsFromEntries($extraction->entries, $params, $tz);
+        if ([] === $events) {
+            return NodeResult::ok(CalendarEventSpeech::nothingToEnter($language), [], $metadata + [
+                'calendar_event' => ['created' => false, 'reason' => 'no_entries_found'],
+            ]);
+        }
+
+        return $this->writeEvents($node, $context, $events, $tzName, $language, $ownerId, $params, true, $metadata);
+    }
+
+    /**
+     * The times of an entry are the ones on the page. They are placed in the
+     * person's zone, whatever offset the model wrote next to them.
+     *
+     * @param list<CalendarEntry>  $entries
+     * @param array<string, mixed> $params
+     *
+     * @return list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, location: ?string, description: ?string, attendees: list<string>, organizer_email: ?string}>
+     */
+    private function eventsFromEntries(array $entries, array $params, \DateTimeZone $tz): array
+    {
+        $events = [];
+        foreach ($entries as $entry) {
+            try {
+                $start = EventTimezone::parse($entry->start, $tz, true);
+            } catch (\Throwable) {
+                continue;
+            }
+            $events[] = [
+                'title' => $entry->title,
+                'start' => $start,
+                'end' => $this->resolveEnd(['end' => $entry->end, 'duration_minutes' => $params['duration_minutes'] ?? null], $start, $tz, true),
+                'location' => $entry->location,
+                'description' => $entry->description,
+                'attendees' => [],
+                'organizer_email' => null,
+            ];
+        }
+
+        return $events;
+    }
+
+    /**
+     * The entries an approval was given for, as the resumed step receives
+     * them back in its params.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, location: ?string, description: ?string, attendees: list<string>, organizer_email: ?string}>
+     */
+    private function approvedEntries(array $params): array
+    {
+        $rows = $params['entries'] ?? null;
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        $events = [];
+        foreach ($rows as $row) {
+            if (!is_array($row) || !is_string($row['start'] ?? null) || !is_string($row['end'] ?? null)) {
+                continue;
+            }
+            try {
+                $start = new \DateTimeImmutable($row['start']);
+                $end = new \DateTimeImmutable($row['end']);
+            } catch (\Throwable) {
+                continue;
+            }
+            $events[] = [
+                'title' => is_string($row['title'] ?? null) && '' !== trim($row['title']) ? trim($row['title']) : 'Meeting',
+                'start' => $start,
+                'end' => $end > $start ? $end : $start->add(new \DateInterval('PT1H')),
+                'location' => is_string($row['location'] ?? null) ? $row['location'] : null,
+                'description' => is_string($row['description'] ?? null) ? $row['description'] : null,
+                'attendees' => [],
+                'organizer_email' => null,
+            ];
+        }
+
+        return $events;
+    }
+
+    /**
+     * Approval, the .ics, the connected calendar and the confirmation, for
+     * one event or several.
+     *
+     * @param non-empty-list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, location: ?string, description: ?string, attendees: list<string>, organizer_email: ?string}> $events
+     * @param array<string, mixed>                                                                                                                                                                 $params
+     * @param bool                                                                                                                                                                                 $read     the entries were read, not planned: the approval names each of them
+     * @param array<string, mixed>                                                                                                                                                                 $metadata carried onto the result (the usage of the reading call)
+     */
+    private function writeEvents(
+        TaskNode $node,
+        NodeContext $context,
+        array $events,
+        string $tzName,
+        string $language,
+        int $ownerId,
+        array $params,
+        bool $read,
+        array $metadata = [],
+    ): NodeResult {
+        $channel = is_string($params['channel'] ?? null) ? trim($params['channel']) : '';
+        $userAsked = $this->calendarDelivery->userAskedToPutInCalendar((string) $context->message->getText());
+        if ('' === $channel && $userAsked) {
+            $channel = $this->calendarDelivery->defaultCalendarChannel($ownerId) ?? '';
+        }
+
+        $gated = $this->approvalGate?->consult(
+            $context,
+            $node,
+            SkillToolSource::nameFor(Capability::CalendarEvent),
+            $this->approvalArguments($events, $tzName, $channel, $read),
+        );
         if (null !== $gated) {
             return $gated;
         }
 
-        $ics = $this->calendarService->buildIcs(
-            title: $title,
-            start: $start,
-            end: $end,
-            description: is_string($params['description'] ?? null) ? $params['description'] : null,
-            location: is_string($params['location'] ?? null) ? $params['location'] : null,
-            attendees: $this->normalizeAttendees($params['attendees'] ?? null),
-            organizerEmail: is_string($params['organizer_email'] ?? null) ? $params['organizer_email'] : null,
-            timezoneLabel: $tzName,
-        );
+        $first = $events[0];
+        if (1 === count($events)) {
+            $ics = $this->calendarService->buildIcs(
+                title: $first['title'],
+                start: $first['start'],
+                end: $first['end'],
+                description: $first['description'],
+                location: $first['location'],
+                attendees: $first['attendees'],
+                organizerEmail: $first['organizer_email'],
+                timezoneLabel: $tzName,
+            );
+            $filename = 'meeting_'.$first['start']->format('Ymd_His').'.ics';
+        } else {
+            $ics = $this->calendarService->buildIcsForEntries($events, $tzName);
+            $filename = sprintf('calendar_%s_%d_entries.ics', $first['start']->format('Ymd'), count($events));
+        }
 
-        $filename = 'meeting_'.$start->format('Ymd_His').'.ics';
         $stored = $this->fileStorage->storeRawContent($ics, $context->userId, $filename, 'text/calendar');
         if (!$stored['success'] || '' === $stored['path']) {
             $this->logger->warning('CalendarEventRunner: failed to store ics', ['error' => $stored['error'] ?? null]);
@@ -181,20 +352,63 @@ final readonly class CalendarEventRunner implements TaskRunner
             'local_path' => $stored['path'],
         ];
 
-        return $this->confirmStoredEvent(
+        return $this->confirmStoredEvents(
             $context,
             $file,
             $stored['path'],
             $filename,
-            $title,
-            $start,
-            $end,
+            $events,
             $tzName,
             $language,
             $ownerId,
             $channel,
             $userAsked,
+            $metadata,
         );
+    }
+
+    /**
+     * What an approval is asked for. A planned event keeps its fields at the
+     * top level. Entries that were read are listed, with one line that names
+     * them: the approval preview shows scalar values only.
+     *
+     * @param non-empty-list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, location: ?string, description: ?string, attendees: list<string>, organizer_email: ?string}> $events
+     *
+     * @return array<string, mixed>
+     */
+    private function approvalArguments(array $events, string $tzName, string $channel, bool $read): array
+    {
+        if (!$read) {
+            $event = $events[0];
+
+            return [
+                'title' => $event['title'],
+                'start' => $event['start']->format(\DateTimeInterface::ATOM),
+                'end' => $event['end']->format(\DateTimeInterface::ATOM),
+                'timezone' => $tzName,
+                'channel' => $channel,
+                'location' => $event['location'],
+                'description' => $event['description'],
+                'attendees' => $event['attendees'],
+                'organizer_email' => $event['organizer_email'],
+            ];
+        }
+
+        return [
+            'summary' => count($events).' × '.implode('; ', array_map(
+                static fn (array $event): string => $event['start']->format('Y-m-d H:i').' '.$event['title'],
+                $events,
+            )),
+            'timezone' => $tzName,
+            'channel' => $channel,
+            'entries' => array_map(static fn (array $event): array => [
+                'title' => $event['title'],
+                'start' => $event['start']->format(\DateTimeInterface::ATOM),
+                'end' => $event['end']->format(\DateTimeInterface::ATOM),
+                'location' => $event['location'],
+                'description' => $event['description'],
+            ], $events),
+        ];
     }
 
     private function utteranceLanguage(NodeContext $context, string $messageText): string
@@ -210,13 +424,15 @@ final readonly class CalendarEventRunner implements TaskRunner
      * @param array<string, mixed> $params
      */
     private function askInsteadOfWriting(
+        CalendarTurnEvidence $evidence,
+        string $startStr,
         string $messageText,
         string $language,
         string $title,
         array $params,
         int $ownerId,
     ): ?NodeResult {
-        if (!UserNamedClockTime::in($messageText)) {
+        if (!$evidence->backsStart($startStr)) {
             return NodeResult::ok(CalendarEventSpeech::askForTime($language), [], [
                 'calendar_event' => [
                     'title' => $title,
@@ -226,7 +442,6 @@ final readonly class CalendarEventRunner implements TaskRunner
             ]);
         }
 
-        $startStr = is_string($params['start'] ?? null) ? trim($params['start']) : '';
         if ('' === $startStr) {
             return NodeResult::failed('calendar event: missing start time');
         }
@@ -245,23 +460,23 @@ final readonly class CalendarEventRunner implements TaskRunner
     }
 
     /**
-     * @param array<string, mixed> $file
+     * @param array<string, mixed>                                                                                                                                                                 $file
+     * @param non-empty-list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, location: ?string, description: ?string, attendees: list<string>, organizer_email: ?string}> $events
+     * @param array<string, mixed>                                                                                                                                                                 $metadata
      */
-    private function confirmStoredEvent(
+    private function confirmStoredEvents(
         NodeContext $context,
         array $file,
         string $storedPath,
         string $filename,
-        string $title,
-        \DateTimeImmutable $start,
-        \DateTimeImmutable $end,
+        array $events,
         string $tzName,
         string $language,
         int $ownerId,
         string $channel,
         bool $userAsked,
+        array $metadata = [],
     ): NodeResult {
-        $durationMinutes = (int) round(($end->getTimestamp() - $start->getTimestamp()) / 60);
         $webLink = null;
         $deliveryMeta = null;
         $deliveryNote = '';
@@ -293,28 +508,41 @@ final readonly class CalendarEventRunner implements TaskRunner
                 'created' => 0,
                 'skipped' => 0,
             ];
-            $deliveryNote = ' '.CalendarEventSpeech::notDelivered($language);
+            $deliveryNote = ' '.CalendarEventSpeech::notDelivered($language, count($events) > 1);
         }
 
         $deliveredChannel = (true === ($deliveryMeta['ok'] ?? false)) ? $channel : '';
-        $text = CalendarEventSpeech::confirmed(
-            $language,
-            $start,
-            max(1, $durationMinutes),
-            $deliveredChannel,
-            $webLink,
-            $title,
-        ).$deliveryNote;
+        $first = $events[0];
+        if (1 === count($events)) {
+            $durationMinutes = (int) round(($first['end']->getTimestamp() - $first['start']->getTimestamp()) / 60);
+            $text = CalendarEventSpeech::confirmed(
+                $language,
+                $first['start'],
+                max(1, $durationMinutes),
+                $deliveredChannel,
+                $webLink,
+                $first['title'],
+            ).$deliveryNote;
+        } else {
+            // One link cannot stand for several events; the list names each.
+            $text = CalendarEventSpeech::confirmedSeveral($language, $events, $deliveredChannel);
+            $text .= '' !== $deliveryNote ? "\n\n".ltrim($deliveryNote) : '';
+        }
 
-        $metadata = [
-            'media_type' => 'document',
-            'calendar_event' => [
-                'title' => $title,
-                'start' => $start->format(\DateTimeInterface::ATOM),
-                'end' => $end->format(\DateTimeInterface::ATOM),
-                'timezone' => $tzName,
-            ],
+        $metadata['media_type'] = 'document';
+        $metadata['calendar_event'] = [
+            'title' => $first['title'],
+            'start' => $first['start']->format(\DateTimeInterface::ATOM),
+            'end' => $first['end']->format(\DateTimeInterface::ATOM),
+            'timezone' => $tzName,
         ];
+        if (count($events) > 1) {
+            $metadata['calendar_events'] = array_map(static fn (array $event): array => [
+                'title' => $event['title'],
+                'start' => $event['start']->format(\DateTimeInterface::ATOM),
+                'end' => $event['end']->format(\DateTimeInterface::ATOM),
+            ], $events);
+        }
         if (null !== $deliveryMeta) {
             $metadata['calendar_delivery'] = $deliveryMeta;
         }
@@ -323,11 +551,8 @@ final readonly class CalendarEventRunner implements TaskRunner
     }
 
     /**
-     * Resolve which zone a wall-clock event time belongs to.
-     *
-     * Returns the zone, its name, and whether an explicit offset in start/end
-     * must be reinterpreted as wall-clock in that zone — or null when no zone
-     * can be trusted and the event must not be written.
+     * The zone of this event's wall-clock times ({@see EventTimezone}), or
+     * null when none can be trusted and the event must not be written.
      *
      * @param array<string, mixed> $params
      *
@@ -335,45 +560,11 @@ final readonly class CalendarEventRunner implements TaskRunner
      */
     private function resolveTimezone(array $params, string $messageText, int $ownerId): ?array
     {
-        $plannerTz = $this->validZone(is_string($params['timezone'] ?? null) ? trim($params['timezone']) : '');
-        $profileTz = $this->profileTimezone($ownerId);
-
-        // 1. A zone the user named outright (IANA identifier or bare UTC/GMT
-        // token) wins even when the planner emitted something else.
-        $namedTz = $this->extractUserNamedZone($messageText);
-        if (null !== $namedTz && $namedTz !== $profileTz) {
-            return [new \DateTimeZone($namedTz), $namedTz, false];
-        }
-        // 2. A planner zone corroborated by the user's own words (e.g. the
-        // city it is named after) wins for this event.
-        if (null !== $plannerTz && $plannerTz !== $profileTz && $this->isUserNamedZone($plannerTz, $messageText)) {
-            return [new \DateTimeZone($plannerTz), $plannerTz, false];
-        }
-        // 3. The stored profile zone is authoritative.
-        if (null !== $profileTz) {
-            return [new \DateTimeZone($profileTz), $profileTz, true];
-        }
-        // 4. A planner zone that is not a silent UTC default (country inference).
-        if (null !== $plannerTz && 'UTC' !== strtoupper($plannerTz)) {
-            return [new \DateTimeZone($plannerTz), $plannerTz, false];
-        }
-
-        // 5. Server time only — never stamp it onto a wall-clock request.
-        return null;
-    }
-
-    private function validZone(string $name): ?string
-    {
-        if ('' === $name) {
-            return null;
-        }
-        try {
-            new \DateTimeZone($name);
-        } catch (\Throwable) {
-            return null;
-        }
-
-        return $this->canonicalZoneName($name) ?? $name;
+        return EventTimezone::resolve(
+            is_string($params['timezone'] ?? null) ? $params['timezone'] : '',
+            $messageText,
+            $this->profileTimezone($ownerId),
+        );
     }
 
     private function profileTimezone(int $userId): ?string
@@ -390,96 +581,7 @@ final readonly class CalendarEventRunner implements TaskRunner
             return null;
         }
 
-        return $this->validZone(trim((string) ($user->getUserDetails()['timezone'] ?? '')));
-    }
-
-    /**
-     * A zone the user named outright in their own message: a bare UTC/GMT
-     * token or an IANA identifier. Unlike isUserNamedZone() this does not
-     * depend on the planner having emitted the same zone first, so an
-     * explicit "10:00 UTC" wins even when the planner guessed otherwise.
-     */
-    private function extractUserNamedZone(string $messageText): ?string
-    {
-        if ('' === trim($messageText)) {
-            return null;
-        }
-        if (1 === preg_match('/\b(UTC|GMT)\b(?![+-]\d)/i', $messageText)) {
-            return 'UTC';
-        }
-        if (1 !== preg_match_all('#\b([A-Za-z][A-Za-z0-9_.+\-]*(?:/[A-Za-z0-9_.+\-]+)+)\b#', $messageText, $matches)) {
-            return null;
-        }
-        foreach ($matches[1] as $candidate) {
-            // Canonical lookup doubles as validation: lookalikes ("and/or",
-            // "Q3/2026") are not zones, and any casing ("europe/berlin")
-            // resolves to the spelled name ("Europe/Berlin").
-            $canonical = $this->canonicalZoneName($candidate);
-            if (null !== $canonical) {
-                return $canonical;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Canonical IANA spelling for a zone name in any casing, or null when it
-     * names no zone at all. Cached per request; the list is ~400 entries.
-     */
-    private function canonicalZoneName(string $candidate): ?string
-    {
-        static $byLower = null;
-        if (null === $byLower) {
-            $byLower = [];
-            foreach (\DateTimeZone::listIdentifiers() as $id) {
-                $byLower[strtolower($id)] = $id;
-            }
-        }
-
-        return $byLower[strtolower($candidate)] ?? null;
-    }
-
-    /**
-     * Did the user name this planner zone in their own message (as opposed to
-     * the planner inferring or defaulting it)? Matches the IANA name itself,
-     * a bare UTC/GMT token for UTC, or the city the zone is named after.
-     */
-    private function isUserNamedZone(string $tzName, string $messageText): bool
-    {
-        if ('' === trim($messageText)) {
-            return false;
-        }
-        if (str_contains(mb_strtolower($messageText), mb_strtolower($tzName))) {
-            return true;
-        }
-        if ('UTC' === strtoupper($tzName)) {
-            // Bare token only, word-boundary guarded: "production" must not
-            // corroborate UTC, and "UTC+2" names an offset, not UTC itself.
-            return 1 === preg_match('/\b(UTC|GMT)\b(?![+-]\d)/i', $messageText);
-        }
-
-        $slash = strrpos($tzName, '/');
-        $city = str_replace('_', ' ', false === $slash ? $tzName : substr($tzName, $slash + 1));
-
-        return '' !== $city && 1 === preg_match('/\b'.preg_quote($city, '/').'\b/iu', $messageText);
-    }
-
-    private function parseInZone(string $value, \DateTimeZone $zone, bool $stripExplicitOffset): \DateTimeImmutable
-    {
-        $value = trim($value);
-        if ($stripExplicitOffset) {
-            // new \DateTimeImmutable($str, $tz) ignores $tz when $str already
-            // carries Z or an offset — a planner "…T10:00:00Z" must not
-            // override the stored profile zone, so the wall clock is
-            // reinterpreted in it.
-            $value = trim((string) preg_replace('/(?:Z|[+-]\d{2}:?\d{2})\s*$/i', '', $value));
-        }
-        if ('' === $value) {
-            throw new \InvalidArgumentException('empty datetime');
-        }
-
-        return new \DateTimeImmutable($value, $zone);
+        return EventTimezone::valid((string) ($user->getUserDetails()['timezone'] ?? ''));
     }
 
     /**
@@ -512,7 +614,7 @@ final readonly class CalendarEventRunner implements TaskRunner
         $endStr = is_string($params['end'] ?? null) ? trim($params['end']) : '';
         if ('' !== $endStr) {
             try {
-                $end = $this->parseInZone($endStr, $tz, $stripExplicitOffset);
+                $end = EventTimezone::parse($endStr, $tz, $stripExplicitOffset);
                 if ($end > $start) {
                     return $end;
                 }

@@ -163,7 +163,7 @@ final readonly class TaskPlanner
         }
 
         $decoded = $this->withInferredDependencies($decoded);
-        $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, $adjustTopic);
+        $decoded = $this->skillCatalog->adjustPlan($decoded, (string) $message->getText(), $userId, $allowed, $adjustTopic, $message, $conversationHistory);
         $decoded = (new ImageFileWorkArbitration())->adjust($decoded, $message, $allowed);
         $errors = $this->validator->validate($decoded, $allowed);
         if ([] !== $errors) {
@@ -565,7 +565,7 @@ final readonly class TaskPlanner
         }
 
         $lines[] = 'For a calendar/meeting request, emit a "calendar_event" node with an absolute "start" as an ISO-8601 LOCAL datetime in the user\'s local timezone shown above, plus the matching IANA "timezone" string. Do NOT convert the time to UTC and do NOT emit "UTC" unless that is genuinely the user\'s timezone.';
-        $lines[] = 'If the user did not name a clock time (an hour of day — "tomorrow" or "Freitag" alone is not enough), do NOT invent 09:00 or any other hour and do NOT emit calendar_event. Ask for the time in the same language as the latest user message.';
+        $lines[] = 'If the user did not name a clock time (an hour of day — "tomorrow" or "Freitag" alone is not enough), do NOT invent 09:00 or any other hour and do NOT emit calendar_event. Ask for the time in the same language as the latest user message. The one exception is an attached file that holds the time: then emit calendar_event without "start", depending on the file_analysis step that reads the file.';
         $lines[] = 'The plan "language" field must match the latest user message, not the UI locale. A German request gets "de" even when the product UI is English.';
         $lines[] = 'When a calendar_event node is emitted, set compose_reply inputs.text to "$nX.text" so the runner\'s confirmation (date, time, duration) is what the user sees.';
 
