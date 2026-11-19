@@ -9,6 +9,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\RateLimitService;
 use App\Service\Usage\CostCalculationService;
@@ -48,7 +49,7 @@ final class RateLimitServiceTierTest extends TestCase
             $configRepository,
             $em,
             $this->createMock(LoggerInterface::class),
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $this->createMock(CostCalculationService::class),
             $this->createMock(SubscriptionRepository::class),
             $this->createMock(TopupRepository::class),
@@ -90,7 +91,7 @@ final class RateLimitServiceTierTest extends TestCase
             $configRepository,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $this->createMock(CostCalculationService::class),
             $this->createMock(SubscriptionRepository::class),
             $this->createMock(TopupRepository::class),
@@ -116,7 +117,7 @@ final class RateLimitServiceTierTest extends TestCase
             $configRepository,
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(LoggerInterface::class),
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $this->createMock(CostCalculationService::class),
             $this->createMock(SubscriptionRepository::class),
             $this->createMock(TopupRepository::class),

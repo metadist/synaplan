@@ -9,6 +9,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\RateLimitService;
 use App\Service\Usage\CostCalculationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -61,7 +62,7 @@ final class RateLimitServiceMaxOutputTokensTest extends TestCase
             $config,
             $this->createMock(EntityManagerInterface::class),
             new NullLogger(),
-            $billing,
+            new PlanLimitEnforcement($billing, $this->createStub(ConfigRepository::class)),
             $this->createMock(CostCalculationService::class),
             $this->createMock(SubscriptionRepository::class),
             $this->createMock(TopupRepository::class),

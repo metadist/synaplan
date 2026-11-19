@@ -7,7 +7,7 @@ namespace App\Service\Admin;
 use App\Repository\UserRepository;
 use App\Service\Iam\LevelGrantService;
 use App\Service\Iam\LevelGrantSource;
-use App\Service\Iam\UserLifecycleService;
+use App\Service\Setup\FirstAdminCreator;
 use App\Service\Setup\SetupStateService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -41,7 +41,7 @@ final readonly class BootstrapAdminService
 
     public function __construct(
         private UserRepository $userRepository,
-        private UserLifecycleService $userLifecycleService,
+        private FirstAdminCreator $firstAdminCreator,
         private EntityManagerInterface $entityManager,
         private UserPasswordHasherInterface $passwordHasher,
         private LockFactory $lockFactory,
@@ -96,12 +96,7 @@ final readonly class BootstrapAdminService
                 return self::RESULT_PROMOTED;
             }
 
-            $user = $this->userLifecycleService->createUser(
-                email: $email,
-                plainPassword: $password,
-                userLevel: 'ADMIN',
-                emailVerified: true,
-            );
+            $user = $this->firstAdminCreator->create($email, $password);
 
             if ($forcePasswordChange) {
                 $user->setMustChangePassword(true);

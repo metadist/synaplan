@@ -352,7 +352,17 @@
     "footerNote": "¿Preguntas? Contacta a nuestro equipo de soporte.",
     "messageBlocked": "No se pudo enviar el mensaje",
     "messageBlockedDesc": "Has alcanzado tu límite de {action}. Mejora tu plan o espera a que el límite se restablezca.",
-    "retryLater": "Reintentar"
+    "retryLater": "Reintentar",
+    "selfHosted": {
+      "usedUp": {
+        "title": "Límite alcanzado",
+        "description": "Tu plan en este servidor incluye {limit} {action} y ya los has usado. Pide más a la persona que administra este Synaplan."
+      },
+      "none": {
+        "title": "No incluido en tu plan",
+        "description": "Tu plan en este servidor no incluye {action}. Pide a la persona que administra este Synaplan que asigne un plan a tu cuenta."
+      }
+    }
   },
   "settings": {
     "voice": {

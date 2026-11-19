@@ -68,7 +68,6 @@
         "src/Controller/PromptController.php::PromptController::update": 147,
         "src/Controller/RagController.php::RagController::search": 76,
         "src/Controller/RealtimeTokenController.php::RealtimeTokenController::issueSubscriptionToken": 73,
-        "src/Controller/SetupController.php::SetupController::createFirstAdmin": 56,
         "src/Controller/SharedChatPageController.php::SharedChatPageController::generateMetaTags": 63,
         "src/Controller/SharedChatPageController.php::SharedChatPageController::render404": 54,
         "src/Controller/StaticUploadController.php::StaticUploadController::resolveFileContext": 56,

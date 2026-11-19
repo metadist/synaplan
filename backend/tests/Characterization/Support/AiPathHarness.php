@@ -72,6 +72,7 @@ use App\Service\Api\OpenAiImageGenerationRequest;
 use App\Service\Api\OpenAiImageGenerationService;
 use App\Service\Api\OpenAiToolCallingGate;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Chat\ProviderTranscriptCapture;
@@ -1420,7 +1421,7 @@ final class AiPathHarness
             $configRepo,
             $em,
             $logger,
-            $billing,
+            new PlanLimitEnforcement($billing, $this->createStub(ConfigRepository::class)),
             $costs,
             $subscriptions,
             $topups,

@@ -7,6 +7,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\RateLimitService;
 use App\Service\Usage\CostCalculationService;
 use Doctrine\DBAL\Connection;
@@ -60,7 +61,7 @@ class RateLimitServiceUnifiedTest extends TestCase
             $this->configRepository,
             $this->em,
             $this->logger,
-            $billingService,
+            new PlanLimitEnforcement($billingService, $this->createStub(ConfigRepository::class)),
             $costCalculationService,
             $subscriptionRepository,
             $this->createMock(TopupRepository::class),
@@ -228,7 +229,7 @@ class RateLimitServiceUnifiedTest extends TestCase
             $this->configRepository,
             $this->em,
             $this->logger,
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $costCalculationService,
             $this->createMock(SubscriptionRepository::class),
             $this->createMock(TopupRepository::class),
@@ -299,7 +300,7 @@ class RateLimitServiceUnifiedTest extends TestCase
             $this->configRepository,
             $this->em,
             $this->logger,
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $costCalculationService,
             $this->createMock(SubscriptionRepository::class),
             $this->createMock(TopupRepository::class),

@@ -27,5 +27,18 @@ export function useSetupState() {
     }
   }
 
-  return { state, loading, error, load }
+  /**
+   * Re-read the state without the loading screen. Creating the administrator
+   * stores the closed access defaults of a new installation, which the access
+   * step has to show instead of the values read before.
+   */
+  async function refresh(): Promise<void> {
+    try {
+      state.value = await getSetupState()
+    } catch {
+      // The access step still works with the values read on load.
+    }
+  }
+
+  return { state, loading, error, load, refresh }
 }

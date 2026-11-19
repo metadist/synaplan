@@ -31,6 +31,7 @@ use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
 use App\Repository\VoiceSessionRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\Document\ChatToolLoop;
 use App\Service\Document\DocumentKind;
@@ -483,7 +484,7 @@ final class UsageHookTest extends TestCase
         $topups = $this->createStub(TopupRepository::class);
         $topups->method('sumForUserInPeriod')->willReturn(0.0);
 
-        $limits = new RateLimitService($configRepo, $em, new NullLogger(), $billing, $costs, $subscriptions, $topups);
+        $limits = new RateLimitService($configRepo, $em, new NullLogger(), new PlanLimitEnforcement($billing, $this->createStub(ConfigRepository::class)), $costs, $subscriptions, $topups);
 
         $mismatchLogger = new class(function (array $ctx): void {
             $this->mismatches[] = $ctx;

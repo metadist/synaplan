@@ -421,10 +421,16 @@ Synaplan has subscription plans in its source, and AWS reviews what a buyer
 actually gets, so this is worth stating precisely.
 
 **The AMI ships with billing switched off.** `firstboot.sh` writes empty
-`STRIPE_*` values, which puts the application in open-source mode: no plans, no
-quotas, no upgrade prompts, every feature available. That is a requirement, not
+`STRIPE_*` values, which puts the application in open-source mode: no plans for
+sale, no upgrade prompts, every feature available. That is a requirement, not
 a preference — a Marketplace product may not withhold features behind a payment
 the listing does not disclose.
+
+Usage is the operator's to hand out, not something to buy. A new installation
+gives the Free plan (level `New`) no AI usage, so self-registered strangers
+cannot spend the operator's provider keys. The operator changes an account's
+level under **Users**, or turns the limits off under **Admin → Configuration**
+(`PLAN_LIMITS_WITHOUT_BILLING`). The administrator account is never limited.
 
 **An operator may switch on their own billing afterwards**, with their own
 Stripe account, to charge their own end users. That is supported, documented in

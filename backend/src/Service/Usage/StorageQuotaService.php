@@ -5,7 +5,7 @@ namespace App\Service\Usage;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
-use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\File\FileStorageService;
 use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -29,7 +29,7 @@ final readonly class StorageQuotaService
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private BillingService $billingService,
+        private PlanLimitEnforcement $planLimits,
         private RateLimitService $rateLimitService,
     ) {
     }
@@ -39,7 +39,7 @@ final readonly class StorageQuotaService
      */
     public function isUnlimited(User $user): bool
     {
-        return !$this->billingService->isEnabled() || 'ADMIN' === $user->getRateLimitLevel();
+        return !$this->planLimits->isEnforced() || 'ADMIN' === $user->getRateLimitLevel();
     }
 
     /**

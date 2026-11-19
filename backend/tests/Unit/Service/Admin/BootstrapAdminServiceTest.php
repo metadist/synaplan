@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Admin;
 
 use App\Entity\User;
+use App\Repository\ConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\BootstrapAdminService;
 use App\Service\Iam\UserLifecycleService;
+use App\Service\Setup\FirstAdminCreator;
+use App\Service\Setup\FreshInstallDefaults;
 use App\Service\Setup\SetupStateService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
@@ -30,6 +33,7 @@ final class BootstrapAdminServiceTest extends TestCase
     use \App\Tests\Support\MemoryLevelGrants;
     private UserRepository&MockObject $userRepository;
     private UserLifecycleService&MockObject $userLifecycleService;
+    private ConfigRepository&MockObject $configRepository;
     private EntityManagerInterface&MockObject $entityManager;
     private UserPasswordHasherInterface&MockObject $passwordHasher;
     private LockFactory&MockObject $lockFactory;
@@ -43,6 +47,7 @@ final class BootstrapAdminServiceTest extends TestCase
     {
         $this->userRepository = $this->createMock(UserRepository::class);
         $this->userLifecycleService = $this->createMock(UserLifecycleService::class);
+        $this->configRepository = $this->createMock(ConfigRepository::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
         $this->passwordHasher = $this->createMock(UserPasswordHasherInterface::class);
         $this->lockFactory = $this->createMock(LockFactory::class);
@@ -55,7 +60,7 @@ final class BootstrapAdminServiceTest extends TestCase
 
         $this->service = new BootstrapAdminService(
             $this->userRepository,
-            $this->userLifecycleService,
+            new FirstAdminCreator($this->userLifecycleService, new FreshInstallDefaults($this->configRepository)),
             $this->entityManager,
             $this->passwordHasher,
             $this->lockFactory,
@@ -267,6 +272,52 @@ final class BootstrapAdminServiceTest extends TestCase
         $this->userRepository->method('findByEmail')->willReturn((new User())->setPw('old-hash'));
         $this->passwordHasher->method('hashPassword')->willReturn('new-hash');
         $this->setupState->expects($this->once())->method('markCompleted');
+
+        $this->service->bootstrap('admin@example.com', 'SecurePass123!');
+    }
+
+    public function testCreatingTheFirstAdminClosesSignUpAndTheFreePlan(): void
+    {
+        $this->userRepository->method('hasAdmin')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn(null);
+        $this->userLifecycleService->method('createUser')->willReturn(new User());
+
+        $inserted = [];
+        $this->configRepository->expects($this->exactly(2))->method('insertIfAbsent')
+            ->willReturnCallback(function (int $owner, string $group, string $setting, string $value) use (&$inserted): string {
+                $inserted["{$group}.{$setting}"] = $value;
+
+                return $value;
+            });
+        $zeroed = [];
+        $this->configRepository->expects($this->exactly(\count(FreshInstallDefaults::FREE_PLAN_QUOTAS)))->method('setValue')
+            ->willReturnCallback(function (int $owner, string $group, string $setting, string $value) use (&$zeroed): \App\Entity\Config {
+                $zeroed["{$group}.{$setting}"] = $value;
+
+                return new \App\Entity\Config();
+            });
+
+        $this->service->bootstrap('admin@example.com', 'SecurePass123!');
+
+        $this->assertSame([
+            'ACCESS.REGISTRATION_ENABLED' => 'false',
+            'SYSTEM_FLAGS.PLAN_LIMITS_WITHOUT_BILLING' => 'true',
+        ], $inserted);
+        $this->assertSame('0', $zeroed['RATELIMITS_NEW.MESSAGES_TOTAL']);
+        $this->assertSame(['0'], array_values(array_unique($zeroed)));
+    }
+
+    /**
+     * Promotion means the installation already had a user, so it is not new:
+     * its sign-up and plan settings stay as they are.
+     */
+    public function testPromotingAnExistingUserKeepsTheInstallationsSettings(): void
+    {
+        $this->userRepository->method('hasAdmin')->willReturn(false);
+        $this->userRepository->method('findByEmail')->willReturn((new User())->setPw('old-hash'));
+        $this->passwordHasher->method('hashPassword')->willReturn('new-hash');
+        $this->configRepository->expects($this->never())->method('insertIfAbsent');
+        $this->configRepository->expects($this->never())->method('setValue');
 
         $this->service->bootstrap('admin@example.com', 'SecurePass123!');
     }

@@ -50,7 +50,17 @@
     "footerNote": "Des questions ? Contactez notre équipe de support.",
     "messageBlocked": "Le message n’a pas pu être envoyé",
     "messageBlockedDesc": "Vous avez atteint votre limite de {action}. Passez à une formule supérieure ou attendez la réinitialisation de la limite.",
-    "retryLater": "Réessayer"
+    "retryLater": "Réessayer",
+    "selfHosted": {
+      "usedUp": {
+        "title": "Limite atteinte",
+        "description": "Votre forfait sur ce serveur comprend {limit} {action}, et ils sont épuisés. Demandez-en davantage à la personne qui gère ce Synaplan."
+      },
+      "none": {
+        "title": "Non inclus dans votre forfait",
+        "description": "Votre forfait sur ce serveur ne comprend pas de {action}. Demandez à la personne qui gère ce Synaplan d’attribuer un forfait à votre compte."
+      }
+    }
   },
   "paywall": {
     "title": {

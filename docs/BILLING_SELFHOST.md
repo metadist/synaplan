@@ -6,9 +6,18 @@
 > **In this guide:** Why Synaplan ships with billing turned off (unrestricted open-source mode), and how to connect your own Stripe account if you host Synaplan for paying customers.
 
 Synaplan ships with billing **off**. Without Stripe credentials the install runs
-in open-source mode: no limits, no quotas, no upgrade prompts, no subscription
-routes, and no cost-budget gate. That is the state every self-host and every
-marketplace image starts in, and most operators never need to change it.
+in open-source mode: no upgrade prompts, no subscription routes, and no
+cost-budget gate. That is the state every self-host and every marketplace image
+starts in, and most operators never need to change it.
+
+Usage limits are a separate switch, because your provider keys pay for every
+answer. A **new installation** applies the plan limits even without billing and
+gives the Free plan (level `New`) no usage at all: a stranger who signs up, or
+an account you create, cannot use AI until you change its level under
+**Users** to Pro, Team or Business. The switch is
+**Admin → Configuration → Authentication → `PLAN_LIMITS_WITHOUT_BILLING`**;
+turn it off for unlimited usage for every account. An installation set up
+before this default keeps unlimited usage without billing.
 
 If you run Synaplan **for other people** and want to charge them, you can switch
 billing on with your own Stripe account. You are then the merchant of record —
@@ -22,14 +31,15 @@ the money goes to you, we are not involved in the payment and take no cut.
 
 | Area | Behaviour with billing off |
 |------|----------------------------|
-| Rate limits (`RateLimitService`) | `unlimited` for every user |
-| Storage quota (`StorageQuotaService`) | effectively unbounded |
+| Rate limits (`RateLimitService`) | `unlimited` for every user, unless `PLAN_LIMITS_WITHOUT_BILLING` is on (the default of a new installation) |
+| Storage quota (`StorageQuotaService`) | effectively unbounded, with the same exception |
 | Cost-budget gate | never enforced, even with `COST_BUDGET_GATE_ENABLED=true` |
 | Embedding-model switch, BYO provider keys, historical email import | open to every user level |
 | Subscription routes, Stripe checkout, upgrade CTAs | hidden |
 
 Because the tier checks hang off that single flag, a `NEW` user on an install
-without billing has the same feature set as an admin. Do not re-add a tier check
+without billing has the same feature set as an admin; only the amount of usage
+can be limited. Do not re-add a tier check
 that bypasses `PremiumFeatureGate` — that is what makes the open-source mode
 trustworthy.
 

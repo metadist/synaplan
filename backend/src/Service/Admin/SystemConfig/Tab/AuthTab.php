@@ -10,6 +10,7 @@ use App\Service\Admin\SystemConfig\FieldDefinition;
 use App\Service\Admin\SystemConfig\SystemConfigTab;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupPauseSwitch;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\Chat\GuestChatConfig;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
 
@@ -72,6 +73,12 @@ final readonly class AuthTab implements SystemConfigTab
                 description: 'Let visitors try the chat without signing in. Turn this off so everyone has to sign in first — unauthenticated visitors are sent to the login page and every guest endpoint is refused.',
                 default: 'true',
                 row: new DatabaseRow(GuestChatConfig::CONFIG_GROUP, GuestChatConfig::KEY_ENABLED),
+            ),
+            'PLAN_LIMITS_WITHOUT_BILLING' => new FieldDefinition(
+                type: 'boolean',
+                description: 'Apply the plan limits although billing (Stripe) is not set up. On: each account gets the limits of its plan, so a Free-plan account cannot spend your provider keys beyond them. A new installation starts with this on and gives the Free plan (level New) no usage at all; to let a person use AI, change their level under Users to Pro, Team or Business. Off: every signed-in account uses AI without limits, paid by your provider keys. With billing set up the limits always apply.',
+                default: 'false',
+                row: new DatabaseRow(PlanLimitEnforcement::CONFIG_GROUP, PlanLimitEnforcement::KEY_WITHOUT_BILLING),
             ),
             'SIGNUP_PAUSED' => new FieldDefinition(
                 type: 'boolean',

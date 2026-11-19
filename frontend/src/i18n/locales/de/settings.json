@@ -207,7 +207,17 @@
     "footerNote": "Fragen? Kontaktieren Sie unser Support-Team.",
     "messageBlocked": "Nachricht konnte nicht gesendet werden",
     "messageBlockedDesc": "Du hast dein {action}-Limit erreicht. Upgrade deinen Plan oder warte bis das Limit zurückgesetzt wird.",
-    "retryLater": "Erneut versuchen"
+    "retryLater": "Erneut versuchen",
+    "selfHosted": {
+      "usedUp": {
+        "title": "Limit erreicht",
+        "description": "Dein Plan auf diesem Server enthält {limit} {action}, und sie sind aufgebraucht. Frag die Person, die dieses Synaplan betreibt, nach mehr."
+      },
+      "none": {
+        "title": "Nicht in deinem Plan enthalten",
+        "description": "Dein Plan auf diesem Server enthält keine {action}. Frag die Person, die dieses Synaplan betreibt, ob sie deinem Konto einen Plan gibt."
+      }
+    }
   },
   "paywall": {
     "title": {
