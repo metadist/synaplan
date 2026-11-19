@@ -769,7 +769,10 @@
         "optional": "Optional",
         "optionalTitle": "Optionale Dienste sind aus",
         "optionalBody": "Synaplan läuft ohne sie. Ein Name zeigt den Dienst auf dieser Seite.",
-        "criticalBody": "Diese sind ausgefallen. Ein Name zeigt, was fehlt."
+        "criticalBody": "Diese sind ausgefallen. Ein Name zeigt, was fehlt.",
+        "progress": "Startet",
+        "progressTitle": "Ein Dienst startet noch",
+        "progressBody": "Er ist noch nicht bereit. Das ist kein Ausfall."
       },
       "model": "Modell",
       "models": "Modelle",

@@ -1,5 +1,9 @@
 import type { Feature, ServiceReadiness } from '@/services/featuresService'
-import { idsCoveredByServices, serviceNeedsAttention } from '@/utils/serviceReadiness'
+import {
+  idsCoveredByServices,
+  serviceIsInProgress,
+  serviceNeedsAttention,
+} from '@/utils/serviceReadiness'
 
 export interface StatusGap {
   id: string
@@ -52,4 +56,15 @@ export function statusGaps(
     (a, b) =>
       Number(a.kind === 'optional') - Number(b.kind === 'optional') || a.name.localeCompare(b.name)
   )
+}
+
+/** Critical outage, then a service still coming up, then optional gaps, then ready. */
+export function statusTone(
+  gaps: StatusGap[],
+  services: ServiceReadiness[] | undefined
+): 'ok' | 'critical' | 'progress' | 'optional' {
+  if (gaps.some((gap) => gap.kind === 'critical')) return 'critical'
+  if ((services ?? []).some(serviceIsInProgress)) return 'progress'
+  if (gaps.length > 0) return 'optional'
+  return 'ok'
 }

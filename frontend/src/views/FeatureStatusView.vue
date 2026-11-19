@@ -21,7 +21,7 @@
         >
           <div class="flex items-center justify-between gap-4">
             <div class="flex items-center gap-4 min-w-0">
-              <div v-if="summaryTone !== 'optional'" class="text-4xl">
+              <div v-if="summaryTone === 'ok' || summaryTone === 'critical'" class="text-4xl">
                 {{ summaryTone === 'ok' ? '✅' : '⚠️' }}
               </div>
               <div class="min-w-0">
@@ -50,11 +50,7 @@
                   }}
                 </p>
                 <p v-if="summaryTone !== 'ok'" class="txt-secondary text-sm mt-2">
-                  {{
-                    summaryTone === 'critical'
-                      ? $t('settings.features.gaps.criticalBody')
-                      : $t('settings.features.gaps.optionalBody')
-                  }}
+                  {{ summaryBody }}
                 </p>
                 <StatusGapList v-if="gaps.length > 0" :gaps="gaps" @show="showGap" />
               </div>
@@ -167,6 +163,7 @@
                   v-for="feature in category"
                   :id="`feature-${feature.id}`"
                   :key="feature.id"
+                  tabindex="-1"
                   class="surface-card p-5 hover:shadow-md transition-shadow scroll-mt-24"
                   data-testid="item-feature"
                 >
@@ -266,7 +263,7 @@ import SchedulerStatusCard from '@/components/admin/SchedulerStatusCard.vue'
 import ServiceReadinessSection from '@/components/admin/ServiceReadinessSection.vue'
 import StatusGapList from '@/components/admin/StatusGapList.vue'
 import { servicesNeedingAttention } from '@/utils/serviceReadiness'
-import { statusGaps, type StatusGap } from '@/utils/statusGaps'
+import { statusGaps, statusTone, type StatusGap } from '@/utils/statusGaps'
 import { useAccordion } from '@/composables/useAccordion'
 import { setFeatureStatusCounts } from '@/composables/useNavItems'
 import {
@@ -288,24 +285,20 @@ const gaps = computed(() =>
     ? statusGaps(featuresStatus.value.features, featuresStatus.value.services)
     : []
 )
-const summaryTone = computed<'ok' | 'critical' | 'optional'>(() => {
-  if (gaps.value.some((gap) => gap.kind === 'critical')) return 'critical'
-  if (gaps.value.length > 0) return 'optional'
-  return 'ok'
-})
+const summaryTone = computed(() => statusTone(gaps.value, featuresStatus.value?.services))
 const summaryBorder = computed(() => {
   if (summaryTone.value === 'critical') return 'border-[var(--status-warning)]'
-  if (summaryTone.value === 'optional') return 'border-[var(--brand)]'
-  return 'border-[var(--status-success)]'
+  if (summaryTone.value === 'ok') return 'border-[var(--status-success)]'
+  return 'border-[var(--brand)]'
 })
 const summaryPill = computed(() => {
   if (summaryTone.value === 'critical') {
     return 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]'
   }
-  if (summaryTone.value === 'optional') {
-    return 'bg-[var(--brand-alpha-light)] text-[var(--brand)]'
+  if (summaryTone.value === 'ok') {
+    return 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
   }
-  return 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
+  return 'bg-[var(--brand-alpha-light)] text-[var(--brand)]'
 })
 
 // Group features by category with custom ordering
@@ -369,11 +362,18 @@ const {
 const { t } = useI18n()
 const summaryTitle = computed(() => {
   if (summaryTone.value === 'ok') return t('settings.features.allOperational')
+  if (summaryTone.value === 'progress') return t('settings.features.gaps.progressTitle')
   if (summaryTone.value === 'optional') return t('settings.features.gaps.optionalTitle')
   return t('settings.features.title')
 })
+const summaryBody = computed(() => {
+  if (summaryTone.value === 'critical') return t('settings.features.gaps.criticalBody')
+  if (summaryTone.value === 'progress') return t('settings.features.gaps.progressBody')
+  return t('settings.features.gaps.optionalBody')
+})
 const summaryPillLabel = computed(() => {
   if (summaryTone.value === 'ok') return t('settings.features.ready')
+  if (summaryTone.value === 'progress') return t('settings.features.gaps.progress')
   if (summaryTone.value === 'optional') return t('settings.features.gaps.optional')
   return t('settings.features.issuesDetected')
 })
@@ -381,7 +381,10 @@ const summaryPillLabel = computed(() => {
 async function showGap(gap: StatusGap): Promise<void> {
   if (gap.category) openFeatureCategory(gap.category)
   await nextTick()
-  document.getElementById(gap.anchor)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  const target = document.getElementById(gap.anchor)
+  if (!(target instanceof HTMLElement)) return
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 const getStatusClass = (status: string) => {

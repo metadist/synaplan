@@ -764,7 +764,10 @@
         "optional": "Opcional",
         "optionalTitle": "Hay servicios opcionales apagados",
         "optionalBody": "Synaplan funciona sin ellos. Un nombre muestra el servicio en esta página.",
-        "criticalBody": "Estos están caídos. Un nombre muestra qué falló."
+        "criticalBody": "Estos están caídos. Un nombre muestra qué falló.",
+        "progress": "Preparando",
+        "progressTitle": "Un servicio todavía está arrancando",
+        "progressBody": "Aún no está listo. No es una caída."
       },
       "model": "modelo",
       "models": "modelos",

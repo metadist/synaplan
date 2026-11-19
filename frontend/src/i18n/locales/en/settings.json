@@ -769,7 +769,10 @@
         "optional": "Optional",
         "optionalTitle": "Optional services are off",
         "optionalBody": "Synaplan works without these. Open a name to see that service on this page.",
-        "criticalBody": "These are down. Open a name to see what failed."
+        "criticalBody": "These are down. Open a name to see what failed.",
+        "progress": "Setting up",
+        "progressTitle": "A service is still starting",
+        "progressBody": "It is not ready yet. This is not an outage."
       },
       "model": "model",
       "models": "models",

@@ -769,7 +769,10 @@
         "optional": "Facultatif",
         "optionalTitle": "Des services facultatifs sont arrêtés",
         "optionalBody": "Synaplan fonctionne sans eux. Un nom affiche le service sur cette page.",
-        "criticalBody": "Ceux-ci sont en panne. Un nom montre ce qui a échoué."
+        "criticalBody": "Ceux-ci sont en panne. Un nom montre ce qui a échoué.",
+        "progress": "Démarrage",
+        "progressTitle": "Un service est encore en cours de démarrage",
+        "progressBody": "Il n'est pas encore prêt. Ce n'est pas une panne."
       },
       "model": "modèle",
       "models": "modèles",

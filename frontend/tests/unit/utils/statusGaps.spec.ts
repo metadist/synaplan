@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Feature, ServiceReadiness } from '@/services/featuresService'
-import { statusGaps } from '@/utils/statusGaps'
+import { statusGaps, statusTone } from '@/utils/statusGaps'
 
 function feature(partial: Partial<Feature> & Pick<Feature, 'id' | 'status'>): Feature {
   return {
@@ -84,5 +84,26 @@ describe('statusGaps', () => {
     )
 
     expect(gaps.map((gap) => [gap.kind, gap.anchor])).toEqual([['optional', 'service-ollama']])
+  })
+
+  it('treats a service that is still starting as progress, not as ready', () => {
+    const downloading = service('ollama', 'downloading')
+    expect(statusTone([], [downloading])).toBe('progress')
+    expect(statusTone([], [service('tika', 'ready')])).toBe('ok')
+    expect(
+      statusTone(
+        [
+          {
+            id: 'db',
+            name: 'MariaDB',
+            kind: 'critical',
+            anchor: 'feature-db',
+            category: null,
+            service: null,
+          },
+        ],
+        [downloading]
+      )
+    ).toBe('critical')
   })
 })
