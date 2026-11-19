@@ -764,6 +764,13 @@
       "issuesDetected": "Issues detected",
       "ready": "Ready",
       "healthSummary": "{healthy} of {total} services healthy",
+      "gaps": {
+        "critical": "Critical",
+        "optional": "Optional",
+        "optionalTitle": "Optional services are off",
+        "optionalBody": "Synaplan works without these. Open a name to see that service on this page.",
+        "criticalBody": "These are down. Open a name to see what failed."
+      },
       "model": "model",
       "models": "models",
       "adminOnlyTitle": "Admin access required",

@@ -297,9 +297,9 @@ describe('useNavItems rail', () => {
     expect(children.map((child) => child.key)).toEqual([
       'admin-dashboard',
       'admin-features',
-      'admin-setup',
       'admin-people',
       'admin-usage',
+      'admin-setup',
       'admin-config',
     ])
     expect(children.find((child) => child.key === 'admin-features')?.label).toBe('System status')

@@ -760,6 +760,13 @@
       "issuesDetected": "Sorunlar Tespit Edildi",
       "ready": "Hazır",
       "healthSummary": "{total} servisten {healthy} tanesi sağlıklı",
+      "gaps": {
+        "critical": "Kritik",
+        "optional": "İsteğe bağlı",
+        "optionalTitle": "İsteğe bağlı servisler kapalı",
+        "optionalBody": "Synaplan bunlar olmadan çalışır. Bir ad, servisi bu sayfada gösterir.",
+        "criticalBody": "Bunlar çalışmıyor. Bir ad, neyin başarısız olduğunu gösterir."
+      },
       "model": "model",
       "models": "model",
       "adminOnlyTitle": "Yönetici erişimi gerekli",

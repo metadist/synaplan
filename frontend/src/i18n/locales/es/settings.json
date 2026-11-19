@@ -759,6 +759,13 @@
       "issuesDetected": "Problemas detectados",
       "ready": "Listo",
       "healthSummary": "{healthy} de {total} servicios saludables",
+      "gaps": {
+        "critical": "Crítico",
+        "optional": "Opcional",
+        "optionalTitle": "Hay servicios opcionales apagados",
+        "optionalBody": "Synaplan funciona sin ellos. Un nombre muestra el servicio en esta página.",
+        "criticalBody": "Estos están caídos. Un nombre muestra qué falló."
+      },
       "model": "modelo",
       "models": "modelos",
       "adminOnlyTitle": "Se requiere acceso de administrador",

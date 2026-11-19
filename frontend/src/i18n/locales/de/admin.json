@@ -1730,10 +1730,10 @@
     }
   },
   "capacity": {
-    "title": "Kapazität",
+    "title": "Serverauslastung",
     "subtitle": "Wie ausgelastet jeder Server dieser Installation ist und ob einer Hilfe braucht.",
     "loading": "Server werden gelesen…",
-    "unavailable": "Die Kapazität kann gerade nicht gelesen werden, weil der gemeinsame Cache nicht antwortet. Die Server arbeiten weiter.",
+    "unavailable": "Die Serverauslastung kann gerade nicht gelesen werden, weil der gemeinsame Cache nicht antwortet. Die Server arbeiten weiter.",
     "failed": "Die Server konnten nicht gelesen werden. Versuchen Sie es gleich noch einmal.",
     "empty": "Noch hat kein Server berichtet — Server berichten innerhalb einer Minute nach dem Start.",
     "checkAgain": "Erneut prüfen",

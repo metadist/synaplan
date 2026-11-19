@@ -1730,10 +1730,10 @@
     }
   },
   "capacity": {
-    "title": "Capacité",
+    "title": "Charge des serveurs",
     "subtitle": "La charge de chaque serveur de cette installation, et si l’un d’eux a besoin d’aide.",
     "loading": "Lecture des serveurs…",
-    "unavailable": "La capacité ne peut pas être lue pour le moment, car le cache partagé ne répond pas. Les serveurs continuent de fonctionner.",
+    "unavailable": "La charge des serveurs ne peut pas être lue pour le moment, car le cache partagé ne répond pas. Les serveurs continuent de fonctionner.",
     "failed": "Les serveurs n’ont pas pu être lus. Réessayez dans un instant.",
     "empty": "Aucun serveur n’a encore fait de rapport — les serveurs le font dans la minute qui suit leur démarrage.",
     "checkAgain": "Vérifier à nouveau",
