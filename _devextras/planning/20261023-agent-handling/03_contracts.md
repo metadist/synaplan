@@ -64,13 +64,22 @@ Galera-safe `CREATE TABLE IF NOT EXISTS` via `addSql` (AGENTS.md). Erasure:
 
 ### 2.2 Redis (shared kernel, research quality `10_contracts.md` shapes)
 
+Built in AH8a as `App\Service\Run\RunKeyspace::runs()`. `{id}` is the
+`BRUNS.BUUID` ULID; every key name is built from a validated id, so a caller's
+text never reaches a key. The shared Redis client adds its own prefix.
+
 | Key | Content | TTL |
 | --- | ------- | --- |
-| `run:{uuid}:events` | Redis Stream of events (§3), ids `0-{seq}` | 48 h after terminal |
-| `run:{uuid}:checkpoint` | serialized loop state: messages so far (compacted), ledger, budgets used | no TTL while the run is not terminal (including `waiting_for_you` up to the 72 h approval expiry); 48 h after terminal |
-| `run:{uuid}:claim` | `SET NX PX` lease with unit token | lease |
-| `run:{uuid}:hints` | list of pending hints | until consumed |
-| `run:{uuid}:cancel` | flag checked before every paid call | 48 h |
+| `run:state:{id}` | the checkpoint: serialized run state (kind-specific codec), expected and last written unit | none while the run is not terminal (including `waiting_for_you` up to the 72 h approval expiry); 48 h after terminal |
+| `run:events:{id}` / `run:events:{id}:seq` | list of `{seq}\n{json}` events (§3) and its counter; written only while the state key exists | as the state key |
+| `run:claim:{id}:{seq}` | `SET NX PX` lease of one unit, value = 32-hex token; the checkpoint is a compare-and-set on it | lease |
+| `run:claims` | sorted set `{id}\|{seq}\|{token}` scored by lease end, read by the reaper | — |
+| `run:active` | set of run ids that still have work | — |
+| `run:reap:{id}` | `{seq}\|{count}\|{at}`: lost or stalled attempts of the current unit | 48 h |
+| `run:cancel:{id}` | flag checked before every paid call | 48 h |
+| `run:delivered:{id}` | delivery-into-chat mark, set once | 48 h |
+| `run:idem:{userId}:{sha256(key)}` | run id a start with that `Idempotency-Key` opened | 24 h |
+| `run:hints:{id}` | list of pending hints (AH step that adds hints) | until consumed |
 
 A Redis flush while a run is not terminal loses its checkpoint; the reaper
 then ends the run as `interrupted` with the durable ledger written so far

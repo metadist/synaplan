@@ -7,7 +7,8 @@ to them.
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
 | AH0 | draft | — | plan written 2026-10-23; §0 ticked the same day |
-| AH8a, AH8b | ordered | — | the owner ordered AH8 on 2026-11-19, split in two PRs, after AU26, for row 46 phase B (projects plan §0 #66, #69) |
+| AH8a | in review | — | run kernel `App\Service\Run\*` and `BRUNS` (migration `Version20261119150000`, `BNOTES`, `BKIND` `assistant` · `research` · `chat`), `RunEraser`, kernel reapers in `app:runs:reap`; no consumer yet. See 2026-11-19 below |
+| AH8b | ordered | — | research runs on the kernel, no behaviour change |
 | AH1–AH7, AH9–AH23, AHX1–AHX2 | not started | — | plan only until the owner orders them |
 
 ---
@@ -66,3 +67,39 @@ that shape the plan:
 **Verdict recorded in the plan:** use them as clients now (Phase 0); do not
 embed them as the engine (§0 #1); build the agent layer natively on the
 architecture update's one loop and research quality's run kernel.
+
+---
+
+## 2026-11-19 — AH8a: run kernel and `BRUNS`
+
+Branch `refactor/run-kernel` off `main` @ `2ed58677e`. The kernel is the
+research engine's machinery with the research rules taken out:
+
+- `RunService` (start with a 24 h `Idempotency-Key`, stop as a flag),
+  `RunUnit` (claim, reload, check the stop, run, fenced checkpoint, next
+  unit), `RunClaim`, `RunCheckpointStore`, `RunEventLog`, `RunReaper`,
+  `RunDelivery` (into the chat once, on the server), `RunKeyRemoval`.
+- What differs per kind sits behind `RunState` / `RunStateCodec`,
+  `RunUnitHandler` and `RunReapPolicy`, so research keeps its stored format
+  in AH8b.
+- The Lua scripts for claim, renew, get and delete-if-equals are the
+  research engine's, byte for byte (`RedisRunKeysTest`). The checkpoint
+  script also writes without expiry, because a run that is not terminal has
+  no TTL (§2.2); the research engine still refreshes its 48 h TTL.
+- Budgets are not in the kernel: a kind's handler gets them as profile input.
+- `BRUNS` follows `03` §2.1 plus `BNOTES` (mediumtext null) and `chat` among
+  the `BKIND` values. No unique index on `(BUSERID, BIDEMPOTENCY)`: the key is
+  reused after 24 h, and Redis holds the 24 h window.
+- `app:runs:reap` runs every service tagged `app.run_reaper`; none is tagged
+  yet. The Messenger transport for `RunUnitBus` and `app:runs:prune` come
+  with the first consumer.
+
+Tests first, `tests/Unit/Service/Run` (72 tests): two workers claim one unit
+and one executes; a lease that ran out cannot checkpoint; the reaper
+redispatches a lost unit once, then interrupts and delivers; a stalled run;
+a waiting run is left to its policy; a repeated start with the same key
+opens nothing; a stop before or during a unit means no paid call; a run the
+reaper ended reaches the chat exactly once with the tab closed. Writing them
+found two defects, fixed here: id and seq patterns accepted a trailing
+newline (`$` without `D`), and one unreadable run stopped the whole reaper
+pass.

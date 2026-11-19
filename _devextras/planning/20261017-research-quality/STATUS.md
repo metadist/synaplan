@@ -598,6 +598,11 @@ The run machinery (units, claims, checkpoints, event log, reaper, delivery)
 is shared as `App\Service\Run\*`: whichever of RS6 and AH8 is built first
 creates it, and the other adopts it. Nothing in RS1–RS4, RD1 or RQ2b changes.
 
+**2026-11-19:** AH8 is built first. AH8a (agent handling, branch
+`refactor/run-kernel`) adds the kernel as `App\Service\Run\*` and `BRUNS`
+with no consumer; the research engine (`Service/Research/Run/*`) is
+unchanged. AH8b moves research onto the kernel with no behaviour change.
+
 ---
 
 ## 2026-10-23 — RQ2b spike against B1+
