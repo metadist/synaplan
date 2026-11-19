@@ -51,6 +51,13 @@ case, upper case and a digit. Once you have signed in, delete **both**
 variables and redeploy. The account keeps its password, and the password no
 longer sits in the container environment.
 
+Without the setup wizard nobody decides on sign-up and guest chat, so both
+stay **on**: anyone who reaches the address can create an account or chat as a
+guest. For a server only your team uses, switch them off right after the
+first sign-in under **Admin → Configuration**, or set
+`REGISTRATION_ENABLED=false` and `GUEST_CHAT_ENABLED=false` before the first
+deployment.
+
 ## Secrets
 
 Coolify generates every secret on the first deployment and keeps it under
@@ -128,22 +135,62 @@ The three app roles run `ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION}`.
 Redeploying never changes the version on its own.
 
 1. Read the release notes of the target version.
-2. Back up (see below).
+2. Back up (see below) and wait until all three backups show **Success**.
 3. Set `SYNAPLAN_VERSION` under **Environment Variables** to the release, for
-   example `5.9.0`, and click **Redeploy**.
+   example `5.9.0`, and click **Restart current version**.
 
-The web role applies database migrations on start. To go back, restore the
-backup taken in step 2 and set the old version again; migrations are not
-reversed.
+Coolify pulls the new image and recreates the containers; the web role applies
+the database migrations on start. Expect about half a minute in which the
+address does not answer. Accounts, files and settings stay as they were.
+
+Migrations are not reversed. To go back, restore the backup from step 2 and
+set the old version again.
 
 ## Backup
 
-Synaplan's data lives in four volumes of this resource: `synaplan-mariadb`,
-`synaplan-qdrant`, `synaplan-uploads` and `synaplan-redis`. Back up all four
-together, together with the secrets above. A database backup without
-`SERVICE_PASSWORD_MARIADB` and `SERVICE_PASSWORD_64_APPSECRET` cannot be used.
-Stop the resource before copying the volumes, so the database and the vector
-store are copied at the same point in time.
+Synaplan keeps its data in the database and in three volumes. Coolify backs
+up all of it from the resource's **Backups** page:
+
+| Add Backup → | Target | Archive behavior | Contains |
+| ------------ | ------ | ---------------- | -------- |
+| Database backup | `db` | — | accounts, chats, settings, encrypted provider keys |
+| Storage backup | `Backend: synaplan-uploads` | Keep containers running | uploaded files |
+| Storage backup | `Qdrant: synaplan-qdrant` | Stop containers during archive | the document index |
+
+The database backup is a `mariadb-dump` taken while Synaplan runs. Stopping
+Qdrant for its archive takes a few seconds; chat keeps working, document
+search waits. `synaplan-redis` holds only queues and caches and needs no
+backup. Under each schedule, **Enable S3** copies the archives off the
+server; without it they stay in `/data/coolify/backups` on the same disk.
+
+Keep the secrets from [Secrets](#secrets) with the backups. A database backup
+without `SERVICE_PASSWORD_64_APPSECRET` cannot decrypt the stored provider
+keys.
+
+### Restore
+
+Restore all three from the same point in time.
+
+1. **Backups → Import Backup → File**, enter the server path of the database
+   backup, **Check File**, then **Restore From File**. This replaces the
+   tables. The dumps are in
+   `/data/coolify/backups/databases/<team>/<resource>-db-<UUID>/`;
+   **Download backup** under **Executions** gives a copy.
+2. Click **Stop** on the resource.
+3. Coolify does not restore volumes itself. On the server, as root, unpack
+   each archive into its volume. The volume names start with the resource's
+   UUID, shown in the URL of the resource:
+
+   ```bash
+   UUID=your-resource-uuid
+   for v in uploads qdrant; do
+     f=$(ls -t /data/coolify/backups/volumes/*/*/volume-$UUID-synaplan-$v-*.tar.gz | head -1)
+     docker run -i --rm -v "${UUID}_synaplan-$v:/restore" alpine:3.22 \
+       sh -c 'find /restore -mindepth 1 -delete && tar -xzf - -C /restore' < "$f"
+   done
+   ```
+
+4. Click **Start**.
 
 ## Not included
 
