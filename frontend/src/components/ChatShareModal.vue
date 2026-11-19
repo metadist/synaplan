@@ -66,9 +66,8 @@
             <div v-if="!shareInfo?.isShared" class="space-y-4">
               <p class="txt-secondary">
                 {{ $t('chatShare.notPublic') }}
-                <span class="font-semibold text-[var(--brand)]">{{
-                  $t('chatShare.private')
-                }}</span>.
+                <span class="font-semibold text-[var(--brand)]">{{ $t('chatShare.private') }}</span
+                >.
                 {{ $t('chatShare.makePublicDescription') }}
               </p>
 

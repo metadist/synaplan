@@ -434,7 +434,7 @@
           <!-- The shared chat stays selected during incognito, so its files must
              not become attachable or deletable from this session. -->
           <template #beside-plus>
-            <ChatProjectPicker :enabled="projectPickerEnabled" />
+            <ChatProjectPicker ref="projectPicker" :enabled="projectPickerEnabled" />
             <ConversationFilesBar
               v-if="!incognitoStore.active"
               :files="conversationFiles"
@@ -443,6 +443,12 @@
               @attach="attachConversationFile"
               @preview="previewConversationFile"
               @remove="removeConversationFile"
+            />
+          </template>
+          <template #plus-extra="{ anchor, close }">
+            <ChatProjectPlusRow
+              :enabled="projectPickerEnabled"
+              @pick="(close(), projectPicker?.openAt(anchor()))"
             />
           </template>
           <!-- Native onboarding: a signed-out store purchase waiting to be
@@ -673,6 +679,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import ChatInput from '@/components/ChatInput.vue'
 import ScrollToBottomButton from '@/components/chat/ScrollToBottomButton.vue'
 import ChatProjectPicker from '@/components/projects/ChatProjectPicker.vue'
+import ChatProjectPlusRow from '@/components/projects/ChatProjectPlusRow.vue'
 import ChatAccessErrorBanner from '@/components/ChatAccessErrorBanner.vue'
 import ChatMessage from '@/components/ChatMessage.vue'
 import MarketingNews from '@/components/MarketingNews.vue'
@@ -925,6 +932,8 @@ const sharedConversationAccess = computed(() =>
 const sharedConversationOwnerName = computed(
   () => chatsStore.conversationSource?.owner?.name?.trim() || null
 )
+const projectPicker = ref<InstanceType<typeof ChatProjectPicker> | null>(null)
+
 /** Own chats of a signed-in person, outside incognito; the server checks ownership again. */
 const projectPickerEnabled = computed(
   () => !isGuestMode.value && !incognitoStore.active && canComposeSharedChat.value

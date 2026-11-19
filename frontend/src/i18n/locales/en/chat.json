@@ -1365,7 +1365,8 @@
       "label": "Project: {name}",
       "none": "No project",
       "open": "Open project",
-      "empty": "You have no projects yet. Create one in the Chats panel."
+      "empty": "You have no projects yet. Create one in the Chats panel.",
+      "row": "Project"
     },
     "move": {
       "menu": "Move to project…",

@@ -1306,7 +1306,8 @@
       "label": "Proje: {name}",
       "none": "Proje yok",
       "open": "Projeyi aç",
-      "empty": "Henüz projeniz yok. Sohbetler panelinden bir tane oluşturun."
+      "empty": "Henüz projeniz yok. Sohbetler panelinden bir tane oluşturun.",
+      "row": "Proje"
     },
     "move": {
       "menu": "Projeye taşı…",

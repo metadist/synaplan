@@ -1363,7 +1363,8 @@
       "label": "Projekt: {name}",
       "none": "Kein Projekt",
       "open": "Projekt öffnen",
-      "empty": "Du hast noch keine Projekte. Lege eines im Chats-Bereich an."
+      "empty": "Du hast noch keine Projekte. Lege eines im Chats-Bereich an.",
+      "row": "Projekt"
     },
     "move": {
       "menu": "In Projekt verschieben…",

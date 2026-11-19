@@ -353,6 +353,7 @@
                   />
                   <KnowledgeFolderPicker v-model="selectedGroupKey" :groups="knowledgeGroups" />
                 </template>
+                <slot name="plus-extra" :anchor="plusButtonRect" :close="closePlusMenu" />
               </div>
 
               <input
@@ -645,6 +646,12 @@ const cameraInputRef = ref<HTMLInputElement | null>(null)
 const togglePlusMenu = () => {
   triggerHapticImpact('light')
   plusMenuOpen.value = !plusMenuOpen.value
+}
+
+const plusButtonRect = (): DOMRect | null =>
+  plusMenuRef.value?.querySelector('[data-testid="btn-chat-plus"]')?.getBoundingClientRect() ?? null
+const closePlusMenu = () => {
+  plusMenuOpen.value = false
 }
 
 const handlePlusAttach = () => {

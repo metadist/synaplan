@@ -1,10 +1,10 @@
 <template>
-  <div v-if="visible" class="relative min-w-0 flex-shrink">
+  <div v-if="visible" class="hidden min-w-0 flex-shrink md:block">
     <button
       ref="trigger"
       type="button"
-      class="inline-flex h-8 max-w-[10rem] items-center gap-1.5 rounded-lg border border-light-border/30 px-2 text-xs font-medium txt-secondary hover:txt-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] dark:border-dark-border/20"
-      :class="{ 'txt-primary': current }"
+      class="surface-chip icon-ghost inline-flex h-[44px] max-w-[13rem] items-center gap-2 !rounded-xl px-3 text-sm font-medium touch-manipulation"
+      :class="{ 'pill--active': open }"
       :aria-label="$t('projects.picker.label', { name: label })"
       :title="$t('projects.picker.label', { name: label })"
       :aria-expanded="open"
@@ -13,9 +13,9 @@
       data-testid="btn-chat-project"
       @click="toggle"
     >
-      <FolderIcon class="h-4 w-4 flex-shrink-0" aria-hidden="true" />
-      <span class="truncate" :class="{ 'hidden sm:inline': !current }">{{ label }}</span>
-      <ChevronDownIcon class="h-3 w-3 flex-shrink-0" aria-hidden="true" />
+      <FolderIcon class="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+      <span class="truncate">{{ label }}</span>
+      <ChevronDownIcon class="h-4 w-4 flex-shrink-0" aria-hidden="true" />
     </button>
 
     <Teleport :to="teleportTarget">
@@ -23,7 +23,7 @@
         <div
           ref="panel"
           role="menu"
-          class="dropdown-panel scroll-thin fixed w-max min-w-48 max-w-[calc(100vw-16px)] overflow-y-auto whitespace-nowrap"
+          class="dropdown-panel scroll-thin fixed flex w-max min-w-56 flex-col gap-1 p-1.5 max-w-[calc(100vw-16px)] overflow-y-auto whitespace-nowrap"
           :style="style"
           data-testid="menu-chat-project"
           @click.stop
@@ -56,14 +56,19 @@
             />
             <span class="truncate">{{ project.name }}</span>
           </button>
-          <p v-if="store.projects.length === 0" class="px-3 py-2 text-xs txt-secondary">
+          <p v-if="store.projects.length === 0" class="px-3 py-1 text-xs txt-secondary">
             {{ $t('projects.picker.empty') }}
           </p>
+          <div
+            v-if="current"
+            role="separator"
+            class="my-0.5 h-px bg-light-border/40 dark:bg-dark-border/30"
+          ></div>
           <router-link
             v-if="current"
             :to="`/projects/${current.id}`"
             role="menuitem"
-            class="dropdown-item mt-1 border-t border-light-border/30 dark:border-dark-border/20"
+            class="dropdown-item"
             data-testid="link-chat-project-open"
             @click="close"
           >
@@ -109,13 +114,15 @@ const busy = ref(false)
 const trigger = ref<HTMLElement | null>(null)
 const panel = ref<HTMLElement | null>(null)
 const style = ref<Record<string, string>>({})
+/** Set when the list is opened from the plus menu instead of the chip (phones). */
+const anchor = ref<DOMRect | null>(null)
 
 const visible = computed(() => props.enabled && store.available && store.loaded)
 const current = computed(() => store.projectOfChat(chats.activeChatId))
 const label = computed(() => current.value?.name ?? t('projects.picker.none'))
 
 function place(): void {
-  const rect = trigger.value?.getBoundingClientRect()
+  const rect = anchor.value ?? trigger.value?.getBoundingClientRect()
   if (!rect) return
   const width = panel.value?.offsetWidth ?? 0
   const left = Math.max(EDGE_GAP, Math.min(rect.left, window.innerWidth - width - EDGE_GAP))
@@ -129,6 +136,11 @@ function place(): void {
 
 async function toggle(): Promise<void> {
   if (open.value) return close()
+  await openAt(null)
+}
+
+async function openAt(rect: DOMRect | null): Promise<void> {
+  anchor.value = rect
   place()
   open.value = true
   await nextTick()
@@ -141,7 +153,7 @@ async function toggle(): Promise<void> {
 function close(): void {
   if (!open.value) return
   open.value = false
-  void nextTick(() => trigger.value?.focus())
+  void nextTick(() => (anchor.value ? null : trigger.value)?.focus())
 }
 
 function onPanelKeydown(event: KeyboardEvent): void {
@@ -181,6 +193,7 @@ async function choose(projectId: string | null): Promise<void> {
 }
 
 onMounted(() => void store.loadOnce())
+defineExpose({ openAt })
 document.addEventListener('keydown', onKeydown)
 window.addEventListener('resize', close)
 onUnmounted(() => {
