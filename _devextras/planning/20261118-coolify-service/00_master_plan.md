@@ -206,7 +206,7 @@ One Coolify identifier per secret, no underscore in the identifier (§1.4):
 | Synaplan variable | Container | Coolify variable |
 | ----------------- | --------- | ---------------- |
 | `APP_SECRET` | app roles | `SERVICE_PASSWORD_64_APPSECRET` |
-| `TOKEN_SECRET` (accepted, no longer read) | app roles | `SERVICE_PASSWORD_64_TOKENSECRET` |
+| `TOKEN_SECRET` | — | not set: no longer read, and a new install has no older file to load |
 | `DB_PASSWORD`, `MARIADB_PASSWORD` | app roles, db | `SERVICE_PASSWORD_MARIADB` |
 | `MARIADB_ROOT_PASSWORD` | db | `SERVICE_PASSWORD_MARIADBROOT` |
 | `REALTIME_API_KEY`, `CENTRIFUGO_HTTP_API_KEY` | app roles, centrifugo | `SERVICE_PASSWORD_64_REALTIMEAPI` |

@@ -45,6 +45,12 @@ and you cannot finish setup at once, set `BOOTSTRAP_ADMIN_EMAIL` and
 deployment; the administrator is then created on the first start and `/setup`
 is closed.
 
+Set both or neither: one without the other stops every app container at
+start. The password needs 8 to 64 characters; below 16 it must mix lower
+case, upper case and a digit. Once you have signed in, delete **both**
+variables and redeploy. The account keeps its password, and the password no
+longer sits in the container environment.
+
 ## Secrets
 
 Coolify generates every secret on the first deployment and keeps it under
@@ -53,7 +59,6 @@ Coolify generates every secret on the first deployment and keeps it under
 | Coolify variable | Used as |
 | ---------------- | ------- |
 | `SERVICE_PASSWORD_64_APPSECRET` | `APP_SECRET` |
-| `SERVICE_PASSWORD_64_TOKENSECRET` | `TOKEN_SECRET` (accepted, not read) |
 | `SERVICE_PASSWORD_MARIADB` | `DB_PASSWORD`, `MARIADB_PASSWORD` |
 | `SERVICE_PASSWORD_MARIADBROOT` | `MARIADB_ROOT_PASSWORD` |
 | `SERVICE_PASSWORD_64_REALTIMEAPI` | `REALTIME_API_KEY`, Centrifugo API key |
@@ -106,6 +111,16 @@ of Coolify, add that proxy's address.
 The browser opens the WebSocket on the same address
 (`/connection/websocket`); the web role passes it to Centrifugo. Coolify's
 Traefik forwards WebSocket upgrades without extra labels.
+
+## Large uploads
+
+Traefik v3 ends a request whose body has not arrived within 60 seconds
+(`respondingTimeouts.readTimeout`). A large document over a slow line can
+therefore fail even though Synaplan would accept it. To allow longer uploads,
+open **Servers → your server → Proxy**, add
+`--entrypoints.https.transport.respondingTimeouts.readTimeout=600s` (and the
+same for `http` if you serve plain HTTP) to the Traefik command, and restart
+the proxy. This applies to every resource on that server.
 
 ## Update
 

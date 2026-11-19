@@ -85,7 +85,6 @@ test('serves the public address Coolify generates for the web role', () => {
 test('takes every secret from Coolify, never from a literal', () => {
   const secrets = {
     APP_SECRET: 'SERVICE_PASSWORD_64_APPSECRET',
-    TOKEN_SECRET: 'SERVICE_PASSWORD_64_TOKENSECRET',
     DB_PASSWORD: 'SERVICE_PASSWORD_MARIADB',
     MARIADB_PASSWORD: 'SERVICE_PASSWORD_MARIADB',
     MARIADB_ROOT_PASSWORD: 'SERVICE_PASSWORD_MARIADBROOT',
@@ -99,6 +98,10 @@ test('takes every secret from Coolify, never from a literal', () => {
   for (const [name, generated] of Object.entries(secrets)) {
     assert.equal(environmentValue(name), `\${${generated}}`, `${name} must come from ${generated}`)
   }
+
+  // TOKEN_SECRET is no longer read; a generated value would only be one more
+  // secret the operator is told to back up.
+  assert.doesNotMatch(COOLIFY, /^\s*TOKEN_SECRET:/m)
 
   // Coolify takes everything after SERVICE_PASSWORD_ or SERVICE_PASSWORD_64_
   // as one identifier; an underscore in it would split the name.
