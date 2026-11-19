@@ -3,7 +3,7 @@
     <button
       ref="trigger"
       type="button"
-      class="surface-chip icon-ghost inline-flex h-[44px] max-w-[13rem] items-center gap-2 !rounded-xl px-3 text-sm font-medium touch-manipulation"
+      class="icon-ghost inline-flex h-9 max-w-[11rem] items-center gap-1.5 !rounded-lg px-2.5 text-xs font-medium txt-secondary touch-manipulation"
       :class="{ 'pill--active': open }"
       :aria-label="$t('projects.picker.label', { name: label })"
       :title="$t('projects.picker.label', { name: label })"
@@ -13,9 +13,9 @@
       data-testid="btn-chat-project"
       @click="toggle"
     >
-      <FolderIcon class="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+      <FolderIcon class="h-4 w-4 flex-shrink-0" aria-hidden="true" />
       <span class="truncate">{{ label }}</span>
-      <ChevronDownIcon class="h-4 w-4 flex-shrink-0" aria-hidden="true" />
+      <ChevronDownIcon class="h-3 w-3 flex-shrink-0" aria-hidden="true" />
     </button>
 
     <Teleport :to="teleportTarget">

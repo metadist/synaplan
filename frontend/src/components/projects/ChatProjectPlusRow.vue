@@ -2,7 +2,7 @@
   <button
     v-if="visible"
     type="button"
-    class="plus-menu-row text-xs md:hidden"
+    class="plus-menu-row text-xs"
     data-testid="btn-plus-project"
     @click="emit('pick')"
   >
@@ -14,7 +14,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRightIcon, FolderIcon } from '@heroicons/vue/24/outline'
 import { useProjectsStore } from '@/stores/projects'
@@ -28,7 +28,20 @@ const { t } = useI18n()
 const store = useProjectsStore()
 const chats = useChatsStore()
 
-const visible = computed(() => props.enabled && store.available && store.loaded)
+// The control bar shows the picker from the md breakpoint up; only a phone needs this row.
+const phone = ref(false)
+const query =
+  typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null
+const sync = (): void => {
+  phone.value = query?.matches ?? false
+}
+onMounted(() => {
+  sync()
+  query?.addEventListener('change', sync)
+})
+onUnmounted(() => query?.removeEventListener('change', sync))
+
+const visible = computed(() => props.enabled && phone.value && store.available && store.loaded)
 const name = computed(
   () => store.projectOfChat(chats.activeChatId)?.name ?? t('projects.picker.none')
 )
