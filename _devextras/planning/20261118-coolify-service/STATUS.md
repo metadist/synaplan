@@ -10,8 +10,8 @@ to them.
 | CF1 | done 2026-11-19 | — | Coolify development stack, `next` @ `ed1e184` (reports 4.7.5), on the owner's M4 (Colima, arm64), ports moved off the Synaplan dev stack. `traefik/whoami:v1.11.0` from the API's Docker Compose path answered 200 through `coolify-proxy` (`traefik:v3.7`) |
 | CF2 | in progress | — | `deploy/coolify/synaplan.yaml` deployed, all nine containers healthy, setup wizard walked, live chat connected, redeploy survived. Chat, upload and a spoken answer not walked yet (see below) |
 | CF3 | done 2026-11-19 | — | tag `v2.1.1` on `metadist/synaplan-tts` `c208a5f42`; its `ci.yml` published `ghcr.io/metadist/synaplan-tts:2.1.1` for `amd64` and `arm64` (`docker manifest inspect`). The file pins `2.1.1` |
-| CF4 | in progress | — | file, guide, test, release pins on branch `feat/coolify-service` |
-| CF5 | not started | — | |
+| CF4 | done 2026-11-19 | #3195 | file, guide, test, release pins |
+| CF5 | done 2026-11-19 | — | update 5.8.0 → 5.8.8 and backup and restore measured on CF1, guide rewritten from the result (see below) |
 | CF6 | not started | — | `SYNAPLAN_PLATFORM: coolify` already set in the file; unknown platforms fall back to `selfhost` until CF6 |
 | CF7 | not started | — | opened by a person (§0 #7) |
 | CF8 | blocked | — | Coolify docs still show the pause on 2026-11-19 |
@@ -38,6 +38,21 @@ was the file as committed.
 | Live chat | WebSocket to `/connection/websocket` opened; Centrifugo `api/info` reported `num_clients: 1` |
 | Redeploy | compose updated to `synaplan-tts:2.1.1` through the API, service restarted: all nine containers healthy again within a minute, the four volumes kept their creation time, `BUSER` still 1 row, the administrator signed in (`POST /api/v1/auth/login` 200, level `ADMIN`) |
 | Not walked | chat stream, document upload and question, spoken answer (need a provider key typed by the owner) |
+
+## CF5 walk, 2026-11-19
+
+Instance: CF1, now Coolify v4.7.5. Second resource `synaplan-cf5`, the file as
+merged with `SYNAPLAN_VERSION=5.8.0` and both `BOOTSTRAP_ADMIN_*` set, URLs
+pointed at `http://cf5.localhost:8880` as in CF2. A marker text file was
+uploaded (`process_level=store`) before every step and fetched after it.
+
+| Check | Result |
+| ----- | ------ |
+| Bootstrap | administrator created on the first start, `/api/v1/setup/state` `adminExists: true`, `wizardRequired: false`. Sign-up and guest chat both `true`: nobody turned them off. The guide now says so |
+| Update | `SYNAPLAN_VERSION` 5.8.0 → 5.8.8 through the API, then restart: Coolify pulled the image; `doctrine_migration_versions` 139 → 148 (the nine migrations between the tags); all nine containers healthy 33 s after the restart; the address did not answer for 20 s (1 s probe); user, sign-in and the marker file unchanged |
+| Backup | **Backups** page of the resource: Database backup of `db` (`mariadb-dump`, 394.57 KB), Storage backup of `Backend: synaplan-uploads` (keep running) and of `Qdrant: synaplan-qdrant` (stop containers during archive). All three **Success**; the web role answered 200 throughout the Qdrant archive |
+| Restore | marker file deleted after the backup, then: **Import Backup → File → Restore From File** with the dump's server path brought the file row back; resource stopped, both volume archives unpacked into their volumes with the command in the guide, run as written in the server shell; started: 9 healthy, `files=1`, download identical to the marker, sign-in 200 |
+| Not covered | Qdrant held no collection (no embedding provider), so the index archive was restored empty; Coolify has no volume restore of its own (only database import) |
 
 ## Not verified (plan §5)
 
