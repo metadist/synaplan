@@ -1225,6 +1225,11 @@
     "loadFailed": "Proje yüklenemedi.",
     "nameLabel": "Proje adı",
     "rename": "Projeyi yeniden adlandır",
+    "renameMessage": "Proje için yeni bir ad seçin.",
+    "pin": "Projeyi sabitle",
+    "unpin": "Proje sabitlemesini kaldır",
+    "pinFailed": "Proje sabitlenemedi.",
+    "pinned": "Sabitlendi",
     "renameFailed": "Proje yeniden adlandırılamadı.",
     "delete": "Projeyi sil",
     "deleteTitle": "“{name}” silinsin mi?",
@@ -1307,6 +1312,9 @@
       "moved": "Sohbet taşındı.",
       "removed": "Sohbet projeden çıkarıldı.",
       "failed": "Sohbet taşınamadı."
+    },
+    "menu": {
+      "label": "Proje menüsü: {name}"
     }
   }
 }

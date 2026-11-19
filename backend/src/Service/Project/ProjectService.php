@@ -66,7 +66,7 @@ final readonly class ProjectService
     }
 
     /**
-     * Only the fields the caller sends are changed. An empty description or
+     * Only the fields the caller sends are changed (name, description, instructions, pinned). An empty description or
      * instructions text clears the field.
      *
      * @param array<string, mixed> $changes
@@ -82,6 +82,12 @@ final readonly class ProjectService
         }
         if (\array_key_exists('instructions', $changes)) {
             $project->instruct($this->cleanText($changes['instructions'], $this->config->instructionsMaxChars(), 'instructions'));
+        }
+        if (\array_key_exists('pinned', $changes)) {
+            if (!\is_bool($changes['pinned'])) {
+                throw ProjectException::invalid('pinned must be true or false');
+            }
+            $project->pin($changes['pinned']);
         }
         $this->em->flush();
 

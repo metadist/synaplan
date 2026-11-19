@@ -9,8 +9,12 @@ import {
 import { featureNotConfigured } from '@/services/api/featureNotConfigured'
 import { useProjectChatsStore } from '@/stores/projectChats'
 
+/** Pinned projects first, then the most recently changed. */
 const newestFirst = (list: ProjectItem[]): ProjectItem[] =>
-  [...list].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+  [...list].sort(
+    (a, b) =>
+      Number(b.pinned) - Number(a.pinned) || Date.parse(b.updatedAt) - Date.parse(a.updatedAt)
+  )
 
 /**
  * Projects of the signed-in person. `available` is false when the module is

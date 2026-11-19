@@ -32,6 +32,7 @@ export interface ProjectPatch {
   name?: string
   description?: string | null
   instructions?: string | null
+  pinned?: boolean
 }
 
 export interface AddSourcesResult {

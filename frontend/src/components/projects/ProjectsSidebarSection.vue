@@ -15,7 +15,7 @@
       </button>
       <button
         type="button"
-        class="absolute right-3 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)]"
+        class="absolute right-3 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] pointer-events-none opacity-0 transition-opacity focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/section:pointer-events-auto group-hover/section:opacity-100"
         :title="$t('projects.new')"
         :aria-label="$t('projects.new')"
         data-testid="btn-sidebar-project-new"
@@ -33,15 +33,27 @@
         {{ $t('projects.sidebarEmpty') }}
       </p>
       <ul v-else class="space-y-0.5" data-testid="list-sidebar-projects">
-        <li v-for="project in store.projects" :key="project.id">
+        <li
+          v-for="project in store.projects"
+          :key="project.id"
+          class="group/project relative overflow-hidden rounded-lg"
+        >
           <router-link
             :to="`/projects/${project.id}`"
-            class="sidebar-section-label flex items-center rounded-lg px-3 py-1.5 text-sm truncate"
-            active-class="font-semibold"
+            class="project-row-link flex items-center rounded-lg text-[15px] leading-5 truncate hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
+            active-class="project-row-link-active"
             :data-testid="`link-sidebar-project-${project.id}`"
           >
+            <Icon
+              v-if="project.pinned"
+              icon="mdi:pin"
+              class="mr-1.5 h-3.5 w-3.5 flex-shrink-0 txt-secondary"
+              :aria-label="$t('projects.pinned')"
+              role="img"
+            />
             <span class="truncate">{{ project.name }}</span>
           </router-link>
+          <ProjectRowMenu :project="project" />
         </li>
       </ul>
     </div>
@@ -53,6 +65,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ChevronDownIcon, FolderIcon, PlusIcon } from '@heroicons/vue/24/outline'
+import { Icon } from '@iconify/vue'
+import ProjectRowMenu from '@/components/projects/ProjectRowMenu.vue'
 import { useProjectsStore } from '@/stores/projects'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
@@ -112,3 +126,43 @@ async function createProject(): Promise<void> {
 
 onMounted(() => void store.loadOnce())
 </script>
+
+<style scoped>
+/* Same inks as the Chats panel (its scoped classes do not reach this
+   component): section label, empty hint and history-weight rows. */
+.sidebar-section-label {
+  color: #2d3545;
+}
+
+.sidebar-empty-hint {
+  color: #293141;
+}
+
+.project-row-link {
+  padding: 0.3125rem 0.375rem;
+  font-weight: 400;
+  color: #3b4353;
+}
+
+.project-row-link-active {
+  font-weight: 500;
+  color: var(--brand);
+  background-color: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+
+.dark .sidebar-section-label {
+  color: #b0b7c4;
+}
+
+.dark .sidebar-empty-hint {
+  color: #a7afbe;
+}
+
+.dark .project-row-link {
+  color: #cdd1da;
+}
+
+.dark .project-row-link-active {
+  color: var(--brand);
+}
+</style>

@@ -1284,6 +1284,11 @@
     "loadFailed": "Le projet n’a pas pu être chargé.",
     "nameLabel": "Nom du projet",
     "rename": "Renommer le projet",
+    "renameMessage": "Choisissez un nouveau nom pour le projet.",
+    "pin": "Épingler le projet",
+    "unpin": "Détacher le projet",
+    "pinFailed": "Le projet n’a pas pu être épinglé.",
+    "pinned": "Épinglé",
     "renameFailed": "Le projet n’a pas pu être renommé.",
     "delete": "Supprimer le projet",
     "deleteTitle": "Supprimer « {name} » ?",
@@ -1366,6 +1371,9 @@
       "moved": "Conversation déplacée.",
       "removed": "Conversation retirée du projet.",
       "failed": "La conversation n’a pas pu être déplacée."
+    },
+    "menu": {
+      "label": "Menu du projet : {name}"
     }
   }
 }

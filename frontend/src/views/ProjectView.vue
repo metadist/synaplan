@@ -94,7 +94,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { PencilSquareIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import MainLayout from '@/components/MainLayout.vue'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
@@ -102,23 +102,18 @@ import ProjectChatsTab from '@/components/projects/ProjectChatsTab.vue'
 import ProjectSourcesTab from '@/components/projects/ProjectSourcesTab.vue'
 import ProjectInstructionsTab from '@/components/projects/ProjectInstructionsTab.vue'
 import { useProjectsStore } from '@/stores/projects'
-import { useProjectChatsStore } from '@/stores/projectChats'
-import { useChatsStore } from '@/stores/chats'
-import { projectsApi, type DeleteChatsMode } from '@/services/api/projectsApi'
+import { projectsApi } from '@/services/api/projectsApi'
 import { ApiError } from '@/services/api/httpClient'
 import { featureNotConfigured } from '@/services/api/featureNotConfigured'
-import { useDialog } from '@/composables/useDialog'
+import { useProjectActions } from '@/composables/useProjectActions'
 import { useNotification } from '@/composables/useNotification'
 
 type TabId = 'chats' | 'sources' | 'instructions'
 
 const { t } = useI18n()
 const route = useRoute()
-const router = useRouter()
 const store = useProjectsStore()
-const chatsStore = useProjectChatsStore()
-const allChats = useChatsStore()
-const { confirm, choose } = useDialog()
+const actions = useProjectActions()
 const { error: showError } = useNotification()
 
 const tab = ref<TabId>('chats')
@@ -183,42 +178,7 @@ async function saveName(): Promise<void> {
   }
 }
 
-async function chooseDeleteMode(name: string, chatCount: number): Promise<DeleteChatsMode | null> {
-  if (chatCount === 0) {
-    const ok = await confirm({
-      title: t('projects.deleteTitle', { name }),
-      message: t('projects.deleteEmpty'),
-      confirmText: t('projects.delete'),
-      cancelText: t('common.cancel'),
-      danger: true,
-    })
-    return ok ? 'keep' : null
-  }
-  const picked = await choose({
-    title: t('projects.deleteTitle', { name }),
-    message: t('projects.deleteWithChats', chatCount),
-    confirmText: t('projects.deleteKeepChats'),
-    extraText: t('projects.deleteAllChats'),
-    cancelText: t('common.cancel'),
-    // Keeping the chats is the safe default; only "delete chats too" is red.
-    danger: false,
-  })
-  if (picked === null) return null
-  return picked === 'extra' ? 'delete' : 'keep'
-}
-
-async function deleteProject(): Promise<void> {
-  const current = project.value
-  if (!current) return
-  const mode = await chooseDeleteMode(current.name, chatsStore.chatsOf(current.id).length)
-  if (mode === null) return
-  try {
-    await store.remove(current.id, mode)
-    // Chats deleted with the project must leave the Chats panel too.
-    if (mode === 'delete') await allChats.loadChats()
-    await router.push('/')
-  } catch {
-    showError(t('projects.deleteFailed'))
-  }
+function deleteProject(): Promise<void> {
+  return project.value ? actions.deleteProject(project.value) : Promise.resolve()
 }
 </script>

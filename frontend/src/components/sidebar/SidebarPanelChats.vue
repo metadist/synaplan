@@ -70,7 +70,7 @@
           v-else
           :chats="incomingChatList"
           list-test-id="list-chat-v2-incoming"
-          :active-chat-id="chatsStore.activeChatId"
+          :active-chat-id="highlightedChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
@@ -108,7 +108,7 @@
           :chats="pinnedChats"
           list-test-id="list-chat-v2-pinned"
           :allow-move="projectsStore.loaded && projectsStore.available"
-          :active-chat-id="chatsStore.activeChatId"
+          :active-chat-id="highlightedChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
@@ -154,7 +154,7 @@
       <div v-show="chatsExpanded" id="sidebar-chat-list" class="px-2">
         <ChatHistoryList
           :chats="unpinnedChats"
-          :active-chat-id="chatsStore.activeChatId"
+          :active-chat-id="highlightedChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
           :generating="isGenerating"
@@ -274,6 +274,11 @@ const rememberExpanded = (key: string, open: boolean) => {
     // Private mode can block storage. The section still toggles for this visit.
   }
 }
+
+const props = withDefaults(defineProps<{ chatHighlighted?: boolean }>(), { chatHighlighted: true })
+
+/** The open chat is only marked while the chat itself is on screen, not on a project page. */
+const highlightedChatId = computed(() => (props.chatHighlighted ? chatsStore.activeChatId : null))
 
 const sectionToggleClass =
   'sidebar-section-label mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-4 py-1 text-left text-[15px] font-semibold hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'

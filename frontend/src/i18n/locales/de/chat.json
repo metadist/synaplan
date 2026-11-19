@@ -1282,6 +1282,11 @@
     "loadFailed": "Das Projekt konnte nicht geladen werden.",
     "nameLabel": "Projektname",
     "rename": "Projekt umbenennen",
+    "renameMessage": "Wähle einen neuen Namen für das Projekt.",
+    "pin": "Projekt anpinnen",
+    "unpin": "Projekt lösen",
+    "pinFailed": "Das Projekt konnte nicht angepinnt werden.",
+    "pinned": "Angepinnt",
     "renameFailed": "Das Projekt konnte nicht umbenannt werden.",
     "delete": "Projekt löschen",
     "deleteTitle": "„{name}“ löschen?",
@@ -1364,6 +1369,9 @@
       "moved": "Chat verschoben.",
       "removed": "Chat aus dem Projekt entfernt.",
       "failed": "Der Chat konnte nicht verschoben werden."
+    },
+    "menu": {
+      "label": "Projektmenü: {name}"
     }
   }
 }
