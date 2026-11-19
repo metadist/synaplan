@@ -13,6 +13,60 @@
           data-testid="section-header"
         />
 
+        <div
+          v-if="featuresReady"
+          class="surface-card p-6 border-l-4"
+          :class="summaryBorder"
+          data-testid="section-features-summary"
+        >
+          <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4 min-w-0">
+              <div v-if="summaryTone === 'ok' || summaryTone === 'critical'" class="text-4xl">
+                {{ summaryTone === 'ok' ? '✅' : '⚠️' }}
+              </div>
+              <div class="min-w-0">
+                <h3 class="text-xl font-bold txt-primary mb-1">
+                  {{ summaryTitle }}
+                </h3>
+                <p class="txt-secondary text-sm">
+                  {{
+                    $t('settings.features.healthSummary', {
+                      healthy: featuresStatus?.summary.healthy,
+                      total: featuresStatus?.summary.total,
+                    })
+                  }}
+                </p>
+                <p
+                  v-if="servicesDown > 0"
+                  class="text-sm text-red-600 dark:text-red-400"
+                  data-testid="text-services-need-attention"
+                >
+                  {{
+                    $t(
+                      'settings.features.services.needAttention',
+                      { count: servicesDown },
+                      servicesDown
+                    )
+                  }}
+                </p>
+                <p v-if="summaryTone !== 'ok'" class="txt-secondary text-sm mt-2">
+                  {{ summaryBody }}
+                </p>
+                <StatusGapList v-if="gaps.length > 0" :gaps="gaps" @show="showGap" />
+              </div>
+            </div>
+
+            <div
+              :class="[
+                'px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm whitespace-nowrap',
+                summaryPill,
+              ]"
+            >
+              {{ summaryPillLabel }}
+            </div>
+          </div>
+        </div>
+
         <SchedulerStatusCard />
 
         <!-- Loading State -->
@@ -56,64 +110,6 @@
 
         <!-- Features List (grouped by category) -->
         <template v-else>
-          <!-- Summary Card -->
-          <div
-            class="surface-card p-6 border-l-4"
-            :class="allReady ? 'border-[var(--status-success)]' : 'border-[var(--status-warning)]'"
-            data-testid="section-features-summary"
-          >
-            <div class="flex items-center justify-between gap-4">
-              <div class="flex items-center gap-4">
-                <div class="text-4xl">
-                  {{ allReady ? '✅' : '⚠️' }}
-                </div>
-                <div>
-                  <h3 class="text-xl font-bold txt-primary mb-1">
-                    {{
-                      allReady
-                        ? $t('settings.features.allOperational')
-                        : $t('settings.features.title')
-                    }}
-                  </h3>
-                  <p class="txt-secondary text-sm">
-                    {{
-                      $t('settings.features.healthSummary', {
-                        healthy: featuresStatus.summary.healthy,
-                        total: featuresStatus.summary.total,
-                      })
-                    }}
-                  </p>
-                  <p
-                    v-if="servicesDown > 0"
-                    class="text-sm text-red-600 dark:text-red-400"
-                    data-testid="text-services-need-attention"
-                  >
-                    {{
-                      $t(
-                        'settings.features.services.needAttention',
-                        { count: servicesDown },
-                        servicesDown
-                      )
-                    }}
-                  </p>
-                </div>
-              </div>
-
-              <div
-                :class="[
-                  'px-5 py-2.5 rounded-lg text-sm font-semibold shadow-sm',
-                  allReady
-                    ? 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
-                    : 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]',
-                ]"
-              >
-                {{
-                  allReady ? $t('settings.features.ready') : $t('settings.features.issuesDetected')
-                }}
-              </div>
-            </div>
-          </div>
-
           <ServiceReadinessSection
             v-if="featuresStatus.services && featuresStatus.services.length > 0"
             :services="featuresStatus.services"
@@ -165,8 +161,10 @@
               <div class="space-y-3" data-testid="section-feature-category">
                 <div
                   v-for="feature in category"
+                  :id="`feature-${feature.id}`"
                   :key="feature.id"
-                  class="surface-card p-5 hover:shadow-md transition-shadow"
+                  tabindex="-1"
+                  class="surface-card p-5 hover:shadow-md transition-shadow scroll-mt-24"
                   data-testid="item-feature"
                 >
                   <div class="flex items-start justify-between gap-4 mb-3">
@@ -252,7 +250,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, nextTick, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
@@ -262,7 +261,9 @@ import FeatureModulesSection from '@/components/admin/FeatureModulesSection.vue'
 import ComputeStatusCard from '@/components/admin/ComputeStatusCard.vue'
 import SchedulerStatusCard from '@/components/admin/SchedulerStatusCard.vue'
 import ServiceReadinessSection from '@/components/admin/ServiceReadinessSection.vue'
+import StatusGapList from '@/components/admin/StatusGapList.vue'
 import { servicesNeedingAttention } from '@/utils/serviceReadiness'
+import { statusGaps, statusTone, type StatusGap } from '@/utils/statusGaps'
 import { useAccordion } from '@/composables/useAccordion'
 import { setFeatureStatusCounts } from '@/composables/useNavItems'
 import {
@@ -276,9 +277,29 @@ const isLoadingFeatures = ref(false)
 const isDevOnly = ref(false)
 
 const servicesDown = computed(() => servicesNeedingAttention(featuresStatus.value?.services))
-const allReady = computed(
-  () => !!featuresStatus.value?.summary.all_ready && servicesDown.value === 0
+const featuresReady = computed(
+  () => !isLoadingFeatures.value && !isDevOnly.value && !!featuresStatus.value?.features
 )
+const gaps = computed(() =>
+  featuresStatus.value?.features
+    ? statusGaps(featuresStatus.value.features, featuresStatus.value.services)
+    : []
+)
+const summaryTone = computed(() => statusTone(gaps.value, featuresStatus.value?.services))
+const summaryBorder = computed(() => {
+  if (summaryTone.value === 'critical') return 'border-[var(--status-warning)]'
+  if (summaryTone.value === 'ok') return 'border-[var(--status-success)]'
+  return 'border-[var(--brand)]'
+})
+const summaryPill = computed(() => {
+  if (summaryTone.value === 'critical') {
+    return 'bg-[var(--status-warning-muted)] text-[var(--status-warning-text)]'
+  }
+  if (summaryTone.value === 'ok') {
+    return 'bg-[var(--status-success-muted)] text-[var(--status-success-text)]'
+  }
+  return 'bg-[var(--brand-alpha-light)] text-[var(--brand)]'
+})
 
 // Group features by category with custom ordering
 const featuresByCategory = computed(() => {
@@ -332,10 +353,39 @@ const featureCategoryIds = computed(() => Object.keys(featuresByCategory.value))
 const {
   isOpen: isFeatureCategoryOpen,
   toggle: toggleFeatureCategory,
+  open: openFeatureCategory,
   expandAll: expandAllFeatureCategories,
   collapseAll: collapseAllFeatureCategories,
   allOpen: allFeatureCategoriesOpen,
 } = useAccordion(featureCategoryIds)
+
+const { t } = useI18n()
+const summaryTitle = computed(() => {
+  if (summaryTone.value === 'ok') return t('settings.features.allOperational')
+  if (summaryTone.value === 'progress') return t('settings.features.gaps.progressTitle')
+  if (summaryTone.value === 'optional') return t('settings.features.gaps.optionalTitle')
+  return t('settings.features.title')
+})
+const summaryBody = computed(() => {
+  if (summaryTone.value === 'critical') return t('settings.features.gaps.criticalBody')
+  if (summaryTone.value === 'progress') return t('settings.features.gaps.progressBody')
+  return t('settings.features.gaps.optionalBody')
+})
+const summaryPillLabel = computed(() => {
+  if (summaryTone.value === 'ok') return t('settings.features.ready')
+  if (summaryTone.value === 'progress') return t('settings.features.gaps.progress')
+  if (summaryTone.value === 'optional') return t('settings.features.gaps.optional')
+  return t('settings.features.issuesDetected')
+})
+
+async function showGap(gap: StatusGap): Promise<void> {
+  if (gap.category) openFeatureCategory(gap.category)
+  await nextTick()
+  const target = document.getElementById(gap.anchor)
+  if (!(target instanceof HTMLElement)) return
+  target.focus({ preventScroll: true })
+  target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
 
 const getStatusClass = (status: string) => {
   switch (status) {

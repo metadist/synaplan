@@ -1726,10 +1726,10 @@
     }
   },
   "capacity": {
-    "title": "Capacidad",
+    "title": "Carga del servidor",
     "subtitle": "Qué tan cargado está cada servidor de esta instalación y si alguno necesita ayuda.",
     "loading": "Leyendo los servidores…",
-    "unavailable": "La capacidad no se puede leer ahora porque la caché compartida no responde. Los servidores siguen funcionando.",
+    "unavailable": "La carga del servidor no se puede leer ahora porque la caché compartida no responde. Los servidores siguen funcionando.",
     "failed": "No se pudieron leer los servidores. Inténtelo de nuevo en un momento.",
     "empty": "Ningún servidor ha informado todavía — los servidores informan en el primer minuto tras arrancar.",
     "checkAgain": "Comprobar de nuevo",

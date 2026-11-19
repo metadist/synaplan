@@ -74,8 +74,10 @@ const stateClass = (state: ServiceReadinessState): string => {
     <ul class="surface-card rounded-2xl divide-y divide-light-border/20 dark:divide-dark-border/10">
       <li
         v-for="row in rows"
+        :id="`service-${row.service.id}`"
         :key="row.service.id"
-        class="p-4 sm:p-5 space-y-2"
+        tabindex="-1"
+        class="p-4 sm:p-5 space-y-2 scroll-mt-24"
         :class="row.problem ? 'border-l-4 border-[var(--status-error)]' : ''"
         data-testid="item-service"
         :data-service="row.service.id"

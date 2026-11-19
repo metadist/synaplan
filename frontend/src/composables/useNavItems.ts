@@ -340,8 +340,8 @@ export function useNavItems() {
     }
 
     if (canSeeOperate(authStore.isAdmin)) {
-      // One entry per topic: status pages first, then AI, people and platform
-      // settings. Model health is a tab of AI infrastructure; its badge sits there.
+      // Status, then people and cost, then how loaded the servers are, then
+      // AI, then platform settings. Model health is a tab of AI infrastructure.
       const badge = (count: number) => (count > 0 ? String(count) : undefined)
       const adminChildren: NavChild[] = [
         {
@@ -357,15 +357,6 @@ export function useNavItems() {
           icon: AdjustmentsHorizontalIcon,
           badge: badge(disabledFeaturesCount.value + servicesDownCount.value),
         },
-        ...capacityNavEntries(t('nav.adminCapacity')),
-        {
-          key: 'admin-setup',
-          path: '/admin/setup',
-          label: t('nav.adminProviderSetup'),
-          icon: CpuChipIcon,
-          badge: badge(offlineModelsCount.value),
-          alsoActiveOn: ['/admin/vectors'],
-        },
         ...adminUserNavEntries({ people: t('nav.adminPeople'), usage: t('nav.adminUsage') }),
         ...(partnersListed.value
           ? [
@@ -377,6 +368,15 @@ export function useNavItems() {
               },
             ]
           : []),
+        ...capacityNavEntries(t('nav.adminCapacity')),
+        {
+          key: 'admin-setup',
+          path: '/admin/setup',
+          label: t('nav.adminProviderSetup'),
+          icon: CpuChipIcon,
+          badge: badge(offlineModelsCount.value),
+          alsoActiveOn: ['/admin/vectors'],
+        },
         {
           key: 'admin-config',
           path: '/admin/config',

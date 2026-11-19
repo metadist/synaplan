@@ -1730,10 +1730,10 @@
     }
   },
   "capacity": {
-    "title": "Capacity",
+    "title": "Server load",
     "subtitle": "How loaded each server of this installation is, and whether one needs help.",
     "loading": "Reading the servers…",
-    "unavailable": "Capacity cannot be read right now because the shared cache does not answer. The servers keep working.",
+    "unavailable": "Server load cannot be read right now because the shared cache does not answer. The servers keep working.",
     "failed": "The servers could not be read. Try again in a moment.",
     "empty": "No server has reported yet — servers report within a minute after they start.",
     "checkAgain": "Check again",

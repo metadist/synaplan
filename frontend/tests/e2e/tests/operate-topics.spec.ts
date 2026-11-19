@@ -2,8 +2,9 @@
  * Operate is grouped by topic.
  *
  * Journey J-OP-1 (admin): "Where do I set up the AI, and where does the rest
- * of the server live?" — Operate lists six entries (Overview, System status,
- * AI infrastructure, People, Partners, System configuration). AI infrastructure holds
+ * of the server live?" — Operate lists Overview, System status, Users, Usage,
+ * then AI infrastructure and System configuration. Partners and Server load
+ * appear only when this install has them. AI infrastructure holds
  * everything the AI needs: providers and keys, model health, document reading
  * with its reading services, knowledge search with embeddings, vector database
  * and reranking, chat behaviour and system prompts. System configuration keeps
@@ -48,9 +49,9 @@ test.describe('@ci Operate topics', () => {
       expect(ids.filter((id) => !environmentDependent.includes(id ?? ''))).toEqual([
         'link-sidebar-v2-admin-dashboard',
         'link-sidebar-v2-admin-features',
-        'link-sidebar-v2-admin-setup',
         'link-sidebar-v2-admin-people',
         'link-sidebar-v2-admin-usage',
+        'link-sidebar-v2-admin-setup',
         'link-sidebar-v2-admin-config',
       ])
       await flyout.locator(NAV.flyoutLinkAdminSetup).click()

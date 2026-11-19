@@ -1726,10 +1726,10 @@
     }
   },
   "capacity": {
-    "title": "Kapasite",
+    "title": "Sunucu yükü",
     "subtitle": "Bu kurulumdaki her sunucunun ne kadar yüklü olduğu ve birinin yardıma ihtiyacı olup olmadığı.",
     "loading": "Sunucular okunuyor…",
-    "unavailable": "Paylaşılan önbellek yanıt vermediği için kapasite şu anda okunamıyor. Sunucular çalışmaya devam ediyor.",
+    "unavailable": "Paylaşılan önbellek yanıt vermediği için sunucu yükü şu anda okunamıyor. Sunucular çalışmaya devam ediyor.",
     "failed": "Sunucular okunamadı. Birazdan tekrar deneyin.",
     "empty": "Henüz hiçbir sunucu rapor vermedi — sunucular başladıktan sonraki bir dakika içinde rapor verir.",
     "checkAgain": "Tekrar kontrol et",

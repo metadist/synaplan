@@ -166,7 +166,7 @@ test.describe('@ci Capacity', () => {
     })
     await page.goto('/admin/capacity')
     await expect(page.locator(selectors.capacity.unavailable)).toContainText(
-      'Capacity cannot be read right now because the shared cache does not answer. The servers keep working.'
+      'Server load cannot be read right now because the shared cache does not answer. The servers keep working.'
     )
     await expect(page.locator(selectors.capacity.retry)).toBeVisible()
   })
