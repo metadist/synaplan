@@ -99,16 +99,16 @@
         },
         {
             "name": "api-platform/doctrine-orm",
-            "version": "v5.0.7",
+            "version": "v5.0.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/doctrine-orm.git",
-                "reference": "dd6b34c3ac93a6a48aa1b3aba1fe64bfd49369eb"
+                "reference": "24c674ec32081029aa3e85e653f9a270a8985160"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/dd6b34c3ac93a6a48aa1b3aba1fe64bfd49369eb",
-                "reference": "dd6b34c3ac93a6a48aa1b3aba1fe64bfd49369eb",
+                "url": "https://api.github.com/repos/api-platform/doctrine-orm/zipball/24c674ec32081029aa3e85e653f9a270a8985160",
+                "reference": "24c674ec32081029aa3e85e653f9a270a8985160",
                 "shasum": ""
             },
             "require": {
@@ -184,10 +184,10 @@
                 "rest"
             ],
             "support": {
-                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.7"
+                "source": "https://github.com/api-platform/doctrine-orm/tree/v5.0.8"
             },
-            "time": "2026-11-10T11:13:12+00:00",
-            "published-time": "2026-11-13T14:11:33+00:00"
+            "time": "2026-11-16T10:25:14+00:00",
+            "published-time": "2026-11-16T10:29:25+00:00"
         },
         {
             "name": "api-platform/documentation",
@@ -973,16 +973,16 @@
         },
         {
             "name": "api-platform/symfony",
-            "version": "v5.0.7",
+            "version": "v5.0.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/symfony.git",
-                "reference": "073f1093502429037d00788a928c46f5d37cb505"
+                "reference": "d04e6372f80ea053e02ec688c45abc33cd33f92a"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/api-platform/symfony/zipball/073f1093502429037d00788a928c46f5d37cb505",
-                "reference": "073f1093502429037d00788a928c46f5d37cb505",
+                "url": "https://api.github.com/repos/api-platform/symfony/zipball/d04e6372f80ea053e02ec688c45abc33cd33f92a",
+                "reference": "d04e6372f80ea053e02ec688c45abc33cd33f92a",
                 "shasum": ""
             },
             "require": {
@@ -1104,10 +1104,10 @@
                 "symfony"
             ],
             "support": {
-                "source": "https://github.com/api-platform/symfony/tree/v5.0.7"
+                "source": "https://github.com/api-platform/symfony/tree/v5.0.8"
             },
-            "time": "2026-11-10T11:14:13+00:00",
-            "published-time": "2026-11-13T14:12:29+00:00"
+            "time": "2026-11-16T09:48:48+00:00",
+            "published-time": "2026-11-16T10:29:15+00:00"
         },
         {
             "name": "api-platform/validator",
@@ -14714,7 +14714,7 @@
     "packages-dev": [
         {
             "name": "api-platform/test",
-            "version": "v5.0.7",
+            "version": "v5.0.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/api-platform/test.git",
@@ -14785,10 +14785,10 @@
             ],
             "support": {
                 "issues": "https://github.com/api-platform/test/issues",
-                "source": "https://github.com/api-platform/test/tree/v5.0.7"
+                "source": "https://github.com/api-platform/test/tree/v5.0.8"
             },
             "time": "2026-09-22T14:19:04+00:00",
-            "published-time": "2026-11-13T14:10:56+00:00"
+            "published-time": "2026-11-16T10:28:15+00:00"
         },
         {
             "name": "clue/ndjson-react",
