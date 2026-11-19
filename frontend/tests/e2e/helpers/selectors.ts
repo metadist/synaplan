@@ -292,6 +292,9 @@ export const selectors = {
     adminAutoTurnOn: '[data-testid="research-admin-auto-turn-on"]',
     adminAutoConsequence: '[data-testid="research-admin-auto-consequence"]',
     adminAutoNeedsResearch: '[data-testid="research-admin-auto-needs-research"]',
+    /** Shown the moment a research limit, budget, or model differs from what is stored */
+    adminUnsaved: '[data-testid="section-unsaved-bar"]',
+    adminSave: '[data-testid="btn-unsaved-save"]',
   },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */

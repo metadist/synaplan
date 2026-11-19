@@ -35,6 +35,11 @@ final readonly class ResearchSettingsInput
         $budgets = [];
         $sentBudgets = self::section($body, 'budgets');
         foreach (ResearchDepth::cases() as $depth) {
+            // Auto reads the standard row. Storing it would write that row
+            // again and undo the standard numbers in the same save.
+            if (ResearchDepth::Auto === $depth) {
+                continue;
+            }
             $row = self::section($sentBudgets, $depth->value);
             if ([] === $row) {
                 continue;

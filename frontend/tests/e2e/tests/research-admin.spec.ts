@@ -39,6 +39,12 @@ async function stubAdminResearch(page: Page, initial: Partial<typeof STORED> = {
       puts.push(body)
       if (typeof body.autoEnabled === 'boolean') state.autoEnabled = body.autoEnabled
       if (typeof body.enabled === 'boolean') state.enabled = body.enabled
+      if (body.budgets && typeof body.budgets === 'object') {
+        state.budgets = body.budgets as typeof state.budgets
+      }
+      if (body.limits && typeof body.limits === 'object') {
+        state.limits = body.limits as typeof state.limits
+      }
     }
     await route.fulfill({ status: 200, json: state })
   })
@@ -84,5 +90,27 @@ test.describe('@ci @research The administrator turns automatic research off and 
       { timeout: TIMEOUTS.STANDARD }
     )
     await expect(page.locator(selectors.research.adminAutoTurnOff)).toBeDisabled()
+  })
+
+  test('changing a depth limit shows Save and confirms when it is stored', async ({ page }) => {
+    const puts = await stubAdminResearch(page)
+    await page.goto('/admin/setup?tab=research')
+
+    const cap = page.locator('[data-testid="research-admin-standard-costCap"]')
+    await expect(cap).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(page.locator(selectors.research.adminUnsaved)).toHaveCount(0)
+
+    await cap.fill('2.5')
+    const bar = page.locator(selectors.research.adminUnsaved)
+    await expect(bar).toBeVisible()
+    await expect(bar).toContainText('You have unsaved changes')
+
+    await page.locator(selectors.research.adminSave).click()
+    await expect(page.locator(selectors.notification.success)).toContainText(
+      'Changes saved successfully',
+      { timeout: TIMEOUTS.STANDARD }
+    )
+    await expect(bar).toHaveCount(0)
+    expect(puts.at(-1)?.budgets).toMatchObject({ standard: { costCap: 2.5 } })
   })
 })

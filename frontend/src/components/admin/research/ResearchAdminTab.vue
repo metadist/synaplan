@@ -1,5 +1,5 @@
 <template>
-  <div data-testid="research-admin-tab">
+  <div data-testid="research-admin-tab" :class="{ 'pb-40': dirty }">
     <div v-if="loading" class="text-center py-12">
       <Icon icon="mdi:loading" class="w-8 h-8 animate-spin mx-auto txt-secondary" />
     </div>
@@ -120,26 +120,16 @@
             />
           </label>
         </div>
-        <button
-          type="button"
-          class="btn-primary px-4 py-2.5 text-sm font-medium mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="research-admin-save"
-          :disabled="saving || !dirty"
-          @click="save"
-        >
-          {{ t('adminSetup.research.save') }}
-        </button>
-        <p v-if="saved && !dirty" class="text-sm txt-secondary mt-2" role="status">
-          {{ t('adminSetup.research.saved') }}
-        </p>
-        <p
-          v-if="errorPlace === 'save'"
-          class="text-sm text-red-600 dark:text-red-400 mt-2"
-          role="alert"
-        >
-          {{ errorText }}
-        </p>
       </section>
+
+      <p
+        v-if="errorPlace === 'save'"
+        class="text-sm text-red-600 dark:text-red-400 mb-6"
+        role="alert"
+        data-testid="research-admin-save-error"
+      >
+        {{ errorText }}
+      </p>
 
       <ResearchSampleCard
         :enabled="form.enabled"
@@ -147,6 +137,8 @@
         :quick-cost-cap="stored?.budgets.quick.costCap ?? 0"
         :sample="form.sample"
       />
+
+      <UnsavedChangesBar :show="dirty" @save="save" @discard="discard" />
     </template>
   </div>
 </template>
@@ -155,6 +147,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useI18n } from 'vue-i18n'
+import { useNotification } from '@/composables/useNotification'
+import UnsavedChangesBar from '@/components/UnsavedChangesBar.vue'
 import {
   fetchResearchAdmin,
   saveResearchAdmin,
@@ -195,11 +189,11 @@ const modelSlots: { field: ModelField; label: string; testid: string }[] = [
 ]
 
 const { t } = useI18n()
+const { success: notifySaved, error: notifyFailed } = useNotification()
 const loading = ref(true)
 const loadFailed = ref(false)
 const switching = ref(false)
 const saving = ref(false)
-const saved = ref(false)
 const errorText = ref('')
 const errorPlace = ref<'switch' | 'save' | ''>('')
 const form = ref<ResearchAdmin | null>(null)
@@ -302,17 +296,33 @@ async function setEnabled(enabled: boolean): Promise<void> {
   }
 }
 
+function discard(): void {
+  if (!stored.value) return
+  form.value = JSON.parse(JSON.stringify(stored.value)) as ResearchAdmin
+  models.value = { ...storedModels.value }
+  errorPlace.value = ''
+  errorText.value = ''
+}
+
+function failSave(message: string): void {
+  errorPlace.value = 'save'
+  errorText.value = message
+  notifyFailed(message)
+}
+
 async function save(): Promise<void> {
-  if (!form.value) return
-  saved.value = false
+  if (!form.value || saving.value) return
   errorPlace.value = ''
   const invalid = firstOutOfRange(form.value)
   if (invalid) {
-    errorPlace.value = 'save'
-    errorText.value = t('adminSetup.research.errors.outOfRange', { field: fieldLabel(invalid) })
+    failSave(t('adminSetup.research.errors.outOfRange', { field: fieldLabel(invalid) }))
     return
   }
-  const body: Record<string, unknown> = { limits: form.value.limits, budgets: form.value.budgets }
+  const budgets: Record<string, ResearchAdmin['budgets']['quick']> = {}
+  for (const depth of DEPTHS) {
+    budgets[depth] = form.value.budgets[depth]
+  }
+  const body: Record<string, unknown> = { limits: form.value.limits, budgets }
   for (const slot of modelSlots) {
     if (models.value[slot.field] !== storedModels.value[slot.field]) {
       body[slot.field] = models.value[slot.field] === '' ? 0 : Number(models.value[slot.field])
@@ -321,10 +331,9 @@ async function save(): Promise<void> {
   saving.value = true
   try {
     apply(await saveResearchAdmin(body))
-    saved.value = true
+    notifySaved(t('unsavedChanges.saved'))
   } catch (error) {
-    errorPlace.value = 'save'
-    errorText.value = refusalText(error, 'adminSetup.research.errors.saveFailed')
+    failSave(refusalText(error, 'adminSetup.research.errors.saveFailed'))
   } finally {
     saving.value = false
   }

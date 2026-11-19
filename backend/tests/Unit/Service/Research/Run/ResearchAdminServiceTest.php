@@ -190,6 +190,21 @@ final class ResearchAdminServiceTest extends TestCase
         self::assertSame(['searches' => 3, 'sources' => 5, 'minutes' => 2, 'costCap' => 0.5], $described['budgets']['quick']);
     }
 
+    public function testAStaleAutomaticRowDoesNotOverwriteTheStandardBudget(): void
+    {
+        $repo = $this->memoryRepo();
+        $service = $this->service($repo, new ResearchConfig($repo, ''));
+
+        $described = $service->update($this->admin(), [
+            'budgets' => [
+                'standard' => ['costCap' => 2.5],
+                'auto' => ['searches' => 10, 'sources' => 15, 'minutes' => 6, 'costCap' => 1],
+            ],
+        ], '127.0.0.1');
+
+        self::assertSame(2.5, $described['budgets']['standard']['costCap']);
+    }
+
     public function testASecondSampleIsRefusedWhileOneIsRunning(): void
     {
         $repo = $this->memoryRepo();
