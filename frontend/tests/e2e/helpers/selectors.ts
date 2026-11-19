@@ -288,13 +288,15 @@ export const selectors = {
     lookDeeperSection: '[data-testid="section-look-deeper"]',
     /** Admin tab: the automatic-research switch under the research switch */
     adminAuto: '[data-testid="research-admin-auto"]',
-    adminAutoTurnOff: '[data-testid="research-admin-auto-turn-off"]',
-    adminAutoTurnOn: '[data-testid="research-admin-auto-turn-on"]',
+    adminAutoTurnOff: '[data-testid="research-admin-auto-switch"]',
+    adminAutoTurnOn: '[data-testid="research-admin-auto-switch"]',
     adminAutoConsequence: '[data-testid="research-admin-auto-consequence"]',
     adminAutoNeedsResearch: '[data-testid="research-admin-auto-needs-research"]',
-    /** Shown the moment a research limit, budget, or model differs from what is stored */
+    /** Stays in the page. A research edit must not mount the fixed unsaved bar. */
+    adminSaveRow: '[data-testid="research-admin-save-row"]',
+    adminSave: '[data-testid="research-admin-save"]',
+    adminSaveStatus: '[data-testid="research-admin-save-status"]',
     adminUnsaved: '[data-testid="section-unsaved-bar"]',
-    adminSave: '[data-testid="btn-unsaved-save"]',
   },
   multitask: {
     /** Task-plan block inside the assistant bubble (multi-node DAG turns) */

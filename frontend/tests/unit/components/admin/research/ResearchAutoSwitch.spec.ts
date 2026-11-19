@@ -31,7 +31,9 @@ describe('ResearchAutoSwitch', () => {
     const wrapper = mountSwitch()
 
     expect(wrapper.find('[data-testid="research-admin-auto-consequence"]').exists()).toBe(false)
-    await wrapper.get('[data-testid="research-admin-auto-turn-off"]').trigger('click')
+    const toggle = wrapper.get('[data-testid="research-admin-auto-switch"]')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+    await toggle.trigger('click')
     await flushPromises()
 
     expect(saveResearchAdmin).toHaveBeenCalledWith({ autoEnabled: false })
@@ -42,7 +44,9 @@ describe('ResearchAutoSwitch', () => {
     expect(wrapper.get('[data-testid="research-admin-auto-consequence"]').text()).toContain(
       'Off: the chat answers every question directly'
     )
-    expect(wrapper.get('[data-testid="research-admin-auto-turn-on"]').text()).toBe('Turn on')
+    expect(
+      wrapper.get('[data-testid="research-admin-auto-switch"]').attributes('aria-checked')
+    ).toBe('false')
   })
 
   it('is disabled with one sentence while research is off', () => {
@@ -52,7 +56,7 @@ describe('ResearchAutoSwitch', () => {
       'Turn on Research first.'
     )
     expect(
-      wrapper.get('[data-testid="research-admin-auto-turn-off"]').attributes('disabled')
+      wrapper.get('[data-testid="research-admin-auto-switch"]').attributes('disabled')
     ).toBeDefined()
     expect(wrapper.find('[data-testid="research-admin-auto-consequence"]').exists()).toBe(false)
   })
@@ -73,7 +77,7 @@ describe('ResearchAutoSwitch', () => {
     )
     const wrapper = mountSwitch({ autoEnabled: false })
 
-    await wrapper.get('[data-testid="research-admin-auto-turn-on"]').trigger('click')
+    await wrapper.get('[data-testid="research-admin-auto-switch"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toBe('Turn on Research first.')
@@ -84,7 +88,7 @@ describe('ResearchAutoSwitch', () => {
     saveResearchAdmin.mockRejectedValue(new Error('offline'))
     const wrapper = mountSwitch()
 
-    await wrapper.get('[data-testid="research-admin-auto-turn-off"]').trigger('click')
+    await wrapper.get('[data-testid="research-admin-auto-switch"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.get('[role="alert"]').text()).toContain('Automatic research stays as it was')
