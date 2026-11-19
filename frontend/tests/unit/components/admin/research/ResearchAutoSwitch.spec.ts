@@ -44,9 +44,9 @@ describe('ResearchAutoSwitch', () => {
     expect(wrapper.get('[data-testid="research-admin-auto-consequence"]').text()).toContain(
       'Off: the chat answers every question directly'
     )
-    expect(wrapper.get('[data-testid="research-admin-auto-switch"]').attributes('aria-checked')).toBe(
-      'false'
-    )
+    expect(
+      wrapper.get('[data-testid="research-admin-auto-switch"]').attributes('aria-checked')
+    ).toBe('false')
   })
 
   it('is disabled with one sentence while research is off', () => {

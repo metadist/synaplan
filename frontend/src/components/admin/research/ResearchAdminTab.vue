@@ -21,7 +21,9 @@
               }}
             </h2>
             <p class="text-sm txt-secondary mt-1">
-              {{ form.enabled ? t('adminSetup.research.onBody') : t('adminSetup.research.offBody') }}
+              {{
+                form.enabled ? t('adminSetup.research.onBody') : t('adminSetup.research.offBody')
+              }}
             </p>
           </div>
           <GatewaySettingToggle
