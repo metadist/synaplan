@@ -40,7 +40,7 @@ queued ──► running ──► completed
 | ------ | ---- | ----- |
 | `BID` | bigint PK | |
 | `BUUID` | char(26) | public id (ULID) |
-| `BKIND` | varchar(16) | `assistant` · `research` |
+| `BKIND` | varchar(16) | `assistant` · `research` · `chat` (row 46) |
 | `BUSERID` | bigint | runs as (§0 #10) |
 | `BSTARTEDBY` | bigint null | person who clicked; null for schedules |
 | `BAGENTID` / `BAGENTVERSIONID` | bigint null | the assistant and the version used |
@@ -48,6 +48,7 @@ queued ──► running ──► completed
 | `BCHATID` | bigint null | where the result is delivered |
 | `BORIGIN` | varchar(32) | `chat` · `saved_task:{id}` · `trigger:{kind}` · `api` |
 | `BSTATUS` | varchar(24) | §1 |
+| `BNOTES` | mediumtext null | run notes of a `chat` run (row 46 `03` §1.5); created by AH8a |
 | `BWAITREASON` | varchar(16) null | §1 |
 | `BJOB` | text | the job as written by the person (≤ 8,000 characters) |
 | `BOUTCOME` | text null | outcome sentence |
@@ -153,7 +154,7 @@ wrap-up.
 | --- | ------- | ------- |
 | `RUNS.ENABLED` | 0 | module switch (env pin `FEATURE_RUNS_ENABLED`) |
 | `RUNS.UNIT_SECONDS` | 120 | shared kernel unit cap |
-| `RUNS.MAX_STEPS` / `RUNS.MAX_MINUTES` / `RUNS.MAX_MINUTES_UNATTENDED` | 30 / 15 / 30 | per run; minutes count `running` time only — `queued` and `waiting_for_you` are excluded (§1) |
+| `RUNS.MAX_STEPS` / `RUNS.MAX_MINUTES` / `RUNS.MAX_MINUTES_UNATTENDED` | 30 / 15 / 30 | per run; minutes count `running` time only — `queued` and `waiting_for_you` are excluded (§1). Defaults of the assistant profile; the `chat` profile of row 46 sets no step and no minute budget |
 | `RUNS.MAX_COST_EUR` | 1.00 | per run, helpers included |
 | `RUNS.MAX_ACTIVE_PER_PERSON` / `RUNS.MAX_ACTIVE` | 3 / 20 | queued beyond |
 | `RUNS.HELPERS_ENABLED` / `RUNS.MAX_HELPERS` / `RUNS.MAX_PARALLEL_HELPERS` / `RUNS.MAX_HELPER_DEPTH` | 0 / 6 / 3 / 2 | §0 #14 |

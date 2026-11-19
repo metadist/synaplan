@@ -102,6 +102,21 @@ before the next step; the owner merges.
 
 ### AH8 — `refactor(runs): one run kernel for research and assistant runs`
 
+Split in two pull requests (row 46, owner 2026-11-19):
+
+- **AH8a** `refactor(runs): run kernel and BRUNS, extracted from the research
+  engine` — `App\Service\Run\*` and the `BRUNS` migration, taken from
+  `Service/Research/Run/*` (lease, reaper, unit worker, state) with
+  characterization tests; no consumer yet. The migration also carries
+  `BNOTES` (mediumtext null) and names `chat` among the `BKIND` values.
+- **AH8b** `refactor(research): research runs on the run kernel` — the
+  research engine uses the kernel; no behaviour change, its snapshots and
+  the research corpus unchanged.
+
+Budgets are profile input: a profile sets steps, minutes and cost, and may
+set no step and no minute budget (the `chat` profile of row 46). Cost stays
+mandatory for every profile.
+
 - **Reads:** research quality `03_research_engine.md` §6–§9, `10_contracts.md`;
   architecture update `03_contracts.md` §7–§8; `ChatRunBuffer`.
 - **Tests first:** unit claim (two workers, one executes), fenced checkpoint,

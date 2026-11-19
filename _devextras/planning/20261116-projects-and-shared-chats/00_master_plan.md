@@ -1,8 +1,8 @@
 # Projects, shared chats and a chat that works as long as it needs
 
-**Status:** Plan only, 2026-11-16. Nothing is built. §0 records what the
-owner said in the sessions of 2026-11-12 and 2026-11-13; rows marked ☐ wait
-for the owner. No step starts until the owner orders row 46.
+**Status:** 2026-11-19. Phase 0 and phase A are on `main` (PJ0–PJ4,
+[`STATUS.md`](./STATUS.md)). Phase B is blocked: AU26 and AH8 are not on
+`main`. §0 records what the owner said; rows marked ☐ wait for the owner.
 **Owner:** product owner.
 **Roadmap:** row 46. Steps `PJ0`–`PJ28`, journeys `J-PJ-1`–`J-PJ-11`.
 **Binding:** [`docs/UX_CONTRACT.md`](../../../docs/UX_CONTRACT.md) (U1–U12),
@@ -110,11 +110,11 @@ proposal and wait for a tick. **Ask** rows are ask-first by `AGENTS.md`.
 | 18 | The Chat model runs every step. No list of "verified" models. A weak model gives a weak result. | Chat model | Yes — owner |
 | 19 | A Chat model without tool calling (`tool_use` feature) answers as today, in one call. The model page says so next to that model. | As today | ☐ |
 | 20 | Settings → AI Models loses the card "Task planning / Reading sources / Fact-checking" (`PlannerModelCard.vue`). Admin → Research keeps its optional reading and checking models. | Remove | ☐ |
-| 21 | A simple question stays as fast and as cheap as today: the first model call runs in the request. Only when the model asks for a tool does the turn become a run in the worker. | Inline first | ☐ (PJ2 measures) |
-| 22 | Built on AU26 (one loop) and AH8 (run kernel, `BRUNS`). Ordering row 46 phase B orders those two steps first. | Reuse | ☐ |
-| 23 | For web chat this plan replaces three rows of row 25 §0: #12 (no `MAX_STEPS`, no `MAX_MINUTES` for the `chat` profile), #8 (no "Let it work" button needed in chat; every message can become long work), #6 (no model conformance list). Agents keep row 25's rules. | Replace for chat | ☐ |
-| 24 | The router keeps what is not a judgement about effort: language, topic, and the direct paths for "make an image / a video / audio". Web search, depth and multi-step are the loop's. | Keep fast paths | ☐ |
-| 25 | The research engine and the task planner stay for Desktop, the API and Saved Tasks. In web chat they are not called when the loop is on. The citation check of the engine runs on a loop answer that cites web sources. | Keep, reuse check | ☐ |
+| 21 | A simple question stays as fast and as cheap as today: the first model call runs in the request. Only when the model asks for a tool does the turn become a run in the worker. | Inline first | Yes — owner, 2026-11-19 (PJ2 measured it) |
+| 22 | Built on AU26 (one loop) and AH8 (run kernel, `BRUNS`). Ordering row 46 phase B orders those two steps first. | Reuse | Yes — owner, 2026-11-19; order AU26 → AH8a → AH8b → PJ5 (#69) |
+| 23 | For web chat this plan replaces three rows of row 25 §0: #12 (no `MAX_STEPS`, no `MAX_MINUTES` for the `chat` profile), #8 (no "Let it work" button needed in chat; every message can become long work), #6 (no model conformance list). Agents keep row 25's rules. | Replace for chat | Yes — owner, 2026-11-19 |
+| 24 | The router keeps what is not a judgement about effort: language, topic, and the direct paths for "make an image / a video / audio". Web search, depth and multi-step are the loop's. | Keep fast paths | Yes — owner, 2026-11-19 |
+| 25 | The research engine and the task planner stay for Desktop, the API and Saved Tasks. In web chat they are not called when the loop is on. The citation check of the engine runs on a loop answer that cites web sources. | Keep, reuse check | Yes — owner, 2026-11-19 |
 
 ### Notes and long chats
 
@@ -187,11 +187,17 @@ proposal and wait for a tick. **Ask** rows are ask-first by `AGENTS.md`.
 
 | # | Decision | Default | Agree? |
 | - | -------- | ------- | ------ |
-| 63 | **Ask — schema.** New tables `BPROJECTS`, `BPROJECTMEMORIES`, `BCHATALLOWANCES`, `BCHATAPPGRANTS`, `BPUSHDEVICES`; new columns `BCHATS.BPROJECTID`, `BCHATS.BPROJECTSHARED`, `BCHATS.BMEMORYMODE`, `BMESSAGES.BAUTHORID`, `BRUNS.BNOTES`; `BRUNS.BKIND` gets the value `chat`; two switches in `BUSERDETAILS` (`03` §2). | — | ☐ Ask |
+| 63 | **Ask — schema.** New tables `BPROJECTS`, `BPROJECTMEMORIES`, `BCHATALLOWANCES`, `BCHATAPPGRANTS`, `BPUSHDEVICES`; new columns `BCHATS.BPROJECTID`, `BCHATS.BPROJECTSHARED`, `BCHATS.BMEMORYMODE`, `BMESSAGES.BAUTHORID`, `BRUNS.BNOTES`; `BRUNS.BKIND` gets the value `chat`; two switches in `BUSERDETAILS` (`03` §2). | — | `BPROJECTS`, `BCHATS.BPROJECTID/BPROJECTSHARED/BMEMORYMODE`: Yes — owner (PJ3); `BPROJECTS.BPINNEDAT` shipped with PJ4; `BRUNS.BKIND = chat` and `BRUNS.BNOTES`: Yes — owner, 2026-11-19, in AH8a's `BRUNS` migration; the rest ☐ Ask |
 | 64 | Four flags, all off: `LOOP.ENABLED`, `SHARED_CHATS.ENABLED`, `PROJECTS.ENABLED`, `PUSH.ENABLED`. Projects and shared chats are feature modules. | Off | ☐ |
 | 65 | `LOOP.ENABLED` turns on for everyone only after the gate in §6 is green on the corpus of PJ1. | Gate first | ☐ |
-| 66 | Order: 0, then A and C in either order, B as soon as AU26 and AH8 are on `main`, then D, E, F. | As written | ☐ |
+| 66 | Order: 0, then A and C in either order, B as soon as AU26 and AH8 are on `main`, then D, E, F. | As written | Yes — owner, 2026-11-19: after A comes AU26, then AH8a, AH8b, then PJ5. C waits until the owner orders it |
 | 67 | In a shared chat the Chat model is the sender's, also when the owner pays. The amount bounds what that can cost. | Sender's model | ☐ |
+| 68 | How a `chat` run ends. A turn without a work list ends when the model answers without a tool. A run with open `update_plan` items or ledger values is ended by the loop: one required `finish`, checked against the work list (`03` §1.5.1). Resolves the conflict between `03` §3 and §1.5.1. | Staged | Yes — owner, 2026-11-19 |
+| 69 | AU26 and AH8 take their limits as profile input. `ToolLimits` keeps today's numbers as defaults; the `chat` profile sets no iteration cap, no deadline, no step and no minute budget. Their briefs say so (row 22 S4, row 25 `04_sprints.md`). AH8 is split: AH8a kernel and `BRUNS` extracted from the research engine, no consumer; AH8b research runs on it, no behaviour change. | Profile input; split | Yes — owner, 2026-11-19 |
+| 70 | Until PJ6, a `chat` run checks the payer's monthly budget before every model call and ends cleanly when it is empty. `LOOP.ENABLED` stays 0 in every environment until PJ6 and PJ8 are merged. | Budget per call, flag off | Yes — owner, 2026-11-19 |
+| 71 | A chat inside a project cannot get a "Can write" share until projects can be shared (PJ20). "Can read" stays possible. The share dialog says why in one sentence. | Not before PJ20 | Yes — owner, 2026-11-19 |
+| 72 | When a member's account is deleted, their messages in other people's shared chats stay as rows, but the text becomes "Message deleted" and the name a neutral label. The AI's answers stay. | Replace text | Yes — owner, 2026-11-19 |
+| 73 | `PROJECTS.ENABLED` turns on with PJ28, together with the other flags, not in its own step. | With PJ28 | Yes — owner, 2026-11-19 |
 
 ---
 
@@ -533,3 +539,4 @@ refused.
 | Date | Change |
 | ---- | ------ |
 | 2026-11-16 | First version, from the owner's sessions of 2026-11-12 and 2026-11-13 and a code map on `0d228e323`. Plan only. |
+| 2026-11-19 | After PJ4 (`89694c4b2`): §0 #21–#25 ticked; #63 partly; #66 order fixed (AU26 → AH8a → AH8b → PJ5); new rows #68–#73 (end of a run, limits as profile input, budget per call until PJ6, no write share for project chats before PJ20, deleted member's text, projects flag with PJ28). `03` and `04` follow. |

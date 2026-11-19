@@ -96,7 +96,9 @@ five locales, the five exit bullets for an `ota-candidate` step.
 
 ## Phase B — the chat works as long as it needs
 
-Starts when AU26 and AH8 are on `main`.
+Starts when AU26 and AH8 are on `main`. Order (owner, 2026-11-19, §0 #66,
+#69): AU26 (row 22, S4) → AH8a → AH8b (row 25) → PJ5. Both briefs take
+their limits as profile input.
 
 ### PJ5 — a chat turn runs on the one loop as a run
 
@@ -109,14 +111,25 @@ Starts when AU26 and AH8 are on `main`.
   stream continues over the hand-over without a lost or doubled chunk; a
   killed worker ends in `interrupted` and a true sentence; flag off and a
   model without `tool_use` take today's path byte for byte
-  (characterization snapshots unchanged).
+  (characterization snapshots unchanged). Security: another account
+  cannot read `run:{uuid}:events` or re-attach (403/404); a unit after the
+  chat was moved out of its project runs without the project's sources; a
+  unit for a deleted or disabled account ends `interrupted`; a write tool
+  in a unit waits for approval and is never auto-approved; a payer whose
+  monthly budget runs out between two calls stops before the next call
+  (§0 #70); the checkpoint is gone after terminal + TTL and on account
+  erasure. End of a run (§0 #68): a turn without `update_plan` ends on a
+  plain answer; a run with open plan items is ended by the required
+  `finish`.
 - **Do:** run profile `chat` (no steps, no minutes); the prompt
   `tools:chat_loop`; the hand-over; skipping the search classifier, the
   auto-research gate and the task planner when the loop is on; the check
   before delivery; usage recorded per call.
 - **Touches:** new `Service/Chat/Loop/*`; small edits where the turn is
   dispatched. `MessageProcessor` and `TurnDispatcher` do not grow.
-- **Exit:** the tests; PJ1's simple group within G1 on the dev stack.
+- **Exit:** the tests; PJ1's simple group within G1 on the dev stack;
+  `LOOP.ENABLED` stays 0 in every environment until PJ6 and PJ8 are merged
+  (§0 #70).
 
 ### PJ6 — cost limit that ends with a result, and circle detection
 
@@ -217,7 +230,9 @@ Starts when AU26 and AH8 are on `main`.
   and `use` cannot; the author is stored; G10 as tests (no memory read, no
   extraction, no digest, no tail); two members posting at once produce one
   run and one queued message; `@Ben` at the start gets no answer; owner
-  queries on `BUSERID` still return the whole chat.
+  queries on `BUSERID` still return the whole chat; an `edit` share on a
+  chat inside a project is refused with 422 (§0 #71); a deleted member's
+  messages keep their row with the text "Message deleted" (§0 #72).
 - **Do:** `edit` on `ConversationKind`; the gate in the two places;
   `BMESSAGES.BAUTHORID` and `Message::authorId()`; "counts as shared";
   memory, digest and tail switches; author names in history and summary

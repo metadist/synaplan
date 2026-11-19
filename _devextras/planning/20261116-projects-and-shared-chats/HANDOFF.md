@@ -1,6 +1,6 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-17, `main` @ `f54cb3353`. Geschrieben für einen Agenten ohne Zugriff
+Stand: 2026-11-19, `main` @ `89694c4b2`. Geschrieben für einen Agenten ohne Zugriff
 auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Dateien in diesem
 Ordner geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
@@ -17,9 +17,9 @@ beliebig lange arbeiten darf. 28 Schritte PJ0–PJ28 in Phasen 0, A–F.
 **Auftrag des Owners:** die Schritte der Reihe nach umsetzen, nach `AGENTS.md`,
 mit Blick auf Usability und vor allem Sicherheit.
 
-**Stand:** PJ0–PJ3 sind auf `main`. Die Aufgabe als Nächstes ist **PJ4** (Projektseite
-und Projekte im Chats-Panel, siehe Abschnitt 9). Es ist kein Branch dafür angelegt,
-nichts ist begonnen.
+**Stand:** PJ0–PJ4 sind auf `main` (Phase 0 und A fertig). Phase B (PJ5) ist blockiert,
+weil AU26 und AH8 fehlen. Der Owner hat am 2026-11-19 entschieden: als Nächstes **AU26**,
+dann **AH8a**, **AH8b**, dann PJ5 (siehe Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
@@ -28,7 +28,8 @@ nichts ist begonnen.
 | PJ2 Spike "ein Chat-Turn als Run-Einheiten" | fertig, gemergt | #3142 |
 | Loop-Vertrag (Ledger, Guard, Ende eines Laufs) | fertig, gemergt (Doku) | #3151 |
 | PJ3 Projekte mit Quellen und Instruktionen (API) | fertig, gemergt | #3152 |
-| PJ4–PJ28 | nicht begonnen | — |
+| PJ4 Projektseite, Projekte im Chats-Panel | fertig, gemergt | #3186 |
+| PJ5–PJ28 | nicht begonnen; zuerst AU26, AH8a, AH8b | — |
 
 ## 2. Bisherige Implementierungen
 
@@ -102,8 +103,9 @@ Tests: `tests/Unit/Service/Project/{ProjectChatScopeTest,ProjectChatMembershipTe
 
 ### Noch offen
 
-Alles Frontend (kein Router-Eintrag, kein Store, keine Views für Projekte; nachgesehen
-mit `grep projects frontend/src/router/index.ts`: keine Treffer) und PJ4–PJ28.
+PJ5–PJ28. PJ4 (#3186) hat das Frontend gebracht (`views/ProjectView.vue`,
+`components/projects/*`, `stores/projects.ts`, `services/api/projectsApi.ts`) und die
+Spalte `BPROJECTS.BPINNEDAT` (Migration `Version20261119120000`).
 
 ## 3. Wichtige Architektur- und Designentscheidungen
 
@@ -140,15 +142,15 @@ mit `grep projects frontend/src/router/index.ts`: keine Treffer) und PJ4–PJ28.
   ein 403 endet als `failed` mit Grund (z. B. "HTTP 403"). Der Grund ist auf 500
   Zeichen gekürzt.
 
-## 4. Betroffene Dateien (Orientierung für PJ4)
+## 4. Betroffene Dateien (Orientierung für AU26 und AH8)
 
-Frontend-Dateien, die PJ4 laut Brief liest oder anlegt:
-
-- Lesen: `frontend/src/components/sidebar/SidebarPanelChats.vue`,
-  `ChatHistoryList.vue`, `KnowledgeFolderPicker.vue`, die Upload-Zeilen der
-  Files-Seite, `docs/UX_CONTRACT.md` §4, `docs/FRONTEND_CONVENTIONS.md`.
-- Neu: `views/ProjectView.vue`, `components/projects/*`, `stores/projects.ts`,
-  `services/api/projectsApi.ts`, Locale-Schlüssel in allen fünf Sprachen.
+- AU26: `backend/src/AI/Messages/Tools/GatewayToolLoop.php` (im Size-Ledger),
+  `backend/src/AI/OpenAI/OpenAiGatewayToolLoop.php`,
+  `backend/src/Service/Document/ChatToolLoop.php`,
+  `backend/src/Service/Tool/Execution/ToolLimits.php`, der Snapshot `tool_loops.json`.
+- AH8a: `backend/src/Service/Research/Run/*` (`ResearchLease`, `ResearchReaper`,
+  `ResearchUnitWorker`, `ResearchStateStore`), `Service/Chat/Run/ChatRunService.php`
+  (heute re-attachbarer Chat-Turn), Contract `../20261023-agent-handling/03_contracts.md`.
 
 ## 5. Technische Details, APIs, Datenbank
 
@@ -186,17 +188,16 @@ neue Pflicht-Env-Variable für Production.** Die Gate-Seeder-Zeile für `project
 an (`DEFAULT_ON`).
 
 **Zod und TypeScript:** `make -C frontend generate-schemas` erzeugt
-`frontend/src/generated/api-schemas.ts` (gitignored). PJ4 muss das ausführen und die
+`frontend/src/generated/api-schemas.ts` (gitignored). Jeder Schritt mit neuer API muss das ausführen und die
 Typen daraus über `httpClient` und `services/api/` verwenden; keine handgeschriebenen
 Payload-Interfaces.
 
 ## 6. Bekannte Probleme und Einschränkungen
 
-- **Kein UI.** Projekte sind nur über die API nutzbar; die Migration lässt das Flag aus.
-  Production nicht einschalten, bevor PJ4 gemergt ist.
+- **Flag aus.** `PROJECTS.ENABLED` bleibt 0 bis PJ28 (§0 #73).
 - **Chats ohne eigene Projekt-Zuordnung über `/chats`:** `POST /chats` und
-  `PATCH /chats/{id}` kennen kein Projekt (bewusst, siehe Abschnitt 3). PJ4 "Chat in
-  ein Projekt verschieben" muss die `PUT`-Route benutzen.
+  `PATCH /chats/{id}` kennen kein Projekt (bewusst, siehe Abschnitt 3). PJ4 nutzt die
+  `PUT`/`DELETE`-Routen unter `/projects/{uuid}/chats/{chatId}`; PJ20/PJ22 ebenso.
 - **Nicht geprüft:** ein E2E-Lauf für PJ3 (`make test-e2e`), weil keine UI und keine
   von der UI genutzte Route geändert wurde; CI lief auf #3152 grün (`All Checks Passed`).
 - **Nicht geprüft:** PDF-Quelle über multipart-Upload im echten Chat (nur Textquelle
@@ -232,61 +233,39 @@ Anbieter `anthropic claude-sonnet-5-5`, `ragSources` mit `groupKey: project:<uui
 Link mit 403 → `failed` mit Grund. Löschen mit ungültigem `chats` → 422; mit
 `chats=keep` bleibt ein Plain-Chat (`BPROJECTID` null), Quellen weg.
 
-## 8. Offene Aufgaben, nach Wichtigkeit
+## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **PJ4** Projektseite und Projekte im Chats-Panel (Abschnitt 9). Voraussetzung, um
-   das Flag je einschalten zu können.
-2. **Phase B (PJ5–PJ11)** Loop als Lauf. Wartet laut `STATUS.md` und §0 auf AU26 und
-   AH8 und auf offene Entscheidungen (#12 Kostenlimit, #14 Token-Cap, #20 Planner-Karte
-   entfernen, #22/#23).
-3. **Phase C (PJ12–PJ19)** gemeinsame Chats. Offene Entscheidungen: #36, #37, #45, #46,
-   #67; Notion-Spike #49 (PJ18).
-4. **Phase D (PJ20–PJ22)** gemeinsame Projekte und Projektgedächtnis (#54, #55). Hier
-   werden `BPROJECTSHARED` und `BMEMORYMODE` benutzt.
-5. **Phase E (PJ23–PJ27)** Push. Ask-first: Push-Plugin (#61), Relay-Dienst (#62),
-   Schema (#63). Betrifft `synaplan-apps` und `synaplan-platform`.
-6. **PJ28** Doku und Flags.
+1. **AU26** (Zeile 22): ein Tool-Loop für Dokument-Chat und beide Gateways, Grenzen als
+   Profil-Eingabe (§0 #69).
+2. **AH8a** (Zeile 25): Run-Kernel und `BRUNS` aus `Service/Research/Run/*` extrahiert,
+   ohne Nutzer; Migration mit `BNOTES` und `chat` als `BKIND`-Wert (§0 #63).
+3. **AH8b**: Research läuft auf dem Kernel, ohne Verhaltensänderung.
+4. **Phase B (PJ5–PJ11).** Vor PJ6: #12, #14, #15; vor PJ7: #27; vor PJ9: #31;
+   vor PJ10: #20; vor PJ11: #65. `LOOP.ENABLED` bleibt 0, bis PJ6 und PJ8 gemergt sind (§0 #70).
+5. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt. Offen: #34–#37, #40,
+   #45, #46, #67, Schema `BMESSAGES.BAUTHORID` u. a. (#63); Notion-Spike #49 (PJ18).
+6. **Phase D (PJ20–PJ22)**: #54–#56. **Phase E (PJ23–PJ27)**: #58–#62. **PJ28**: Flags an.
 
-Ask-first laut `AGENTS.md` (vor Umsetzung den Owner fragen): Schemaänderungen, neue
-Abhängigkeit, Docker/CI/Build-Konfiguration, neuer AI-Provider. Der Owner hat die
-Migration von PJ3 ausdrücklich freigegeben; das gilt nicht für weitere Schemaänderungen.
+Ask-first laut `AGENTS.md`: Schemaänderungen, neue Abhängigkeit, Docker/CI/Build-Konfiguration,
+neuer AI-Provider. Freigegeben sind nur die Migrationen von PJ3 und die `BRUNS`-Migration von
+AH8a (Zeile 25 §0 #9, hier §0 #63).
 
-## 9. Exakt nächster Schritt: PJ4
+## 9. Exakt nächster Schritt: AU26
 
-1. `git checkout main && git pull --ff-only`, danach Branch `feat/projects-ui` von
-   `main` anlegen (ein Thema, ein Branch, ein PR).
-2. Brief lesen: `04_sprints.md` Zeile 78 ff. ("PJ4"), `02_journeys_and_ui.md` J-PJ-1
-   (Wireframes und Texte), `03_contracts.md` für die API, `docs/UX_CONTRACT.md` U1–U12,
-   `docs/FRONTEND_CONVENTIONS.md`.
-3. `make -C frontend generate-schemas` ausführen, damit `projects`-Typen vorhanden sind
-   (die Datei ist gitignored).
-4. **Tests zuerst:** Vitest für die Zustände einer Quellenzeile (`reading`, `ready`,
-   `failed` mit Grund); Playwright `@ci`: Projekt anlegen, Textquelle hinzufügen,
-   fragen, die genannte Quelle sehen. Das Flag muss im Test an sein
-   (`PROJECTS.ENABLED=1` oder `PROJECTS_ENABLED=1` für den Teststack).
-5. **Umsetzen:** Abschnitt "Projekte" im Chats-Panel; Route `/projects/:id` mit Tabs
-   Chats, Quellen, Instruktionen (Gedächtnis und Mitglieder kommen mit PJ20–PJ22);
-   Dialog "Quelle hinzufügen" (Datei, Link, Text); Projektname im Composer eines
-   Projekt-Chats; Chat über sein Menü in ein Projekt verschieben oder herauslösen
-   (`PUT`/`DELETE /projects/{uuid}/chats/{chatId}`).
-6. Die UI darf nur sichtbar sein, wenn das Flag an ist: die Projektrouten antworten
-   sonst 404 `feature_not_configured`; die UI muss das als "nicht verfügbar" behandeln,
-   nicht als Fehler.
-7. Regeln aus `AGENTS.md` für die UI: `<script setup lang="ts">`, keine Komponente über
-   300 Zeilen, kein `any`, keine Semikolons, Texte über `vue-i18n` in allen fünf
-   Sprachen (`frontend/src/i18n/locales/{en,de,es,fr,tr}/`), Bestätigungen über
-   `useDialog()`, Toasts über `useNotification()`, Farben nur als Tokens, Buttons mit
-   House-Klassen, Heroicons. Hellen und dunklen Modus und Telefonbreite prüfen.
-8. Vor dem Commit `make format` und `make ci-local` ungefiltert; vor dem Push
-   `make test-e2e` (UI und Routen betroffen). Danach commit (`feat(projects): …`),
-   push, `gh pr create` gegen `main`, auf Copilot-Review und `All Checks Passed`
-   auf dem aktuellen Head warten, jeden Thread beantworten, **nicht mergen**.
-9. Die Reise im Browser durchgehen (nicht nur Screenshot): anmelden mit
-   `admin@synaplan.com` (Zugangsdaten in `docs/DEVELOPMENT.md`; der Admin hat ein echtes
-   Default-Modell, der Demo-Account nicht), Projekt anlegen, Quelle hinzufügen, im
-   Projekt-Chat nach einem Satz aus der Quelle fragen, Quelle entfernen, Projekt
-   löschen. Das Flag dafür lokal einschalten und danach wieder auf `0` setzen.
-10. `STATUS.md` im selben PR aktualisieren (Zeile PJ4, Eintrag mit Datum).
+1. `git checkout main && git pull --ff-only`, Branch `refactor/one-agent-loop`.
+2. Brief: `../20261021-architecture-update/S4_one_tool_path.md` Abschnitt AU26, Contract
+   `../20261021-architecture-update/03_contracts.md` §4 (Loop und Adapter).
+3. Tests zuerst: `ToolLoopCharacterizationTest` und `tool_loops.json` bleiben unverändert;
+   neuer Unit-Test: Loop ohne Iterationsgrenze und ohne Deadline endet erst bei einer
+   Antwort ohne Tool.
+4. `AgentToolLoop` mit drei Adaptern (`DocumentToolLoopAdapter`, `MessagesToolLoopAdapter`,
+   `OpenAiToolLoopAdapter`); Grenzen als `ToolLoopLimits` übergeben, `ToolLimits` liefert die
+   heutigen Defaults; die drei Kopien der Schleife und der Konstanten sind weg;
+   `GatewayToolLoop` verlässt den Size-Ledger (nur Entfernungen).
+5. Gate: `make ci-local` ungefiltert, `make test-e2e` (Chat betroffen), commit
+   `refactor(tools): one agent loop for document chat and both gateways`, PR, auf Copilot und
+   `All Checks Passed` warten, Threads beantworten, nicht mergen.
+6. `STATUS.md` der Zeile 22 und dieses Ordners im selben PR aktualisieren.
 
 ## 10. Anforderungen und Entscheidungen des Owners
 
@@ -298,8 +277,7 @@ Migration von PJ3 ausdrücklich freigegeben; das gilt nicht für weitere Schema�
   committen. Beim Prüfen von Umgebungsvariablen keine Werte oder Präfixe ausgeben.
 - Der Owner mergt. Ausnahme war eine ausdrückliche Anweisung für #3142, #3151 und
   #3152 (Admin-Override); sie gilt nicht weiter.
-- Ob der Agent auf Copilot und CI warten soll, hat der Owner zuletzt mit "ich schaue
-  selbst" beantwortet. Im Zweifel einmal kurz fragen.
+- Auf Copilot und CI wird gewartet, wie `AGENTS.md` es verlangt (Owner, 2026-11-19).
 - Die Playwright-Läufe laufen beim Owner nicht auf diesem Rechner. Wie der Lauf
   gestartet wird, steht in den persönlichen Setup-Notizen des Owners (Agent-Memory), nicht
   in diesem Repository. Nicht auf dem lokalen Mac starten, wenn die Notizen etwas anderes
@@ -315,7 +293,7 @@ Migration von PJ3 ausdrücklich freigegeben; das gilt nicht für weitere Schema�
   aus; Push aufs Telefon, nichts im Browser. Offene ☐-Zeilen dort **nicht** selbst
   entscheiden.
 - PJ3 wurde vom Owner mit "alle Zeilen für PJ3" (§0 #4–#7) und "Ja" für die
-  Migration freigegeben. Für PJ4 gibt es keine Schemaänderung; kommt eine, erst fragen.
+  Migration freigegeben. Am 2026-11-19 kamen #21–#25 und #68–#73 dazu.
 
 ## 11. Lokale Umgebung (Stand der letzten Arbeit)
 
@@ -335,4 +313,3 @@ Migration von PJ3 ausdrücklich freigegeben; das gilt nicht für weitere Schema�
   `cat >`-Ausgabe überschreiben (ist einmal passiert, per `git checkout` wiederhergestellt).
 - php-cs-fixer im Container hält auf dem Mac nicht; Import-Reihenfolge-Diffs von Hand
   korrigieren.
-- Dieses Dokument selbst ist nicht committet (siehe `git status`).
