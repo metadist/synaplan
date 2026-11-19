@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\OpenAI;
 
+use App\Service\Tool\Execution\ToolLimits;
 use App\Service\Tool\Loop\ToolCallPartition;
 use App\Service\Tool\Loop\ToolLoopAdapter;
 use App\Service\Tool\Loop\ToolLoopStop;
@@ -68,9 +69,16 @@ final class OpenAiToolLoopAdapter implements ToolLoopAdapter
         return ToolLoopTurn::run($partition->ours);
     }
 
-    public function execute(array $ours): ?ToolLoopStop
+    public function execute(array $ours, array $skipped): ?ToolLoopStop
     {
         $results = ($this->runOurs)($ours);
+        foreach ($skipped as $call) {
+            $results[] = [
+                'role' => 'tool',
+                'tool_call_id' => (string) ($call['id'] ?? ''),
+                'content' => ToolLimits::SKIPPED_RESULT,
+            ];
+        }
         if ([] !== $this->client) {
             return ToolLoopStop::ClientTools;
         }

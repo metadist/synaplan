@@ -133,25 +133,16 @@ final readonly class OpenAiGatewayToolLoop
         );
         $stop = $this->loop->run(ToolLoopLimits::defaults($this->config->mcpMaxIterations($user->getId())), $adapter)->stop;
 
+        // Every exit reports the usage and the facade charge of all rounds,
+        // not only of the last one.
+        $last = $adapter->completed($notes);
         if (ToolLoopStop::ClientTools === $stop) {
-            $last = $adapter->last();
             $last['tool_calls'] = $adapter->clientCalls();
             $last['content'] = '';
             $last['finish_reason'] = 'tool_calls';
-            $last['usage'] = $adapter->usage();
-            $last['loop_notes'] = $notes;
-
-            return $last;
-        }
-        if (ToolLoopStop::Halted === $stop) {
-            $last = $adapter->last();
-            $last['usage'] = $adapter->usage();
-            $last['loop_notes'] = $notes;
-
-            return $last;
         }
 
-        return $adapter->completed($notes);
+        return $last;
     }
 
     /**
@@ -217,7 +208,7 @@ final readonly class OpenAiGatewayToolLoop
         }
         $callback(['type' => 'finish', 'finish_reason' => '' !== $finish ? $finish : 'stop']);
 
-        return $this->streamMetadata($adapter->last(), $options, $notes, $adapter->usage());
+        return $this->streamMetadata($adapter->completed($notes), $options, $notes, $adapter->usage());
     }
 
     /**

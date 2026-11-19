@@ -18,6 +18,7 @@ use App\Service\Mcp\McpClientConfig;
 use App\Service\Mcp\McpToolRegistry;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
+use App\Service\Tool\Execution\ToolLimits;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 
@@ -267,6 +268,78 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         self::assertSame(['[web_search:x]'], $result['loop_notes']);
     }
 
+    public function testAMixedTurnReportsTheFacadeChargeOfEveryRound(): void
+    {
+        $search = $this->searchReturning('ok');
+        $round = 0;
+        $facade = $this->createMock(AiFacade::class);
+        $facade->method('chat')->willReturnCallback(static function () use (&$round): array {
+            ++$round;
+
+            return [
+                'content' => '',
+                'provider' => 'test',
+                'model' => 'test-model',
+                'finish_reason' => 'tool_calls',
+                'tool_calls' => [[
+                    'id' => 'call_'.$round,
+                    'type' => 'function',
+                    'function' => 1 === $round
+                        ? ['name' => 'web_search', 'arguments' => '{"query":"x"}']
+                        : ['name' => 'get_weather', 'arguments' => '{"city":"Berlin"}'],
+                ]],
+                'usage' => ['prompt_tokens' => 1, 'completion_tokens' => 1, 'total_tokens' => 2],
+                'facade_metered' => true,
+                'facade_charged_cost' => 1 === $round ? '0.001000' : '0.002000',
+                'facade_price_known' => true,
+            ];
+        });
+
+        $result = $this->loop($search, mcpEnabled: false, facade: $facade)->complete(
+            $this->user(),
+            [['role' => 'user', 'content' => 'mixed']],
+            ['model' => 'test-model', 'tools' => [['type' => 'function', 'function' => ['name' => 'get_weather']]]],
+        );
+
+        self::assertSame('tool_calls', $result['finish_reason']);
+        self::assertSame('get_weather', $result['tool_calls'][0]['function']['name']);
+        self::assertSame('0.003000', $result['facade_charged_cost']);
+        self::assertSame(4, $result['usage']['total_tokens']);
+    }
+
+    public function testEveryCallPastThePerTurnCapGetsASkippedResult(): void
+    {
+        $search = $this->searchReturning('ok');
+        $calls = array_map(static fn (int $n): array => [
+            'id' => 'call_'.$n,
+            'type' => 'function',
+            'function' => ['name' => 'web_search', 'arguments' => '{"query":"q'.$n.'"}'],
+        ], range(1, ToolLimits::MAX_TOOLS_PER_TURN + 2));
+        $replayed = [];
+        $facade = $this->createMock(AiFacade::class);
+        $facade->method('chat')->willReturnCallback(static function (array $messages) use ($calls, &$replayed): array {
+            if (1 === count($messages)) {
+                return ['content' => '', 'provider' => 'test', 'model' => 'test-model', 'finish_reason' => 'tool_calls', 'tool_calls' => $calls];
+            }
+            $replayed = $messages;
+
+            return ['content' => 'done', 'provider' => 'test', 'model' => 'test-model', 'finish_reason' => 'stop'];
+        });
+
+        $result = $this->loop($search, mcpEnabled: false, facade: $facade)->complete(
+            $this->user(),
+            [['role' => 'user', 'content' => 'many']],
+            ['model' => 'test-model'],
+        );
+
+        self::assertSame('done', $result['content']);
+        $answered = array_column(array_filter($replayed, static fn (array $m): bool => 'tool' === $m['role']), 'content', 'tool_call_id');
+        self::assertSame(array_column($calls, 'id'), array_keys($answered));
+        self::assertSame(ToolLimits::SKIPPED_RESULT, $answered['call_17']);
+        self::assertSame(ToolLimits::SKIPPED_RESULT, $answered['call_18']);
+        self::assertNotSame(ToolLimits::SKIPPED_RESULT, $answered['call_16']);
+    }
+
     public function testStreamSuppressesIntermediateServerRound(): void
     {
         $search = $this->createMock(WebSearchTool::class);
@@ -504,6 +577,19 @@ final class OpenAiGatewayToolLoopTest extends TestCase
         );
 
         return $facade;
+    }
+
+    private function searchReturning(string $text): WebSearchTool
+    {
+        $search = $this->createMock(WebSearchTool::class);
+        $search->method('isAvailable')->willReturn(true);
+        $search->method('declaration')->willReturn((new WebSearchTool(
+            $this->createStub(\App\Plug\WebSearch\WebSearchGateway::class),
+            new NullLogger(),
+        ))->declaration());
+        $search->method('execute')->willReturn(['text' => $text, 'isError' => false, 'query' => 'x', 'resultCount' => 1]);
+
+        return $search;
     }
 
     private function unavailableSearch(): WebSearchTool

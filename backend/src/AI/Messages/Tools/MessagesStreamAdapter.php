@@ -91,19 +91,22 @@ final class MessagesStreamAdapter implements ToolLoopAdapter
         return ToolLoopTurn::run($partition->ours);
     }
 
-    public function execute(array $ours): ?ToolLoopStop
+    public function execute(array $ours, array $skipped): ?ToolLoopStop
     {
         $emitter = $this->emitter;
-        $toolResults = $this->owned->execute(
-            $ours,
-            $this->dispatch,
-            $this->user,
-            $this->pages,
-            ping: static function () use ($emitter): void {
-                $emitter->emitPing();
-            },
-            assistant: $this->assistant,
-        );
+        $toolResults = [
+            ...$this->owned->execute(
+                $ours,
+                $this->dispatch,
+                $this->user,
+                $this->pages,
+                ping: static function () use ($emitter): void {
+                    $emitter->emitPing();
+                },
+                assistant: $this->assistant,
+            ),
+            ...$this->owned->skippedResults($skipped),
+        ];
         $this->body = MessagesToolTurn::appendToolTurn($this->body, ServerToolReplay::withoutClientUses($this->content, $this->client), $toolResults);
         if ($this->webSearchRounds >= $this->config->webSearchMaxRounds($this->user->getId())) {
             $this->body = WebSearchWrapUp::forceWrapUp($this->body);

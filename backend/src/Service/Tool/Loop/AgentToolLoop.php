@@ -40,7 +40,10 @@ final readonly class AgentToolLoop
                 continue;
             }
 
-            $stop = $adapter->execute(\array_slice($turn->ours, 0, $limits->maxToolsPerTurn));
+            $stop = $adapter->execute(
+                \array_slice($turn->ours, 0, $limits->maxToolsPerTurn),
+                \array_slice($turn->ours, $limits->maxToolsPerTurn),
+            );
             if (null !== $stop) {
                 return new ToolLoopRun($stop, $iterations);
             }

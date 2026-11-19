@@ -95,6 +95,7 @@ final class AgentToolLoopTest extends TestCase
         self::assertCount(ToolLimits::MAX_TOOLS_PER_TURN, $adapter->executed[0]);
         self::assertSame(['id' => 'c1'], $adapter->executed[0][0]);
         self::assertSame(['id' => 'c16'], $adapter->executed[0][15]);
+        self::assertSame([['id' => 'c17'], ['id' => 'c18'], ['id' => 'c19'], ['id' => 'c20']], $adapter->skipped[0]);
     }
 
     public function testAnAgainTurnSpendsAnIterationAndRunsNoTool(): void

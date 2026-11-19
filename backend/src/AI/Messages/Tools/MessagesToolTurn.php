@@ -15,28 +15,6 @@ use App\Service\Runtime\RuntimeProfile;
 final readonly class MessagesToolTurn
 {
     /**
-     * @param list<array<string, mixed>> $content
-     *
-     * @return list<array<string, mixed>>
-     */
-    private static function dropEmptyThinking(array $content): array
-    {
-        $out = [];
-        foreach ($content as $block) {
-            if ('thinking' === ($block['type'] ?? '')) {
-                $text = (string) ($block['thinking'] ?? $block['text'] ?? '');
-                if ('' === trim($text)) {
-                    continue;
-                }
-                $block['thinking'] = $text;
-            }
-            $out[] = $block;
-        }
-
-        return $out;
-    }
-
-    /**
      * Drop unpaired Anthropic server-tool uses from every assistant turn
      * before the next upstream call.
      *
@@ -148,5 +126,27 @@ final readonly class MessagesToolTurn
         }
 
         return $body;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $content
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function dropEmptyThinking(array $content): array
+    {
+        $out = [];
+        foreach ($content as $block) {
+            if ('thinking' === ($block['type'] ?? '')) {
+                $text = (string) ($block['thinking'] ?? $block['text'] ?? '');
+                if ('' === trim($text)) {
+                    continue;
+                }
+                $block['thinking'] = $text;
+            }
+            $out[] = $block;
+        }
+
+        return $out;
     }
 }

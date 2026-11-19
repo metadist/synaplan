@@ -42,6 +42,12 @@ final class ToolLoopLimitsTest extends TestCase
         new ToolLoopLimits(4, 240, 0);
     }
 
+    public function testRejectsANegativeIterationCap(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new ToolLoopLimits(-1, 240);
+    }
+
     public function testRejectsANegativeDeadline(): void
     {
         $this->expectException(\InvalidArgumentException::class);

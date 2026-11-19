@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Service\RateLimitService;
 use App\Service\Runtime\RuntimeProfile;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolLimits;
 use App\Service\Tool\Loop\ToolCallPartition;
 use App\Service\Tool\Policy\PolicyContext;
 use Psr\Log\LoggerInterface;
@@ -125,6 +126,22 @@ final readonly class GatewayOwnedTools
         }
 
         return $results;
+    }
+
+    /**
+     * One error tool_result per call past the per-turn cap, so the replayed
+     * assistant turn has no tool_use without its result.
+     *
+     * @param list<array<string, mixed>> $toolUses
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function skippedResults(array $toolUses): array
+    {
+        return array_map(
+            fn (array $block): array => $this->toolResultBlock((string) ($block['id'] ?? ''), ToolLimits::SKIPPED_RESULT, isError: true),
+            $toolUses,
+        );
     }
 
     private function owned(): GatewayOwnedCall

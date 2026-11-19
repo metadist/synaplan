@@ -17,6 +17,8 @@ final readonly class ToolLimits
     public const DEADLINE_SECONDS = 240;
     public const MAX_TOOLS_PER_TURN = 16;
     public const RESULT_CHARS = 12000;
+    /** The result of a call past {@see self::MAX_TOOLS_PER_TURN}. */
+    public const SKIPPED_RESULT = 'Tool call skipped: too many tool calls in one turn. Call it again in the next turn if you still need it.';
 
     public static function clamp(string $text): string
     {

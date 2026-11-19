@@ -59,7 +59,11 @@ final class DocumentToolLoopAdapter implements ToolLoopAdapter
         return ToolLoopTurn::run(array_values($calls));
     }
 
-    public function execute(array $ours): ?ToolLoopStop
+    /**
+     * The assistant turn lists only the calls that run, so a skipped call
+     * needs no result here.
+     */
+    public function execute(array $ours, array $skipped): ?ToolLoopStop
     {
         $this->messages[] = [
             'role' => 'assistant',

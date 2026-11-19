@@ -22,6 +22,9 @@ final readonly class ToolLoopLimits
         if ($maxToolsPerTurn < 1) {
             throw new \InvalidArgumentException('A turn must allow at least one tool.');
         }
+        if (null !== $maxIterations && $maxIterations < 0) {
+            throw new \InvalidArgumentException('An iteration cap cannot be negative.');
+        }
         if (null !== $deadlineSeconds && $deadlineSeconds < 0) {
             throw new \InvalidArgumentException('A deadline cannot be negative.');
         }

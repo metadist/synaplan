@@ -91,9 +91,12 @@ final class MessagesCompleteAdapter implements ToolLoopAdapter
         return $this->toolTurn($this->lastBody);
     }
 
-    public function execute(array $ours): ?ToolLoopStop
+    public function execute(array $ours, array $skipped): ?ToolLoopStop
     {
-        $toolResults = $this->owned->execute($ours, $this->dispatch, $this->user, $this->pages, null, $this->assistant);
+        $toolResults = [
+            ...$this->owned->execute($ours, $this->dispatch, $this->user, $this->pages, null, $this->assistant),
+            ...$this->owned->skippedResults($skipped),
+        ];
         $this->body = MessagesToolTurn::appendToolTurn($this->body, ServerToolReplay::withoutClientUses($this->content, $this->client), $toolResults);
         if ($this->webSearchRounds >= $this->config->webSearchMaxRounds($this->user->getId())) {
             $this->body = WebSearchWrapUp::forceWrapUp($this->body);

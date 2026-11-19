@@ -20,6 +20,9 @@ final class ScriptedToolLoopAdapter implements ToolLoopAdapter
     /** @var list<list<array<string, mixed>>> */
     public array $executed = [];
 
+    /** @var list<list<array<string, mixed>>> */
+    public array $skipped = [];
+
     /**
      * @param \Closure(int): ToolLoopTurn $script
      * @param ToolLoopStop|null           $stopAfterExecute what execute() answers
@@ -42,9 +45,10 @@ final class ScriptedToolLoopAdapter implements ToolLoopAdapter
         return ($this->script)($iteration);
     }
 
-    public function execute(array $ours): ?ToolLoopStop
+    public function execute(array $ours, array $skipped): ?ToolLoopStop
     {
         $this->executed[] = $ours;
+        $this->skipped[] = $skipped;
 
         return $this->stopAfterExecute;
     }
