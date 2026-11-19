@@ -87,6 +87,33 @@ event that already exists is counted as delivered, never created twice.
 
 The `.ics` download always remains available as the no-connection fallback.
 
+### Calendar entries from a file or an earlier step
+
+A calendar request does not have to name the time itself. *"Put the three
+flights of this booking into my calendar"* with a picture of the booking, or
+*"add the meeting from Tom's mail to my calendar"*, works in one turn:
+
+- The plan reads first (`file_analysis` for a picture or a document,
+  `email_search`, `url_fetch`), and one `calendar_event` step takes every
+  entry from that text. Without a reading step it uses the text of the files
+  attached to the message, else of the files attached earlier in the chat, so
+  a follow-up such as *"it is all in the picture"* works too.
+- All entries land in one `.ics` and, with a calendar connected, in that
+  calendar. The reply lists each entry with its date and times.
+- No hour is invented. An entry is written only when the text that was read
+  names its start time. A start the planner wrote is used only when the person
+  named it: any clock time in the latest message, or that very hour and minute
+  earlier in the chat.
+- When neither the message nor anything that was read holds a time, the reply
+  asks for it. When no calendar is connected, the reply says so once and the
+  `.ics` is attached in the same turn.
+- Times are the wall-clock times on the page, placed in the person's time
+  zone. A flight that lands in another time zone keeps the arrival time as
+  printed.
+
+The reading is one call on the Text Analytics model (the Chat model when none
+is set). Its instructions are the internal prompt `tools:calendar_entries`.
+
 ## Dropbox (folder delivery)
 
 OAuth2 consent flow, the same framework as Microsoft 365 (no password stored;
@@ -147,7 +174,10 @@ the connection UI labels it accordingly.
   `transactionId` derived from the delivering file and source message, so a
   re-run never duplicates an event (Graph answers 409 for a repeated
   transaction, which counts as already delivered). The `.ics` download stays
-  attached to the reply as the no-connection fallback.
+  attached to the reply as the no-connection fallback. The times can also
+  come from an attached file or an earlier step, and several entries are
+  created in one turn: see
+  [Calendar entries from a file or an earlier step](#calendar-entries-from-a-file-or-an-earlier-step).
 - **Mail from your own mailbox** (`Mail.Send`): "mail it to me" results are
   sent from the connected account itself (they appear in the Outlook Sent
   items) instead of the platform's system mailbox. If the Graph send fails or

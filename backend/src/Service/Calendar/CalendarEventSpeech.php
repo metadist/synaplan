@@ -36,10 +36,7 @@ final class CalendarEventSpeech
         $time = $start->format('H:i');
         $duration = self::durationLabel($lang, $durationMinutes);
         $named = '' !== trim($title) && 'Meeting' !== trim($title) ? trim($title) : '';
-        $sink = '';
-        if ('' !== $channel) {
-            $sink = str_contains(strtolower($channel), 'outlook') ? 'outlook' : 'calendar';
-        }
+        $sink = self::sink($channel);
 
         $text = match ($lang) {
             'de' => match ($sink) {
@@ -76,6 +73,70 @@ final class CalendarEventSpeech
         return $text;
     }
 
+    /**
+     * Several entries written in one step: one sentence, then a line per
+     * entry with its day and its times, so the person can check each one.
+     *
+     * @param list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable}> $entries
+     */
+    public static function confirmedSeveral(string $language, array $entries, string $channel): string
+    {
+        $lang = UserUtteranceLanguage::normalize($language);
+        $count = count($entries);
+        $sink = self::sink($channel);
+
+        $header = match ($lang) {
+            'de' => match ($sink) {
+                'outlook' => sprintf('Ich habe %d Kalendereinträge in Outlook hinzugefügt:', $count),
+                'calendar' => sprintf('Ich habe %d Kalendereinträge in deinen Kalender hinzugefügt:', $count),
+                default => sprintf('Ich habe %d Kalendereinträge erstellt:', $count),
+            },
+            'es' => match ($sink) {
+                'outlook' => sprintf('He añadido %d eventos de calendario en Outlook:', $count),
+                'calendar' => sprintf('He añadido %d eventos de calendario en tu calendario:', $count),
+                default => sprintf('He creado %d eventos de calendario:', $count),
+            },
+            'fr' => match ($sink) {
+                'outlook' => sprintf('J’ai ajouté %d événements de calendrier dans Outlook :', $count),
+                'calendar' => sprintf('J’ai ajouté %d événements de calendrier dans votre calendrier :', $count),
+                default => sprintf('J’ai créé %d événements de calendrier :', $count),
+            },
+            'tr' => match ($sink) {
+                'outlook' => sprintf('Outlook’a %d takvim kaydı ekledim:', $count),
+                'calendar' => sprintf('Takviminize %d takvim kaydı ekledim:', $count),
+                default => sprintf('%d takvim kaydı oluşturdum:', $count),
+            },
+            // Without a calendar the entries exist as a file only: "created", not "added".
+            default => match ($sink) {
+                'outlook' => sprintf('I added %d calendar events to Outlook:', $count),
+                'calendar' => sprintf('I added %d calendar events to your calendar:', $count),
+                default => sprintf('I created %d calendar events:', $count),
+            },
+        };
+
+        $lines = [];
+        foreach ($entries as $entry) {
+            $lines[] = '- '.self::entryLine($lang, $entry['title'], $entry['start'], $entry['end']);
+        }
+
+        return $header."\n\n".implode("\n", $lines);
+    }
+
+    /**
+     * The step read something, and no appointment with a date and a time was
+     * in it. Asks for the one thing that is missing instead of guessing.
+     */
+    public static function nothingToEnter(string $language): string
+    {
+        return match (UserUtteranceLanguage::normalize($language)) {
+            'de' => 'Ich habe in dem, was ich gelesen habe, keinen Termin mit Datum und Uhrzeit gefunden. Um welchen Termin geht es, und wann ist er?',
+            'es' => 'No he encontrado ninguna cita con fecha y hora en lo que he leído. ¿De qué cita se trata y cuándo es?',
+            'fr' => 'Je n’ai trouvé aucun rendez-vous avec une date et une heure dans ce que j’ai lu. De quel rendez-vous s’agit-il, et quand a-t-il lieu ?',
+            'tr' => 'Okuduklarımda tarihi ve saati olan bir randevu bulamadım. Hangi randevu ve ne zaman?',
+            default => 'I found no appointment with a date and a time in what I read. Which appointment is it, and when?',
+        };
+    }
+
     public static function unknownTimezone(string $language, string $title): string
     {
         return match (UserUtteranceLanguage::normalize($language)) {
@@ -87,8 +148,18 @@ final class CalendarEventSpeech
         };
     }
 
-    public static function notDelivered(string $language): string
+    public static function notDelivered(string $language, bool $several = false): string
     {
+        if ($several) {
+            return match (UserUtteranceLanguage::normalize($language)) {
+                'de' => 'Sie wurden nicht in einen Kalender eingetragen — die .ics-Datei ist angehängt. Verbinde einen Kalender unter Apps → Microsoft 365.',
+                'es' => 'No se añadieron a un calendario: el archivo .ics está adjunto. Conecta un calendario en Apps → Microsoft 365.',
+                'fr' => 'Ils n’ont pas été ajoutés à un calendrier — le fichier .ics est joint. Connectez un calendrier sous Apps → Microsoft 365.',
+                'tr' => 'Bir takvime eklenmediler — .ics dosyası ekte. Apps → Microsoft 365 altında bir takvim bağlayın.',
+                default => 'They were not added to a calendar — the .ics is attached. Connect a calendar under Apps → Microsoft 365.',
+            };
+        }
+
         return match (UserUtteranceLanguage::normalize($language)) {
             'de' => 'Der Termin wurde nicht in einen Kalender eingetragen — die .ics-Datei ist angehängt. Verbinde einen Kalender unter Apps → Microsoft 365.',
             'es' => 'El evento no se añadió a un calendario: el archivo .ics está adjunto. Conecta un calendario en Apps → Microsoft 365.',
@@ -102,11 +173,16 @@ final class CalendarEventSpeech
      * Stop the planner inventing 09:00, and keep the visible reply as the
      * runner's sentence (`$nX.text`) in the user's language.
      *
+     * A calendar step keeps a start the person named. A start they did not
+     * name is taken off the step when it can read its entries instead: from a
+     * step it depends on, or from a file of this conversation. The plan
+     * becomes the question about the time only when there is nothing to read.
+     *
      * @param array<string, mixed> $payload
      *
      * @return array<string, mixed>
      */
-    public static function adjustPlan(array $payload, string $messageText): array
+    public static function adjustPlan(array $payload, string $messageText, ?CalendarTurnEvidence $evidence = null): array
     {
         $language = UserUtteranceLanguage::detect($messageText, is_string($payload['language'] ?? null) ? $payload['language'] : 'en');
         $payload['language'] = $language;
@@ -116,30 +192,40 @@ final class CalendarEventSpeech
             return $payload;
         }
 
-        if (!UserNamedClockTime::in($messageText) && self::hasCalendarEvent($tasks)) {
-            $payload['tasks'] = [[
-                'id' => 'n1',
-                'capability' => 'compose_reply',
-                'depends_on' => [],
-                'inputs' => ['text' => self::askForTime($language)],
-                'params' => [],
-            ]];
-            $payload['reply_node'] = 'n1';
-
+        $calendarIds = self::calendarIds($tasks);
+        if ([] === $calendarIds) {
             return $payload;
         }
 
-        $calendarId = self::firstCalendarId($tasks);
-        if (null === $calendarId) {
-            return $payload;
+        $evidence ??= new CalendarTurnEvidence($messageText);
+        foreach ($tasks as $i => $task) {
+            if (!self::isCalendarEvent($task)) {
+                continue;
+            }
+            $start = self::plannedStart($task);
+            if ('' !== $start && $evidence->backsStart($start)) {
+                continue;
+            }
+            if (self::dependsOnAStep($task) || $evidence->hasFileText()) {
+                $tasks[$i] = self::withoutPlannedTimes($task);
+                continue;
+            }
+            if ('' !== $start || !UserNamedClockTime::in($messageText)) {
+                return self::askForTimePlan($payload, $language);
+            }
         }
 
+        // Every calendar step is named: which of them writes is only known
+        // when they run. A step that had nothing to add returns no text, and
+        // the reply step leaves it out of a list.
+        $references = array_map(static fn (string $id): string => '$'.$id.'.text', $calendarIds);
+        $replyText = 1 === count($references) ? $references[0] : $references;
         foreach ($tasks as $i => $task) {
             if (!is_array($task) || ($task['capability'] ?? '') !== 'compose_reply') {
                 continue;
             }
             $inputs = is_array($task['inputs'] ?? null) ? $task['inputs'] : [];
-            $inputs['text'] = '$'.$calendarId.'.text';
+            $inputs['text'] = $replyText;
             $tasks[$i]['inputs'] = $inputs;
         }
         $payload['tasks'] = $tasks;
@@ -148,25 +234,118 @@ final class CalendarEventSpeech
     }
 
     /**
-     * @param list<mixed> $tasks
+     * @param array<string, mixed> $payload
+     *
+     * @return array<string, mixed>
      */
-    private static function hasCalendarEvent(array $tasks): bool
+    private static function askForTimePlan(array $payload, string $language): array
     {
-        return null !== self::firstCalendarId($tasks);
+        $payload['tasks'] = [[
+            'id' => 'n1',
+            'capability' => 'compose_reply',
+            'depends_on' => [],
+            'inputs' => ['text' => self::askForTime($language)],
+            'params' => [],
+        ]];
+        $payload['reply_node'] = 'n1';
+
+        return $payload;
     }
 
     /**
      * @param list<mixed> $tasks
+     *
+     * @return list<string>
      */
-    private static function firstCalendarId(array $tasks): ?string
+    private static function calendarIds(array $tasks): array
     {
+        $ids = [];
         foreach ($tasks as $task) {
-            if (is_array($task) && ($task['capability'] ?? '') === 'calendar_event' && is_string($task['id'] ?? null)) {
-                return $task['id'];
+            if (self::isCalendarEvent($task) && is_string($task['id'] ?? null)) {
+                $ids[] = $task['id'];
             }
         }
 
-        return null;
+        return $ids;
+    }
+
+    /**
+     * @phpstan-assert-if-true array<string, mixed> $task
+     */
+    private static function isCalendarEvent(mixed $task): bool
+    {
+        return is_array($task) && 'calendar_event' === ($task['capability'] ?? '');
+    }
+
+    /**
+     * The planner writes the event fields under `params` or under `inputs`.
+     *
+     * @param array<string, mixed> $task
+     */
+    private static function plannedStart(array $task): string
+    {
+        foreach (['params', 'inputs'] as $bag) {
+            $start = is_array($task[$bag] ?? null) ? ($task[$bag]['start'] ?? null) : null;
+            if (is_string($start) && '' !== trim($start)) {
+                return trim($start);
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     */
+    private static function dependsOnAStep(array $task): bool
+    {
+        return is_array($task['depends_on'] ?? null) && [] !== $task['depends_on'];
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     *
+     * @return array<string, mixed>
+     */
+    private static function withoutPlannedTimes(array $task): array
+    {
+        foreach (['params', 'inputs'] as $bag) {
+            if (is_array($task[$bag] ?? null)) {
+                unset($task[$bag]['start'], $task[$bag]['end']);
+            }
+        }
+
+        return $task;
+    }
+
+    /**
+     * Date, times, then the title: the same order in every language. Always
+     * the date, never "tomorrow": the person checks the list against the
+     * booking it was read from.
+     */
+    private static function entryLine(string $language, string $title, \DateTimeImmutable $start, \DateTimeImmutable $end): string
+    {
+        $until = $end->format('Y-m-d') === $start->format('Y-m-d')
+            ? $end->format('H:i')
+            : self::dateLabel($language, $end).' '.$end->format('H:i');
+        $times = $start->format('H:i').'–'.$until.('de' === $language ? ' Uhr' : '');
+        $separator = 'fr' === $language ? ' : ' : ': ';
+
+        return self::dateLabel($language, $start).', '.$times.$separator.trim($title);
+    }
+
+    private static function dateLabel(string $language, \DateTimeImmutable $date): string
+    {
+        return 'de' === $language ? $date->format('d.m.Y') : $date->format('Y-m-d');
+    }
+
+    private static function sink(string $channel): string
+    {
+        if ('' === $channel) {
+            return '';
+        }
+
+        return str_contains(strtolower($channel), 'outlook') ? 'outlook' : 'calendar';
     }
 
     private static function quotedTitle(string $language, string $title): string
@@ -207,7 +386,7 @@ final class CalendarEventSpeech
             };
         }
 
-        return 'de' === $language ? $start->format('d.m.Y') : $start->format('Y-m-d');
+        return self::dateLabel($language, $start);
     }
 
     private static function durationLabel(string $language, int $minutes): string

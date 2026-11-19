@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Multitask\Skill;
 
+use App\Entity\Message;
 use App\Service\Agent\Policy\AssistantSkillGate;
 use App\Service\Multitask\Execution\TaskRunner;
 use App\Service\Multitask\MultitaskRoutingConfig;
@@ -125,20 +126,31 @@ final class SkillCatalog
     /**
      * Let a skill repair a decoded plan before validation. A no-op when no
      * skill registered an adjuster. Used so a title change named only by
-     * page title still searches before it writes.
+     * page title still searches before it writes, and so a calendar step
+     * keeps only a start the person named.
      *
-     * @param array<string, mixed> $payload
-     * @param list<string>|null    $allowedCapabilities
+     * @param array<string, mixed>                                     $payload
+     * @param list<string>|null                                        $allowedCapabilities
+     * @param Message|null                                             $message             the message being planned; an adjuster that
+     *                                                                                      needs more than its text (its attachments) reads it here
+     * @param array<int, Message|array{role: string, content: string}> $thread              the conversation before it, oldest first
      *
      * @return array<string, mixed>
      */
-    public function adjustPlan(array $payload, string $messageText, ?int $userId, ?array $allowedCapabilities = null, string $topic = ''): array
-    {
+    public function adjustPlan(
+        array $payload,
+        string $messageText,
+        ?int $userId,
+        ?array $allowedCapabilities = null,
+        string $topic = '',
+        ?Message $message = null,
+        array $thread = [],
+    ): array {
         foreach ($this->byCapability as $descriptor) {
             if (null === $descriptor->planAdjuster) {
                 continue;
             }
-            $payload = ($descriptor->planAdjuster)($payload, $messageText, $userId, $allowedCapabilities, $topic);
+            $payload = ($descriptor->planAdjuster)($payload, $messageText, $userId, $allowedCapabilities, $topic, $message, $thread);
         }
 
         return $payload;

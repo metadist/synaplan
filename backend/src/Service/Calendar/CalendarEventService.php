@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Calendar;
 
 /**
- * Builds RFC 5545 iCalendar (.ics) content for a single meeting/event.
+ * Builds RFC 5545 iCalendar (.ics) content: one meeting, or several entries
+ * in one file (the flights of a booking).
  *
  * Times are emitted as UTC instants (DTSTART/DTEND with a trailing "Z"), which
  * every calendar client converts back to the viewer's local time — so the
@@ -34,6 +35,67 @@ final class CalendarEventService
         ?string $organizerEmail = null,
         ?string $timezoneLabel = null,
     ): string {
+        return $this->wrap($this->eventLines($title, $start, $end, $description, $location, $attendees, $organizerEmail, $timezoneLabel));
+    }
+
+    /**
+     * Several entries in one file. A calendar client imports them together,
+     * and a connected calendar receives each as its own event.
+     *
+     * @param list<array{title: string, start: \DateTimeImmutable, end: \DateTimeImmutable, description?: ?string, location?: ?string}> $entries
+     */
+    public function buildIcsForEntries(array $entries, ?string $timezoneLabel = null): string
+    {
+        $lines = [];
+        foreach ($entries as $entry) {
+            $lines = [...$lines, ...$this->eventLines(
+                $entry['title'],
+                $entry['start'],
+                $entry['end'],
+                $entry['description'] ?? null,
+                $entry['location'] ?? null,
+                [],
+                null,
+                $timezoneLabel,
+            )];
+        }
+
+        return $this->wrap($lines);
+    }
+
+    /**
+     * @param list<string> $eventLines the VEVENT blocks, unfolded
+     */
+    private function wrap(array $eventLines): string
+    {
+        $lines = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:'.$this->escapeText(self::PRODID),
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            ...$eventLines,
+            'END:VCALENDAR',
+        ];
+
+        return implode("\r\n", array_map([$this, 'foldLine'], $lines))."\r\n";
+    }
+
+    /**
+     * @param list<string> $attendees
+     *
+     * @return list<string> one VEVENT block, unfolded
+     */
+    private function eventLines(
+        string $title,
+        \DateTimeImmutable $start,
+        \DateTimeImmutable $end,
+        ?string $description,
+        ?string $location,
+        array $attendees,
+        ?string $organizerEmail,
+        ?string $timezoneLabel,
+    ): array {
         $utc = new \DateTimeZone('UTC');
         $startUtc = $start->setTimezone($utc);
         $endUtc = $end->setTimezone($utc);
@@ -72,11 +134,6 @@ final class CalendarEventService
         $descriptionText = implode("\n", $descriptionParts);
 
         $lines = [
-            'BEGIN:VCALENDAR',
-            'VERSION:2.0',
-            'PRODID:'.$this->escapeText(self::PRODID),
-            'CALSCALE:GREGORIAN',
-            'METHOD:PUBLISH',
             'BEGIN:VEVENT',
             'UID:'.$uid,
             'DTSTAMP:'.$stamp,
@@ -100,9 +157,8 @@ final class CalendarEventService
 
         $lines[] = 'STATUS:CONFIRMED';
         $lines[] = 'END:VEVENT';
-        $lines[] = 'END:VCALENDAR';
 
-        return implode("\r\n", array_map([$this, 'foldLine'], $lines))."\r\n";
+        return $lines;
     }
 
     /**

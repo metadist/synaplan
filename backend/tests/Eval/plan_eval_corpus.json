@@ -643,5 +643,69 @@
         "file_analysis"
       ]
     }
+  },
+  {
+    "id": "calendar_entries_from_attached_picture",
+    "text": "Trage bitte die 3 Flüge in mein Outlook Calender",
+    "language": "de",
+    "options": {
+      "client_country": "DE"
+    },
+    "attach": {
+      "type": "png",
+      "path": "booking.png"
+    },
+    "expect": {
+      "capabilities": [
+        "file_analysis",
+        "calendar_event"
+      ],
+      "edges": [
+        "file_analysis->calendar_event"
+      ],
+      "forbid": [
+        "chat",
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "calendar_entries_from_attached_document",
+    "text": "Put the meeting from this invitation into my calendar.",
+    "language": "en",
+    "options": {
+      "client_country": "DE"
+    },
+    "attach": {
+      "type": "pdf",
+      "path": "invitation.pdf",
+      "file_text": "Invitation: Quarterly review, Thursday 3 December 2026, 14:30 to 16:00, Room Berlin."
+    },
+    "expect": {
+      "capabilities": [
+        "calendar_event"
+      ],
+      "forbid": [
+        "chat",
+        "image_generation"
+      ]
+    }
+  },
+  {
+    "id": "calendar_without_a_time_or_a_file_asks",
+    "text": "termin morgen in den kalender",
+    "language": "de",
+    "options": {
+      "client_country": "DE"
+    },
+    "expect": {
+      "capabilities": [
+        "compose_reply"
+      ],
+      "forbid": [
+        "calendar_event",
+        "file_analysis"
+      ]
+    }
   }
 ]

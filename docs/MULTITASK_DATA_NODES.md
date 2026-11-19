@@ -50,6 +50,12 @@ connected B2 storage server). Three layers now make the handover structural:
 | Reference tolerance | `NodeContext` | `$n1.output`, `$n1.result`, `$n1.content`, `${n1.text}` … resolve to the node text instead of leaking as literal placeholders. |
 | Runner safety net | `UpstreamHandover` in `ChatRunner` | Whatever is still missing — `inputs.text = "$message.text"`, data parked under `inputs.context` — is appended to the user message as a labelled "Data returned by the previous steps" block. A correctly spliced plan already contains the text verbatim, so nothing is added; when it fires, `ChatRunner: plan did not hand over upstream step output` is logged with the node ids. |
 
+`calendar_event` consumes upstream text as well. When its plan carries no
+start time the person named, it takes its entries from the steps it depends
+on (a `file_analysis`, an `email_search`, a `url_fetch`), however the planner
+wired them, and falls back to the text of the turn's files. See
+[Calendar entries from a file or an earlier step](CONNECTIONS.md#calendar-entries-from-a-file-or-an-earlier-step).
+
 Debugging a turn: `BMESSAGEMETA.task_plan_definition` holds the executed plan
 (exact `inputs`/`depends_on`), the usage ledger shows whether a `PLANNING`
 call happened at all, and `McpFetchRunner: tool call succeeded` reports the

@@ -1,4 +1,50 @@
 {
+    "calendar_entries_from_attached_picture": {
+        "plan": {
+            "language": "de",
+            "reply_node": "n3",
+            "tasks": [
+                {
+                    "capability": "file_analysis",
+                    "depends_on": [],
+                    "id": "n1",
+                    "inputs": {
+                        "files": "$message.files",
+                        "prompt": "Liste jeden Flug mit Datum, Abflug- und Ankunftszeit, Abflug- und Zielort sowie die Buchungsnummer auf."
+                    }
+                },
+                {
+                    "capability": "calendar_event",
+                    "depends_on": [
+                        "n1"
+                    ],
+                    "id": "n2",
+                    "inputs": {
+                        "source": "$n1.text"
+                    },
+                    "params": {
+                        "channel": "outlook",
+                        "timezone": "Europe/Berlin"
+                    }
+                },
+                {
+                    "capability": "compose_reply",
+                    "depends_on": [
+                        "n2"
+                    ],
+                    "id": "n3",
+                    "inputs": {
+                        "attachments": [
+                            "$n2.file"
+                        ],
+                        "text": "$n2.text"
+                    }
+                }
+            ],
+            "version": 1
+        },
+        "utterance": "Trage bitte die 3 Flüge in mein Outlook Calender"
+    },
     "pdf_edit_attached_file": {
         "plan": {
             "language": "en",

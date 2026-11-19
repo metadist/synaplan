@@ -31,6 +31,18 @@ final readonly class RequestedCalendarDelivery
         Connection::TYPE_M365 => 'm365_calendar',
     ];
 
+    private const CALENDAR_WORD = '(?:calendar|calender|kalender|calendario|calendrier|agenda|caldav|outlook|m365|(?:microsoft|office)\s*365)';
+
+    /**
+     * A preposition, at most two words (a possessive, a product name), then
+     * the calendar: "in mein Outlook", "to my nextcloud calendar". A longer
+     * gap is a sentence that merely mentions a calendar further on.
+     */
+    private const INTO_A_CALENDAR = '/\b(?:in|into|to|onto|auf|im|ins|en|a\s+(?:mi|tu)|al|à|au|dans|sur)(?:\s+[\p{L}\d\'’-]+){0,2}\s+'.self::CALENDAR_WORD.'\b|\btakvim(?:ime|imize|e)\b/u';
+
+    /** A refusal in the same clause as the calendar it refuses. */
+    private const NOT_INTO_A_CALENDAR = '/\b(?:do\s+not|don\'?t|not|nicht|ohne|without|ne\s+pas|no\s+(?:l[oa]s?\s+)?(?:pongas|añadas|guardes))\b[^.!?,;\n]{0,40}?(?:\b'.self::CALENDAR_WORD.'\b|\btakvim)/u';
+
     public function __construct(
         private ConnectionRepository $connections,
         private DestinationRegistry $destinations,
@@ -42,20 +54,20 @@ final readonly class RequestedCalendarDelivery
     /**
      * True when the user explicitly asked to put the event into a connected
      * calendar — not when they only asked for a downloadable invite.
+     *
+     * What counts is the destination ("in mein Outlook", "to my calendar"),
+     * whatever the verb: a verb list missed "eintragen", "schreiben" and
+     * "enter". A refusal counts only next to the destination, so "do it now,
+     * do not ask again" is not read as "not into the calendar".
      */
     public function userAskedToPutInCalendar(string $text): bool
     {
         $haystack = mb_strtolower($text);
-        if (preg_match('/\b(do not|don\'t|dont|nicht|ne pas|no pongas)\b/u', $haystack)) {
+        if (1 === preg_match(self::NOT_INTO_A_CALENDAR, $haystack)) {
             return false;
         }
 
-        // Require a destination phrase ("put/add/save … in/into/to … calendar"),
-        // not a generic save/upload plus a calendar word (e.g. "save the .ics file").
-        return (bool) preg_match(
-            '/\b(put|add|save|store|upload|lege|speicher|ablage|guarda|kaydet|ajoute|mets)\b.{0,48}\b(in|into|to|auf|im|ins|in den|in die)\b.{0,48}\b(calendar|kalender|calendario|takvim|calendrier|caldav|outlook)\b/u',
-            $haystack
-        );
+        return 1 === preg_match(self::INTO_A_CALENDAR, $haystack);
     }
 
     /**

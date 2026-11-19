@@ -132,6 +132,48 @@ final class RequestedCalendarDeliveryTest extends TestCase
         self::assertFalse($delivery->userAskedToPutInCalendar('lege den Termin nicht in meinen Kalender'));
     }
 
+    /**
+     * The destination counts, whatever the verb. "Eintragen" is how German
+     * says it, and a list of verbs did not have it.
+     */
+    public function testTheDestinationCountsWhateverTheVerb(): void
+    {
+        $delivery = $this->delivery([], []);
+
+        self::assertTrue($delivery->userAskedToPutInCalendar('Trage bitte die 3 Flüge in mein Outlook Calender'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('Gut, bitte in meinen m365 calendar eintragen'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('schreib den Termin in den Kalender'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('enter it into my calendar'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('ponlo en mi calendario'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('ajoute-le à mon calendrier'));
+        self::assertTrue($delivery->userAskedToPutInCalendar('takvimime ekle'));
+
+        self::assertFalse($delivery->userAskedToPutInCalendar('Ja, trage ein, was Du hast'), 'names no calendar');
+        self::assertFalse($delivery->userAskedToPutInCalendar('Create an Outlook invite for tomorrow at 10'), 'an invite to download');
+        self::assertFalse(
+            $delivery->userAskedToPutInCalendar('Meeting in Berlin über den neuen Kalender der Firma morgen um 10'),
+            'a calendar mentioned further on is not a destination',
+        );
+    }
+
+    /**
+     * "Stop asking, enter it now" was read as "not into the calendar",
+     * because any "nicht" in the message counted as a refusal.
+     */
+    public function testARefusalCountsOnlyNextToTheCalendar(): void
+    {
+        $delivery = $this->delivery([], []);
+
+        self::assertTrue($delivery->userAskedToPutInCalendar(
+            'Hoer auf zu fragen trage ein Trage die Daten, die du hast, jetzt in meinen Kalender ein in M365. Jetzt eintragen, nicht mehr fragen.'
+        ));
+        self::assertTrue($delivery->userAskedToPutInCalendar('I have no time tomorrow, add the meeting to my calendar at 15:00'));
+
+        self::assertFalse($delivery->userAskedToPutInCalendar('Erstelle den Termin, aber ohne Kalender'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('no lo pongas en mi calendario'));
+        self::assertFalse($delivery->userAskedToPutInCalendar('ne pas ajouter à mon calendrier'));
+    }
+
     public function testDefaultCalendarChannelUsesTheOnlyConnectedCalendar(): void
     {
         $caldav = new Connection(1, 'caldav', 'personal');
