@@ -22,7 +22,7 @@ final class LeadConformanceKeys implements ResearchRunKeys
         return null;
     }
 
-    public function set(string $key, string $value, int $ttlSeconds): bool
+    public function set(string $key, string $value, ?int $ttlSeconds): bool
     {
         return true;
     }
@@ -42,7 +42,7 @@ final class LeadConformanceKeys implements ResearchRunKeys
         return false;
     }
 
-    public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool
+    public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, ?int $ttlSeconds): bool
     {
         return false;
     }
@@ -78,10 +78,6 @@ final class LeadConformanceKeys implements ResearchRunKeys
         return [];
     }
 
-    public function zAdd(string $key, int $score, string $member): void
-    {
-    }
-
     public function zRem(string $key, string $member): void
     {
     }
@@ -91,9 +87,9 @@ final class LeadConformanceKeys implements ResearchRunKeys
         return [];
     }
 
-    public function appendEvent(string $runId, string $body): ?int
+    public function appendEvent(string $seqKey, string $listKey, string $runKey, string $body): ?int
     {
-        if ('' === $runId) {
+        if ('' === $runKey) {
             return null;
         }
         $this->events[] = $body;

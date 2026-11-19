@@ -72,7 +72,7 @@ final class RunReaperTest extends RunKernelCase
         self::assertNotNull($token);
         $run->status = 'completed';
         // The run ended through another path while this claim's index entry stayed.
-        $this->keys->set($this->keyspace->state($run->id), $run->encode(1, 0, 0), null);
+        $this->keys->set($this->keyspace->state($run->id), $run->stored(1, 0, 0, null), null);
         $this->clock->sleep(2);
 
         self::assertSame(['redispatched' => 0, 'interrupted' => 0, 'waited' => 0], $this->reaper($policy)->reap());

@@ -6,13 +6,14 @@ namespace App\Service\Research\Run;
 
 use App\Service\Research\Run\Lead\LeadConversation;
 use App\Service\Research\Run\Ledger\EvidenceLedger;
+use App\Service\Run\RunState;
 
 /**
  * One run as it is stored. A finished run always carries an outcome, and a
  * running one does not, so a screen never shows a result that has not ended
  * and never ends without a sentence.
  */
-final class ResearchRunState
+final class ResearchRunState implements RunState
 {
     public ?\DateTimeImmutable $expiresAt = null;
 
@@ -322,6 +323,47 @@ final class ResearchRunState
         $this->assertShape();
     }
 
+    public function runId(): string
+    {
+        return $this->ref->id;
+    }
+
+    public function expectedSeq(): int
+    {
+        return $this->expectedSeq;
+    }
+
+    public function checkpointSeq(): int
+    {
+        return $this->checkpointSeq;
+    }
+
+    public function isTerminal(): bool
+    {
+        return $this->status->isTerminal();
+    }
+
+    public function updatedAt(): int
+    {
+        return ($this->updatedAt ?? $this->ref->createdAt)->getTimestamp();
+    }
+
+    public function stored(int $expectedSeq, int $checkpointSeq, int $now, ?int $expiresAt): string
+    {
+        $this->assertShape();
+
+        return $this->encode($expectedSeq, $checkpointSeq, self::utc($now), null === $expiresAt ? null : self::utc($expiresAt));
+    }
+
+    public function checkpointed(int $expectedSeq, int $checkpointSeq, int $now, ?int $expiresAt): void
+    {
+        $this->checkpointSeq = $checkpointSeq;
+        $this->expectedSeq = $expectedSeq;
+        $this->updatedAt = self::utc($now);
+        $this->expiresAt = null === $expiresAt ? null : self::utc($expiresAt);
+        $this->assertShape();
+    }
+
     public function assertShape(): void
     {
         $finished = $this->status->isTerminal();
@@ -368,6 +410,11 @@ final class ResearchRunState
         }
 
         return $keys;
+    }
+
+    private static function utc(int $unix): \DateTimeImmutable
+    {
+        return (new \DateTimeImmutable('@'.$unix))->setTimezone(new \DateTimeZone('UTC'));
     }
 
     private static function stamp(\DateTimeImmutable $moment): string

@@ -27,10 +27,11 @@ interface RunState
 
     /**
      * The stored form after a unit was written: waiting for $expectedSeq, with
-     * $checkpointSeq written at $now. Does not change this object.
+     * $checkpointSeq written at $now, kept until $expiresAt (null: no expiry).
+     * Does not change this object.
      */
-    public function encode(int $expectedSeq, int $checkpointSeq, int $now): string;
+    public function stored(int $expectedSeq, int $checkpointSeq, int $now, ?int $expiresAt): string;
 
     /** The write went through: move this object to the stored form. */
-    public function checkpointed(int $expectedSeq, int $checkpointSeq, int $now): void;
+    public function checkpointed(int $expectedSeq, int $checkpointSeq, int $now, ?int $expiresAt): void;
 }

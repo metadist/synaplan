@@ -1409,6 +1409,9 @@ services:
         arguments:
             $envValue: '%env(RESEARCH_ENABLED)%'
 
+    # Research keys extend the kernel's; a plain RunKeys stays the kernel store.
+    App\Service\Run\RunKeys: '@App\Service\Run\RedisRunKeys'
+
     App\Service\File\CloudFilesConfig:
         arguments:
             $envValue: '%env(CLOUD_FILES_ENABLED)%'

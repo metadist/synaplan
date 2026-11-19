@@ -92,4 +92,28 @@ final class RunKeyspaceTest extends TestCase
         $this->expectException(\InvalidArgumentException::class);
         new RunKeyspace('Run:*', RunIds::PATTERN);
     }
+
+    public function testAKindMayRenameItsKeys(): void
+    {
+        $keyspace = new RunKeyspace('research', '/^rr_[0-9a-f]{16}$/D', ['state' => 'run', 'cancel' => 'stop']);
+        $id = 'rr_0123456789abcdef';
+
+        self::assertSame('research:run:'.$id, $keyspace->state($id));
+        self::assertSame('research:stop:'.$id, $keyspace->cancel($id));
+        self::assertSame('research:events:'.$id, $keyspace->events($id));
+        self::assertSame('research:claim:'.$id.':2', $keyspace->claim($id, 2));
+        self::assertSame('research:claims', $keyspace->claims());
+    }
+
+    public function testAnUnknownOrUnsafeKeyNameIsRefused(): void
+    {
+        foreach ([['nope' => 'x'], ['state' => 'a:b']] as $segments) {
+            try {
+                new RunKeyspace('research', '/^rr_[0-9a-f]{16}$/D', $segments);
+                self::fail('A bad key name was accepted.');
+            } catch (\InvalidArgumentException) {
+                self::addToAssertionCount(1);
+            }
+        }
+    }
 }

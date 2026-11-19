@@ -10,7 +10,10 @@ namespace App\Service\Run;
 interface RunStateCodec
 {
     /**
+     * Null when the stored form is unreadable and counts as no run, the way a
+     * kind that never raised on a broken form treats it.
+     *
      * @throws \UnexpectedValueException when the stored form is not a run of this kind
      */
-    public function decode(string $stored): RunState;
+    public function decode(string $stored): ?RunState;
 }

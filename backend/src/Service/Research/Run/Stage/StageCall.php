@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
-use App\Service\Research\Run\ResearchLease;
 use App\Service\Research\Run\ResearchStatus;
+use App\Service\Run\RunClaim;
 
 /**
  * One paid call, and a single retry when the answer is not the JSON shape.
@@ -87,7 +87,7 @@ final readonly class StageCall
         $lease = $ctx->lease;
         // The token is gone, so this step must not pay for another call.
         // The checkpoint cannot land, and the reaper still owns the run.
-        if ($lease instanceof ResearchLease && !$lease->renew()) {
+        if ($lease instanceof RunClaim && !$lease->renew()) {
             return new StageResult('done');
         }
 

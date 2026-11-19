@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Run;
 
 use App\Service\Infrastructure\RedisService;
-use App\Service\Research\Run\RedisResearchRunKeys;
 use App\Service\Run\RedisRunKeys;
 use App\Service\Run\RunStoreUnavailable;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class RedisRunKeysTest extends TestCase
@@ -92,27 +90,5 @@ final class RedisRunKeysTest extends TestCase
         $redis->method('eval')->willReturn(0);
 
         self::assertNull((new RedisRunKeys($redis))->appendEvent('seq', 'list', 'run', '{}'));
-    }
-
-    /**
-     * @return iterable<string, array{string}>
-     */
-    public static function sharedScripts(): iterable
-    {
-        yield 'claim' => ['CLAIM'];
-        yield 'renew' => ['RENEW'];
-        yield 'get' => ['GET'];
-        yield 'members' => ['MEMBERS'];
-        yield 'delete if equals' => ['DELETE_IF_EQUALS'];
-    }
-
-    /** The kernel's lease scripts are the research engine's, unchanged. */
-    #[DataProvider('sharedScripts')]
-    public function testTheLeaseScriptsMatchTheResearchEngine(string $name): void
-    {
-        self::assertSame(
-            (new \ReflectionClassConstant(RedisResearchRunKeys::class, $name))->getValue(),
-            (new \ReflectionClassConstant(RedisRunKeys::class, $name))->getValue(),
-        );
     }
 }

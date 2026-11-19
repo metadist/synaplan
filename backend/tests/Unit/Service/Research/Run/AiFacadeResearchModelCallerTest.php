@@ -8,10 +8,10 @@ use App\AI\Service\AiFacade;
 use App\AI\StructuredOutput\Schema\ResearchTriageSchema;
 use App\DTO\CostResult;
 use App\Service\ModelConfigService;
-use App\Service\Research\Run\ResearchLease;
 use App\Service\Research\Run\ResearchStateStore;
 use App\Service\Research\Run\ResearchUnitWorker;
 use App\Service\Research\Run\Stage\AiFacadeResearchModelCaller;
+use App\Service\Run\RunClaim;
 use App\Service\Usage\CostCalculationService;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
@@ -58,7 +58,7 @@ final class AiFacadeResearchModelCallerTest extends TestCase
         $store = new ResearchStateStore(new MemoryResearchRunKeys($clock), $clock);
         $token = $store->claim('rr_0123456789abcdef', 1, ResearchUnitWorker::LEASE_MS);
         self::assertIsString($token);
-        $lease = new ResearchLease($store, 'rr_0123456789abcdef', 1, $token, ResearchUnitWorker::LEASE_MS);
+        $lease = new RunClaim($store->runs(), 'rr_0123456789abcdef', 1, $token, ResearchUnitWorker::LEASE_MS);
         $ai = $this->createMock(AiFacade::class);
         $ai->expects(self::once())->method('chat')->with(
             self::anything(),
@@ -86,7 +86,7 @@ final class AiFacadeResearchModelCallerTest extends TestCase
         $token = $store->claim('rr_0123456789abcdef', 1, ResearchUnitWorker::LEASE_MS);
         self::assertIsString($token);
         $clock->sleep(intdiv(ResearchUnitWorker::LEASE_MS, 1000) + 1);
-        $lease = new ResearchLease($store, 'rr_0123456789abcdef', 1, $token, ResearchUnitWorker::LEASE_MS);
+        $lease = new RunClaim($store->runs(), 'rr_0123456789abcdef', 1, $token, ResearchUnitWorker::LEASE_MS);
         $ai = $this->createMock(AiFacade::class);
         $ai->expects(self::never())->method('chat');
 

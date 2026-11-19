@@ -17,8 +17,8 @@ beliebig lange arbeiten darf. 28 Schritte PJ0–PJ28 in Phasen 0, A–F.
 **Auftrag des Owners:** die Schritte der Reihe nach umsetzen, nach `AGENTS.md`,
 mit Blick auf Usability und vor allem Sicherheit.
 
-**Stand:** PJ0–PJ4 sind auf `main` (Phase 0 und A fertig). Phase B (PJ5) ist blockiert,
-weil AU26 und AH8 fehlen. Der Owner hat am 2026-11-19 entschieden: als Nächstes **AU26**,
+**Stand:** PJ0–PJ4, AU26 und AH8a sind auf `main`. Phase B (PJ5) wartet auf AH8b
+(im Review). Der Owner hat am 2026-11-19 entschieden: als Nächstes **AU26**,
 dann **AH8a**, **AH8b**, dann PJ5 (siehe Abschnitt 9).
 
 | Schritt | Zustand | PR |
@@ -29,8 +29,10 @@ dann **AH8a**, **AH8b**, dann PJ5 (siehe Abschnitt 9).
 | Loop-Vertrag (Ledger, Guard, Ende eines Laufs) | fertig, gemergt (Doku) | #3151 |
 | PJ3 Projekte mit Quellen und Instruktionen (API) | fertig, gemergt | #3152 |
 | PJ4 Projektseite, Projekte im Chats-Panel | fertig, gemergt | #3186 |
-| AU26 ein Agent-Loop (Zeile 22) | im Review, Branch `refactor/one-agent-loop` | — |
-| PJ5–PJ28 | nicht begonnen; zuerst AH8a (im Review), AH8b; AU26 gemergt (#3193) | — |
+| AU26 ein Agent-Loop (Zeile 22) | fertig, gemergt | #3193 |
+| AH8a Run-Kernel und `BRUNS` | fertig, gemergt | #3198 |
+| AH8b Research auf dem Kernel | im Review, Branch `refactor/research-on-run-kernel` | — |
+| PJ5–PJ28 | nicht begonnen; zuerst AH8b (im Review) | — |
 
 ## 2. Bisherige Implementierungen
 
@@ -236,11 +238,11 @@ Link mit 403 → `failed` mit Grund. Löschen mit ungültigem `chats` → 422; m
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **AU26** (Zeile 22): ein Tool-Loop für Dokument-Chat und beide Gateways, Grenzen als
+1. **AU26** (Zeile 22, gemergt #3193): ein Tool-Loop für Dokument-Chat und beide Gateways, Grenzen als
    Profil-Eingabe (§0 #69).
-2. **AH8a** (Zeile 25): Run-Kernel und `BRUNS` aus `Service/Research/Run/*` extrahiert,
+2. **AH8a** (Zeile 25, gemergt #3198): Run-Kernel und `BRUNS` aus `Service/Research/Run/*` extrahiert,
    ohne Nutzer; Migration mit `BNOTES` und `chat` als `BKIND`-Wert (§0 #63).
-3. **AH8b**: Research läuft auf dem Kernel, ohne Verhaltensänderung.
+3. **AH8b** (im Review): Research läuft auf dem Kernel, ohne Verhaltensänderung.
 4. **Phase B (PJ5–PJ11).** Vor PJ6: #12, #14, #15; vor PJ7: #27; vor PJ9: #31;
    vor PJ10: #20; vor PJ11: #65. `LOOP.ENABLED` bleibt 0, bis PJ6 und PJ8 gemergt sind (§0 #70).
 5. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt. Offen: #34–#37, #40,
@@ -251,18 +253,18 @@ Ask-first laut `AGENTS.md`: Schemaänderungen, neue Abhängigkeit, Docker/CI/Bui
 neuer AI-Provider. Freigegeben sind nur die Migrationen von PJ3 und die `BRUNS`-Migration von
 AH8a (Zeile 25 §0 #9, hier §0 #63).
 
-## 9. Exakt nächster Schritt: AH8b (AU26 gemergt als #3193, AH8a im Review)
+## 9. Exakt nächster Schritt: PJ5 (nach dem Merge von AH8b)
 
-1. Nach dem Merge von AH8a: `git checkout main && git pull --ff-only`, Branch
-   `refactor/research-on-run-kernel`.
-2. Brief: `../20261023-agent-handling/04_sprints.md` AH8b; Kernel und Schlüssel-Layout in
-   `../20261023-agent-handling/03_contracts.md` §2.2, Stand in dessen `STATUS.md` (2026-11-19).
-3. Tests zuerst: die bestehenden Research-Tests (`tests/Unit/Service/Research/Run`) bleiben
-   unverändert grün; `ResearchState` implementiert `RunState`/`RunStateCodec`, Lease, Reaper und
-   Unit-Worker von Research werden durch `RunUnit`, `RunReaper` und eine `RunReapPolicy` ersetzt.
-4. Gate wie gehabt (`make ci-local`, `make test-e2e` wegen Research-UI), Commit
-   `refactor(research): research runs on the run kernel`, PR, Copilot und
-   `All Checks Passed`, Threads beantworten, nicht mergen.
+1. AH8b ist im Review (Branch `refactor/research-on-run-kernel`). Erst nach dessen Merge
+   und nur auf Auftrag des Owners: `git checkout main && git pull --ff-only`, neuer
+   Branch für PJ5.
+2. Brief: `04_sprints.md` PJ5; der Chat-Lauf ist eine neue Art auf dem Kernel
+   (`App\Service\Run\*`), mit `ToolLoopLimits::unbounded()` als Profil-Eingabe (AU26).
+   Wie Research die Kernel-Schnittstellen bedient (`ResearchUnitHandler`,
+   `ResearchReapPolicy`, `ResearchRunCodec`), steht im agent-handling `STATUS.md`
+   (2026-11-19 AH8b).
+3. Gate wie gehabt, Commit, PR, Copilot und `All Checks Passed`, Threads beantworten,
+   nicht mergen.
 
 ## 10. Anforderungen und Entscheidungen des Owners
 

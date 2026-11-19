@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
-use App\Service\Research\Run\ResearchLease;
+use App\Service\Run\RunClaim;
 
 /**
  * One structured or plain model call. Tests replay recorded answers through
  * their own implementation. The live caller is the only production one.
  *
  * When $lease is set, the call is inside a claimed step. Renew it at least
- * every ResearchLease::waitMs() while the provider is still working, and
+ * every RunClaim::waitMs() while the provider is still working, and
  * stop when renew returns false. A caller that cannot renew mid-request
  * returns inside that wait, so the claim is still held when it comes back.
  */
@@ -29,6 +29,6 @@ interface ResearchModelCaller
         string $user,
         ?StructuredOutputSchema $schema,
         ?\Closure $onText = null,
-        ?ResearchLease $lease = null,
+        ?RunClaim $lease = null,
     ): ResearchModelReply;
 }
