@@ -44,6 +44,7 @@ export const CATALOG_PATHS = [
   'deploy/aws/packer/synaplan.pkr.hcl',
   'deploy/quickstart/compose.yaml',
   'deploy/quickstart/compose.lite.yaml',
+  'deploy/coolify/synaplan.yaml',
   'server.json',
 ]
 
@@ -60,6 +61,7 @@ export const readPinnedRelease = (root = DEFAULT_ROOT) => {
   const quickstartLiteCompose = readQuickstartComposeVersion(
     read('deploy/quickstart/compose.lite.yaml')
   )
+  const coolifyCompose = readQuickstartComposeVersion(read('deploy/coolify/synaplan.yaml'))
 
   // Checked before the versions: an image pinned without a digest leaves both
   // the tag and the digest unreadable, and reporting that as a missing version
@@ -89,6 +91,8 @@ export const readPinnedRelease = (root = DEFAULT_ROOT) => {
     'deploy/quickstart/compose.yaml (APP_VERSION default)': quickstartCompose.appVersion,
     'deploy/quickstart/compose.lite.yaml (image default)': quickstartLiteCompose.image,
     'deploy/quickstart/compose.lite.yaml (APP_VERSION default)': quickstartLiteCompose.appVersion,
+    'deploy/coolify/synaplan.yaml (image default)': coolifyCompose.image,
+    'deploy/coolify/synaplan.yaml (APP_VERSION default)': coolifyCompose.appVersion,
     'server.json': readServerJsonVersion(read('server.json')),
   }
 

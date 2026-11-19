@@ -1,0 +1,210 @@
+# documentation: https://docs.synaplan.com/
+# slogan: Open-source AI workspace for chat, documents, agents and MCP, with your own models and keys.
+# category: ai
+# tags: ai,chat,llm,rag,agents,mcp,assistant,documents
+# logo: svgs/synaplan.svg
+# port: 80
+
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.8.8}
+
+x-app-environment: &app-environment
+  APP_ENV: prod
+  APP_DEBUG: "0"
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.8.8}
+  SYNAPLAN_PLATFORM: coolify
+  APP_URL: ${SERVICE_URL_BACKEND}
+  FRONTEND_URL: ${SERVICE_URL_BACKEND}
+  REALTIME_ALLOWED_ORIGINS: ${SERVICE_URL_BACKEND}
+  APP_SECRET: ${SERVICE_PASSWORD_64_APPSECRET}
+  TOKEN_SECRET: ${SERVICE_PASSWORD_64_TOKENSECRET}
+  BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
+  BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  REGISTRATION_ENABLED: ${REGISTRATION_ENABLED:-}
+  GUEST_CHAT_ENABLED: ${GUEST_CHAT_ENABLED:-}
+  SYMFONY_TRUSTED_PROXIES: ${SYMFONY_TRUSTED_PROXIES:-PRIVATE_SUBNETS}
+  FRANKENPHP_WORKER_NUM: ${FRANKENPHP_WORKER_NUM:-16}
+  FRANKENPHP_MAX_WAIT_TIME: ${FRANKENPHP_MAX_WAIT_TIME:-15s}
+  FEATURE_FREEAPI_ENABLED: ${FEATURE_FREEAPI_ENABLED:-true}
+  FREEAPI_BASE_URL: ${FREEAPI_BASE_URL:-https://web.synaplan.com}
+  AI_DEFAULT_PROVIDER: ${AI_DEFAULT_PROVIDER:-groq}
+  GROQ_API_KEY: ${GROQ_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY:-}
+  MAILER_DSN: ${MAILER_DSN:-null://null}
+  APP_SENDER_EMAIL: ${APP_SENDER_EMAIL:-}
+  APP_SENDER_NAME: Synaplan
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: synaplan
+  DB_USER: synaplan
+  DB_PASSWORD: ${SERVICE_PASSWORD_MARIADB}
+  DB_SERVER_VERSION: mariadb-12.3.2
+  REDIS_DSN: redis://redis:6379
+  LOCK_DSN: redis://redis:6379
+  REALTIME_ENABLED: "true"
+  REALTIME_API_URL: http://centrifugo:8000/api
+  REALTIME_API_KEY: ${SERVICE_PASSWORD_64_REALTIMEAPI}
+  REALTIME_TOKEN_SECRET: ${SERVICE_PASSWORD_64_REALTIMETOKEN}
+  REALTIME_PUBLIC_WS_URL: ""
+  QDRANT_URL: http://qdrant:6333
+  TIKA_BASE_URL: http://tika:9998
+  SYNAPLAN_TTS_URL: http://tts:10200
+  OLLAMA_BASE_URL: ""
+  AUTO_DOWNLOAD_MODELS: "false"
+  WHISPER_ENABLED: "false"
+  FFMPEG_BINARY: /usr/bin/ffmpeg
+  PHP_MAX_FILE_UPLOADS: "100"
+  LOG_FORMAT: json
+
+services:
+  backend:
+    image: *app-image
+    environment:
+      <<: *app-environment
+      SERVICE_URL_BACKEND_80: ${SERVICE_URL_BACKEND_80}
+      SYNAPLAN_ROLE: web
+    volumes:
+      - synaplan-uploads:/var/www/backend/var/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      centrifugo:
+        condition: service_healthy
+      tika:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 300s
+
+  worker:
+    image: *app-image
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: worker
+    volumes:
+      - synaplan-uploads:/var/www/backend/var/uploads
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  scheduler:
+    image: *app-image
+    environment:
+      <<: *app-environment
+      SYNAPLAN_ROLE: scheduler
+    volumes:
+      - synaplan-uploads:/var/www/backend/var/uploads
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/container-healthcheck"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+
+  db:
+    image: mariadb:13.0.2
+    command: --max-allowed-packet=256M --innodb-buffer-pool-size=512M
+    environment:
+      MARIADB_DATABASE: synaplan
+      MARIADB_USER: synaplan
+      MARIADB_PASSWORD: ${SERVICE_PASSWORD_MARIADB}
+      MARIADB_ROOT_PASSWORD: ${SERVICE_PASSWORD_MARIADBROOT}
+    volumes:
+      - synaplan-mariadb:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MARIADB_ROOT_PASSWORD\" --silent"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  redis:
+    image: redis:8.10-alpine
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - synaplan-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  centrifugo:
+    image: centrifugo/centrifugo:v6.10.3
+    environment:
+      CENTRIFUGO_HTTP_SERVER_ADDRESS: "0.0.0.0"
+      CENTRIFUGO_HTTP_SERVER_PORT: "8000"
+      CENTRIFUGO_LOG_LEVEL: info
+      CENTRIFUGO_ENGINE_TYPE: redis
+      CENTRIFUGO_ENGINE_REDIS_ADDRESS: redis://redis:6379/3
+      CENTRIFUGO_CLIENT_USER_CONNECTION_LIMIT: "16"
+      CENTRIFUGO_CLIENT_PING_INTERVAL: 25s
+      CENTRIFUGO_CLIENT_STALE_CLOSE_DELAY: 60s
+      CENTRIFUGO_CLIENT_ALLOWED_ORIGINS: ${SERVICE_URL_BACKEND}
+      CENTRIFUGO_CLIENT_TOKEN_HMAC_SECRET_KEY: ${SERVICE_PASSWORD_64_REALTIMETOKEN}
+      CENTRIFUGO_HTTP_API_KEY: ${SERVICE_PASSWORD_64_REALTIMEAPI}
+      CENTRIFUGO_ADMIN_ENABLED: "true"
+      CENTRIFUGO_ADMIN_PASSWORD: ${SERVICE_PASSWORD_CENTRIFUGOADMIN}
+      CENTRIFUGO_ADMIN_SECRET: ${SERVICE_PASSWORD_64_CENTRIFUGOSECRET}
+      CENTRIFUGO_PROMETHEUS_ENABLED: "true"
+      CENTRIFUGO_HEALTH_ENABLED: "true"
+      CENTRIFUGO_CHANNEL_NAMESPACES: '[{"name":"widget","presence":false,"history_size":100,"history_ttl":"10m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"widgettyping","presence":false,"history_size":0,"history_ttl":"0s","force_recovery":false,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":true,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"user","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"admin","presence":true,"history_size":50,"history_ttl":"5m","force_recovery":true,"allow_subscribe_for_anonymous":false,"allow_subscribe_for_client":false,"allow_publish_for_subscriber":false,"allow_publish_for_client":false,"allow_publish_for_anonymous":false},{"name":"system","presence":false,"history_size":10,"history_ttl":"1m","force_recovery":false,"allow_subscribe_for_anonymous":true,"allow_subscribe_for_client":true,"allow_publish_for_subscriber":false}]'
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  tika:
+    image: apache/tika:3.3.3.0
+    command: -h 0.0.0.0 -p 9998
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+
+  qdrant:
+    image: qdrant/qdrant:v1.20.1
+    volumes:
+      - synaplan-qdrant:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/6333 && printf 'GET /readyz HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  tts:
+    image: ghcr.io/metadist/synaplan-tts:2.1.1
+    environment:
+      VOICES_DIR: /voices
+      EXTRA_VOICES_DIR: /voices-extra
+      DEFAULT_VOICE: en_US-lessac-medium

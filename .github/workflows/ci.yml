@@ -2765,6 +2765,7 @@ jobs:
           - \`deploy/aws/packer/synaplan.pkr.hcl\` for the AWS Marketplace AMI
           - \`deploy/quickstart/compose.yaml\` for the one-file quickstart
           - \`deploy/quickstart/compose.lite.yaml\` for the smaller quickstart
+          - \`deploy/coolify/synaplan.yaml\` for the Coolify service file
           - \`server.json\` for the official MCP Registry
 
           Existing deployments are unaffected. They keep the version their operator
