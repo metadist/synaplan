@@ -16,6 +16,9 @@ use App\Service\Tool\Execution\GateRequest;
 use App\Service\Tool\Execution\ToolCaller;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
+use App\Service\Tool\Execution\ToolLimits;
+use App\Service\Tool\Loop\AgentToolLoop;
+use App\Service\Tool\Loop\ToolLoopLimits;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
@@ -26,16 +29,13 @@ use App\Service\Tool\ToolSource;
 /**
  * Multi-round document tool loop on ChatProviderInterface / AiFacade.
  *
- * Bounds and error-as-tool_result match GatewayToolLoop. Tools never abort
- * the loop. Intermediate provider rounds are not streamed; callers get
+ * Runs on {@see AgentToolLoop} with the default limits; the wire side is
+ * {@see DocumentToolLoopAdapter}. Tools never abort the loop. Intermediate
+ * provider rounds are not streamed; callers get
  * {@see ChatToolLoopResult} plus optional per-step callbacks.
  */
 final readonly class ChatToolLoop
 {
-    private const WALL_CLOCK_SECONDS = 240;
-    private const MAX_TOOLS_PER_TURN = 16;
-    private const MAX_RESULT_CHARS = 12000;
-
     public function __construct(
         private AiFacade $aiFacade,
         private DocumentToolRegistry $registry,
@@ -45,6 +45,7 @@ final readonly class ChatToolLoop
         private ?ToolsConfig $toolsConfig = null,
         private ?ProviderTranscriptCapture $transcripts = null,
         private ?UserRepository $users = null,
+        private AgentToolLoop $loop = new AgentToolLoop(),
     ) {
     }
 
@@ -60,99 +61,70 @@ final readonly class ChatToolLoop
         ?int $userId = null,
         ?callable $onStep = null,
     ): ChatToolLoopResult {
-        $started = time();
-        $maxIter = $this->config->maxIterations();
-        $maxOps = $this->config->maxOpsPerTurn();
-        $tools = $this->resolveTools($session->kind(), $userId);
-        $options['tools'] = $tools;
+        $options['tools'] = $this->resolveTools($session->kind(), $userId);
         $options['tool_choice'] = $options['tool_choice'] ?? 'auto';
         $options['usage_turn_id'] = $options['usage_turn_id'] ?? ('doc-loop-'.bin2hex(random_bytes(8)));
 
-        $content = '';
-        $usage = [];
-        $ops = 0;
-        $facadeMetered = false;
-        $charged = 0.0;
-        $priceKnown = true;
+        $adapter = new DocumentToolLoopAdapter(
+            $this->aiFacade,
+            $this->transcripts,
+            $messages,
+            $options,
+            $userId,
+            $this->config->maxOpsPerTurn(),
+            fn (array $call): array => $this->callTool($call, $session, $userId),
+            null !== $onStep ? $onStep(...) : null,
+        );
+        $this->loop->run(ToolLoopLimits::defaults($this->config->maxIterations()), $adapter);
 
-        for ($i = 0; $i < $maxIter; ++$i) {
-            if ((time() - $started) >= self::WALL_CLOCK_SECONDS) {
-                break;
-            }
-            $this->transcripts?->record($messages);
-            $response = $this->aiFacade->chat($messages, $userId, $options);
-            [$usage, $facadeMetered, $charged, $priceKnown] = $this->foldRound($usage, $facadeMetered, $charged, $priceKnown, $response);
-            $content = (string) ($response['content'] ?? '');
-            $calls = $response['tool_calls'] ?? [];
-            if (!is_array($calls) || [] === $calls) {
-                break;
-            }
-            $calls = array_slice($calls, 0, self::MAX_TOOLS_PER_TURN);
-            $messages[] = [
-                'role' => 'assistant',
-                'content' => $content,
-                'tool_calls' => $calls,
-            ];
-            foreach ($calls as $call) {
-                if ($ops >= $maxOps) {
-                    break 2;
-                }
-                $name = (string) ($call['function']['name'] ?? $call['name'] ?? '');
-                $id = (string) ($call['id'] ?? $name);
-                $rawArgs = $call['function']['arguments'] ?? $call['arguments'] ?? '{}';
-                $args = is_array($rawArgs) ? $rawArgs : (json_decode((string) $rawArgs, true) ?: []);
-                if (!is_array($args)) {
-                    $args = [];
-                }
-                $tool = $this->registry->get($name);
-                if (null === $tool || !in_array($session->kind(), $tool->appliesTo(), true)) {
-                    if (null !== $this->toolRegistry && null !== $this->toolsConfig && null !== $userId && $this->toolsConfig->isRegistryEnabled($userId)) {
-                        throw new ToolNotRegisteredException($name);
-                    }
-                    $result = DocumentToolResult::error('Unknown tool '.$name, 'processing.documentStepUnknownTool', ['name' => $name]);
-                    $session->record($result);
-                    $payload = $this->clamp($result->message);
-                } else {
-                    $actor = null !== $userId && null !== $this->users ? $this->users->find($userId) : null;
-                    $registered = null !== $this->toolRegistry && null !== $userId
-                        ? $this->toolRegistry->get($userId, $name, ['documentKind' => $session->kind()])
-                        : null;
-                    $outcome = $this->invoker->invoke(
-                        $registered ?? new ToolDescriptor($name, $name, '', [], SideEffect::Write, ToolSource::Document, $userId ?? 0, ToolDescriptor::POLICY_OWN_ARTEFACT),
-                        new ToolInvocation(
-                            $name,
-                            $args,
-                            new ToolCaller($userId, 'chat', document: $session),
-                            decision: $actor instanceof User ? new GateRequest($actor, PolicyContext::Interactive, 'chat:0') : null,
-                            user: $actor instanceof User ? $actor : null,
-                        ),
-                    );
-                    $result = $outcome->document ?? DocumentToolResult::error($outcome->resultText, 'processing.documentStepFailed', ['name' => $name]);
-                    $payload = $outcome->resultText;
-                }
-                ++$ops;
-                if (null !== $onStep) {
-                    $onStep($result, $ops);
-                }
-                $messages[] = [
-                    'role' => 'tool',
-                    'tool_call_id' => $id,
-                    'name' => $name,
-                    'content' => $payload,
-                ];
-            }
-        }
-
-        return new ChatToolLoopResult($content, $session, $usage, $facadeMetered, $facadeMetered ? number_format($charged, 6, '.', '') : null, $priceKnown);
+        return $adapter->result($session);
     }
 
-    private function clamp(string $payload): string
+    /**
+     * Runs one document tool call. A failure is the tool result, not a throw.
+     *
+     * @param array<string, mixed> $call
+     *
+     * @return array{0: DocumentToolResult, 1: string}
+     */
+    private function callTool(array $call, DocumentSession $session, ?int $userId): array
     {
-        if (strlen($payload) > self::MAX_RESULT_CHARS) {
-            return substr($payload, 0, self::MAX_RESULT_CHARS).'…';
+        $name = (string) ($call['function']['name'] ?? $call['name'] ?? '');
+        $rawArgs = $call['function']['arguments'] ?? $call['arguments'] ?? '{}';
+        $args = is_array($rawArgs) ? $rawArgs : (json_decode((string) $rawArgs, true) ?: []);
+        if (!is_array($args)) {
+            $args = [];
+        }
+        $tool = $this->registry->get($name);
+        if (null === $tool || !in_array($session->kind(), $tool->appliesTo(), true)) {
+            if (null !== $this->toolRegistry && null !== $this->toolsConfig && null !== $userId && $this->toolsConfig->isRegistryEnabled($userId)) {
+                throw new ToolNotRegisteredException($name);
+            }
+            $result = DocumentToolResult::error('Unknown tool '.$name, 'processing.documentStepUnknownTool', ['name' => $name]);
+            $session->record($result);
+
+            return [$result, ToolLimits::clamp($result->message)];
         }
 
-        return $payload;
+        $actor = null !== $userId && null !== $this->users ? $this->users->find($userId) : null;
+        $registered = null !== $this->toolRegistry && null !== $userId
+            ? $this->toolRegistry->get($userId, $name, ['documentKind' => $session->kind()])
+            : null;
+        $outcome = $this->invoker->invoke(
+            $registered ?? new ToolDescriptor($name, $name, '', [], SideEffect::Write, ToolSource::Document, $userId ?? 0, ToolDescriptor::POLICY_OWN_ARTEFACT),
+            new ToolInvocation(
+                $name,
+                $args,
+                new ToolCaller($userId, 'chat', document: $session),
+                decision: $actor instanceof User ? new GateRequest($actor, PolicyContext::Interactive, 'chat:0') : null,
+                user: $actor instanceof User ? $actor : null,
+            ),
+        );
+
+        return [
+            $outcome->document ?? DocumentToolResult::error($outcome->resultText, 'processing.documentStepFailed', ['name' => $name]),
+            $outcome->resultText,
+        ];
     }
 
     /**
@@ -180,47 +152,5 @@ final readonly class ChatToolLoop
         }
 
         return $tools;
-    }
-
-    /**
-     * @param array<string, mixed> $usage
-     * @param array<string, mixed> $response
-     *
-     * @return array{0: array<string, mixed>, 1: bool, 2: float, 3: bool}
-     */
-    private function foldRound(array $usage, bool $metered, float $charged, bool $priceKnown, array $response): array
-    {
-        $usage = $this->mergeUsage($usage, is_array($response['usage'] ?? null) ? $response['usage'] : []);
-        if (true === ($response['facade_metered'] ?? false)) {
-            $metered = true;
-            $roundCost = $response['facade_charged_cost'] ?? null;
-            if (is_string($roundCost) && is_numeric($roundCost)) {
-                $charged += (float) $roundCost;
-            }
-            if (false === ($response['facade_price_known'] ?? true)) {
-                $priceKnown = false;
-            }
-        }
-
-        return [$usage, $metered, $charged, $priceKnown];
-    }
-
-    /**
-     * @param array<string, mixed> $a
-     * @param array<string, mixed> $b
-     *
-     * @return array<string, mixed>
-     */
-    private function mergeUsage(array $a, array $b): array
-    {
-        foreach ($b as $key => $value) {
-            if (is_numeric($value)) {
-                $a[$key] = (int) ($a[$key] ?? 0) + (int) $value;
-            } else {
-                $a[$key] = $value;
-            }
-        }
-
-        return $a;
     }
 }

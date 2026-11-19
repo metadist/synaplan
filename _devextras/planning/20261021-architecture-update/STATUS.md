@@ -112,8 +112,47 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936) | merged (`926d7e4e3`) | Every loop and runner calls `ToolInvoker`. `tool_loops.json` matches the merged AU23 snapshot. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
 | 2026-11-04 | AU25 | [#2980](https://github.com/metadist/synaplan/pull/2980) | merged (`2026-11-04`) | The gate runs on every call. Writes are audited. The OpenAI loop and custom HTTP gain `TOOLS`. Own-file edits stay allowed |
 | 2026-11-08 | AU25b | [#3035](https://github.com/metadist/synaplan/pull/3035) | merged | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
-| 2026-11-19 | AU26 | — | ordered | The owner ordered AU26 next, with limits as profile input (`S4_one_tool_path.md`), for row 46 phase B (projects plan §0 #66, #69) |
+| 2026-11-19 | AU26 | this branch | open | One `AgentToolLoop` under document chat and both gateways; limits are `ToolLoopLimits` (profile input, `ToolLimits` the defaults). `tool_loops.json` unchanged. `GatewayToolLoop` 1,274 → 223 lines, out of the size ledger |
 | 2026-11-14 | S5 web chat | this branch | open | Pump role, run stream, watchdog relay behind `SYNAPLAN_RELAY`, live re-attach. Flags stay off. Gateways, widget, guest and incognito stay in the request. AU32 waits for the soak |
+
+## 2026-11-19 — AU26: one agent loop
+
+Started from `main` at `0869d11ca`.
+
+- `App\Service\Tool\Loop\AgentToolLoop` owns the iteration cap, the
+  deadline and the tools per turn. It reads them from `ToolLoopLimits`, which
+  the caller passes. `ToolLoopLimits::defaults($cap)` carries today's numbers
+  from `ToolLimits`; `ToolLoopLimits::unbounded()` has no cap and no
+  deadline (for the PJ5 chat profile). A turn is `stop`, `again` (one more
+  call without a tool, the web-search wrap-up) or `run` (Synaplan's calls).
+  `ToolCallPartition` splits ours from the client's. The run reports a
+  `ToolLoopStop` and the iteration count.
+- Adapters keep the wire: `DocumentToolLoopAdapter` (document chat),
+  `MessagesCompleteAdapter` and `MessagesStreamAdapter` (Messages gateway),
+  `OpenAiToolLoopAdapter` (OpenAI gateway, complete and stream differ only in
+  the model call). The Messages side split into `GatewayOwnedTools` (our
+  calls, one `tool_result` each), `MessagesTurnCollector` (one streamed
+  turn), `WebSearchWrapUp` and `MessagesToolTurn`.
+- Error-as-result stays in `ToolInvoker` and the executors (AU24): the loop
+  never sees a tool throw. A document tool the registry does not know still
+  throws `ToolNotRegisteredException` when the registry is on, as before.
+- Grep on this branch: `WALL_CLOCK_SECONDS`, `MAX_TOOLS_PER_TURN` outside
+  `ToolLimits`, `MAX_TOOL_RESULT_CHARS` and `MAX_RESULT_CHARS` are gone from
+  `backend/src`; no `for ($i = 0; $i < $max…)` loop is left in the three
+  callers. `WebFetchTool::RESULT_CHAR_BUDGET` is `ToolLimits::RESULT_CHARS`.
+- Behaviour: `tool_loops.json` and every loop test unchanged. Two
+  differences that no wire shows: the document loop's deadline is checked
+  with the same clock as the gateways (`now > start + 240` instead of whole
+  seconds `>=`), and its "Unknown tool" text is clamped by characters, not
+  bytes (the text is short).
+- Size ledger: five `GatewayToolLoop` rows removed (file, constructor,
+  `collectStreamedTurn`, `runComplete`, `runStream`). Its constructor takes
+  `GatewayOwnedDeps` (6 parameters instead of 14). `OpenAiGatewayToolLoop`
+  stays at 13 parameters.
+- Not in AU26: the run metrics of the projects plan (`STATUS` of row 46,
+  "For AU26 and AH8 to expose") need the AH8a kernel (notes, compaction,
+  ledger). AU26 hands back the stop reason and the iteration count per run;
+  the rest moves to AH8a and PJ5.
 
 ## 2026-11-08 — AU25b: tool calls in the audit log
 

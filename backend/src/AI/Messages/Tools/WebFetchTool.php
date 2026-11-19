@@ -9,6 +9,7 @@ use App\Service\Context\ContextCondenser;
 use App\Service\File\FileHelper;
 use App\Service\Research\UrlContentResult;
 use App\Service\Research\UrlContentService;
+use App\Service\Tool\Execution\ToolLimits;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -25,11 +26,11 @@ final readonly class WebFetchTool
     public const NAME = 'web_fetch';
 
     /**
-     * Same ceiling {@see GatewayToolLoop} applies when it clamps a tool
+     * Same ceiling {@see ToolLimits::clamp()} applies to every tool
      * result. Longer pages are condensed to this size first, so the clamp
      * does not cut a page in the middle of a sentence.
      */
-    public const RESULT_CHAR_BUDGET = 12000;
+    public const RESULT_CHAR_BUDGET = ToolLimits::RESULT_CHARS;
 
     public const PAGE_LIMIT_MESSAGE = 'Page limit for this message reached. Answer from the pages you already read.';
 

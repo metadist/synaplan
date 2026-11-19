@@ -29,6 +29,7 @@ dann **AH8a**, **AH8b**, dann PJ5 (siehe Abschnitt 9).
 | Loop-Vertrag (Ledger, Guard, Ende eines Laufs) | fertig, gemergt (Doku) | #3151 |
 | PJ3 Projekte mit Quellen und Instruktionen (API) | fertig, gemergt | #3152 |
 | PJ4 Projektseite, Projekte im Chats-Panel | fertig, gemergt | #3186 |
+| AU26 ein Agent-Loop (Zeile 22) | im Review, Branch `refactor/one-agent-loop` | — |
 | PJ5–PJ28 | nicht begonnen; zuerst AU26, AH8a, AH8b | — |
 
 ## 2. Bisherige Implementierungen
@@ -250,7 +251,7 @@ Ask-first laut `AGENTS.md`: Schemaänderungen, neue Abhängigkeit, Docker/CI/Bui
 neuer AI-Provider. Freigegeben sind nur die Migrationen von PJ3 und die `BRUNS`-Migration von
 AH8a (Zeile 25 §0 #9, hier §0 #63).
 
-## 9. Exakt nächster Schritt: AU26
+## 9. Exakt nächster Schritt: AU26 (umgesetzt, im Review; danach AH8a)
 
 1. `git checkout main && git pull --ff-only`, Branch `refactor/one-agent-loop`.
 2. Brief: `../20261021-architecture-update/S4_one_tool_path.md` Abschnitt AU26, Contract
@@ -258,8 +259,8 @@ AH8a (Zeile 25 §0 #9, hier §0 #63).
 3. Tests zuerst: `ToolLoopCharacterizationTest` und `tool_loops.json` bleiben unverändert;
    neuer Unit-Test: Loop ohne Iterationsgrenze und ohne Deadline endet erst bei einer
    Antwort ohne Tool.
-4. `AgentToolLoop` mit drei Adaptern (`DocumentToolLoopAdapter`, `MessagesToolLoopAdapter`,
-   `OpenAiToolLoopAdapter`); Grenzen als `ToolLoopLimits` übergeben, `ToolLimits` liefert die
+4. `AgentToolLoop` mit drei Adaptern (`DocumentToolLoopAdapter`, `MessagesCompleteAdapter`
+   und `MessagesStreamAdapter`, `OpenAiToolLoopAdapter`); Grenzen als `ToolLoopLimits` übergeben, `ToolLimits` liefert die
    heutigen Defaults; die drei Kopien der Schleife und der Konstanten sind weg;
    `GatewayToolLoop` verlässt den Size-Ledger (nur Entfernungen).
 5. Gate: `make ci-local` ungefiltert, `make test-e2e` (Chat betroffen), commit

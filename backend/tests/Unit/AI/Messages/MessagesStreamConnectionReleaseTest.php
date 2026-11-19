@@ -11,6 +11,7 @@ use App\AI\Messages\MessagesGateway;
 use App\AI\Messages\MessagesModelResolver;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnalyzeImageTool;
+use App\AI\Messages\Tools\GatewayOwnedDeps;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\NativeToolRegistry;
@@ -219,10 +220,12 @@ final class MessagesStreamConnectionReleaseTest extends TestCase
 
         return new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createStub(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($this->createStub(WebSearchTool::class), $this->createStub(WebFetchTool::class)),
-            $this->createStub(AnalyzeImageTool::class),
-            $client,
-            $servers,
+            new GatewayOwnedDeps(
+                $client,
+                $servers,
+                new NativeToolRegistry($this->createStub(WebSearchTool::class), $this->createStub(WebFetchTool::class)),
+                $this->createStub(AnalyzeImageTool::class),
+            ),
             $config,
             $rateLimits,
             new NullLogger(),

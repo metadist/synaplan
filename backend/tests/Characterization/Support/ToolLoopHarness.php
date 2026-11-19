@@ -7,6 +7,7 @@ namespace App\Tests\Characterization\Support;
 use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\CodeExecutionTool;
+use App\AI\Messages\Tools\GatewayOwnedDeps;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\NativeToolRegistry;
@@ -84,6 +85,8 @@ use App\Service\Tool\ApprovalService;
 use App\Service\Tool\ChatApprovalContinuationService;
 use App\Service\Tool\Custom\HttpToolExecutor;
 use App\Service\Tool\Exception\ToolNotRegisteredException;
+use App\Service\Tool\Execution\ToolLimits;
+use App\Service\Tool\Loop\ToolLoopLimits;
 use App\Service\Tool\Policy\ApprovalPolicy;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\Policy\PolicyOutcome;
@@ -996,28 +999,18 @@ final class ToolLoopHarness
      */
     private function bounds(): array
     {
-        $read = static function (string $class, string $name): int {
-            $constant = new \ReflectionClassConstant($class, $name);
-
-            return (int) $constant->getValue();
-        };
+        // All three adapters pass the defaults to the one loop.
+        $limits = ToolLoopLimits::defaults();
+        $bound = [
+            'wall_clock_seconds' => $limits->deadlineSeconds,
+            'max_tools_per_turn' => $limits->maxToolsPerTurn,
+            'max_result_chars' => ToolLimits::RESULT_CHARS,
+        ];
 
         return [
-            'chat' => [
-                'wall_clock_seconds' => $read(ChatToolLoop::class, 'WALL_CLOCK_SECONDS'),
-                'max_tools_per_turn' => $read(ChatToolLoop::class, 'MAX_TOOLS_PER_TURN'),
-                'max_result_chars' => $read(ChatToolLoop::class, 'MAX_RESULT_CHARS'),
-            ],
-            'gateway' => [
-                'wall_clock_seconds' => $read(GatewayToolLoop::class, 'WALL_CLOCK_SECONDS'),
-                'max_tools_per_turn' => $read(GatewayToolLoop::class, 'MAX_TOOLS_PER_TURN'),
-                'max_result_chars' => $read(GatewayToolLoop::class, 'MAX_TOOL_RESULT_CHARS'),
-            ],
-            'openai' => [
-                'wall_clock_seconds' => $read(OpenAiGatewayToolLoop::class, 'WALL_CLOCK_SECONDS'),
-                'max_tools_per_turn' => $read(OpenAiGatewayToolLoop::class, 'MAX_TOOLS_PER_TURN'),
-                'max_result_chars' => $read(OpenAiGatewayToolLoop::class, 'MAX_TOOL_RESULT_CHARS'),
-            ],
+            'chat' => $bound,
+            'gateway' => $bound,
+            'openai' => $bound,
             'note' => 'The 240s deadline is read from the wall clock, so this suite does not wait it out. The iterations case is the live cap.',
         ];
     }
@@ -1273,19 +1266,21 @@ final class ToolLoopHarness
 
         $this->gateway = new GatewayToolLoop(
             $catalogAdapter,
-            new NativeToolRegistry($webSearch, $this->double(WebFetchTool::class)),
-            $image,
-            $mcp,
-            $servers,
+            new GatewayOwnedDeps(
+                $mcp,
+                $servers,
+                new NativeToolRegistry($webSearch, $this->double(WebFetchTool::class)),
+                $image,
+                $this->gate,
+                $registry,
+                $toolsConfig,
+                $codeTool,
+                $http,
+                $customTools,
+            ),
             $messages,
             $rates,
             $logger,
-            $this->gate,
-            $registry,
-            $toolsConfig,
-            $codeTool,
-            $http,
-            $customTools,
         );
         $this->openai = new OpenAiGatewayToolLoop(
             $openaiCatalog,

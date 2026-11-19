@@ -17,6 +17,7 @@ use App\Service\Tool\Execution\ToolChannel;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolLimits;
 use App\Service\Tool\Execution\ToolOutcome;
 use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Policy\PolicyContext;
@@ -262,9 +263,7 @@ final readonly class GatewayOwnedCall
 
     private function present(string $text): string
     {
-        if (mb_strlen($text) > GatewayToolLoop::MAX_TOOL_RESULT_CHARS) {
-            $text = mb_substr($text, 0, GatewayToolLoop::MAX_TOOL_RESULT_CHARS).'…';
-        }
+        $text = ToolLimits::clamp($text);
 
         return '' !== $text ? $text : '(empty tool result)';
     }
