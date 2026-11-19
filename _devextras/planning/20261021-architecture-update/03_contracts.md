@@ -1128,7 +1128,8 @@ duration. **Never the arguments or the result.**
 `ToolLimits` as the defaults; a profile may set none, row 46 §0 #69), partition of
 Synaplan-owned and client-owned tool calls, and error-as-result; the three
 loops keep only their wire format (`DocumentToolLoopAdapter`,
-`MessagesToolLoopAdapter`, `OpenAiToolLoopAdapter`).
+`MessagesCompleteAdapter` and `MessagesStreamAdapter`, `OpenAiToolLoopAdapter`;
+built in AU26, `App\Service\Tool\Loop\`).
 
 ---
 

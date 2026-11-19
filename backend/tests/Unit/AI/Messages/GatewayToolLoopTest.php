@@ -9,6 +9,7 @@ use App\AI\Messages\Mcp\McpToolCatalogAdapter;
 use App\AI\Messages\MessagesTranslatorInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Messages\Tools\AnalyzeImageTool;
+use App\AI\Messages\Tools\GatewayOwnedDeps;
 use App\AI\Messages\Tools\GatewayToolCatalog;
 use App\AI\Messages\Tools\GatewayToolLoop;
 use App\AI\Messages\Tools\KnowledgeSearchTool;
@@ -17,6 +18,7 @@ use App\AI\Messages\Tools\ServerToolReplay;
 use App\AI\Messages\Tools\WebFetchBudget;
 use App\AI\Messages\Tools\WebFetchTool;
 use App\AI\Messages\Tools\WebSearchTool;
+use App\AI\Messages\Tools\WebSearchWrapUp;
 use App\Entity\McpServerConfig;
 use App\Entity\User;
 use App\Repository\McpServerConfigRepository;
@@ -64,10 +66,12 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $client,
-            $servers,
+            new GatewayOwnedDeps(
+                $client,
+                $servers,
+                new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $config,
             $rateLimits,
             new NullLogger(),
@@ -189,10 +193,12 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
@@ -292,10 +298,12 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $client,
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $client,
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $this->createConfiguredMock(RateLimitService::class, [
                 'checkLimit' => ['allowed' => true],
@@ -345,10 +353,12 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $this->createConfiguredMock(RateLimitService::class, [
                 'checkLimit' => ['allowed' => true],
@@ -416,15 +426,17 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+                httpExecutor: $executor,
+                customTools: $repo,
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
-            httpExecutor: $executor,
-            customTools: $repo,
         );
 
         $snapshot = [
@@ -529,15 +541,17 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($this->createMock(WebSearchTool::class), $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+                httpExecutor: $executor,
+                customTools: $repo,
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
-            httpExecutor: $executor,
-            customTools: $repo,
         );
 
         $snapshot = [
@@ -640,10 +654,12 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
@@ -751,10 +767,12 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
@@ -860,10 +878,12 @@ final class GatewayToolLoopTest extends TestCase
 
         $loop = new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($webSearch, $this->createMock(WebFetchTool::class)),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => 2]),
             $rateLimits,
             new NullLogger(),
@@ -1229,7 +1249,7 @@ final class GatewayToolLoopTest extends TestCase
             ['web_search'],
         );
 
-        $this->assertSame(GatewayToolLoop::WRAP_UP_AFTER_SEARCH, $instruction);
+        $this->assertSame(WebSearchWrapUp::WRAP_UP_AFTER_SEARCH, $instruction);
         $this->assertStringNotContainsString('one or two sentences', (string) $instruction);
     }
 
@@ -1858,10 +1878,12 @@ final class GatewayToolLoopTest extends TestCase
 
         return new GatewayToolLoop(
             new McpToolCatalogAdapter($this->createMock(\App\Service\Mcp\McpToolRegistry::class)),
-            new NativeToolRegistry($webSearch, $webFetch ?? $this->createMock(WebFetchTool::class), $knowledge),
-            $this->createMock(AnalyzeImageTool::class),
-            $this->createMock(McpClient::class),
-            $this->createMock(McpServerConfigRepository::class),
+            new GatewayOwnedDeps(
+                $this->createMock(McpClient::class),
+                $this->createMock(McpServerConfigRepository::class),
+                new NativeToolRegistry($webSearch, $webFetch ?? $this->createMock(WebFetchTool::class), $knowledge),
+                $this->createMock(AnalyzeImageTool::class),
+            ),
             $this->createConfiguredMock(MessagesGatewayConfig::class, ['mcpMaxIterations' => 8, 'webSearchMaxRounds' => $maxRounds, 'webFetchMaxPerTurn' => $webFetchMax]),
             $rateLimits,
             new NullLogger(),

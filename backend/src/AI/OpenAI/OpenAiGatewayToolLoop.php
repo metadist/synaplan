@@ -27,8 +27,12 @@ use App\Service\Tool\Execution\ToolChannel;
 use App\Service\Tool\Execution\ToolInvocation;
 use App\Service\Tool\Execution\ToolInvoker;
 use App\Service\Tool\Execution\ToolInvokerSlot;
+use App\Service\Tool\Execution\ToolLimits;
 use App\Service\Tool\Execution\ToolOutcomeKind;
 use App\Service\Tool\Execution\ToolUsageRecorder;
+use App\Service\Tool\Loop\AgentToolLoop;
+use App\Service\Tool\Loop\ToolLoopLimits;
+use App\Service\Tool\Loop\ToolLoopStop;
 use App\Service\Tool\Policy\PolicyContext;
 use App\Service\Tool\SideEffect;
 use App\Service\Tool\ToolDescriptor;
@@ -58,10 +62,6 @@ use Symfony\Contracts\Service\Attribute\Required;
  */
 final readonly class OpenAiGatewayToolLoop
 {
-    private const MAX_TOOL_RESULT_CHARS = 12000;
-    private const MAX_TOOLS_PER_TURN = 16;
-    private const WALL_CLOCK_SECONDS = 240;
-
     /**
      * Chat option the controller sets when the Synaplan Demo gate already
      * waived the shared hourly MESSAGES cap. Removed before a provider sees it.
@@ -69,6 +69,8 @@ final readonly class OpenAiGatewayToolLoop
     public const DEMO_HOURLY_CAP_WAIVED = 'demo_hourly_cap_waived';
 
     private ToolInvokerSlot $toolInvoker;
+
+    private AgentToolLoop $loop;
 
     public function __construct(
         private OpenAiGatewayToolCatalog $catalog,
@@ -86,6 +88,7 @@ final readonly class OpenAiGatewayToolLoop
         private ?CodeExecutionTool $codeExecutionTool = null,
     ) {
         $this->toolInvoker = new ToolInvokerSlot();
+        $this->loop = new AgentToolLoop();
     }
 
     #[Required]
@@ -118,108 +121,25 @@ final readonly class OpenAiGatewayToolLoop
 
         $options['tools'] = $merged;
         $options['usage_turn_id'] = $options['usage_turn_id'] ?? ('openai-loop-'.bin2hex(random_bytes(8)));
-        $maxIterations = $this->config->mcpMaxIterations($user->getId());
-        $deadline = microtime(true) + self::WALL_CLOCK_SECONDS;
         $notes = [];
-        $summedUsage = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
-        $summedCharged = 0.0;
-        $metered = false;
-        $priceKnown = true;
-        $last = [];
+        $adapter = $this->adapter(
+            $messages,
+            fn (array $turn): array => $this->aiFacade->chat($turn, $user->getId(), $options),
+            $snapshot['dispatch'],
+            $user,
+            $notes,
+            $assistant,
+            $demoHourlyCapWaived,
+        );
+        $stop = $this->loop->run(ToolLoopLimits::defaults($this->config->mcpMaxIterations($user->getId())), $adapter)->stop;
 
-        for ($i = 0; $i < $maxIterations; ++$i) {
-            if (microtime(true) > $deadline) {
-                break;
-            }
-
-            $last = $this->aiFacade->chat($messages, $user->getId(), $options);
-            $summedUsage = $this->addUsage($summedUsage, is_array($last['usage'] ?? null) ? $last['usage'] : []);
-            [$metered, $summedCharged, $priceKnown] = self::foldCharged($last, $metered, $summedCharged, $priceKnown);
-
-            $toolCalls = $this->normalizeToolCalls($last['tool_calls'] ?? []);
-            $finish = is_string($last['finish_reason'] ?? null) ? $last['finish_reason'] : '';
-            if ('tool_calls' !== $finish && [] === $toolCalls) {
-                return self::finalizeComplete($last, $summedUsage, $notes, $metered, $summedCharged, $priceKnown);
-            }
-
-            $partition = $this->partition($toolCalls, $snapshot['dispatch']);
-            if ([] !== $partition['client']) {
-                if ([] !== $partition['ours']) {
-                    $executed = $this->executeOurs(
-                        $partition['ours'],
-                        $snapshot['dispatch'],
-                        $user,
-                        $notes,
-                        $assistant,
-                        $demoHourlyCapWaived,
-                    );
-                    unset($executed);
-                }
-                $last['tool_calls'] = $partition['client'];
-                $last['content'] = '';
-                $last['finish_reason'] = 'tool_calls';
-                $last['usage'] = $summedUsage;
-                $last['loop_notes'] = $notes;
-
-                return $last;
-            }
-
-            if ([] === $partition['ours']) {
-                $last['usage'] = $summedUsage;
-                $last['loop_notes'] = $notes;
-
-                return $last;
-            }
-
-            $results = $this->executeOurs(
-                $partition['ours'],
-                $snapshot['dispatch'],
-                $user,
-                $notes,
-                $assistant,
-                $demoHourlyCapWaived,
-            );
-            $messages = $this->appendToolTurn($messages, $toolCalls, $results);
-        }
-
-        return self::finalizeComplete($last, $summedUsage, $notes, $metered, $summedCharged, $priceKnown);
-    }
-
-    /**
-     * @param array<string, mixed> $round
-     *
-     * @return array{0: bool, 1: float, 2: bool}
-     */
-    private static function foldCharged(array $round, bool $metered, float $charged, bool $priceKnown): array
-    {
-        if (true === ($round['facade_metered'] ?? false)) {
-            $metered = true;
-            if (isset($round['facade_charged_cost']) && is_numeric($round['facade_charged_cost'])) {
-                $charged += (float) $round['facade_charged_cost'];
-            }
-            if (false === ($round['facade_price_known'] ?? true)) {
-                $priceKnown = false;
-            }
-        }
-
-        return [$metered, $charged, $priceKnown];
-    }
-
-    /**
-     * @param array<string, mixed> $last
-     * @param array<string, int>   $summedUsage
-     * @param list<string>         $notes
-     *
-     * @return array<string, mixed>
-     */
-    private static function finalizeComplete(array $last, array $summedUsage, array $notes, bool $metered, float $charged, bool $priceKnown): array
-    {
-        $last['usage'] = $summedUsage;
-        $last['loop_notes'] = $notes;
-        if ($metered) {
-            $last['facade_metered'] = true;
-            $last['facade_charged_cost'] = number_format($charged, 6, '.', '');
-            $last['facade_price_known'] = $priceKnown;
+        // Every exit reports the usage and the facade charge of all rounds,
+        // not only of the last one.
+        $last = $adapter->completed($notes);
+        if (ToolLoopStop::ClientTools === $stop) {
+            $last['tool_calls'] = $adapter->clientCalls();
+            $last['content'] = '';
+            $last['finish_reason'] = 'tool_calls';
         }
 
         return $last;
@@ -267,67 +187,53 @@ final readonly class OpenAiGatewayToolLoop
         }
 
         $options['tools'] = $merged;
-        $maxIterations = $this->config->mcpMaxIterations($user->getId());
-        $deadline = microtime(true) + self::WALL_CLOCK_SECONDS;
         $notes = [];
-        $summedUsage = ['prompt_tokens' => 0, 'completion_tokens' => 0, 'total_tokens' => 0];
-        $last = [];
+        $adapter = $this->adapter(
+            $messages,
+            fn (array $turn): array => $this->aiFacade->chatStream($turn, $forwardText, $user->getId(), $options),
+            $snapshot['dispatch'],
+            $user,
+            $notes,
+            $assistant,
+            $demoHourlyCapWaived,
+        );
+        $stop = $this->loop->run(ToolLoopLimits::defaults($this->config->mcpMaxIterations($user->getId())), $adapter)->stop;
 
-        for ($i = 0; $i < $maxIterations; ++$i) {
-            if (microtime(true) > $deadline) {
-                break;
-            }
-
-            $last = $this->aiFacade->chatStream($messages, $forwardText, $user->getId(), $options);
-            $summedUsage = $this->addUsage($summedUsage, is_array($last['usage'] ?? null) ? $last['usage'] : []);
-
-            $toolCalls = $this->normalizeToolCalls($last['tool_calls'] ?? []);
-            $finish = is_string($last['finish_reason'] ?? null) ? $last['finish_reason'] : '';
-            if ('tool_calls' !== $finish && [] === $toolCalls) {
-                $callback(['type' => 'finish', 'finish_reason' => '' !== $finish ? $finish : 'stop']);
-
-                return $this->streamMetadata($last, $options, $notes, $summedUsage);
-            }
-
-            $partition = $this->partition($toolCalls, $snapshot['dispatch']);
-            if ([] !== $partition['client']) {
-                if ([] !== $partition['ours']) {
-                    $executed = $this->executeOurs(
-                        $partition['ours'],
-                        $snapshot['dispatch'],
-                        $user,
-                        $notes,
-                        $assistant,
-                        $demoHourlyCapWaived,
-                    );
-                    unset($executed);
-                }
-                $this->emitClientToolDeltas($partition['client'], $callback);
-                $callback(['type' => 'finish', 'finish_reason' => 'tool_calls']);
-
-                return $this->streamMetadata($last, $options, $notes, $summedUsage);
-            }
-
-            if ([] === $partition['ours']) {
-                $callback(['type' => 'finish', 'finish_reason' => '' !== $finish ? $finish : 'stop']);
-
-                return $this->streamMetadata($last, $options, $notes, $summedUsage);
-            }
-
-            $results = $this->executeOurs(
-                $partition['ours'],
-                $snapshot['dispatch'],
-                $user,
-                $notes,
-                $assistant,
-                $demoHourlyCapWaived,
-            );
-            $messages = $this->appendToolTurn($messages, $toolCalls, $results);
+        $finish = $adapter->finishReason();
+        if (ToolLoopStop::ClientTools === $stop) {
+            $this->emitClientToolDeltas($adapter->clientCalls(), $callback);
+            $finish = 'tool_calls';
+        } elseif ($stop->isLimit()) {
+            $finish = 'stop';
         }
+        $callback(['type' => 'finish', 'finish_reason' => '' !== $finish ? $finish : 'stop']);
 
-        $callback(['type' => 'finish', 'finish_reason' => 'stop']);
+        return $this->streamMetadata($adapter->completed($notes), $options, $notes, $adapter->usage());
+    }
 
-        return $this->streamMetadata($last, $options, $notes, $summedUsage);
+    /**
+     * @param list<array<string, mixed>>                                 $messages
+     * @param \Closure(list<array<string, mixed>>): array<string, mixed> $callModel
+     * @param array<string, DispatchEntry>                               $dispatch
+     * @param list<string>                                               $notes
+     */
+    private function adapter(
+        array $messages,
+        \Closure $callModel,
+        array $dispatch,
+        User $user,
+        array &$notes,
+        ?RuntimeProfile $assistant,
+        bool $demoHourlyCapWaived,
+    ): OpenAiToolLoopAdapter {
+        return new OpenAiToolLoopAdapter(
+            $messages,
+            $callModel,
+            fn (string $name): bool => isset($dispatch[$name]) || $this->mcpCatalogAdapter->isOurs($name),
+            function (array $ours) use ($dispatch, $user, &$notes, $assistant, $demoHourlyCapWaived): array {
+                return $this->executeOurs($ours, $dispatch, $user, $notes, $assistant, $demoHourlyCapWaived);
+            },
+        );
     }
 
     /**
@@ -395,28 +301,6 @@ final readonly class OpenAiGatewayToolLoop
     /**
      * @param list<array<string, mixed>>   $toolCalls
      * @param array<string, DispatchEntry> $dispatch
-     *
-     * @return array{ours: list<array<string, mixed>>, client: list<array<string, mixed>>}
-     */
-    private function partition(array $toolCalls, array $dispatch): array
-    {
-        $ours = [];
-        $client = [];
-        foreach ($toolCalls as $call) {
-            $name = (string) ($call['function']['name'] ?? '');
-            if (isset($dispatch[$name]) || $this->mcpCatalogAdapter->isOurs($name)) {
-                $ours[] = $call;
-            } else {
-                $client[] = $call;
-            }
-        }
-
-        return ['ours' => $ours, 'client' => $client];
-    }
-
-    /**
-     * @param list<array<string, mixed>>   $toolCalls
-     * @param array<string, DispatchEntry> $dispatch
      * @param list<string>                 $notes
      *
      * @return list<array<string, mixed>>
@@ -429,10 +313,6 @@ final readonly class OpenAiGatewayToolLoop
         ?RuntimeProfile $assistant = null,
         bool $demoHourlyCapWaived = false,
     ): array {
-        if (count($toolCalls) > self::MAX_TOOLS_PER_TURN) {
-            $toolCalls = array_slice($toolCalls, 0, self::MAX_TOOLS_PER_TURN);
-        }
-
         $results = [];
         foreach ($toolCalls as $call) {
             $id = (string) ($call['id'] ?? '');
@@ -677,27 +557,6 @@ final readonly class OpenAiGatewayToolLoop
     }
 
     /**
-     * @param list<array<string, mixed>> $messages
-     * @param list<array<string, mixed>> $toolCalls
-     * @param list<array<string, mixed>> $results
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function appendToolTurn(array $messages, array $toolCalls, array $results): array
-    {
-        $messages[] = [
-            'role' => 'assistant',
-            'content' => null,
-            'tool_calls' => $toolCalls,
-        ];
-        foreach ($results as $result) {
-            $messages[] = $result;
-        }
-
-        return $messages;
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function toolMessage(string $toolCallId, string $content): array
@@ -727,43 +586,8 @@ final readonly class OpenAiGatewayToolLoop
 
     private function clamp(string $text): string
     {
-        if (mb_strlen($text) > self::MAX_TOOL_RESULT_CHARS) {
-            return mb_substr($text, 0, self::MAX_TOOL_RESULT_CHARS).'…';
-        }
+        $text = ToolLimits::clamp($text);
 
         return '' !== $text ? $text : '(empty tool result)';
-    }
-
-    /**
-     * @return list<array<string, mixed>>
-     */
-    private function normalizeToolCalls(mixed $raw): array
-    {
-        if (!is_array($raw)) {
-            return [];
-        }
-        $out = [];
-        foreach ($raw as $call) {
-            if (is_array($call)) {
-                $out[] = $call;
-            }
-        }
-
-        return $out;
-    }
-
-    /**
-     * @param array{prompt_tokens: int, completion_tokens: int, total_tokens: int} $sum
-     * @param array<string, mixed>                                                 $usage
-     *
-     * @return array{prompt_tokens: int, completion_tokens: int, total_tokens: int}
-     */
-    private function addUsage(array $sum, array $usage): array
-    {
-        $sum['prompt_tokens'] += (int) ($usage['prompt_tokens'] ?? 0);
-        $sum['completion_tokens'] += (int) ($usage['completion_tokens'] ?? 0);
-        $sum['total_tokens'] += (int) ($usage['total_tokens'] ?? 0);
-
-        return $sum;
     }
 }

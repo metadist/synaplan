@@ -14,7 +14,6 @@
     },
     "fileLines": {
         "src/AI/Messages/MessagesGateway.php": 1025,
-        "src/AI/Messages/Tools/GatewayToolLoop.php": 1431,
         "src/AI/Messages/Translator/OpenAiMessagesTranslator.php": 1499,
         "src/AI/Provider/AnthropicProvider.php": 1731,
         "src/AI/Provider/HiggsfieldProvider.php": 1100,
@@ -65,7 +64,6 @@
         "src/AI/Health/ModelHealthEvaluator.php::ModelHealthEvaluator": 11,
         "src/AI/Health/ModelHealthVerdict.php::ModelHealthVerdict": 13,
         "src/AI/Messages/MessagesGateway.php::MessagesGateway": 21,
-        "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop": 14,
         "src/AI/OpenAI/OpenAiGatewayToolLoop.php::OpenAiGatewayToolLoop": 13,
         "src/AI/Service/AiFacade.php::AiFacade": 16,
         "src/AI/Service/ProviderRegistry.php::ProviderRegistry": 12,
@@ -128,9 +126,6 @@
     "methodLines": {
         "src/AI/Health/ModelHealthOverview.php::ModelHealthOverview::build": 131,
         "src/AI/Messages/MessagesGateway.php::MessagesGateway::prepare": 284,
-        "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::collectStreamedTurn": 191,
-        "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::runComplete": 148,
-        "src/AI/Messages/Tools/GatewayToolLoop.php::GatewayToolLoop::runStream": 116,
         "src/AI/Messages/Translator/GeminiMessagesTranslator.php::GeminiMessagesTranslator::streamGeminiToAnthropic": 175,
         "src/AI/Messages/Translator/OpenAiMessagesTranslator.php::OpenAiMessagesTranslator::streamOpenAiToAnthropic": 183,
         "src/AI/Messages/Translator/OpenAiMessagesTranslator.php::OpenAiMessagesTranslator::streamResponsesToAnthropic": 217,
