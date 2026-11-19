@@ -155,10 +155,12 @@ class MistralProviderTest extends TestCase
     {
         $off = $this->buildChatOptions([], ['model' => 'mistral-large-4', 'reasoning' => false], false);
         $on = $this->buildChatOptions([], ['model' => 'mistral-large-4', 'reasoning' => true], false);
-        $large3 = $this->buildChatOptions([], ['model' => 'mistral-large-latest', 'reasoning' => false], false);
+        $alias = $this->buildChatOptions([], ['model' => 'mistral-large-latest', 'reasoning' => false], false);
+        $large3 = $this->buildChatOptions([], ['model' => 'mistral-large-2512', 'reasoning' => false], false);
 
         $this->assertSame('none', $off['reasoning_effort']);
         $this->assertArrayNotHasKey('reasoning_effort', $on);
+        $this->assertSame('none', $alias['reasoning_effort']);
         $this->assertArrayNotHasKey('reasoning_effort', $large3);
     }
 

@@ -581,8 +581,28 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * Mistral Large 4 is a pinned id. `mistral-large-latest` still resolves to
-     * Large 3, and the catalog price is the published GA rate ($0.70 / $2.10).
+     * Mistral Large 3 stays on its own id. The floating alias now serves
+     * Large 4, which has its own rows at the published GA rate.
+     */
+    public function testMistralLarge3IsPinnedOffTheMovingAlias(): void
+    {
+        $rows = ModelCatalog::find('mistral:mistral-large-2512');
+
+        $this->assertCount(1, $rows);
+        $row = $rows[0];
+        $this->assertSame(245, $row['id']);
+        $this->assertSame('Mistral Large 3', $row['name']);
+        $this->assertSame('chat', $row['tag']);
+        $this->assertSame('mistral-large-2512', $row['providerId']);
+        $this->assertSame('mistral-large-2512', $row['json']['params']['model'] ?? null);
+        $this->assertEqualsWithDelta(0.50, (float) $row['priceIn'], 1e-9);
+        $this->assertEqualsWithDelta(1.50, (float) $row['priceOut'], 1e-9);
+        $this->assertEqualsWithDelta(0.05, (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+        $this->assertNull(ModelCatalog::findBidByKey('mistral:mistral-large-latest:chat'));
+    }
+
+    /**
+     * Mistral Large 4 is a pinned id at the published GA rate ($0.70 / $2.10).
      */
     public function testMistralLarge4IsPinnedToItsOwnIdAndPublishedPrice(): void
     {
@@ -591,7 +611,7 @@ class ModelCatalogTest extends TestCase
         $this->assertCount(2, $rows, 'Expected mistral-large-4 chat + vision variants');
         $this->assertSame(['chat', 'pic2text'], array_column($rows, 'tag'));
         $this->assertNotSame(
-            ModelCatalog::findBidByKey('mistral:mistral-large-latest:chat'),
+            ModelCatalog::findBidByKey('mistral:mistral-large-2512:chat'),
             ModelCatalog::findBidByKey('mistral:mistral-large-4:chat'),
         );
 
@@ -740,7 +760,7 @@ class ModelCatalogTest extends TestCase
             'gemini-3.5-flash' => ['google:gemini-3.5-flash', 0.15],
             'gemini-3-flash-preview' => ['google:gemini-3-flash-preview', 0.05],
             'mistral-medium-3.5' => ['mistral:mistral-medium-latest', 0.15],
-            'mistral-large-3' => ['mistral:mistral-large-latest', 0.05],
+            'mistral-large-3' => ['mistral:mistral-large-2512', 0.05],
             'mistral-large-4' => ['mistral:mistral-large-4', 0.07],
             'gemini-3.8-flash' => ['google:gemini-3.8-flash', 0.075],
             'gemini-4-argon' => ['google:gemini-4-argon', 0.10],
