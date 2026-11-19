@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import ResearchAdminTab from '@/components/admin/research/ResearchAdminTab.vue'
+import { useNotification } from '@/composables/useNotification'
 import { ApiError } from '@/services/api/httpClient'
 
 const fetchResearchAdmin = vi.fn()
@@ -37,6 +38,7 @@ const refusal = (status: number, code: string, field: string | null = null) =>
 describe('ResearchAdminTab', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    useNotification().notifications.value.splice(0)
     fetchResearchAdmin.mockReset()
     saveResearchAdmin.mockReset()
     startResearchSample.mockReset()
@@ -76,9 +78,24 @@ describe('ResearchAdminTab', () => {
     const status = wrapper.get('[data-testid="research-admin-status"]').text()
     expect(status).toContain('This switch is set by the server')
     expect(status).not.toContain('English only')
-    expect(
-      wrapper.get('[data-testid="research-admin-save"]').element.parentElement?.textContent
-    ).not.toContain('This switch is set by the server')
+    expect(wrapper.find('[data-testid="research-admin-save-error"]').exists()).toBe(false)
+    expect(useNotification().notifications.value).toHaveLength(0)
+  })
+
+  it('shows a save bar as soon as a limit changes, and discard puts it back', async () => {
+    const wrapper = mount(ResearchAdminTab)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
+    const input = wrapper.get('[data-testid="research-admin-standard-costCap"]')
+    await input.setValue('2.5')
+
+    expect(wrapper.get('[data-testid="btn-unsaved-save"]').text()).toContain('Save Changes')
+    await wrapper.get('[data-testid="btn-unsaved-discard"]').trigger('click')
+
+    expect((input.element as HTMLInputElement).value).toBe('1')
+    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
+    expect(saveResearchAdmin).not.toHaveBeenCalled()
   })
 
   it('refuses an out-of-range value without calling the server', async () => {
@@ -86,14 +103,27 @@ describe('ResearchAdminTab', () => {
     await flushPromises()
 
     await wrapper.get('[data-testid="research-admin-standard-searches"]').setValue('500')
-    await wrapper.get('[data-testid="research-admin-save"]').trigger('click')
+    await wrapper.get('[data-testid="btn-unsaved-save"]').trigger('click')
     await flushPromises()
 
     expect(saveResearchAdmin).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('Standard · Searches is outside its allowed range')
+    expect(wrapper.get('[data-testid="research-admin-save-error"]').text()).toContain(
+      'Standard · Searches is outside its allowed range'
+    )
+    expect(useNotification().notifications.value.at(-1)).toMatchObject({
+      type: 'error',
+      message: 'Standard · Searches is outside its allowed range. Nothing was saved.',
+    })
   })
 
   it('sends a model only when it changed', async () => {
+    fetchResearchAdmin.mockResolvedValue({
+      ...off(),
+      budgets: {
+        ...off().budgets,
+        auto: { searches: 10, sources: 15, minutes: 6, costCap: 1 },
+      },
+    })
     saveResearchAdmin.mockImplementation(async (body: Record<string, unknown>) => ({
       ...off(),
       budgets: body.budgets,
@@ -101,15 +131,22 @@ describe('ResearchAdminTab', () => {
     const wrapper = mount(ResearchAdminTab)
     await flushPromises()
 
-    expect(wrapper.get('[data-testid="research-admin-save"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
     await wrapper.get('[data-testid="research-admin-quick-costCap"]').setValue('0.2')
-    await wrapper.get('[data-testid="research-admin-save"]').trigger('click')
+    await wrapper.get('[data-testid="btn-unsaved-save"]').trigger('click')
     await flushPromises()
 
-    const body = saveResearchAdmin.mock.calls[0]?.[0] as Record<string, unknown>
+    const body = saveResearchAdmin.mock.calls[0]?.[0] as {
+      budgets: Record<string, unknown>
+    }
     expect(body).not.toHaveProperty('readingModelId')
     expect(body).not.toHaveProperty('checkingModelId')
-    expect(wrapper.text()).toContain('Saved')
+    expect(body.budgets).not.toHaveProperty('auto')
+    expect(wrapper.find('[data-testid="section-unsaved-bar"]').exists()).toBe(false)
+    expect(useNotification().notifications.value.at(-1)).toMatchObject({
+      type: 'success',
+      message: 'Changes saved successfully',
+    })
   })
 
   it('does not start a sample until the saved cost is accepted', async () => {
