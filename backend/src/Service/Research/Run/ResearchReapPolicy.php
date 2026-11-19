@@ -15,6 +15,12 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class ResearchReapPolicy implements RunReapPolicy
 {
+    /** An open question is skipped after this long, so the run carries on without the answer. */
+    public const ANSWER_WAIT_SECONDS = 600;
+
+    /** A plan nobody approved ends the run after this long. */
+    public const PLAN_WAIT_SECONDS = 86400;
+
     /** The first interrupt writes the report; a later one only closes the run, so it is paid for once. */
     private const WRITING_ATTEMPT = 2;
 
@@ -42,10 +48,10 @@ final readonly class ResearchReapPolicy implements RunReapPolicy
             return $this->writeAfterWait($state);
         }
         if (ResearchStatus::WaitingAnswer === $state->status) {
-            return $ageSeconds >= ResearchReaper::ANSWER_WAIT_SECONDS && $this->continueAfterQuestion($state);
+            return $ageSeconds >= self::ANSWER_WAIT_SECONDS && $this->continueAfterQuestion($state);
         }
         if (ResearchStatus::WaitingPlan === $state->status) {
-            return $ageSeconds >= ResearchReaper::PLAN_WAIT_SECONDS && $this->stopWaiting($state);
+            return $ageSeconds >= self::PLAN_WAIT_SECONDS && $this->stopWaiting($state);
         }
 
         return false;

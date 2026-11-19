@@ -124,7 +124,7 @@ LUA;
         if (is_int($result)) {
             return 1 === $result;
         }
-        if ((is_string($result) || is_object($result)) && is_numeric((string) $result)) {
+        if ((is_string($result) || $result instanceof \Stringable) && is_numeric((string) $result)) {
             return 1 === (int) (string) $result;
         }
 

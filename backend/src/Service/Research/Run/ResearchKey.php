@@ -16,9 +16,11 @@ final class ResearchKey
     public const CLAIMS = 'research:claims';
     public const ACTIVE = 'research:active';
 
+    private static ?RunKeyspace $keyspace = null;
+
     public static function keyspace(): RunKeyspace
     {
-        return new RunKeyspace('research', ResearchIds::PATTERN, ['state' => 'run', 'cancel' => 'stop']);
+        return self::$keyspace ??= new RunKeyspace('research', ResearchIds::PATTERN, ['state' => 'run', 'cancel' => 'stop']);
     }
 
     public static function run(string $id): string

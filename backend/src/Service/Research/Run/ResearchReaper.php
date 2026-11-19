@@ -15,8 +15,8 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class ResearchReaper
 {
-    public const ANSWER_WAIT_SECONDS = 600;
-    public const PLAN_WAIT_SECONDS = 86400;
+    public const ANSWER_WAIT_SECONDS = ResearchReapPolicy::ANSWER_WAIT_SECONDS;
+    public const PLAN_WAIT_SECONDS = ResearchReapPolicy::PLAN_WAIT_SECONDS;
     public const STALL_SECONDS = RunReaper::STALL_SECONDS;
 
     private RunReaper $reaper;
