@@ -108,6 +108,7 @@
           :chats="pinnedChats"
           list-test-id="list-chat-v2-pinned"
           :allow-move="projectsStore.loaded && projectsStore.available"
+          :project-name-of="projectNameOf"
           :active-chat-id="highlightedChatId"
           :title-of="displayTitle"
           :time-of="(chat) => formatTimestamp(chat.updatedAt || chat.createdAt)"
@@ -161,6 +162,7 @@
           :answer-ready="isAnswerReady"
           :group-of="dateGroupLabel"
           :allow-move="projectsStore.loaded && projectsStore.available"
+          :project-name-of="projectNameOf"
           @select="selectChat"
           @share="shareChat"
           @rename="renameChat"
@@ -279,6 +281,9 @@ const props = withDefaults(defineProps<{ chatHighlighted?: boolean }>(), { chatH
 
 /** The open chat is only marked while the chat itself is on screen, not on a project page. */
 const highlightedChatId = computed(() => (props.chatHighlighted ? chatsStore.activeChatId : null))
+
+const projectNameOf = (chat: { id: number }): string | undefined =>
+  projectsStore.available ? projectsStore.projectOfChat(chat.id)?.name : undefined
 
 const sectionToggleClass =
   'sidebar-section-label mb-0.5 flex w-full items-center gap-1.5 bg-transparent px-4 py-1 text-left text-[15px] font-semibold hover:bg-transparent focus:bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--brand)]'

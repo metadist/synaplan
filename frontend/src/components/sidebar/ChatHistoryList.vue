@@ -156,6 +156,16 @@
         <span class="min-w-0 break-words">{{ originOf(previewChat).label }}</span>
       </p>
       <p
+        v-if="projectNameOf?.(previewChat)"
+        class="mt-1 flex items-center gap-1.5 text-[13px] txt-secondary"
+        data-testid="text-chat-preview-project"
+      >
+        <FolderIcon class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+        <span class="min-w-0 break-words">{{
+          $t('projects.composer.inProject', { name: projectNameOf(previewChat) })
+        }}</span>
+      </p>
+      <p
         v-if="previewChat.incoming && (previewChat.ownerName || previewChat.permission)"
         class="mt-1 text-[13px] txt-secondary break-words"
         data-testid="text-chat-preview-access"
@@ -254,7 +264,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { EllipsisHorizontalIcon } from '@heroicons/vue/24/outline'
+import { EllipsisHorizontalIcon, FolderIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import { triggerHapticImpact } from '@/services/api/nativeHaptics'
 import { canExportChats, canShareChats } from '@/composables/useChatWelcome'
@@ -284,6 +294,8 @@ const props = defineProps<{
   groupOf?: (chat: HistoryChat) => string | null
   /** Offer "Move to project" in the row menu (own chats only). */
   allowMove?: boolean
+  /** Name of the project a chat belongs to, shown in the hover preview. */
+  projectNameOf?: (chat: HistoryChat) => string | undefined
 }>()
 
 const rowsTestId = computed(() => props.listTestId ?? 'list-chat-manager-rows')
@@ -479,7 +491,7 @@ const placePreview = (chat: HistoryChat, row: HTMLElement) => {
     left = Math.max(PREVIEW_GAP, rect.left - PREVIEW_WIDTH - PREVIEW_GAP)
   }
   let top = rect.top
-  const estimatedHeight = 96
+  const estimatedHeight = props.projectNameOf?.(chat) ? 124 : 96
   if (top + estimatedHeight > window.innerHeight - PREVIEW_GAP) {
     top = Math.max(PREVIEW_GAP, window.innerHeight - estimatedHeight - PREVIEW_GAP)
   }
