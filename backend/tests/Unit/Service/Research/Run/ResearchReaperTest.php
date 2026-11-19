@@ -99,7 +99,7 @@ final class ResearchReaperTest extends ResearchUnitCase
         self::assertSame(ResearchOutcome::FAILED_INTERRUPTED, $this->store->load($broken->ref->id)?->outcome?->code);
         self::assertSame(ResearchOutcome::STOPPED_WAITING, $this->store->load($waiting->ref->id)?->outcome?->code);
         self::assertSame(1, $counts['interrupted']);
-        self::assertSame(1, $counts['stopped']);
+        self::assertSame(1, $counts['waited']);
     }
 
     public function testAStalledRunIsQueuedAgainOnceThenClosed(): void
@@ -222,7 +222,7 @@ final class ResearchReaperTest extends ResearchUnitCase
 
         $counts = $this->reaper(new ScriptedResearchUnits(new StageResult('deliver')))->reap();
 
-        self::assertSame(1, $counts['continued']);
+        self::assertSame(1, $counts['waited']);
         self::assertSame(ResearchStatus::Writing, $this->store->load($waiting->ref->id)?->status);
         self::assertSame(ResearchUnitPlan::WRITE, $this->bus->sent[0]['unit'] ?? null);
     }

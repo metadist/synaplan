@@ -13,6 +13,12 @@ use App\Service\Run\RunStateCodec;
  */
 final class TestRunState implements RunState, RunStateCodec
 {
+    /** A stored value the codec does not read as a run. */
+    public const GONE = 'gone';
+
+    /** The expiry the store last wrote with this state; null when it has none. */
+    public ?int $expiresAt = null;
+
     /**
      * @param list<string> $done
      */
@@ -52,7 +58,7 @@ final class TestRunState implements RunState, RunStateCodec
         return $this->updated;
     }
 
-    public function encode(int $expectedSeq, int $checkpointSeq, int $now): string
+    public function stored(int $expectedSeq, int $checkpointSeq, int $now, ?int $expiresAt): string
     {
         return json_encode([
             'id' => $this->id,
@@ -65,15 +71,20 @@ final class TestRunState implements RunState, RunStateCodec
         ], \JSON_THROW_ON_ERROR);
     }
 
-    public function checkpointed(int $expectedSeq, int $checkpointSeq, int $now): void
+    public function checkpointed(int $expectedSeq, int $checkpointSeq, int $now, ?int $expiresAt): void
     {
         $this->expected = $expectedSeq;
         $this->checkpoint = $checkpointSeq;
         $this->updated = $now;
+        $this->expiresAt = $expiresAt;
     }
 
-    public function decode(string $stored): RunState
+    public function decode(string $stored): ?RunState
     {
+        // What an older or foreign writer left is no run of this kind.
+        if (self::GONE === $stored) {
+            return null;
+        }
         $row = json_decode($stored, true, 8, \JSON_THROW_ON_ERROR);
         if (!\is_array($row) || !\is_string($row['id'] ?? null)) {
             throw new \UnexpectedValueException('Not a test run.');

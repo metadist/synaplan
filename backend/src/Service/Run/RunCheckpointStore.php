@@ -11,9 +11,10 @@ use Psr\Clock\ClockInterface;
  * A unit writes through checkpoint() while it holds the claim; open() is for a
  * run no worker has claimed yet.
  *
- * A checkpoint has no expiry while the run is not terminal, so a run waiting
- * for a person keeps its state until its own deadline ends it. A terminal run
- * keeps its keys for the retention window, then Redis drops them.
+ * By default a checkpoint has no expiry while the run is not terminal, so a
+ * run waiting for a person keeps its state until its own deadline ends it. A
+ * kind may keep its own sliding expiry instead ($activeTtlHours). A terminal
+ * run keeps its keys for the retention window, then Redis drops them.
  */
 final readonly class RunCheckpointStore
 {
@@ -25,9 +26,14 @@ final readonly class RunCheckpointStore
         private RunStateCodec $codec,
         private ClockInterface $clock,
         private int $retentionHours = self::DEFAULT_RETENTION_HOURS,
+        private ?int $activeTtlHours = null,
+        private ?\Closure $written = null,
     ) {
         if ($retentionHours < 1 || $retentionHours > 168) {
             throw new \InvalidArgumentException('A finished run is kept between 1 and 168 hours.');
+        }
+        if (null !== $activeTtlHours && ($activeTtlHours < 1 || $activeTtlHours > 168)) {
+            throw new \InvalidArgumentException('A running run is kept between 1 and 168 hours.');
         }
     }
 
@@ -41,7 +47,8 @@ final readonly class RunCheckpointStore
     {
         $runId = $state->runId();
         $now = $this->now();
-        $this->keys->set($this->keyspace->state($runId), $state->encode($state->expectedSeq(), $state->checkpointSeq(), $now), $this->ttlFor($state));
+        $ttl = $this->ttlFor($state);
+        $this->keys->set($this->keyspace->state($runId), $state->stored($state->expectedSeq(), $state->checkpointSeq(), $now, self::expiresAt($now, $ttl)), $ttl);
         $this->syncActive($state);
     }
 
@@ -52,6 +59,9 @@ final readonly class RunCheckpointStore
             return null;
         }
         $state = $this->codec->decode($json);
+        if (null === $state) {
+            return null;
+        }
         if ($state->runId() !== $runId) {
             throw new \UnexpectedValueException('A stored run does not match its key.');
         }
@@ -101,18 +111,20 @@ final readonly class RunCheckpointStore
         $runId = $state->runId();
         $seq = $state->expectedSeq();
         $now = $this->now();
+        $ttl = $this->ttlFor($state);
+        $expiresAt = self::expiresAt($now, $ttl);
         $written = $this->keys->compareAndSet(
             $this->keyspace->claim($runId, $seq),
             $token,
             $this->keyspace->state($runId),
-            $state->encode($seq + 1, $seq, $now),
-            $this->ttlFor($state),
+            $state->stored($seq + 1, $seq, $now, $expiresAt),
+            $ttl,
         );
         if (!$written) {
             return false;
         }
 
-        $state->checkpointed($seq + 1, $seq, $now);
+        $state->checkpointed($seq + 1, $seq, $now, $expiresAt);
         $this->keys->zRem($this->keyspace->claims(), $this->keyspace->claimMember($runId, $seq, $token));
         $this->syncActive($state);
 
@@ -261,10 +273,12 @@ final readonly class RunCheckpointStore
             $this->keys->removeMember($this->keyspace->active(), $state->runId());
             $this->keys->expire($this->keyspace->events($state->runId()), $this->retentionSeconds());
             $this->keys->expire($this->keyspace->eventSeq($state->runId()), $this->retentionSeconds());
-
-            return;
+        } else {
+            $this->keys->addMember($this->keyspace->active(), $state->runId());
         }
-        $this->keys->addMember($this->keyspace->active(), $state->runId());
+        if (null !== $this->written) {
+            ($this->written)($state);
+        }
     }
 
     /**
@@ -280,10 +294,19 @@ final readonly class RunCheckpointStore
         return ['count' => (int) $match[2], 'at' => (int) $match[3]];
     }
 
-    /** No expiry while work is left; the retention window once the run is over. */
+    /** The kind's running expiry (none by default) while work is left; the retention window once the run is over. */
     private function ttlFor(RunState $state): ?int
     {
-        return $state->isTerminal() ? $this->retentionSeconds() : null;
+        if ($state->isTerminal()) {
+            return $this->retentionSeconds();
+        }
+
+        return null === $this->activeTtlHours ? null : $this->activeTtlHours * 3600;
+    }
+
+    private static function expiresAt(int $now, ?int $ttl): ?int
+    {
+        return null === $ttl ? null : $now + $ttl;
     }
 
     private static function assertLease(int $leaseMs): void

@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run;
 
 use App\AI\StructuredOutput\StructuredOutputSchema;
-use App\Service\Research\Run\ResearchLease;
 use App\Service\Research\Run\Stage\ResearchModelCaller;
 use App\Service\Research\Run\Stage\ResearchModelReply;
+use App\Service\Run\RunClaim;
 
 /** Plays recorded model answers in order and keeps the prompts it was given. */
 final class ReplayCaller implements ResearchModelCaller
@@ -25,7 +25,7 @@ final class ReplayCaller implements ResearchModelCaller
         string $user,
         ?StructuredOutputSchema $schema,
         ?\Closure $onText = null,
-        ?ResearchLease $lease = null,
+        ?RunClaim $lease = null,
     ): ResearchModelReply {
         $this->seen[] = ['system' => $system, 'user' => $user];
         $next = array_shift($this->script);

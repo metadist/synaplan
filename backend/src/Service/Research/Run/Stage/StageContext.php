@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Service\Research\Run\Stage;
 
 use App\Service\Research\Run\ResearchEventLog;
-use App\Service\Research\Run\ResearchLease;
 use App\Service\Research\Run\ResearchRoles;
 use App\Service\Research\Run\ResearchRunState;
+use App\Service\Run\RunClaim;
 
 /** What one stage can see. The run, the budget and the ledger live on the state. */
 final class StageContext
@@ -27,7 +27,7 @@ final class StageContext
     }
 
     /** Set by the worker for the step it claimed. Null in a test that does not hold a lease. */
-    public ?ResearchLease $lease = null;
+    public ?RunClaim $lease = null;
 
     /** The person switched the web on. A run that names only files does not search the web. */
     public function webOn(): bool

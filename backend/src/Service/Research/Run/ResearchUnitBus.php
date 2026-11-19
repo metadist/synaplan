@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
-interface ResearchUnitBus
+use App\Service\Run\RunUnitBus;
+
+/** Queues the next research step; the run kernel's bus for research runs. */
+interface ResearchUnitBus extends RunUnitBus
 {
-    public function dispatch(string $runId, string $unit, int $seq, int $delayMs): void;
 }

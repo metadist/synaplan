@@ -4,12 +4,19 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
+use App\Service\Run\RunCheckpointStore;
+use App\Service\Run\RunClaim;
+use App\Service\Run\RunState;
 use Psr\Clock\ClockInterface;
 
 /**
  * Redis state for one research run: the ledger, the checkpoint, and the claim
  * that fences it. A unit writes through `checkpoint` while it holds the claim.
  * `save` is for opening a run, before any worker has claimed it.
+ *
+ * The claim, the checkpoint, the stop flag and the reap marks are the run
+ * kernel's (`runs()`); this class adds what only research keeps: the owner
+ * and per-person indexes, source texts, write-now and the delivery mark.
  *
  * Every key of a run expires with the run, so deleting a person through the
  * owner index reaches all of them.
@@ -21,6 +28,8 @@ final readonly class ResearchStateStore
     /** A reader never sees more than its context window, so more text is only memory. */
     public const MAX_SOURCE_BYTES = 4 * 1024 * 1024;
 
+    private RunCheckpointStore $runs;
+
     public function __construct(
         private ResearchRunKeys $keys,
         private ClockInterface $clock,
@@ -29,6 +38,26 @@ final readonly class ResearchStateStore
         if ($ttlHours < 1 || $ttlHours > 168) {
             throw new \InvalidArgumentException('Research state is kept between 1 and 168 hours.');
         }
+        // A research run keeps its sliding expiry while it runs, as it always has.
+        $this->runs = new RunCheckpointStore(
+            $keys,
+            ResearchKey::keyspace(),
+            new ResearchRunCodec(),
+            $clock,
+            $ttlHours,
+            $ttlHours,
+            function (RunState $state): void {
+                if ($state instanceof ResearchRunState) {
+                    $this->syncMembership($state);
+                }
+            },
+        );
+    }
+
+    /** The kernel's view of the same runs, for the unit worker and the reaper. */
+    public function runs(): RunCheckpointStore
+    {
+        return $this->runs;
     }
 
     public function save(ResearchRunState $state): void
@@ -65,24 +94,9 @@ final readonly class ResearchStateStore
     public function claim(string $runId, int $seq, int $leaseMs): ?string
     {
         ResearchIds::assert($runId);
-        if ($seq < 1) {
-            throw new \InvalidArgumentException('A research unit needs a sequence number.');
-        }
-        if ($leaseMs < 1) {
-            throw new \InvalidArgumentException('A research claim needs a lease.');
-        }
+        self::assertUnit($seq, $leaseMs);
 
-        $token = bin2hex(random_bytes(16));
-        $claimed = $this->keys->claim(
-            ResearchKey::claim($runId, $seq),
-            $token,
-            $leaseMs,
-            ResearchKey::CLAIMS,
-            $this->nowMs() + $leaseMs,
-            ResearchKey::claimMember($runId, $seq, $token),
-        );
-
-        return $claimed ? $token : null;
+        return $this->runs->claim($runId, $seq, $leaseMs);
     }
 
     /**
@@ -92,21 +106,9 @@ final readonly class ResearchStateStore
     public function renew(string $runId, int $seq, string $token, int $leaseMs): bool
     {
         ResearchIds::assert($runId);
-        if ($seq < 1) {
-            throw new \InvalidArgumentException('A research unit needs a sequence number.');
-        }
-        if ($leaseMs < 1) {
-            throw new \InvalidArgumentException('A research claim needs a lease.');
-        }
+        self::assertUnit($seq, $leaseMs);
 
-        return $this->keys->renew(
-            ResearchKey::claim($runId, $seq),
-            $token,
-            $leaseMs,
-            ResearchKey::CLAIMS,
-            $this->nowMs() + $leaseMs,
-            ResearchKey::claimMember($runId, $seq, $token),
-        );
+        return $this->runs->renew($runId, $seq, $token, $leaseMs);
     }
 
     /**
@@ -116,31 +118,7 @@ final readonly class ResearchStateStore
      */
     public function checkpoint(ResearchRunState $state, string $token): bool
     {
-        $state->assertShape();
-        $seq = $state->expectedSeq;
-        $now = $this->now();
-        $expires = $now->modify('+'.$this->ttlHours.' hours');
-        $payload = $state->encode($seq + 1, $seq, $now, $expires);
-        $written = $this->keys->compareAndSet(
-            ResearchKey::claim($state->ref->id, $seq),
-            $token,
-            ResearchKey::run($state->ref->id),
-            $payload,
-            $this->ttlSeconds(),
-        );
-        if (!$written) {
-            return false;
-        }
-
-        $state->checkpointSeq = $seq;
-        $state->expectedSeq = $seq + 1;
-        $state->updatedAt = $now;
-        $state->expiresAt = $expires;
-        $state->assertShape();
-        $this->keys->zRem(ResearchKey::CLAIMS, ResearchKey::claimMember($state->ref->id, $seq, $token));
-        $this->syncMembership($state);
-
-        return true;
+        return $this->runs->checkpoint($state, $token);
     }
 
     /**
@@ -152,33 +130,23 @@ final readonly class ResearchStateStore
      */
     public function underClaim(ResearchRunState $state, int $leaseMs, \Closure $change): ?ResearchRunState
     {
-        $runId = $state->ref->id;
-        $seq = $state->expectedSeq;
-        $token = $this->claim($runId, $seq, $leaseMs);
-        if (null === $token) {
-            return null;
-        }
-        try {
-            $fresh = $this->load($runId);
-            if (null === $fresh || $fresh->status->isTerminal() || $fresh->expectedSeq !== $seq || !$change($fresh)) {
-                $this->release($runId, $seq, $token);
+        $saved = $this->runs->underClaim(
+            $state,
+            $leaseMs,
+            static fn (RunState $fresh): bool => $fresh instanceof ResearchRunState && $change($fresh),
+        );
 
-                return null;
-            }
-        } catch (\Throwable $e) {
-            $this->release($runId, $seq, $token);
-
-            throw $e;
-        }
-
-        return $this->checkpoint($fresh, $token) ? $fresh : null;
+        return $saved instanceof ResearchRunState ? $saved : null;
     }
 
     public function release(string $runId, int $seq, string $token): void
     {
         ResearchIds::assert($runId);
-        $this->keys->deleteIfEquals(ResearchKey::claim($runId, $seq), $token);
-        $this->keys->zRem(ResearchKey::CLAIMS, ResearchKey::claimMember($runId, $seq, $token));
+        // A string that is no claim token holds nothing, so there is nothing to release.
+        if (!RunClaim::isToken($token)) {
+            return;
+        }
+        $this->runs->release($runId, $seq, $token);
     }
 
     /**
@@ -188,22 +156,7 @@ final readonly class ResearchStateStore
      */
     public function expiredClaims(): array
     {
-        $due = [];
-        foreach ($this->keys->zRangeByScore(ResearchKey::CLAIMS, $this->nowMs()) as $member) {
-            $parsed = $this->parseClaim($member);
-            if (null === $parsed) {
-                $this->keys->zRem(ResearchKey::CLAIMS, $member);
-                continue;
-            }
-            $state = $this->load($parsed['runId']);
-            if (null === $state || $state->checkpointSeq >= $parsed['seq']) {
-                $this->keys->zRem(ResearchKey::CLAIMS, $member);
-                continue;
-            }
-            $due[] = $parsed;
-        }
-
-        return $due;
+        return $this->runs->expiredClaims();
     }
 
     /**
@@ -212,25 +165,24 @@ final readonly class ResearchStateStore
      */
     public function noteLostClaim(string $runId, int $seq): int
     {
-        $next = $this->lostClaims($runId, $seq) + 1;
-        $this->keys->set(
-            ResearchKey::reap($runId, $seq),
-            $next.'|'.$this->clock->now()->getTimestamp(),
-            $this->ttlSeconds(),
-        );
+        ResearchIds::assert($runId);
 
-        return $next;
+        return $this->runs->noteLostClaim($runId, $seq);
     }
 
     public function lostClaims(string $runId, int $seq): int
     {
-        return $this->reapMark($runId, $seq)['count'];
+        ResearchIds::assert($runId);
+
+        return $this->runs->lostClaims($runId, $seq);
     }
 
     /** Unix time of the last redispatch of this unit, null when it never needed one. */
     public function lastRedispatchAt(string $runId, int $seq): ?int
     {
-        return $this->reapMark($runId, $seq)['at'];
+        ResearchIds::assert($runId);
+
+        return $this->runs->lastRedispatchAt($runId, $seq);
     }
 
     /**
@@ -240,14 +192,14 @@ final readonly class ResearchStateStore
     public function requestStop(string $runId): void
     {
         ResearchIds::assert($runId);
-        $this->keys->set(ResearchKey::stop($runId), '1', $this->ttlSeconds());
+        $this->runs->requestCancel($runId);
     }
 
     public function stopRequested(string $runId): bool
     {
         ResearchIds::assert($runId);
 
-        return null !== $this->keys->get(ResearchKey::stop($runId));
+        return $this->runs->cancelRequested($runId);
     }
 
     /** Ask the next step to write the report instead of searching again. */
@@ -268,7 +220,7 @@ final readonly class ResearchStateStore
     {
         ResearchIds::assert($runId);
 
-        return null !== $this->keys->get(ResearchKey::claim($runId, $seq));
+        return $this->runs->isClaimed($runId, $seq);
     }
 
     /**
@@ -431,6 +383,7 @@ final readonly class ResearchStateStore
         if (null !== $state && null !== $state->idempotencyKey) {
             $this->keys->delete(ResearchKey::idempotency($state->ref->userId, $state->idempotencyKey));
         }
+        $this->keys->delete(ResearchKey::keyspace()->reap($runId));
         if (null !== $state) {
             for ($seq = 1; $seq <= $state->expectedSeq; ++$seq) {
                 $this->keys->delete(ResearchKey::reap($runId, $seq));
@@ -504,48 +457,21 @@ final readonly class ResearchStateStore
                 continue;
             }
             $this->keys->zRem(ResearchKey::CLAIMS, $member);
-            $parsed = $this->parseClaim($member);
+            $parsed = ResearchKey::keyspace()->parseClaimMember($member);
             if (null !== $parsed) {
                 $this->keys->delete(ResearchKey::claim($runId, $parsed['seq']));
             }
         }
     }
 
-    /**
-     * @return array{count: int, at: ?int}
-     */
-    private function reapMark(string $runId, int $seq): array
+    private static function assertUnit(int $seq, int $leaseMs): void
     {
-        ResearchIds::assert($runId);
         if ($seq < 1) {
             throw new \InvalidArgumentException('A research unit needs a sequence number.');
         }
-        $raw = $this->keys->get(ResearchKey::reap($runId, $seq));
-        if (!is_string($raw) || 1 !== preg_match('/^([0-9]+)\|([0-9]+)$/', $raw, $match)) {
-            return ['count' => 0, 'at' => null];
+        if ($leaseMs < 1) {
+            throw new \InvalidArgumentException('A research claim needs a lease.');
         }
-
-        return ['count' => (int) $match[1], 'at' => (int) $match[2]];
-    }
-
-    /**
-     * @return array{runId: string, seq: int, token: string}|null
-     */
-    private function parseClaim(string $member): ?array
-    {
-        $parts = explode('|', $member, 3);
-        if (3 !== count($parts)) {
-            return null;
-        }
-        [$runId, $seq, $token] = $parts;
-        if (!ResearchIds::isValid($runId)) {
-            return null;
-        }
-        if (1 !== preg_match('/^[1-9][0-9]*$/', $seq) || 1 !== preg_match('/^[0-9a-f]{32}$/', $token)) {
-            return null;
-        }
-
-        return ['runId' => $runId, 'seq' => (int) $seq, 'token' => $token];
     }
 
     private function assertSourceId(string $sourceId): void
@@ -553,11 +479,6 @@ final readonly class ResearchStateStore
         if (1 !== preg_match('/^s[1-9][0-9]*$/', $sourceId)) {
             throw new \InvalidArgumentException('That source is not in this research.');
         }
-    }
-
-    private function nowMs(): int
-    {
-        return (int) $this->clock->now()->format('Uv');
     }
 
     private function now(): \DateTimeImmutable

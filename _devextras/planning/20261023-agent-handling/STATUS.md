@@ -7,8 +7,8 @@ to them.
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
 | AH0 | draft | — | plan written 2026-10-23; §0 ticked the same day |
-| AH8a | in review | — | run kernel `App\Service\Run\*` and `BRUNS` (migration `Version20261119150000`, `BNOTES`, `BKIND` `assistant` · `research` · `chat`), `RunEraser`, kernel reapers in `app:runs:reap`; no consumer yet. See 2026-11-19 below |
-| AH8b | ordered | — | research runs on the kernel, no behaviour change |
+| AH8a | merged | #3198 | run kernel `App\Service\Run\*` and `BRUNS` (migration `Version20261119150000`, `BNOTES`, `BKIND` `assistant` · `research` · `chat`), `RunEraser`, kernel reapers in `app:runs:reap`; no consumer yet. See 2026-11-19 below |
+| AH8b | in review | — | research runs on the kernel, no behaviour change; same Redis keys and stored format. See 2026-11-19 AH8b below |
 | AH1–AH7, AH9–AH23, AHX1–AHX2 | not started | — | plan only until the owner orders them |
 
 ---
@@ -103,3 +103,41 @@ reaper ended reaches the chat exactly once with the tab closed. Writing them
 found two defects, fixed here: id and seq patterns accepted a trailing
 newline (`$` without `D`), and one unreadable run stopped the whole reaper
 pass.
+
+---
+
+## 2026-11-19 — AH8b: research runs on the kernel
+
+Branch `refactor/research-on-run-kernel` off `main` @ `520b81036`. The
+research engine keeps its classes, constants and stored format; its run
+machinery is now the kernel's:
+
+- `ResearchRunState` implements `RunState`; `ResearchRunCodec` reads it.
+  `ResearchStateStore` is a façade over one `RunCheckpointStore` with the
+  research keyspace (`RunKeyspace('research', …, ['state' => 'run',
+  'cancel' => 'stop'])`), so every key keeps its name: `research:run:{id}`,
+  `research:stop:{id}`, `research:claim:{id}:{seq}`, `research:claims`,
+  `research:active`, `research:events:{id}`.
+- `ResearchUnitWorker` runs `RunUnit` with a `ResearchUnitHandler`;
+  `ResearchReaper` runs `RunReaper` with a `ResearchReapPolicy` (answer wait
+  600 s, plan wait 24 h, write-now, report on the first interrupt).
+  `ResearchLease` is gone; a stage holds the kernel's `RunClaim`.
+- `RedisResearchRunKeys` keeps only the source-text script and delegates the
+  rest to `RedisRunKeys`; the duplicated Lua is gone.
+- The kernel learned what research needs: renamed key segments, a sliding
+  expiry while a run is active (`activeTtlHours`, research keeps 48 h and its
+  `expires_at`), a hook after every write (research keeps its per-user index),
+  and a codec that may answer "no run".
+- `app:research:reap` now counts `waited` instead of `continued` and
+  `stopped`.
+
+**One accepted edge across the deploy:** the lost-claim mark moves from
+`research:reap:{id}:{seq}` (`count|at`) to the kernel's
+`research:reap:{id}` (`seq|count|at`). A unit lost in the minutes around the
+deploy can be redispatched once more than before; the run still ends as
+interrupted on the next loss. `delete()` removes both keys.
+
+Gate: `make ci-local` (PHPUnit 12462, Vitest 539 files, PHPStan and Deptrac
+0). The existing research tests pass unchanged except for the reaper count
+name and the 4-argument `appendEvent`; new kernel tests cover the segment
+names, the active expiry, the write hook and the "no run" codec answer.

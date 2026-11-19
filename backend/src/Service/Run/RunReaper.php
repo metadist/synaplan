@@ -71,7 +71,8 @@ final readonly class RunReaper
 
     private function logBroken(string $runId, \Throwable $e): void
     {
-        $this->logger->error('Run reaper could not recover run {run}: {error}', [
+        $this->logger->error('Run reaper could not recover {kind} run {run}: {error}', [
+            'kind' => $this->store->keyspace()->prefix,
             'run' => $runId,
             'error' => $e->getMessage(),
             'exception' => $e,

@@ -4,13 +4,24 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run;
 
+use App\Service\Run\RunKeyspace;
+
 /**
  * Redis key names for one research run. The shared client adds its own prefix.
+ * The run kernel's keys of a research run keep the names they had before the
+ * kernel existed (`keyspace()`), so a run stored before an upgrade carries on.
  */
 final class ResearchKey
 {
     public const CLAIMS = 'research:claims';
     public const ACTIVE = 'research:active';
+
+    private static ?RunKeyspace $keyspace = null;
+
+    public static function keyspace(): RunKeyspace
+    {
+        return self::$keyspace ??= new RunKeyspace('research', ResearchIds::PATTERN, ['state' => 'run', 'cancel' => 'stop']);
+    }
 
     public static function run(string $id): string
     {
@@ -57,6 +68,7 @@ final class ResearchKey
         return $id.'|'.$seq.'|'.$token;
     }
 
+    /** The per-unit reap mark of runs reaped before the kernel; only deleted now. */
     public static function reap(string $id, int $seq): string
     {
         return 'research:reap:'.$id.':'.$seq;

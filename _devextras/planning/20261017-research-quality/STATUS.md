@@ -603,6 +603,11 @@ creates it, and the other adopts it. Nothing in RS1–RS4, RD1 or RQ2b changes.
 with no consumer; the research engine (`Service/Research/Run/*`) is
 unchanged. AH8b moves research onto the kernel with no behaviour change.
 
+**2026-11-19:** AH8a merged as #3198. AH8b (branch
+`refactor/research-on-run-kernel`) runs `ResearchUnitWorker` and
+`ResearchReaper` on `RunUnit` and `RunReaper`; keys, stored state, events
+and the research corpus are unchanged. Details in the agent-handling STATUS.
+
 ---
 
 ## 2026-10-23 — RQ2b spike against B1+

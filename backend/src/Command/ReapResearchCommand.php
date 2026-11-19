@@ -42,7 +42,7 @@ final class ReapResearchCommand extends Command
 
         try {
             $reaped = $this->reaper->reap();
-            $total = $reaped['redispatched'] + $reaped['interrupted'] + $reaped['continued'] + $reaped['stopped'];
+            $total = $reaped['redispatched'] + $reaped['interrupted'] + $reaped['waited'];
             if ($total > 0) {
                 $io->success(sprintf('Recovered %d research run(s).', $total));
             } else {

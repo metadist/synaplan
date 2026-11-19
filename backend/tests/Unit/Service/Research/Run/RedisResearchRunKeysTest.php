@@ -61,6 +61,6 @@ final class RedisResearchRunKeysTest extends TestCase
         $redis = $this->createStub(RedisService::class);
         $redis->method('eval')->willReturn(0);
 
-        self::assertNull((new RedisResearchRunKeys($redis))->appendEvent('rr_0123456789abcdef', '{}'));
+        self::assertNull((new RedisResearchRunKeys($redis))->appendEvent('research:events:rr_0123456789abcdef:seq', 'research:events:rr_0123456789abcdef', 'research:run:rr_0123456789abcdef', '{}'));
     }
 }

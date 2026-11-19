@@ -10,7 +10,6 @@ use App\Service\Research\Run\Ledger\QuoteMatch;
 use App\Service\Research\Run\Ledger\Source;
 use App\Service\Research\Run\ResearchInputBudget;
 use App\Service\Research\Run\ResearchKey;
-use App\Service\Research\Run\ResearchLease;
 use App\Service\Research\Run\ResearchReaper;
 use App\Service\Research\Run\ResearchRunState;
 use App\Service\Research\Run\ResearchStatus;
@@ -25,6 +24,7 @@ use App\Service\Research\Run\Stage\ResearchModelReply;
 use App\Service\Research\Run\Stage\StageCall;
 use App\Service\Research\Run\Stage\StageContext;
 use App\Service\Research\Run\Stage\StageResult;
+use App\Service\Run\RunClaim;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 
@@ -191,7 +191,7 @@ final class ResearchLeaseTest extends ResearchUnitCase
         ]]], '{}', 'test:checker', null);
     }
 
-    /** @return array{redispatched: int, interrupted: int, continued: int, stopped: int} */
+    /** @return array{redispatched: int, interrupted: int, waited: int} */
     private function reapNow(): array
     {
         self::assertSame([], $this->bus->sent);
@@ -246,13 +246,13 @@ final class WaitingCaller implements ResearchModelCaller
 
     public int $sleptMs = 0;
 
-    /** @var array{redispatched: int, interrupted: int, continued: int, stopped: int}|null */
+    /** @var array{redispatched: int, interrupted: int, waited: int}|null */
     public ?array $reap = null;
 
     /**
-     * @param list<ResearchModelReply>                                                                  $script
-     * @param \Closure(): array{redispatched: int, interrupted: int, continued: int, stopped: int}|null $onLast
-     * @param \Closure(int): void|null                                                                  $afterEach
+     * @param list<ResearchModelReply>                                                 $script
+     * @param \Closure(): array{redispatched: int, interrupted: int, waited: int}|null $onLast
+     * @param \Closure(int): void|null                                                 $afterEach
      */
     public function __construct(
         private readonly MockClock $clock,
@@ -271,13 +271,13 @@ final class WaitingCaller implements ResearchModelCaller
         string $user,
         ?StructuredOutputSchema $schema,
         ?\Closure $onText = null,
-        ?ResearchLease $lease = null,
+        ?RunClaim $lease = null,
     ): ResearchModelReply {
         ++$this->calls;
         $left = $this->waitMs;
         while ($left > 0) {
             $slice = $this->beat ? min(30_000, $left) : $left;
-            if ($this->beat && (!$lease instanceof ResearchLease || !$lease->renew())) {
+            if ($this->beat && (!$lease instanceof RunClaim || !$lease->renew())) {
                 break;
             }
             $this->clock->sleep($slice / 1000);

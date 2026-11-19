@@ -127,4 +127,57 @@ final class RunCheckpointStoreTest extends RunKernelCase
         $this->expectException(\UnexpectedValueException::class);
         $this->store->load($run->id);
     }
+
+    public function testAKindWithAnActiveExpirySlidesItOnEveryWrite(): void
+    {
+        $store = new RunCheckpointStore($this->keys, $this->keyspace, new TestRunState(), $this->clock, 48, 24);
+        $run = new TestRunState('01JD0000000000000000000000', updated: $this->clock->now()->getTimestamp());
+        $store->open($run);
+        self::assertSame(24 * 3600 * 1000, $this->keys->ttlMs($this->keyspace->state($run->id)));
+
+        $this->clock->sleep(3600);
+        $token = $store->claim($run->id, 1, 1000);
+        self::assertNotNull($token);
+        self::assertTrue($store->checkpoint($run, $token));
+
+        self::assertSame(24 * 3600 * 1000, $this->keys->ttlMs($this->keyspace->state($run->id)));
+        self::assertSame($this->clock->now()->getTimestamp() + 24 * 3600, $run->expiresAt);
+        $this->clock->sleep(24 * 3600);
+        self::assertNull($store->load($run->id));
+    }
+
+    public function testAnActiveExpiryOutsideTheWindowIsRefused(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        new RunCheckpointStore($this->keys, $this->keyspace, new TestRunState(), $this->clock, 48, 169);
+    }
+
+    public function testTheWrittenHookSeesEveryOpenAndCheckpoint(): void
+    {
+        $seen = [];
+        $store = new RunCheckpointStore(
+            $this->keys,
+            $this->keyspace,
+            new TestRunState(),
+            $this->clock,
+            written: static function (TestRunState $state) use (&$seen): void {
+                $seen[] = $state->checkpointSeq();
+            },
+        );
+        $run = new TestRunState('01JD0000000000000000000000', updated: $this->clock->now()->getTimestamp());
+        $store->open($run);
+        $token = $store->claim($run->id, 1, 1000);
+        self::assertNotNull($token);
+        self::assertTrue($store->checkpoint($run, $token));
+
+        self::assertSame([0, 1], $seen);
+    }
+
+    public function testAStoredValueTheCodecDoesNotReadIsNoRun(): void
+    {
+        $run = $this->openRun();
+        $this->keys->set($this->keyspace->state($run->id), TestRunState::GONE, null);
+
+        self::assertNull($this->store->load($run->id));
+    }
 }

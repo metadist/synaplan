@@ -8,7 +8,7 @@ use App\AI\Service\AiFacade;
 use App\AI\Stream\StreamChunk;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\Service\ModelConfigService;
-use App\Service\Research\Run\ResearchLease;
+use App\Service\Run\RunClaim;
 use App\Service\Usage\CostCalculationService;
 
 /**
@@ -32,14 +32,14 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
         string $user,
         ?StructuredOutputSchema $schema,
         ?\Closure $onText = null,
-        ?ResearchLease $lease = null,
+        ?RunClaim $lease = null,
     ): ResearchModelReply {
         $provider = $this->models->getProviderForModel($modelId);
         $name = $this->models->getModelName($modelId);
         if (null === $provider || '' === $provider || null === $name || '' === $name) {
             return ResearchModelReply::failed();
         }
-        if ($lease instanceof ResearchLease && !$lease->renew()) {
+        if ($lease instanceof RunClaim && !$lease->renew()) {
             return ResearchModelReply::failed();
         }
 
@@ -48,7 +48,7 @@ final readonly class AiFacadeResearchModelCaller implements ResearchModelCaller
             'model' => $name,
             'temperature' => 0.1,
         ];
-        if ($lease instanceof ResearchLease) {
+        if ($lease instanceof RunClaim) {
             $options['timeout'] = intdiv($lease->waitMs(), 1000);
             // The facade's schema repair is another paid call. Renew first.
             // A lost token skips it; the checkpoint still cannot land.

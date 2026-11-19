@@ -43,11 +43,11 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return $this->strings[$key]['value'] ?? null;
     }
 
-    public function set(string $key, string $value, int $ttlSeconds): bool
+    public function set(string $key, string $value, ?int $ttlSeconds): bool
     {
         $this->strings[$key] = [
             'value' => $value,
-            'expiresAt' => $this->nowMs() + $ttlSeconds * 1000,
+            'expiresAt' => null === $ttlSeconds ? PHP_INT_MAX : $this->nowMs() + $ttlSeconds * 1000,
         ];
 
         return true;
@@ -92,7 +92,7 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return true;
     }
 
-    public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, int $ttlSeconds): bool
+    public function compareAndSet(string $claimKey, string $token, string $stateKey, string $state, ?int $ttlSeconds): bool
     {
         if ($this->get($claimKey) !== $token || null === $this->get($stateKey)) {
             return false;
@@ -197,18 +197,17 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return $due;
     }
 
-    public function appendEvent(string $runId, string $body): ?int
+    public function appendEvent(string $seqKey, string $listKey, string $runKey, string $body): ?int
     {
-        $expiresAt = $this->runExpiresAt($runId);
+        $this->sweepString($runKey);
+        $expiresAt = $this->strings[$runKey]['expiresAt'] ?? null;
         if (null === $expiresAt) {
             return null;
         }
-        $seqKey = ResearchKey::eventSeq($runId);
         $this->sweepCounter($seqKey);
         $seq = ($this->counters[$seqKey]['value'] ?? 0) + 1;
         $this->counters[$seqKey] = ['value' => $seq, 'expiresAt' => $expiresAt];
 
-        $listKey = ResearchKey::events($runId);
         $this->sweepList($listKey);
         $items = $this->lists[$listKey]['items'] ?? [];
         $items[] = $seq."\n".$body;

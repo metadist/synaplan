@@ -62,7 +62,12 @@ final readonly class ResearchEventLog
             throw new \InvalidArgumentException('A research update could not be stored.');
         }
 
-        return $this->keys->appendEvent($runId, $body) ?? throw new ResearchRunNotFound($runId);
+        return $this->keys->appendEvent(
+            ResearchKey::eventSeq($runId),
+            ResearchKey::events($runId),
+            ResearchKey::run($runId),
+            $body,
+        ) ?? throw new ResearchRunNotFound($runId);
     }
 
     /**
