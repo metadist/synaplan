@@ -20,8 +20,11 @@ use Doctrine\Migrations\AbstractMigration;
  * replaced with the alias rate: that stamp keeps the LiteLLM price across a
  * non-price catalog change. This migration rewrites both the untouched
  * snapshot and that synced price, and refreshes `BJSON.__catalog_fingerprint`
- * so ModelSeeder keeps managing the row. An admin edit of any other field is
- * left alone.
+ * so ModelSeeder keeps managing the row. The synced repair also closes the
+ * open LiteLLM price-history interval at the alias rate and opens the Large 3
+ * rate, because billing reads history before the model row. An admin edit,
+ * including a unit change that leaves the LiteLLM stamp in place, is left
+ * alone: the stored fingerprint must still match the live row.
  *
  * Idempotent and Galera-safe: raw addSql, no Schema API access (see AGENTS.md —
  * the DBAL comparator throws on that cluster).
@@ -58,6 +61,7 @@ final class Version20261119190000 extends AbstractMigration
         $untouched = (!is_string($stored) || $stored === $current)
             && $current === $this->fingerprint($previous);
         $synced = 'litellm' === ($decoded['__price_owner'] ?? null)
+            && is_string($stored) && $stored === $current
             && 'mistral-large-latest' === (string) $row['BPROVID']
             && abs((float) $row['BPRICEIN'] - 0.70) < 0.000001
             && abs((float) $row['BPRICEOUT'] - 2.10) < 0.000001
@@ -68,6 +72,9 @@ final class Version20261119190000 extends AbstractMigration
         }
 
         $this->queueCatalogUpdate($this->correctedRow(), $row);
+        if ($synced) {
+            $this->repairAliasPriceHistory();
+        }
     }
 
     public function down(Schema $schema): void
@@ -142,6 +149,37 @@ final class Version20261119190000 extends AbstractMigration
             'prevRating' => (float) $read['BRATING'],
             'prevJson' => (string) $read['BJSON'],
         ]);
+    }
+
+    /**
+     * Billing reads the open price-history interval before the model row.
+     * Close the alias rate the sync wrote and open the Large 3 rate. Earlier
+     * intervals stay as they were.
+     */
+    private function repairAliasPriceHistory(): void
+    {
+        $now = gmdate('Y-m-d H:i:s');
+        $this->addSql(<<<'SQL'
+            INSERT INTO BMODEL_PRICE_HISTORY
+                (BMODEL_ID, BPRICEIN, BINUNIT, BPRICEOUT, BOUTUNIT, BCACHEPRICEIN, BSOURCE, BVALID_FROM, BVALID_TO, BCREATED_AT)
+            SELECT 245, 0.50000000, 'per1M', 1.50000000, 'per1M', 0.05000000, 'catalog', :now, NULL, :now
+              FROM BMODEL_PRICE_HISTORY
+             WHERE BMODEL_ID = 245
+               AND BVALID_TO IS NULL
+               AND BSOURCE = 'litellm'
+               AND ABS(BPRICEIN - 0.70) < 0.000001
+               AND ABS(BPRICEOUT - 2.10) < 0.000001
+             LIMIT 1
+            SQL, ['now' => $now]);
+        $this->addSql(<<<'SQL'
+            UPDATE BMODEL_PRICE_HISTORY
+               SET BVALID_TO = :now
+             WHERE BMODEL_ID = 245
+               AND BVALID_TO IS NULL
+               AND BSOURCE = 'litellm'
+               AND ABS(BPRICEIN - 0.70) < 0.000001
+               AND ABS(BPRICEOUT - 2.10) < 0.000001
+            SQL, ['now' => $now]);
     }
 
     /**

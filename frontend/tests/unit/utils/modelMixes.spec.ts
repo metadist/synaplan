@@ -249,7 +249,7 @@ describe('resolveModelMix', () => {
     const mistralChat = model({
       id: 245,
       service: 'Mistral',
-      providerId: 'mistral-large-latest',
+      providerId: 'mistral-large-2512',
       name: 'Mistral Large 3',
     })
 
@@ -268,7 +268,9 @@ describe('resolveModelMix', () => {
 
     expect(resolveModelMix(mixDefinition('europe'), withBoth).defaults.SORT).toBe(79)
     expect(resolveModelMix(mixDefinition('europe'), trustedTokensOnly).defaults.SORT).toBe(330)
+    expect(resolveModelMix(mixDefinition('europe'), trustedTokensOnly).defaults.CHAT).toBe(245)
     expect(resolveModelMix(mixDefinition('europe'), neither).defaults.SORT).toBeUndefined()
+    expect(resolveModelMix(mixDefinition('europe'), neither).defaults.CHAT).toBe(245)
   })
 
   it('resolves the A2Agent mix when the installation serves those models', () => {

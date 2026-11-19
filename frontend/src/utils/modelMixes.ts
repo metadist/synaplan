@@ -212,7 +212,7 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
     candidates: {
       CHAT: [
         ollama('gpt-oss:120b'),
-        mistral('mistral-large-latest'),
+        mistral('mistral-large-2512'),
         mistral('mistral-medium-latest'),
         trustedTokens('openai/gpt-oss-120b'),
         ollama('gpt-oss:20b'),
