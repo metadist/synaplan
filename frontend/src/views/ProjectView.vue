@@ -28,15 +28,16 @@
         </p>
 
         <template v-else-if="project">
-          <header class="mb-6 flex items-start justify-between gap-3">
-            <div class="min-w-0 flex-1">
+          <header class="mb-6 flex items-center justify-between gap-3">
+            <!-- Title and field share one box (height, padding, border, size), so the text does not move when renaming. -->
+            <div class="-ml-3 min-w-0 flex-1">
               <input
                 v-if="renaming"
                 ref="nameInput"
                 v-model="nameDraft"
                 type="text"
                 maxlength="120"
-                class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                class="h-11 w-full px-3 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-2xl font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
                 :aria-label="$t('projects.nameLabel')"
                 data-testid="input-project-name"
                 @keydown.enter.prevent="saveName"
@@ -45,7 +46,7 @@
               />
               <h1
                 v-else
-                class="truncate text-2xl font-semibold txt-primary"
+                class="h-11 truncate border border-transparent px-3 text-2xl font-semibold leading-[2.625rem] txt-primary"
                 data-testid="text-project-name"
               >
                 {{ project.name }}
