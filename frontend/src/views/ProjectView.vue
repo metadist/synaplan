@@ -5,87 +5,87 @@
       data-testid="page-project"
     >
       <div class="mx-auto w-full max-w-4xl">
-    <p
-      v-if="!store.available"
-      class="rounded-xl surface-card px-4 py-8 text-center text-sm txt-secondary"
-      data-testid="text-project-unavailable"
-    >
-      {{ $t('projects.unavailable') }}
-    </p>
-    <p
-      v-else-if="notFound"
-      class="rounded-xl surface-card px-4 py-8 text-center text-sm txt-secondary"
-      data-testid="text-project-not-found"
-    >
-      {{ $t('projects.notFound') }}
-    </p>
-    <p
-      v-else-if="loadFailed"
-      class="rounded-xl surface-card px-4 py-8 text-center text-sm text-red-600 dark:text-red-400"
-      role="alert"
-    >
-      {{ $t('projects.loadFailed') }}
-    </p>
+        <p
+          v-if="!store.available"
+          class="rounded-xl surface-card px-4 py-8 text-center text-sm txt-secondary"
+          data-testid="text-project-unavailable"
+        >
+          {{ $t('projects.unavailable') }}
+        </p>
+        <p
+          v-else-if="notFound"
+          class="rounded-xl surface-card px-4 py-8 text-center text-sm txt-secondary"
+          data-testid="text-project-not-found"
+        >
+          {{ $t('projects.notFound') }}
+        </p>
+        <p
+          v-else-if="loadFailed"
+          class="rounded-xl surface-card px-4 py-8 text-center text-sm text-red-600 dark:text-red-400"
+          role="alert"
+        >
+          {{ $t('projects.loadFailed') }}
+        </p>
 
-    <template v-else-if="project">
-      <header class="mb-6 flex items-start justify-between gap-3">
-        <div class="min-w-0 flex-1">
-          <input
-            v-if="renaming"
-            ref="nameInput"
-            v-model="nameDraft"
-            type="text"
-            maxlength="120"
-            class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-            :aria-label="$t('projects.nameLabel')"
-            data-testid="input-project-name"
-            @keydown.enter.prevent="saveName"
-            @keydown.esc="renaming = false"
-            @blur="saveName"
-          />
-          <h1
-            v-else
-            class="truncate text-2xl font-semibold txt-primary"
-            data-testid="text-project-name"
-          >
-            {{ project.name }}
-          </h1>
-        </div>
-        <div class="flex flex-shrink-0 items-center gap-1">
-          <button
-            type="button"
-            class="icon-ghost inline-flex h-9 w-9 items-center justify-center rounded-lg"
-            :aria-label="$t('projects.rename')"
-            :title="$t('projects.rename')"
-            data-testid="btn-project-rename"
-            @click="startRename"
-          >
-            <PencilSquareIcon class="h-5 w-5" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            class="icon-ghost inline-flex h-9 w-9 items-center justify-center rounded-lg"
-            :aria-label="$t('projects.delete')"
-            :title="$t('projects.delete')"
-            data-testid="btn-project-delete"
-            @click="deleteProject"
-          >
-            <TrashIcon class="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-      </header>
+        <template v-else-if="project">
+          <header class="mb-6 flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <input
+                v-if="renaming"
+                ref="nameInput"
+                v-model="nameDraft"
+                type="text"
+                maxlength="120"
+                class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                :aria-label="$t('projects.nameLabel')"
+                data-testid="input-project-name"
+                @keydown.enter.prevent="saveName"
+                @keydown.esc="renaming = false"
+                @blur="saveName"
+              />
+              <h1
+                v-else
+                class="truncate text-2xl font-semibold txt-primary"
+                data-testid="text-project-name"
+              >
+                {{ project.name }}
+              </h1>
+            </div>
+            <div class="flex flex-shrink-0 items-center gap-1">
+              <button
+                type="button"
+                class="icon-ghost inline-flex h-9 w-9 items-center justify-center rounded-lg"
+                :aria-label="$t('projects.rename')"
+                :title="$t('projects.rename')"
+                data-testid="btn-project-rename"
+                @click="startRename"
+              >
+                <PencilSquareIcon class="h-5 w-5" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                class="icon-ghost inline-flex h-9 w-9 items-center justify-center rounded-lg"
+                :aria-label="$t('projects.delete')"
+                :title="$t('projects.delete')"
+                data-testid="btn-project-delete"
+                @click="deleteProject"
+              >
+                <TrashIcon class="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+          </header>
 
-      <TabNav v-model="tab" :tabs="tabs" :aria-label="project.name" testid="tabs-project" />
+          <TabNav v-model="tab" :tabs="tabs" :aria-label="project.name" testid="tabs-project" />
 
-      <div class="mt-4">
-        <ProjectChatsTab v-if="tab === 'chats'" :project-id="project.id" />
-        <ProjectSourcesTab v-else-if="tab === 'sources'" :project-id="project.id" />
-        <!-- Stays mounted so an unsaved draft survives a tab switch. -->
-        <ProjectInstructionsTab v-show="tab === 'instructions'" :project="project" />
-      </div>
-    </template>
+          <div class="mt-4">
+            <ProjectChatsTab v-if="tab === 'chats'" :project-id="project.id" />
+            <ProjectSourcesTab v-else-if="tab === 'sources'" :project-id="project.id" />
+            <!-- Stays mounted so an unsaved draft survives a tab switch. -->
+            <ProjectInstructionsTab v-show="tab === 'instructions'" :project="project" />
+          </div>
+        </template>
 
-    <p v-else class="text-sm txt-secondary" role="status">{{ $t('common.loading') }}</p>
+        <p v-else class="text-sm txt-secondary" role="status">{{ $t('common.loading') }}</p>
       </div>
     </div>
   </MainLayout>

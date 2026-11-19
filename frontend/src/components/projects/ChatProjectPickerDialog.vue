@@ -97,9 +97,12 @@ watch(
   }
 )
 
-useEscapeKey(() => {
-  if (!busy.value) emit('close')
-}, toRef(props, 'open'))
+useEscapeKey(
+  () => {
+    if (!busy.value) emit('close')
+  },
+  toRef(props, 'open')
+)
 
 async function move(projectId: string): Promise<void> {
   if (props.chatId === null) return
