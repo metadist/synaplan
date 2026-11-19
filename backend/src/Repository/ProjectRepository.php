@@ -27,7 +27,10 @@ final class ProjectRepository extends ServiceEntityRepository
         $rows = $this->createQueryBuilder('p')
             ->where('p.userId = :user')
             ->setParameter('user', $userId)
-            ->orderBy('p.updated', 'DESC')
+            // Pinned projects first (the API promises that order), then the most recently changed.
+            ->addSelect('CASE WHEN p.pinnedAt IS NULL THEN 1 ELSE 0 END AS HIDDEN pinRank')
+            ->orderBy('pinRank', 'ASC')
+            ->addOrderBy('p.updated', 'DESC')
             ->getQuery()
             ->getResult();
 

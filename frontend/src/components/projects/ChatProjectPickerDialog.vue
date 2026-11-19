@@ -91,7 +91,7 @@ watch(
   () => props.open,
   async (isOpen) => {
     if (!isOpen) return
-    void store.load()
+    void store.loadOnce()
     await nextTick()
     panel.value?.focus()
   }

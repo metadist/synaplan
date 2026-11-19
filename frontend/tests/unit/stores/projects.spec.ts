@@ -130,4 +130,17 @@ describe('projects store', () => {
     expect(store.projects).toEqual([])
     expect(store.loaded).toBe(false)
   })
+
+  it('refresh re-reads one project so a renamed chat shows its new title', async () => {
+    const chats = useProjectChatsStore()
+    chats.set('a', [{ id: 5, title: 'New chat', updatedAt: '2026-11-01T10:00:00+00:00' }])
+    chats.set('b', [{ id: 6, title: 'Other', updatedAt: '2026-11-01T10:00:00+00:00' }])
+    api.listChats.mockResolvedValue([
+      { id: 5, title: 'Kitchen budget', updatedAt: '2026-11-02T10:00:00+00:00' },
+    ])
+    await chats.refresh('a')
+    expect(api.listChats).toHaveBeenCalledWith('a')
+    expect(chats.chatsOf('a').map((c) => c.title)).toEqual(['Kitchen budget'])
+    expect(chats.chatsOf('b').map((c) => c.title)).toEqual(['Other'])
+  })
 })

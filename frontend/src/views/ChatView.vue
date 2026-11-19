@@ -936,7 +936,7 @@ const projectPicker = ref<InstanceType<typeof ChatProjectPicker> | null>(null)
 
 /** Own chats of a signed-in person, outside incognito; the server checks ownership again. */
 const projectPickerEnabled = computed(
-  () => !isGuestMode.value && !incognitoStore.active && canComposeSharedChat.value
+  () => authStore.isAuthenticated && !incognitoStore.active && canComposeSharedChat.value
 )
 
 const canComposeSharedChat = computed(() =>

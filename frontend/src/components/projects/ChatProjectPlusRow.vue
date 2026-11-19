@@ -14,11 +14,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ChevronRightIcon, FolderIcon } from '@heroicons/vue/24/outline'
 import { useProjectsStore } from '@/stores/projects'
 import { useChatsStore } from '@/stores/chats'
+import { useMediaQuery } from '@/composables/useMediaQuery'
 
 /** Phone-width entry for the project list, which lives in the plus menu there. */
 const props = defineProps<{ enabled: boolean }>()
@@ -29,17 +30,7 @@ const store = useProjectsStore()
 const chats = useChatsStore()
 
 // The control bar shows the picker from the md breakpoint up; only a phone needs this row.
-const phone = ref(false)
-const query =
-  typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 767px)') : null
-const sync = (): void => {
-  phone.value = query?.matches ?? false
-}
-onMounted(() => {
-  sync()
-  query?.addEventListener('change', sync)
-})
-onUnmounted(() => query?.removeEventListener('change', sync))
+const phone = useMediaQuery('(max-width: 767px)')
 
 const visible = computed(() => props.enabled && phone.value && store.available && store.loaded)
 const name = computed(

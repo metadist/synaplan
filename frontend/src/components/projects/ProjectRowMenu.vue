@@ -35,6 +35,7 @@
         class="fixed w-max min-w-44 max-w-[calc(100vw-16px)] whitespace-nowrap dropdown-panel origin-top-left"
         :style="style"
         @click.stop
+        @keydown="onPanelKeydown"
       >
         <button
           type="button"
@@ -72,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onUnmounted, ref } from 'vue'
+import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { Icon } from '@iconify/vue'
 import {
   ChatBubbleLeftIcon,
@@ -92,6 +93,7 @@ const actions = useProjectActions()
 const open = ref(false)
 const panel = ref<HTMLElement | null>(null)
 const style = ref<Record<string, string>>({})
+let trigger: HTMLElement | null = null
 
 function toggle(event: MouseEvent): void {
   if (open.value) {
@@ -99,11 +101,30 @@ function toggle(event: MouseEvent): void {
     return
   }
   const button = event.currentTarget as HTMLElement
+  trigger = button
   const anchor = button.getBoundingClientRect()
   const row = button.closest<HTMLElement>('li')?.getBoundingClientRect() ?? anchor
   style.value = { top: `${row.top}px`, left: `${row.right + SIDE_GAP}px` }
   open.value = true
-  void nextTick(() => place(anchor, row))
+  void nextTick(() => {
+    place(anchor, row)
+    menuItems()[0]?.focus()
+  })
+}
+
+function menuItems(): HTMLElement[] {
+  return [...(panel.value?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])]
+}
+
+function onPanelKeydown(event: KeyboardEvent): void {
+  const items = menuItems()
+  const at = items.indexOf(document.activeElement as HTMLElement)
+  if (event.key === 'ArrowDown') items[(at + 1) % items.length]?.focus()
+  else if (event.key === 'ArrowUp') items[(at - 1 + items.length) % items.length]?.focus()
+  else if (event.key === 'Home') items[0]?.focus()
+  else if (event.key === 'End') items[items.length - 1]?.focus()
+  else return
+  event.preventDefault()
 }
 
 /** To the right of the row, as wide as its longest item; below the button when there is no room. */
@@ -132,21 +153,30 @@ function run(action: (project: ProjectItem) => Promise<void>): void {
 }
 
 function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Escape') open.value = false
+  if (event.key !== 'Escape') return
+  open.value = false
+  trigger?.focus()
 }
 
 function close(): void {
   open.value = false
 }
 
-document.addEventListener('keydown', onKeydown)
-window.addEventListener('scroll', close, true)
-window.addEventListener('resize', close)
-onUnmounted(() => {
+/** Every project row has a menu; only the open one listens to the page. */
+function listen(on: boolean): void {
+  if (on) {
+    document.addEventListener('keydown', onKeydown)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    return
+  }
   document.removeEventListener('keydown', onKeydown)
   window.removeEventListener('scroll', close, true)
   window.removeEventListener('resize', close)
-})
+}
+
+watch(open, listen)
+onUnmounted(() => listen(false))
 </script>
 
 <style scoped>

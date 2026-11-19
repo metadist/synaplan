@@ -52,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
@@ -70,6 +70,13 @@ const { confirm } = useDialog()
 
 const creating = ref(false)
 const chats = computed(() => store.chatsOf(props.projectId))
+
+// The sidebar index is read once per session; the page shows the current titles.
+watch(
+  () => props.projectId,
+  (projectId) => void store.refresh(projectId).catch(() => undefined),
+  { immediate: true }
+)
 
 function formatDate(iso: string): string {
   const time = Date.parse(iso)

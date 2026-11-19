@@ -1,5 +1,6 @@
 <template>
-  <div v-if="visible" class="hidden min-w-0 flex-shrink md:block">
+  <!-- Rendered from md up only: below it no element may take a slot in the control bar. The menu teleport stays for the plus row. -->
+  <div v-if="visible && desktop" class="min-w-0 flex-shrink">
     <button
       ref="trigger"
       type="button"
@@ -17,72 +18,72 @@
       <span class="truncate">{{ label }}</span>
       <ChevronDownIcon class="h-3 w-3 flex-shrink-0" aria-hidden="true" />
     </button>
-
-    <Teleport :to="teleportTarget">
-      <div v-if="open" class="fixed inset-0 z-[150]" @click="close">
-        <div
-          ref="panel"
-          role="menu"
-          class="dropdown-panel scroll-thin fixed flex w-max min-w-56 flex-col gap-1 p-1.5 max-w-[calc(100vw-16px)] overflow-y-auto whitespace-nowrap"
-          :style="style"
-          data-testid="menu-chat-project"
-          @click.stop
-          @keydown="onPanelKeydown"
-        >
-          <button
-            type="button"
-            role="menuitemradio"
-            :aria-checked="!current"
-            class="dropdown-item"
-            data-testid="btn-chat-project-none"
-            @click="choose(null)"
-          >
-            <CheckIcon class="h-4 w-4 flex-shrink-0" :class="{ invisible: current }" />
-            {{ $t('projects.picker.none') }}
-          </button>
-          <button
-            v-for="project in store.projects"
-            :key="project.id"
-            type="button"
-            role="menuitemradio"
-            :aria-checked="project.id === current?.id"
-            class="dropdown-item"
-            :data-testid="`btn-chat-project-${project.id}`"
-            @click="choose(project.id)"
-          >
-            <CheckIcon
-              class="h-4 w-4 flex-shrink-0"
-              :class="{ invisible: project.id !== current?.id }"
-            />
-            <span class="truncate">{{ project.name }}</span>
-          </button>
-          <p v-if="store.projects.length === 0" class="px-3 py-1 text-xs txt-secondary">
-            {{ $t('projects.picker.empty') }}
-          </p>
-          <div
-            v-if="current"
-            role="separator"
-            class="my-0.5 h-px bg-light-border/40 dark:bg-dark-border/30"
-          ></div>
-          <router-link
-            v-if="current"
-            :to="`/projects/${current.id}`"
-            role="menuitem"
-            class="dropdown-item"
-            data-testid="link-chat-project-open"
-            @click="close"
-          >
-            <ArrowTopRightOnSquareIcon class="h-4 w-4 flex-shrink-0" />
-            {{ $t('projects.picker.open') }}
-          </router-link>
-        </div>
-      </div>
-    </Teleport>
   </div>
+
+  <Teleport v-if="visible" :to="teleportTarget">
+    <div v-if="open" class="fixed inset-0 z-[150]" @click="close">
+      <div
+        ref="panel"
+        role="menu"
+        class="dropdown-panel scroll-thin fixed flex w-max min-w-56 flex-col gap-1 p-1.5 max-w-[calc(100vw-16px)] overflow-y-auto whitespace-nowrap"
+        :style="style"
+        data-testid="menu-chat-project"
+        @click.stop
+        @keydown="onPanelKeydown"
+      >
+        <button
+          type="button"
+          role="menuitemradio"
+          :aria-checked="!current"
+          class="dropdown-item"
+          data-testid="btn-chat-project-none"
+          @click="choose(null)"
+        >
+          <CheckIcon class="h-4 w-4 flex-shrink-0" :class="{ invisible: current }" />
+          {{ $t('projects.picker.none') }}
+        </button>
+        <button
+          v-for="project in store.projects"
+          :key="project.id"
+          type="button"
+          role="menuitemradio"
+          :aria-checked="project.id === current?.id"
+          class="dropdown-item"
+          :data-testid="`btn-chat-project-${project.id}`"
+          @click="choose(project.id)"
+        >
+          <CheckIcon
+            class="h-4 w-4 flex-shrink-0"
+            :class="{ invisible: project.id !== current?.id }"
+          />
+          <span class="truncate">{{ project.name }}</span>
+        </button>
+        <p v-if="store.projects.length === 0" class="px-3 py-1 text-xs txt-secondary">
+          {{ $t('projects.picker.empty') }}
+        </p>
+        <div
+          v-if="current"
+          role="separator"
+          class="my-0.5 h-px bg-light-border/40 dark:bg-dark-border/30"
+        ></div>
+        <router-link
+          v-if="current"
+          :to="`/projects/${current.id}`"
+          role="menuitem"
+          class="dropdown-item"
+          data-testid="link-chat-project-open"
+          @click="close"
+        >
+          <ArrowTopRightOnSquareIcon class="h-4 w-4 flex-shrink-0" />
+          {{ $t('projects.picker.open') }}
+        </router-link>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   ArrowTopRightOnSquareIcon,
@@ -95,6 +96,7 @@ import { useProjectChatsStore } from '@/stores/projectChats'
 import { useChatsStore } from '@/stores/chats'
 import { useNotification } from '@/composables/useNotification'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
+import { useMediaQuery } from '@/composables/useMediaQuery'
 
 const EDGE_GAP = 8
 const GAP = 6
@@ -108,6 +110,8 @@ const projectChats = useProjectChatsStore()
 const chats = useChatsStore()
 const { error: showError } = useNotification()
 const { teleportTarget } = useFullscreenTeleportTarget()
+/** The chip shows from md up; on a phone the plus menu opens the same list. */
+const desktop = useMediaQuery('(min-width: 768px)')
 
 const open = ref(false)
 const busy = ref(false)
@@ -192,7 +196,14 @@ async function choose(projectId: string | null): Promise<void> {
   }
 }
 
-onMounted(() => void store.loadOnce())
+// Signed-out visitors never ask for projects: the API would only answer 401.
+watch(
+  () => props.enabled,
+  (enabled) => {
+    if (enabled) void store.loadOnce()
+  },
+  { immediate: true }
+)
 defineExpose({ openAt })
 document.addEventListener('keydown', onKeydown)
 window.addEventListener('resize', close)

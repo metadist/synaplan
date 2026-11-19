@@ -1,5 +1,5 @@
 <template>
-  <div v-if="store.available" class="mt-5" data-testid="section-sidebar-projects">
+  <div v-if="signedIn && store.available" class="mt-5" data-testid="section-sidebar-projects">
     <div class="group/section relative">
       <button
         type="button"
@@ -15,7 +15,7 @@
       </button>
       <button
         type="button"
-        class="absolute right-3 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] pointer-events-none opacity-0 transition-opacity focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/section:pointer-events-auto group-hover/section:opacity-100"
+        class="project-new-btn absolute right-3 top-1/2 z-10 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md txt-secondary hover:text-[var(--txt-primary)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand)] pointer-events-none opacity-0 transition-opacity focus-visible:pointer-events-auto focus-visible:opacity-100 group-hover/section:pointer-events-auto group-hover/section:opacity-100"
         :title="$t('projects.new')"
         :aria-label="$t('projects.new')"
         data-testid="btn-sidebar-project-new"
@@ -62,13 +62,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ChevronDownIcon, FolderIcon, PlusIcon } from '@heroicons/vue/24/outline'
 import { Icon } from '@iconify/vue'
 import ProjectRowMenu from '@/components/projects/ProjectRowMenu.vue'
 import { useProjectsStore } from '@/stores/projects'
+import { useAuthStore } from '@/stores/auth'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
 
@@ -78,6 +79,9 @@ const NAME_MAX = 120
 const { t } = useI18n()
 const router = useRouter()
 const store = useProjectsStore()
+const auth = useAuthStore()
+/** Guests have no projects; asking would only earn a 401. */
+const signedIn = computed(() => auth.isAuthenticated)
 const { prompt } = useDialog()
 const { error: showError } = useNotification()
 
@@ -125,7 +129,13 @@ async function createProject(): Promise<void> {
   }
 }
 
-onMounted(() => void store.loadOnce())
+watch(
+  signedIn,
+  (yes) => {
+    if (yes) void store.loadOnce()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>
@@ -150,6 +160,14 @@ onMounted(() => void store.loadOnce())
   font-weight: 500;
   color: var(--brand);
   background-color: color-mix(in srgb, var(--brand) 12%, transparent);
+}
+
+/* Without hover (touch) the plus would never appear, and no project could be created. */
+@media (hover: none) {
+  .project-new-btn {
+    pointer-events: auto;
+    opacity: 1;
+  }
 }
 
 @media (hover: hover) and (pointer: fine) {

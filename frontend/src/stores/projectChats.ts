@@ -39,6 +39,11 @@ export const useProjectChatsStore = defineStore('projectChats', () => {
     )
   }
 
+  /** Re-read one project's chats: titles change after the first answer, chats get deleted elsewhere. */
+  async function refresh(projectId: string): Promise<void> {
+    set(projectId, await projectsApi.listChats(projectId))
+  }
+
   async function create(projectId: string, title?: string): Promise<ProjectChatItem> {
     const chat = await projectsApi.createChat(projectId, title)
     set(projectId, [chat, ...chatsOf(projectId)])
@@ -51,7 +56,7 @@ export const useProjectChatsStore = defineStore('projectChats', () => {
     const touched = Object.keys(byProject.value).filter(
       (id) => id === projectId || chatsOf(id).some((c) => c.id === chatId)
     )
-    await Promise.all(touched.map(async (id) => set(id, await projectsApi.listChats(id))))
+    await Promise.all(touched.map(refresh))
   }
 
   async function remove(projectId: string, chatId: number): Promise<void> {
@@ -70,6 +75,7 @@ export const useProjectChatsStore = defineStore('projectChats', () => {
     loadAll,
     replaceAll,
     forget,
+    refresh,
     create,
     move,
     remove,
