@@ -1124,7 +1124,8 @@ Audit row (`BAUDITLOG`, action `tool.executed`): actor user id, tool name,
 source, kind (write / destructive), outcome, approval id, request id,
 duration. **Never the arguments or the result.**
 
-`AgentToolLoop` (AU26) owns iterations, deadline, partition of
+`AgentToolLoop` (AU26) owns iterations and deadline (as profile input with
+`ToolLimits` as the defaults; a profile may set none, row 46 §0 #69), partition of
 Synaplan-owned and client-owned tool calls, and error-as-result; the three
 loops keep only their wire format (`DocumentToolLoopAdapter`,
 `MessagesToolLoopAdapter`, `OpenAiToolLoopAdapter`).

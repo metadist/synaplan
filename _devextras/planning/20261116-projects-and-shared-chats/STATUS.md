@@ -10,8 +10,37 @@ to them.
 | PJ1 | merged | #3141 | corpus and runner; today's numbers from the local stack, see 2026-11-16 below |
 | PJ2 | merged | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
 | PJ3 | merged | #3152 | Projects with sources and instructions (API). Deviation from §10: a chat joins a project through `POST /projects/{uuid}/chats` and `PUT/DELETE /projects/{uuid}/chats/{chatId}`, so `POST /chats` and `PATCH /chats/{id}` are unchanged (no growth of the oversized `ChatController`). The flag is checked in the controller as well as by the module gate. Walked on the stack with a real model: a project chat answered from a text source with its marker, and the instructions shaped the answer. Create takes name and description; instructions go through PATCH. |
-| PJ4 | in review | — | Project page `/projects/:id` (Chats, Sources, Instructions), a "Projects" section in the Chats panel, the Add-source dialog (file, link, text), the project name above the composer of a project chat, and move in/out of a project from the chat menu. A flag-off module answers 404 `feature_not_configured` and the UI shows nothing. `PROJECTS_ENABLED=1` is set in `backend/.env.test` so the E2E spec can run. |
-| PJ5–PJ28 | not started | — | every other ☐ and Ask row of §0 still waits; #21 is confirmed by the PJ2 spike, its tick is the owner's |
+| PJ4 | merged | #3186 | Project page `/projects/:id` (Chats, Sources, Instructions), a "Projects" section in the Chats panel, the Add-source dialog (file, link, text), the project name above the composer of a project chat, and move in/out of a project from the chat menu, pinned projects first (`BPROJECTS.BPINNEDAT`, migration `Version20261119120000`). A flag-off module answers 404 `feature_not_configured` and the UI shows nothing. `PROJECTS_ENABLED=1` is set in `backend/.env.test` so the E2E spec can run. |
+| PJ5–PJ28 | not started | — | Phase B waits for AU26, AH8a, AH8b (ordered 2026-11-19); every other ☐ and Ask row of §0 waits for its step |
+
+---
+
+## 2026-11-19 — after PJ4: what comes next, and the plan fixed
+
+**Checked on** `main` @ `89694c4b2`: AU26 is not merged (three tool loops,
+`ToolLimits` still has fixed caps); AH8 is not started (no `BRUNS`, no
+`App\Service\Run`; research has its own lease, reaper and unit worker in
+`Service/Research/Run/*`). Phase B cannot start.
+
+**Owner decisions** (§0): #21–#25 ticked; #63 for `BRUNS.BKIND = chat` and
+`BRUNS.BNOTES` in AH8a's migration; #66 order AU26 → AH8a → AH8b → PJ5,
+phase C not ordered yet; new rows #68 (staged end of a run), #69 (limits as
+profile input, AH8 split), #70 (budget before every call until PJ6, flag off
+until PJ6 and PJ8), #71 (no "Can write" for a project chat before PJ20),
+#72 (a deleted member's text becomes "Message deleted"), #73 (projects flag
+with PJ28). The review loop of `AGENTS.md` applies again: wait for Copilot
+and `All Checks Passed` on every head.
+
+**Fixed in the plan:** PJ4 merged; `BPROJECTS.BPINNEDAT` (PJ4) in `03` §2.2;
+the PJ3 chat routes in `03` §10; `MAX_SOURCES` 50 and
+`INSTRUCTIONS_MAX_CHARS` 4000 and the env pin `PROJECTS_ENABLED` in `03`
+§11; the contradiction between `03` §3 and §1.5.1; run ownership, per-unit
+re-checks, approvals in units and checkpoint erasure in `03` §1.1 and the
+PJ5 brief. The AU26 brief (row 22, S4) and the AH8 brief (row 25) now take
+limits as profile input; AH8 is AH8a and AH8b.
+
+**Next:** AU26 (`refactor(tools): one agent loop for document chat and both
+gateways`), brief in `../20261021-architecture-update/S4_one_tool_path.md`.
 
 ---
 

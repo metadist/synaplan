@@ -7,7 +7,8 @@ to them.
 | Step | State | PR | Notes |
 | ---- | ----- | -- | ----- |
 | AH0 | draft | — | plan written 2026-10-23; §0 ticked the same day |
-| AH1–AH23, AHX1–AHX2 | not started | — | plan only until the owner orders row 25 |
+| AH8a, AH8b | ordered | — | the owner ordered AH8 on 2026-11-19, split in two PRs, after AU26, for row 46 phase B (projects plan §0 #66, #69) |
+| AH1–AH7, AH9–AH23, AHX1–AHX2 | not started | — | plan only until the owner orders them |
 
 ---
 

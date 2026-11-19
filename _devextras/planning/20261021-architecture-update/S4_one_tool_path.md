@@ -189,6 +189,11 @@ empty.
   Synaplan-owned and client-owned calls, error-as-result) with three thin
   adapters (`03` §4); `ToolLimits` the only place for the caps.
 - Do: `GatewayToolLoop` leaves the size ledger.
+- Do: the limits are profile input: iteration cap, deadline and tools per
+  turn come from a `ToolLoopLimits` value the caller passes. `ToolLimits`
+  keeps today's numbers as the defaults the three adapters pass, so
+  nothing changes on the wire. A profile may pass "no iteration cap" and
+  "no deadline"; the chat run of row 46 (PJ5) needs that (row 46, owner 2026-11-19).
 - Do not: change a wire byte or a stop reason.
 
 ### Vibe brief
@@ -200,6 +205,8 @@ empty.
 ### Exit criteria
 
 1. One loop, three adapters; no duplicated cap constants.
+3. A unit test runs the loop with no iteration cap and no deadline and stops
+   only when the model answers without a tool.
 2. `GatewayToolLoop` out of the size ledger; snapshots unchanged.
 
 ---

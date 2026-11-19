@@ -365,7 +365,7 @@ Details, wireframes and copy in [`02_journeys_and_ui.md`](./02_journeys_and_ui.m
 | AH6 | `feat(telegram): talk to an assistant in Telegram` | ota-candidate | §0 #22 |
 | AH7 | `feat(assistants): describe an assistant in one sentence and get a draft` | ota-candidate | §0 #23 |
 | **Phase B — assistant runs** | | | |
-| AH8 | `refactor(runs): one run kernel for research and assistant runs` | backend-only | §0 #5, #9; AU24; RS6 if merged |
+| AH8 | `refactor(runs): one run kernel for research and assistant runs` — two PRs, AH8a kernel + `BRUNS`, AH8b research on it (row 46, 2026-11-19) | backend-only | §0 #5, #9; AU24; RS6 if merged |
 | AH9 | `feat(assistants): an assistant works through a job step by step` | backend-only | AH8, AU26, AU11, AH3, §0 #6–#13, #24 |
 | AH10 | `feat(runs): list, follow, hint and stop runs through the API` | backend-only | AH9 |
 | AH11 | `feat(chat): let an assistant work on it, with a run card in the chat` | ota-candidate | AH10, §0 #3, #8 |

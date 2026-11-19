@@ -24,8 +24,20 @@ unit (≤ RUNS.UNIT_SECONDS, worker, async_ai_high)
   ├─ model asks for tools ──► next unit
   ├─ model asks the person ─► waiting_for_you (reason question), no unit
   ├─ a tool starts a long job (video) ─► waiting on the job (BJOB), no unit
-  └─ model answers without a tool ──► check, deliver, terminal
+  └─ model answers without a tool
+        ├─ no open work list, no ledger values ──► check, deliver, terminal
+        └─ open work list or ledger values ────► the loop ends it: one
+                                                  required finish (§1.5.1)
 ```
+
+The run is the caller's: every read of `run:{uuid}:events`, a re-attach and a
+second tab check that the caller is `BRUNS.BSTARTEDBY` or, in a shared chat,
+a member (§6.1). A UUID is not a secret. Every unit re-loads the person, the
+chat and the flag and re-resolves the project scope (§7); a chat moved out of
+its project loses the sources at the next unit, not at the next turn. A unit
+never approves a write on its own: a write tool waits for its owner
+(`ApprovalPolicy`), as in AH9. The checkpoint in Redis has a TTL and is
+deleted with the run and on account deletion.
 
 With the loop on, the web chat does not call `TurnWebSearch`,
 `AutoResearchGate` or `TaskPlanExecutor`.
@@ -38,7 +50,7 @@ With the loop on, the web chat does not call `TurnWebSearch`,
 | Minutes | none |
 | Tools per step | `ToolLimits::MAX_TOOLS_PER_TURN` (16), per step, not per run |
 | Result size per tool | `ToolLimits::RESULT_CHARS` (12,000) |
-| Cost | `LOOP.RUN_COST_CAP`, §1.3 |
+| Cost | `LOOP.RUN_COST_CAP`, §1.3. Until PJ6: the payer's monthly budget (`RateLimitService::checkCostBudget`) before every model call, not only before the turn (§0 #70) |
 | Tokens (unpriced models) | `LOOP.RUN_TOKEN_CAP`, §1.3 |
 | Provider timeout per call | as today; a call that times out is a tool or model error, not a run limit |
 | Active runs | `RUNS.MAX_ACTIVE_PER_PERSON`, `RUNS.MAX_ACTIVE`; above them a promoted turn is `queued` and the card says so |
@@ -145,7 +157,9 @@ a model that is asked to say "done" often does not. These rules replace
   progress is a counter or a range. The compaction call has an output budget
   (1,200 tokens in the spike). A summary that reaches it is a failed
   compaction (the existing wrap-up path), never silently cut.
-- **The loop ends the run.** When the work list is empty and nothing waits
+- **The loop ends the run** when it has a work list (open `update_plan`
+  items) or ledger values (§0 #68). A turn without either ends when the
+  model answers without a tool. When the work list is empty and nothing waits
   to be recorded, the loop makes one call with only `finish` offered and the
   call required. If that answer is malformed (HTTP 400, `tool_use_failed`),
   the loop asks once more for the same answer as plain JSON. If that fails
@@ -182,8 +196,8 @@ for any of these.
 | `BCHATS` | `BPROJECTSHARED` | tinyint, default 0 | visible to the project's members |
 | `BCHATS` | `BMEMORYMODE` | varchar(20) null | `project` \| `project_personal`; null outside a project |
 | `BMESSAGES` | `BAUTHORID` | bigint null, index | who wrote an incoming message (`BDIRECT = 'IN'`); null on answers (`'OUT'`). On an incoming row, null means `BUSERID` (every existing row) |
-| `BRUNS` (AH8) | `BNOTES` | mediumtext null | run notes, §1.5 |
-| `BRUNS` (AH8) | `BKIND` | value `chat` | no type change |
+| `BRUNS` (AH8) | `BNOTES` | mediumtext null | run notes, §1.5; created by AH8a's migration (§0 #63) |
+| `BRUNS` (AH8) | `BKIND` | value `chat` | no type change; listed in AH8a's migration comment (§0 #63) |
 
 `BMESSAGES.BUSERID` keeps its meaning: the account the chat lies under. In
 a shared chat that is the chat's owner for every row. Code that means "who
@@ -201,7 +215,8 @@ rows (`BDIRECT = 'IN'`), `null` on answers (`'OUT'`).
 | `BDESCRIPTION` | varchar(500) null | |
 | `BINSTRUCTIONS` | text null | goes into the system prompt of the project's chats |
 | `BGROUPKEY` | varchar(64) | the knowledge folder that holds the sources |
-| `BCREATED`, `BUPDATED` | datetime | |
+| `BPINNEDAT` | datetime null | when the owner pinned it; pinned projects are listed first (PJ4, `Version20261119120000`) |
+| `BCREATED`, `BUPDATED` | datetime (`datetime_immutable` in the entity) | |
 
 ### 2.3 `BPROJECTMEMORIES`
 
@@ -280,8 +295,11 @@ Every tool is a `ToolRegistry` source and runs through `ToolInvoker`.
 | `update_plan` | new | the short plan the card shows: `items[{text, state}]`. Display only; the kernel does not enforce it |
 | `ask_user` | new for chat | §3.1 |
 
-The run ends when the model answers without asking for a tool. There is no
-`finish` tool.
+How a run ends (§0 #68): a turn without a work list ends when the model
+answers without a tool. A run with open `update_plan` items or ledger values
+is ended by the loop with one required `finish` (`{result, outcome}`),
+checked against the work list (§1.5.1). `finish` is offered only in that
+call.
 
 ### 3.1 `ask_user`
 
@@ -384,6 +402,10 @@ PayerResolver::resolve(chat, sender)
   when the active run ends (§0 #37).
 - A message that starts with `@` and the display name of a member gets no
   answer (§0 #36).
+- A chat with `BPROJECTID` set cannot get an `edit` share until PJ20
+  (§0 #71): its turns read the project's sources and instructions, which a
+  member could otherwise read through the answers. `POST /shares` answers
+  422 with a reason; the dialog says it in one sentence. `read` stays.
 - Members' clients learn about new messages through the existing
   `chat.activity` event and fetch them. A run's event stream is readable by
   every member of the chat.
@@ -453,8 +475,9 @@ reads `apps_used`.
 
 - A member leaves or is removed: their grants are deleted, their running
   run is stopped, their messages stay with their name.
-- An account is deleted: its messages in other people's chats stay; the
-  name is replaced by a neutral label. Its project memory entries are
+- An account is deleted: its messages in other people's chats stay as
+  rows, the text becomes "Message deleted" and the name a neutral label
+  (§0 #72). The AI's answers stay. Its project memory entries are
   deleted.
 - Export of personal data includes incoming messages where
   `Message::authorId()` is the person; answers have `authorId = null` and
@@ -591,13 +614,14 @@ regenerated in the same PR.
 
 | Method and path | Step | Body / result |
 | --------------- | ---- | ------------- |
-| `GET /projects` · `POST /projects` | PJ3 | list · `{name}` |
-| `GET` · `PATCH` · `DELETE /projects/{uuid}` | PJ3 | `{name, description, instructions}`; delete takes `chats: keep \| delete` |
+| `GET /projects` · `POST /projects` | PJ3 | list (pinned first) · `{name, description?}` |
+| `GET` · `PATCH` · `DELETE /projects/{uuid}` | PJ3, PJ4 | `{name, description, instructions, pinned}`; delete takes `?chats=keep \| delete` |
 | `GET /projects/{uuid}/sources` | PJ3 | rows with state `reading \| ready \| failed` |
 | `POST /projects/{uuid}/sources` | PJ3 | multipart file, or `{type: "link", url}`, or `{type: "text", title, text}` |
 | `POST /projects/{uuid}/sources/{fileId}/refresh` · `DELETE …/{fileId}` | PJ3 | |
-| `GET /projects/{uuid}/chats` | PJ3 | |
-| `POST /chats`, `PATCH /chats/{id}` | PJ3, PJ20, PJ22 | gain `projectId`, `sharedWithProject`, `memoryMode` |
+| `GET /projects/{uuid}/chats` · `POST /projects/{uuid}/chats` | PJ3 | list · new chat in the project `{title}` |
+| `PUT` · `DELETE /projects/{uuid}/chats/{chatId}` | PJ3 | move a chat into the project · out of it |
+| project-scoped chat settings | PJ20, PJ22 | `sharedWithProject`, `memoryMode`. Not on `POST /chats` / `PATCH /chats/{id}`: `ChatController` is in the size ledger (PJ3 deviation); they go on a `/projects/{uuid}/chats/{chatId}` route |
 | `POST /runs/{uuid}/answer` | PJ9 | §3.1 |
 | `POST /runs` with `continueFrom` | PJ8 | "Keep going" |
 | `POST /runs/{uuid}/seen` | PJ27 | |
@@ -629,16 +653,15 @@ existing installs ships as a migration `UPDATE`.
 | `SHARED_CHATS` | `ENABLED` | 0 | "Can write", allowance, app switches |
 | `SHARED_CHATS` | `MAX_MEMBERS` | 20 | per chat |
 | `PROJECTS` | `ENABLED` | 0 | |
-| `PROJECTS` | `MAX_SOURCES` | 200 | per project |
-| `PROJECTS` | `INSTRUCTIONS_MAX_CHARS` | 8000 | |
+| `PROJECTS` | `MAX_SOURCES` | 50 | per project (`ProjectsConfig`, as built in PJ3) |
+| `PROJECTS` | `INSTRUCTIONS_MAX_CHARS` | 4000 | as built in PJ3 |
 | `PROJECTS` | `MEMORY_ENABLED` | 0 | project memory, after G12 |
 | `PROJECTS` | `MEMORIES_PER_TURN` / `MAX_MEMORIES` | 8 / 300 | |
 | `PUSH` | `ENABLED` | 0 | |
 | `PUSH` | `RELAY_URL` | empty | set by the seeder to Synaplan's relay once it exists |
 | `PUSH` | `DELAY_SECONDS` | 20 | §8.4 |
 
-Env pins follow the module pattern (`FEATURE_PROJECTS`,
-`FEATURE_SHARED_CHATS`). No new compose line is needed for the four flags;
+Env pins follow the module pattern: `PROJECTS_ENABLED` (as built in PJ3; set wins over the database), later `SHARED_CHATS_ENABLED`, `LOOP_ENABLED`, `PUSH_ENABLED`. No new compose line is needed for the four flags;
 if one turns out to be, it is an ask-first item.
 
 ## 12. Audit events
