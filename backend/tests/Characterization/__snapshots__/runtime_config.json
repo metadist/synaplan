@@ -16,7 +16,8 @@
                 "signupPaused": "bool"
             },
             "billing": {
-                "enabled": "bool"
+                "enabled": "bool",
+                "planLimits": "bool"
             },
             "branding": {
                 "accentColor": "string",
@@ -263,7 +264,8 @@
                 "signupPaused": "bool"
             },
             "billing": {
-                "enabled": "bool"
+                "enabled": "bool",
+                "planLimits": "bool"
             },
             "branding": {
                 "accentColor": "string",
@@ -510,7 +512,8 @@
                 "signupPaused": "bool"
             },
             "billing": {
-                "enabled": "bool"
+                "enabled": "bool",
+                "planLimits": "bool"
             },
             "branding": {
                 "accentColor": "string",

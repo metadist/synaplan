@@ -10,6 +10,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\RateLimitService;
 use App\Service\Usage\CostCalculationService;
 use Doctrine\DBAL\Connection;
@@ -43,7 +44,7 @@ class RateLimitServiceZeroCostTest extends TestCase
             $this->createMock(ConfigRepository::class),
             $em,
             new NullLogger(),
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $this->costCalculationService,
             $this->createMock(SubscriptionRepository::class),
             $this->createMock(TopupRepository::class),

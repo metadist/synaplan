@@ -81,7 +81,7 @@ const loading = ref(true)
 
 const isUnlimited = computed(
   () =>
-    !config.billing.enabled ||
+    !config.billing.planLimits ||
     authStore.isAdmin ||
     stats.value?.storage.unlimited === true ||
     stats.value?.user_level === 'ADMIN'

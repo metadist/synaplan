@@ -1708,6 +1708,17 @@
                 "tab": "ai",
                 "type": "password"
             },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "dbGroup": "SYSTEM_FLAGS",
+                "dbKey": "PLAN_LIMITS_WITHOUT_BILLING",
+                "default": "false",
+                "description": "Apply the plan limits although billing (Stripe) is not set up. On: each account gets the limits of its plan, so a Free-plan account cannot spend your provider keys beyond them. A new installation starts with this on and gives the Free plan (level New) no usage at all; to let a person use AI, change their level under Users to Pro, Team or Business. Off: every signed-in account uses AI without limits, paid by your provider keys. With billing set up the limits always apply.",
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "boolean"
+            },
             "PROGRESS_SHOW_MODELS": {
                 "dbGroup": "PROGRESS_NARRATION",
                 "dbKey": "SHOW_MODELS",
@@ -2317,6 +2328,7 @@
                             "REGISTRATION_ENABLED",
                             "REGISTRATION_MODE",
                             "GUEST_CHAT_ENABLED",
+                            "PLAN_LIMITS_WITHOUT_BILLING",
                             "SIGNUP_PAUSED"
                         ],
                         "id": "access",
@@ -3719,6 +3731,12 @@
                 "keySource": "none",
                 "value": ""
             },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "PROGRESS_SHOW_MODELS": {
                 "isMasked": false,
                 "isSet": false,
@@ -5063,6 +5081,12 @@
                 "isSet": false,
                 "keySource": "none",
                 "value": ""
+            },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "PROGRESS_SHOW_MODELS": {
                 "isMasked": false,
@@ -7283,6 +7307,17 @@
                 "tab": "ai",
                 "type": "password"
             },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "dbGroup": "SYSTEM_FLAGS",
+                "dbKey": "PLAN_LIMITS_WITHOUT_BILLING",
+                "default": "false",
+                "description": "Apply the plan limits although billing (Stripe) is not set up. On: each account gets the limits of its plan, so a Free-plan account cannot spend your provider keys beyond them. A new installation starts with this on and gives the Free plan (level New) no usage at all; to let a person use AI, change their level under Users to Pro, Team or Business. Off: every signed-in account uses AI without limits, paid by your provider keys. With billing set up the limits always apply.",
+                "section": "access",
+                "sensitive": false,
+                "source": "database",
+                "tab": "auth",
+                "type": "boolean"
+            },
             "PROGRESS_SHOW_MODELS": {
                 "dbGroup": "PROGRESS_NARRATION",
                 "dbKey": "SHOW_MODELS",
@@ -7892,6 +7927,7 @@
                             "REGISTRATION_ENABLED",
                             "REGISTRATION_MODE",
                             "GUEST_CHAT_ENABLED",
+                            "PLAN_LIMITS_WITHOUT_BILLING",
                             "SIGNUP_PAUSED"
                         ],
                         "id": "access",
@@ -9475,6 +9511,12 @@
                 "keySource": "none",
                 "value": ""
             },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "PROGRESS_SHOW_MODELS": {
                 "isMasked": false,
                 "isSet": false,
@@ -10661,6 +10703,12 @@
                 "isSet": true,
                 "keySource": "db",
                 "value": "••••••••"
+            },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "PROGRESS_SHOW_MODELS": {
                 "isMasked": false,
@@ -11866,6 +11914,12 @@
                 "isSet": false,
                 "keySource": "none",
                 "value": ""
+            },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "PROGRESS_SHOW_MODELS": {
                 "isMasked": false,
@@ -13204,6 +13258,12 @@
                 "keySource": "none",
                 "value": ""
             },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
+            },
             "PROGRESS_SHOW_MODELS": {
                 "isMasked": false,
                 "isSet": false,
@@ -14540,6 +14600,12 @@
                 "isSet": false,
                 "keySource": "none",
                 "value": ""
+            },
+            "PLAN_LIMITS_WITHOUT_BILLING": {
+                "isMasked": false,
+                "isSet": false,
+                "locked": false,
+                "value": "false"
             },
             "PROGRESS_SHOW_MODELS": {
                 "isMasked": false,

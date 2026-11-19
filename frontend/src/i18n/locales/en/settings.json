@@ -50,7 +50,17 @@
     "footerNote": "Questions? Contact our support team.",
     "messageBlocked": "Message could not be sent",
     "messageBlockedDesc": "You've reached your {action} limit. Upgrade your plan or wait for the limit to reset.",
-    "retryLater": "Retry"
+    "retryLater": "Retry",
+    "selfHosted": {
+      "usedUp": {
+        "title": "Limit reached",
+        "description": "Your plan on this server includes {limit} {action}, and they are used up. Ask the person who runs this Synaplan for more."
+      },
+      "none": {
+        "title": "Not included in your plan",
+        "description": "Your plan on this server includes no {action}. Ask the person who runs this Synaplan to give your account a plan."
+      }
+    }
   },
   "paywall": {
     "title": {

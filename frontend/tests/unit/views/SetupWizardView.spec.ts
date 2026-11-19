@@ -59,7 +59,11 @@ function mountView() {
           name: 'SetupProviderStep',
           template: '<div data-testid="stub-provider" />',
         },
-        SetupAccessStep: { name: 'SetupAccessStep', template: '<div data-testid="stub-access" />' },
+        SetupAccessStep: {
+          name: 'SetupAccessStep',
+          props: ['initialRegistrationEnabled', 'initialGuestChatEnabled'],
+          template: '<div data-testid="stub-access" />',
+        },
         SetupDoneStep: { name: 'SetupDoneStep', template: '<div data-testid="stub-done" />' },
       },
     },
@@ -156,6 +160,39 @@ describe('SetupWizardView', () => {
     expect(wrapper.find('[data-testid="stub-done"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="setup-subtitle"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="setup-footer-hint"]').exists()).toBe(false)
+  })
+
+  it('offers sign-up as the server stored it after the administrator was created', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    wrapper.getComponent({ name: 'SetupAdminStep' }).vm.$emit('created')
+    await flushPromises()
+    getSetupState.mockResolvedValue({
+      ...virginState,
+      wizardRequired: false,
+      adminExists: true,
+      access: { ...virginState.access, registrationEnabled: false },
+    })
+    wrapper.getComponent({ name: 'SetupProviderStep' }).vm.$emit('next')
+    await flushPromises()
+
+    const access = wrapper.getComponent({ name: 'SetupAccessStep' })
+    expect(access.props('initialRegistrationEnabled')).toBe(false)
+    expect(access.props('initialGuestChatEnabled')).toBe(true)
+  })
+
+  it('still reaches the access step when the state cannot be read again', async () => {
+    const wrapper = mountView()
+    await flushPromises()
+
+    wrapper.getComponent({ name: 'SetupAdminStep' }).vm.$emit('created')
+    await flushPromises()
+    getSetupState.mockRejectedValue(new Error('backend unreachable'))
+    wrapper.getComponent({ name: 'SetupProviderStep' }).vm.$emit('next')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="stub-access"]').exists()).toBe(true)
   })
 
   it('points an already set-up instance at the login instead of the wizard', async () => {

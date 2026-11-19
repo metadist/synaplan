@@ -48,13 +48,13 @@
 
           <!-- Title -->
           <h2 class="text-2xl font-bold txt-primary text-center mb-2">
-            {{ $t(`limitReached.${limitType}.title`) }}
+            {{ $t(`${copyKey}.title`) }}
           </h2>
 
           <!-- Description -->
           <p class="text-sm txt-secondary text-center mb-6">
             {{
-              $t(`limitReached.${limitType}.description`, {
+              $t(`${copyKey}.description`, {
                 action: actionLabel,
                 limit: formatLimit(currentLimit),
               })
@@ -277,6 +277,17 @@ const showTopup = computed(() => props.topupAvailable && !isNative && config.bil
 // self-hosted/open-source installs billing is disabled — in both cases the modal
 // only informs about the limit, without upgrade steering.
 const purchaseAllowed = computed(() => isPurchaseAllowed() && config.billing.enabled)
+
+// Without billing there is nothing to upgrade to: the person who runs the
+// server decides, and a plan with 0 of an action never had any to use up.
+const copyKey = computed(() => {
+  if (config.billing.enabled || props.limitType === 'hourly') {
+    return `limitReached.${props.limitType}`
+  }
+  return props.currentLimit === 0
+    ? 'limitReached.selfHosted.none'
+    : 'limitReached.selfHosted.usedUp'
+})
 
 const handleTopup = async () => {
   if (topupLoading.value) return

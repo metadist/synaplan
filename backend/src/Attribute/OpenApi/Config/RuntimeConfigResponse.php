@@ -49,6 +49,7 @@ final class RuntimeConfigResponse extends OA\Response
                 description: 'Billing/subscription status (false for open-source deployments)',
                 properties: [
                     new OA\Property(property: 'enabled', type: 'boolean', example: false),
+                    new OA\Property(property: 'planLimits', type: 'boolean', description: 'Whether the plan limits (RATELIMITS_{level}) apply. Always true with billing; without billing only when SYSTEM_FLAGS.PLAN_LIMITS_WITHOUT_BILLING is on.', example: false),
                 ]
             ),
             new OA\Property(

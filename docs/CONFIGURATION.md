@@ -39,7 +39,7 @@ Provider keys are the common case and belong in the UI — see [AI Providers](#a
 | `REDIS_DSN` | `redis://redis:6379` | **Required.** Cache, sessions, locks, queues, realtime engine ([details](#redis-required)) |
 | `REALTIME_ENABLED` | `true` | WebSocket realtime layer (Centrifugo) — see [REALTIME.md](REALTIME.md) |
 | `SETUP_WIZARD_ENABLED` | `true` | Serve the [first-run setup wizard](#first-run-setup) on an installation that has no administrator |
-| `REGISTRATION_ENABLED` | *unset* | Pins every self-sign-up door (email, Google, GitHub, Apple, setup wizards). An existing account still signs in. Does not govern OIDC. Overrides Admin → System Configuration ([Who can sign in](IDENTITY.md)) |
+| `REGISTRATION_ENABLED` | *unset* (a new installation stores off) | Pins every self-sign-up door (email, Google, GitHub, Apple, setup wizards). An existing account still signs in. Does not govern OIDC. Overrides Admin → System Configuration ([Who can sign in](IDENTITY.md)) |
 | `REGISTRATION_MODE` | `open` | `open`: a self-sign-up is active at `NEW`. `admission`: a new account needs a paid plan or an invitation code ([details](IDENTITY.md)) |
 | `SIGNUP_PAUSED` | *unset* | Temporarily closes every self-sign-up door. The answer is `SIGNUP_PAUSED` (503) |
 | `OIDC_ALLOW_USER_PROVISIONING` | `true` | The only switch that stops a first OIDC sign-in from creating an account. Independent of `REGISTRATION_*` |
@@ -219,6 +219,19 @@ table open:
 Self-registration and guest chat are also switches in **Admin → System
 Configuration**, stored in `BCONFIG` and effective without a restart. The setup
 wizard writes the same two rows.
+
+A new installation starts **closed**. When its first administrator is created,
+through the setup wizard or `BOOTSTRAP_ADMIN_*`, Synaplan stores:
+
+| Row | Value | Effect |
+| --- | ----- | ------ |
+| `ACCESS.REGISTRATION_ENABLED` | `false` | Nobody can sign up. The wizard's access step starts with sign-up off and stores what the administrator picks |
+| `SYSTEM_FLAGS.PLAN_LIMITS_WITHOUT_BILLING` | `true` | The plan limits apply although billing is off, guest chat included (`RATELIMITS_ANONYMOUS`) ([details](BILLING_SELFHOST.md)) |
+| `RATELIMITS_NEW.*` quotas | `0` | A Free-plan account (level `New`) has no usage until an administrator changes its level under **Users** |
+
+An installation that had users before keeps its settings. So does the
+development stack with demo data, which never creates its administrator
+through these paths.
 
 `REGISTRATION_ENABLED` and `GUEST_CHAT_ENABLED` act as a **pin**: when either
 is set in the environment, it wins over the database and the admin UI marks

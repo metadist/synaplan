@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\FileRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\RateLimitService;
 use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -43,7 +44,7 @@ class StorageQuotaServiceTest extends TestCase
             $this->configRepository,
             $this->em,
             $this->logger,
-            $billingService,
+            new PlanLimitEnforcement($billingService, $this->createStub(ConfigRepository::class)),
             $this->rateLimitService,
         );
     }
@@ -111,7 +112,7 @@ class StorageQuotaServiceTest extends TestCase
             $this->configRepository,
             $this->em,
             $this->logger,
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $this->rateLimitService,
         );
 

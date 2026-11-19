@@ -29,6 +29,7 @@ use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Repository\UserRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\Billing\PremiumFeatureGate;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\RateLimitService;
@@ -385,7 +386,7 @@ final class MessagesSessionUsageTest extends TestCase
             $configRepo,
             $em,
             new NullLogger(),
-            new BillingService('', ''),
+            new PlanLimitEnforcement(new BillingService('', ''), $this->createStub(ConfigRepository::class)),
             $costs,
             $subscriptions,
             $topups,

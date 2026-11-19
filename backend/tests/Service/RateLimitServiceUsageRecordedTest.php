@@ -10,6 +10,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\RateLimitService;
 use App\Service\Usage\CostCalculationService;
 use App\Service\Usage\UsageRecorded;
@@ -52,7 +53,7 @@ final class RateLimitServiceUsageRecordedTest extends TestCase
             $this->createStub(ConfigRepository::class),
             $em,
             new NullLogger(),
-            new BillingService('sk_test_valid_key', 'price_1RealProId'),
+            new PlanLimitEnforcement(new BillingService('sk_test_valid_key', 'price_1RealProId'), $this->createStub(ConfigRepository::class)),
             $cost,
             $this->createStub(SubscriptionRepository::class),
             $this->createStub(TopupRepository::class),

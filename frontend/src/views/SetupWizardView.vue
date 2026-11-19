@@ -114,7 +114,7 @@
 
         <SetupAdminStep v-else-if="'admin' === step" @created="afterAdminCreated" @stale="load" />
 
-        <SetupProviderStep v-else-if="'provider' === step" @next="step = 'access'" />
+        <SetupProviderStep v-else-if="'provider' === step" @next="openAccessStep" />
 
         <SetupAccessStep
           v-else-if="'access' === step"
@@ -171,7 +171,7 @@ type Step = (typeof STEPS)[number] | 'done'
 
 const { isDark, setTheme } = useTheme()
 const { locale, t } = useI18n()
-const { state, loading, error: loadError, load } = useSetupState()
+const { state, loading, error: loadError, load, refresh } = useSetupState()
 
 const toggleTheme = () => setTheme(isDark.value ? 'light' : 'dark')
 
@@ -215,8 +215,9 @@ const showLockdownHint = computed(() => 'done' !== step.value && !alreadyDone.va
 
 const mailerConfigured = computed(() => true === state.value?.mailerConfigured)
 
+// Sign-up stays closed unless the server says otherwise.
 const DEFAULT_ACCESS = {
-  registrationEnabled: true,
+  registrationEnabled: false,
   guestChatEnabled: true,
   registrationLocked: false,
   guestChatLocked: false,
@@ -235,6 +236,11 @@ async function afterAdminCreated(): Promise<void> {
   const auth = useAuthStore()
   auth.adoptCurrentSession()
   await auth.refreshUser()
+}
+
+async function openAccessStep(): Promise<void> {
+  await refresh()
+  step.value = 'access'
 }
 
 onMounted(load)

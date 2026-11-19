@@ -17,6 +17,7 @@ final readonly class BillingRuntimeConfig implements RuntimeConfigContributorInt
 {
     public function __construct(
         private BillingService $billingService,
+        private PlanLimitEnforcement $planLimits,
         private UsageTaximeterConfig $usageTaximeterConfig,
         private MobileVersionService $mobileVersionService,
         private ClientContextResolver $clientContextResolver,
@@ -31,6 +32,7 @@ final readonly class BillingRuntimeConfig implements RuntimeConfigContributorInt
         return [
             'billing' => [
                 'enabled' => $this->billingService->isEnabled(),
+                'planLimits' => $this->planLimits->isEnforced(),
             ],
             'usageTaximeter' => [
                 'enabled' => $this->usageTaximeterConfig->isEnabled(),

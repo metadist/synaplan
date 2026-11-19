@@ -10,6 +10,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
 use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\RateLimitService;
 use App\Service\Usage\CostCalculationService;
 use App\Service\Usage\DemoCallContext;
@@ -119,7 +120,7 @@ final class DemoCallStatisticsTest extends TestCase
             $config,
             $em,
             new NullLogger(),
-            $this->createStub(BillingService::class),
+            new PlanLimitEnforcement($this->createStub(BillingService::class), $this->createStub(ConfigRepository::class)),
             $costs,
             $this->createStub(SubscriptionRepository::class),
             $this->createStub(TopupRepository::class),

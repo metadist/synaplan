@@ -14,7 +14,7 @@ use App\Service\Chat\GuestChatConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Email\MailerConfig;
 use App\Service\Http\ClientAddress;
-use App\Service\Iam\UserLifecycleService;
+use App\Service\Setup\FirstAdminCreator;
 use App\Service\Setup\SetupStateService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -53,7 +53,7 @@ final class SetupController extends AbstractController
     public function __construct(
         private readonly SetupStateService $setupState,
         private readonly UserRepository $userRepository,
-        private readonly UserLifecycleService $userLifecycleService,
+        private readonly FirstAdminCreator $firstAdminCreator,
         private readonly TokenService $tokenService,
         private readonly ClientContextResolver $clientContextResolver,
         private readonly RegistrationConfig $registrationConfig,
@@ -115,7 +115,7 @@ final class SetupController extends AbstractController
     #[OA\Post(
         path: '/api/v1/setup/admin',
         summary: 'Create the first administrator',
-        description: 'Public, but only while setup is required. Creates an ADMIN account with a verified email address (there is no mailbox to confirm through yet, and no second account that could be hijacked) and signs it in, so the wizard can continue against the admin API. Refuses with 409 as soon as the installation has any user.',
+        description: 'Public, but only while setup is required. Creates an ADMIN account with a verified email address (there is no mailbox to confirm through yet, and no second account that could be hijacked) and signs it in, so the wizard can continue against the admin API. Refuses with 409 as soon as the installation has any user. A new installation starts closed: sign-up off, no usage for Free-plan accounts, plan limits applied without billing.',
         tags: ['Setup']
     )]
     #[OA\RequestBody(
@@ -205,15 +205,7 @@ final class SetupController extends AbstractController
                 return $this->alreadyCompleted();
             }
 
-            $user = $this->userLifecycleService->createUser(
-                email: $dto->email,
-                plainPassword: $dto->password,
-                userLevel: 'ADMIN',
-                // No mailbox round trip is possible yet — the mailer may well be
-                // one of the things this administrator is about to configure —
-                // and there is no other account this could grant access to.
-                emailVerified: true,
-            );
+            $user = $this->firstAdminCreator->create($dto->email, $dto->password);
 
             $this->logger->notice('First administrator created through the setup wizard', [
                 'user_id' => $user->getId(),

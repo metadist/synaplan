@@ -353,7 +353,17 @@
     "footerNote": "Sorularınız mı var? Destek ekibimizle iletişime geçin.",
     "messageBlocked": "Mesaj gönderilemedi",
     "messageBlockedDesc": "{action} limitinize ulaştınız. Planınızı yükseltin veya limitin sıfırlanmasını bekleyin.",
-    "retryLater": "Tekrar Dene"
+    "retryLater": "Tekrar Dene",
+    "selfHosted": {
+      "usedUp": {
+        "title": "Limite ulaşıldı",
+        "description": "Bu sunucudaki planınız {limit} {action} içeriyor ve hepsi kullanıldı. Daha fazlası için bu Synaplan’ı yöneten kişiye başvurun."
+      },
+      "none": {
+        "title": "Planınıza dahil değil",
+        "description": "Bu sunucudaki planınız {action} içermiyor. Hesabınıza bir plan vermesi için bu Synaplan’ı yöneten kişiye başvurun."
+      }
+    }
   },
   "settings": {
     "voice": {

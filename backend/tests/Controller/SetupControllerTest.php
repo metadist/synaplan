@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Entity\Config;
 use App\Entity\Token;
 use App\Entity\User;
 use App\Repository\ConfigRepository;
@@ -11,6 +12,7 @@ use App\Repository\UserRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\TokenService;
 use App\Service\Chat\GuestChatConfig;
+use App\Service\Setup\FreshInstallDefaults;
 use App\Service\Setup\SetupConstants;
 use App\Service\Setup\SetupStateService;
 use Doctrine\DBAL\ArrayParameterType;
@@ -40,6 +42,9 @@ final class SetupControllerTest extends WebTestCase
     private array $createdUserIds = [];
 
     private bool $wroteConfigRows = false;
+
+    /** @var array<string, string> what a first-admin request wrote as closed defaults, by GROUP.SETTING */
+    private array $freshInstallRows = [];
 
     protected function tearDown(): void
     {
@@ -115,6 +120,38 @@ final class SetupControllerTest extends WebTestCase
         $this->createdUserIds[] = (int) $user->getId();
         self::assertSame('ADMIN', $user->getUserLevel());
         self::assertTrue($user->isEmailVerified(), 'there is no mailbox to confirm through yet');
+    }
+
+    /**
+     * A new installation starts closed: nobody can sign up and a Free-plan
+     * account has no usage until the administrator decides otherwise.
+     */
+    public function testCreateFirstAdminStartsTheInstallationClosed(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+
+        $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'SecurePass123');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        $user = $this->findUser($client, self::NEW_ADMIN_EMAIL);
+        self::assertNotNull($user);
+        $this->createdUserIds[] = (int) $user->getId();
+
+        self::assertSame('false', $this->freshInstallRows['ACCESS.REGISTRATION_ENABLED'] ?? null);
+        self::assertSame('true', $this->freshInstallRows['SYSTEM_FLAGS.PLAN_LIMITS_WITHOUT_BILLING'] ?? null);
+        foreach (FreshInstallDefaults::FREE_PLAN_QUOTAS as $quota) {
+            self::assertSame('0', $this->freshInstallRows["RATELIMITS_NEW.{$quota}"] ?? null, $quota);
+        }
+    }
+
+    public function testCreateFirstAdminRefusedOnAnInstallationWithUsersChangesNoSetting(): void
+    {
+        $client = $this->clientWithUsers();
+
+        $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'SecurePass123');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CONFLICT);
+        self::assertSame([], $this->freshInstallRows);
     }
 
     /**
@@ -313,6 +350,26 @@ final class SetupControllerTest extends WebTestCase
         // state service would leave the controller looking at the real, seeded
         // table and refusing with 409.
         static::getContainer()->set(UserRepository::class, $userRepository);
+
+        // The closed defaults of a new installation would otherwise land in the
+        // shared test database and give every later test a Free plan without
+        // usage. This double records what the real class would write.
+        $this->freshInstallRows = [];
+        $freshInstallRepository = $this->createStub(ConfigRepository::class);
+        $record = function (int $owner, string $group, string $setting, string $value): string {
+            $this->freshInstallRows["{$group}.{$setting}"] = $value;
+
+            return $value;
+        };
+        $freshInstallRepository->method('insertIfAbsent')->willReturnCallback($record);
+        $freshInstallRepository->method('setValue')->willReturnCallback(
+            function (int $owner, string $group, string $setting, string $value) use ($record): Config {
+                $record($owner, $group, $setting, $value);
+
+                return new Config();
+            },
+        );
+        static::getContainer()->set(FreshInstallDefaults::class, new FreshInstallDefaults($freshInstallRepository));
 
         return $client;
     }

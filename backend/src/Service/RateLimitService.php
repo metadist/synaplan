@@ -7,7 +7,7 @@ use App\Entity\User;
 use App\Repository\ConfigRepository;
 use App\Repository\SubscriptionRepository;
 use App\Repository\TopupRepository;
-use App\Service\Billing\BillingService;
+use App\Service\Billing\PlanLimitEnforcement;
 use App\Service\Config\LayeredConfigResolver;
 use App\Service\Iam\Policy\PolicyAllowList;
 use App\Service\Usage\CostCalculationService;
@@ -49,7 +49,7 @@ final class RateLimitService implements ResetInterface
         private ConfigRepository $configRepository,
         private EntityManagerInterface $em,
         private LoggerInterface $logger,
-        private BillingService $billingService,
+        private PlanLimitEnforcement $planLimits,
         private CostCalculationService $costCalculationService,
         private SubscriptionRepository $subscriptionRepository,
         private TopupRepository $topupRepository,
@@ -86,8 +86,8 @@ final class RateLimitService implements ResetInterface
      */
     public function checkLimit(User $user, string $action): array
     {
-        // If billing is disabled (Open Source Mode), all users have unlimited usage
-        if (!$this->billingService->isEnabled()) {
+        // Without billing the plan limits apply only where switched on (new installs).
+        if (!$this->planLimits->isEnforced()) {
             return [
                 'allowed' => true,
                 'limit' => PHP_INT_MAX,
@@ -797,7 +797,7 @@ final class RateLimitService implements ResetInterface
     /**
      * Get max output tokens allowed for a user based on their subscription level.
      *
-     * Returns null when billing is disabled (Open Source Mode), for admins, or
+     * Returns null when the plan limits do not apply (Open Source Mode), for admins, or
      * when the level has no MAX_OUTPUT_TOKENS configured — meaning the model's
      * own max_tokens is used without restriction. By design only ANONYMOUS keeps
      * a hard cap; authenticated tiers (NEW/PRO/TEAM/BUSINESS) return null here
@@ -805,7 +805,7 @@ final class RateLimitService implements ResetInterface
      */
     public function getMaxOutputTokens(User $user): ?int
     {
-        if (!$this->billingService->isEnabled()) {
+        if (!$this->planLimits->isEnforced()) {
             return null;
         }
 
