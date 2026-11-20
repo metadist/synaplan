@@ -114,7 +114,7 @@ disabled tokens return the same 404. See `docs/N8N.md`.
 (`POST /api/v1/saved-tasks/{id}/copy`) creates a copy owned by the caller:
 the graph and trigger type are kept, the copy is **paused** (`enabled=false`,
 `allowUnattended=false`), a webhook token is regenerated, outbound `secret`
-and HMAC are stripped. If the caller cannot use the source assistant, the
+and HMAC are stripped. If the caller cannot use the source agent, the
 copy points at a fallback prompt they can use and the response `checklist`
 lists `needsAssistant` (and `needsTool` for tools they cannot run). 409 only
 when there is no fallback prompt at all.

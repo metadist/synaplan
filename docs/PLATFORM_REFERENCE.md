@@ -155,15 +155,15 @@ Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API
 ## Features
 
 - **AI Chat** — Ollama, OpenAI, Anthropic, Gemini, Groq, Mistral, xAI, TrustedTokens (DE), A2Agent (CN), HuggingFace ([provider list](#ai-providers--models))
-- **Self-aware assistant** — Ask "What can you do here?" or type `/help`; the AI assistant answers from this installation's live capabilities, not a generic brochure
+- **Self-aware AI** — Ask "What can you do here?" or type `/help`; the AI answers from this installation's live capabilities, not a generic brochure
 - **Multi-Task DAG Routing** — An AI planner decomposes complex requests into a directed task graph (extract → summarize → generate → reply), routes each step to the model that fits it, and streams live task cards while the steps execute — cheaper models for simple steps means fewer wasted tokens
 - **RAG Search** — Semantic document search with MariaDB VECTOR or Qdrant
 - **Chat Widget** — Embed on any website ([widget guide](https://docs.synaplan.com/widget))
 - **Mobile Apps** — Chat, documents and voice on iPhone and Android, pointed at web.synaplan.com or at your own server ([App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme))
 - **Synaplan Desktop** — Pair a computer and run skills on it. Open **Channels → Synaplan Desktop**. No installer yet ([synaplan-desktop](https://github.com/metadist/synaplan-desktop))
-- **AI assistants** — Saved recipes (instructions, knowledge folders, tools, triggers) that you publish in versions ([assistants](https://docs.synaplan.com/assistants))
+- **Agents** — Saved recipes (instructions, knowledge folders, tools, triggers) that you publish in versions ([agents](https://docs.synaplan.com/agents))
 - **Tools & approvals** — One tool registry; write-class actions pause under **Approvals** ([tools](https://docs.synaplan.com/tools-and-approvals))
-- **Users & groups** — Share folders, chats, assistants and tasks; **Admin → Users** ([people](https://docs.synaplan.com/people-and-groups))
+- **Users & groups** — Share folders, chats, agents and tasks; **Admin → Users** ([people](https://docs.synaplan.com/people-and-groups))
 - **File work** — Short Python or Node runs on *copies* of files you picked, in an isolated sidecar ([guide](COMPUTE.md))
 - **Live Support** — Realtime WebSocket layer (Centrifugo + Redis): human takeover of widget chats, typing indicators, operator notifications ([realtime guide](REALTIME.md))
 - **WhatsApp** — Meta Business API integration
@@ -172,7 +172,7 @@ Open **<http://localhost:5173>**. The API is at <http://localhost:8000>, the API
 - **Saved Tasks** — Pin a multi-step plan and run it on demand or on a schedule, with a **Steps** editor and webhook trigger (**Manage → Automations → Saved Tasks**)
 - **Watched pages** — Save a URL, compare it on a schedule, and mail the diff when it changes
 - **Audio** — Whisper transcription (input) + optional [synaplan-tts](https://github.com/metadist/synaplan-tts) (output; five baked voices, UI language selects the voice)
-- **Documents** — PDF, Word, Excel, images with OCR; the assistant can also build and revise Office files; optional Collabora CODE sidecar for thumbnails, PDF export, preview and combine ([office documents](https://docs.synaplan.com/office-documents))
+- **Documents** — PDF, Word, Excel, images with OCR; the AI can also build and revise Office files; optional Collabora CODE sidecar for thumbnails, PDF export, preview and combine ([office documents](https://docs.synaplan.com/office-documents))
 - **AI Memories** — User profiling with Qdrant vector search
 - **Feedback System** — Feedback capture and analysis powered by Qdrant
 - **Plugins** — Non-invasive plugin system ([plugin guide](https://docs.synaplan.com/plugins))
@@ -280,7 +280,7 @@ Thumbnails, PDF export, inline preview and “Combine as PDF” use Collabora CO
 
 ## File work
 
-The assistant can run a short Python or Node program on copies of files you already picked. `make up` starts it. The dev token, and how to turn the sidecar off, are in [Installation — File work](INSTALLATION.md#file-work-secure-compute).
+The AI can run a short Python or Node program on copies of files you already picked. `make up` starts it. The dev token, and how to turn the sidecar off, are in [Installation — File work](INSTALLATION.md#file-work-secure-compute).
 
 ---
 

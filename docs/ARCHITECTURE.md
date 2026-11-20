@@ -126,7 +126,7 @@ stages in `App\Service\Message\Chat\`:
 | Stage | Produces |
 | ----- | -------- |
 | `ChatTurnContextLoader` | `ChatTurn`: runtime profile, topic prompt, knowledge base, memories |
-| `ChatModelSelector` | `ChatModelChoice`: "Again" > widget > assistant > prompt > default; retired models swapped; image model fallback |
+| `ChatModelSelector` | `ChatModelChoice`: "Again" > widget > agent > prompt > default; retired models swapped; image model fallback |
 | `ChatSystemPromptAssembler` | `ChatSystemPrompt`: sections in channel order, or a user-turn fallback for models without a system role |
 | `ChatMessageAssembler` | the provider messages |
 | `ChatRequestOptions` | document schema, routing tools, token ceiling, sampling, reasoning level |
@@ -162,7 +162,7 @@ flowchart LR
 
 - **Request.** `StreamRequestResolver` turns the request into a typed
   `StreamTurnRequest`: the caller (signed-in person, widget visitor, guest —
-  `StreamCallerResolver`), the pinned assistant (`StreamAgentPinResolver`),
+  `StreamCallerResolver`), the pinned agent (`StreamAgentPinResolver`),
   the input, the options and the incognito history. A request that cannot
   start a turn becomes a `StreamRequestRejected` with its JSON error, or the
   guest-limit event.
@@ -278,8 +278,8 @@ that decides returns, before the AI sorter's paid call:
 
 | Step | Decides |
 | ---- | ------- |
-| `SlashCommandRoute` | on every channel (#2280): a bare command answers with its usage hint, even for a pinned assistant; a tool command (`/pic`, `/vid`, …) routes to its tool; `/search` and `/docs` with an argument become overlays on whatever classifies the rest (`SlashOutcome`); `/docs <query>` without a pin searches the knowledge base |
-| `AgentPinRoute` | a pinned assistant answers with its own prompt and models, asking the sorter only whether the turn needs the web |
+| `SlashCommandRoute` | on every channel (#2280): a bare command answers with its usage hint, even for a pinned agent; a tool command (`/pic`, `/vid`, …) routes to its tool; `/search` and `/docs` with an argument become overlays on whatever classifies the rest (`SlashOutcome`); `/docs <query>` without a pin searches the knowledge base |
+| `AgentPinRoute` | a pinned agent answers with its own prompt and models, asking the sorter only whether the turn needs the web |
 | `FastPathClassifier` | an obviously plain chat message in a certain language skips the sorter (`CLASSIFIER.FAST_PATH_ENABLED`, off by default) |
 | `AgainOverride` | the prompt or the model a user picked for an Again (`BMESSAGEMETA`) |
 | `AttachmentIntent` | a document, audio or video goes to file analysis (#595, #722), unless it is an office edit, a merge or PDF export, or a demand for a new file (#2047) |
@@ -329,7 +329,7 @@ refresh, the attachment store and Discord over fourteen cases.
 
 | Stage | Does |
 | ----- | ---- |
-| `WhatsAppIntake` | admits the message as an `InboundWhatsApp` or answers it early (`WhatsAppMessageAnswered`): a redelivery (lock and cache, so concurrent webhooks see it), an unsupported type (acknowledged silently, #633), a verification code from the website, the account's limit (told by message); names the account the turn runs under, whether a spoken reply is due and the bound assistant |
+| `WhatsAppIntake` | admits the message as an `InboundWhatsApp` or answers it early (`WhatsAppMessageAnswered`): a redelivery (lock and cache, so concurrent webhooks see it), an unsupported type (acknowledged silently, #633), a verification code from the website, the account's limit (told by message); names the account the turn runs under, whether a spoken reply is due and the bound agent |
 | `WhatsAppConversation` | stores the message in the sender's WhatsApp chat (`StoredWhatsAppMessage`) with its metadata and media (`WhatsAppService::handleMediaDownload()`), moves the chat up and tells open browsers; media that cannot be fetched is told to the sender and ends the turn |
 | `WhatsAppReply` | runs the AI pipeline behind a typing indicator and composes the answer once (`WhatsAppAnswer`: doc tags as links, media tags rendered, the sources of a text reply, usage recorded); `WhatsAppReplyDelivery` sends the generated media, a spoken reply or text, and `WhatsAppAnswerStore` keeps what reached the phone |
 
@@ -552,7 +552,7 @@ the Doctrine mapping and proves that none is left.
 | 180 | `UsageLogEraser` | usage log | — |
 | 170 | `WidgetEraser` | widgets and their sessions | — |
 | 160 | `ShareEraser` | shares received, granted, and on owned resources | — |
-| 150 | `AgentEraser` | assistants and their dependents | assistant files and vectors |
+| 150 | `AgentEraser` | agents and their dependents | agent files and vectors |
 | 145 | `ApprovalEraser` | approvals the user owns | — |
 | 140 | `SavedTaskEraser` | Saved Tasks and their runs | — |
 | 135 | `UrlWatchEraser` | watched pages | — |

@@ -650,7 +650,7 @@ resolved redirect URI and the permission list as copyable values.
 ## Async Media Jobs (BCONFIG)
 
 Media generation (image, video, audio) can run as **background jobs** instead of
-blocking the chat turn: the assistant shows a live status banner, a completion
+blocking the chat turn: the AI shows a live status banner, a completion
 toast fires when the render is ready, and a global Jobs tray tracks everything.
 Configured via **BCONFIG** (not env vars). Admins manage the master switch in the
 UI (**Admin → AI infrastructure → Chat behavior → Background media generation**); the rest can be set per
@@ -861,7 +861,7 @@ with its `FEATURE_*` environment variable (see
 | `IAM.GROUPS_ENABLED` | `1` | Users page, groups, audit tab (`FEATURE_IAM_GROUPS_ENABLED`) |
 | `IAM.SHARING_ENABLED` | `1` | Share dialog and “Shared with me” (requires groups; `FEATURE_IAM_SHARING_ENABLED`) |
 | `IAM.GROUP_POLICIES_ENABLED` | `1` | Users → Policies and group-layer defaults (requires groups; `FEATURE_IAM_GROUP_POLICIES_ENABLED`) |
-| `IAM.EVERYONE_SHARES` | `disabled` when anyone can sign up, otherwise `any_owner` | Who may share with everyone who has an account (`any_owner` / `admins_only` / `disabled`). `disabled` removes that audience, including shares users created earlier, until you pick another value; those shares are kept and come back when you switch. A public instance (open self-registration) runs `disabled`. A missing row fails closed while sign-up is open. System assistants and plugin-pack assistants stay available to every account on every value. |
+| `IAM.EVERYONE_SHARES` | `disabled` when anyone can sign up, otherwise `any_owner` | Who may share with everyone who has an account (`any_owner` / `admins_only` / `disabled`). `disabled` removes that audience, including shares users created earlier, until you pick another value; those shares are kept and come back when you switch. A public instance (open self-registration) runs `disabled`. A missing row fails closed while sign-up is open. System agents and plugin-pack agents stay available to every account on every value. |
 | `IAM.DIRECTORY_SYNC_ENABLED` | `1` | Put users into groups from the OIDC groups claim at sign-in (`FEATURE_IAM_DIRECTORY_SYNC_ENABLED`) |
 | `IAM.DIRECTORY_GROUPS_CLAIM` | `groups` | Dotted claim path for directory groups |
 | `IAM.DIRECTORY_GROUP_NAMES` | `{}` | JSON map of claim value → display name |
@@ -926,7 +926,7 @@ Admins edit them under **Manage → Developer & devices → Coding clients**.
 
 | Setting | Default | Meaning |
 | ------- | ------- | ------- |
-| `WEB_SEARCH_MAX_ROUNDS` | `4` | Web searches in one message before the assistant must answer from the results and cite its sources. Range 1–6. A missing row uses the same default. Rows that still held the old seed of `2` were raised to `4` by `Version20261028130000`; a value an administrator chose (anything else) stays. The system prompt tells the model to scale its searches to the question, so the ceiling is rarely reached on a one-fact question. |
+| `WEB_SEARCH_MAX_ROUNDS` | `4` | Web searches in one message before the AI must answer from the results and cite its sources. Range 1–6. A missing row uses the same default. Rows that still held the old seed of `2` were raised to `4` by `Version20261028130000`; a value an administrator chose (anything else) stays. The system prompt tells the model to scale its searches to the question, so the ceiling is rarely reached on a one-fact question. |
 | `WEB_FETCH_MAX_PER_TURN` | `3` | Pages Synaplan may open in one message on a non-Anthropic route. Range 0–10. `0` opens none. Anthropic routes keep Anthropic’s own limit. A missing row uses 3. |
 | `KNOWLEDGE_TOOLS` | `desktop` | Who can search a pinned knowledge folder from a coding client. `desktop` (paired desktop keys), `all`, or `off`. A missing row uses `desktop`. The folder still has to be pinned on the message. |
 
@@ -1006,7 +1006,7 @@ and [AI plugs](ADMIN.md#ai-plugs-s1s5).
 
 ## Feature flags (`FEATURE_*`)
 
-Every feature from the September 2026 waves — people & sharing, AI assistants,
+Every feature from the September 2026 waves — people & sharing, agents,
 tool registry and approvals, saved-task steps, watched pages, linked
 platforms, Synaplan Desktop, office document tools, optional module gates — is a
 `BCONFIG` flag that is **on by default** and editable under **Admin → System
@@ -1014,7 +1014,7 @@ configuration → Features**. Automated deployments pin a flag with
 `FEATURE_<GROUP>_<SETTING>=false` (or `true`); the toggle then shows as locked.
 The complete table with keys, defaults and shipping PRs is in
 [FEATURE_FLAGS.md](FEATURE_FLAGS.md). For flags that resolve the per-user row
-first (assistants, bundle export, workflow builder, Saved Tasks, MCP client,
+first (agents, bundle export, workflow builder, Saved Tasks, MCP client,
 multitask routing, async media), a global write from the admin page also drops
 the acting administrator's own row, otherwise they would not see their own
 change.

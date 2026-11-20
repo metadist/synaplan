@@ -276,7 +276,7 @@ Kubernetes / reuse in other projects:
 
 ### File work (secure compute)
 
-The assistant can run a **short Python or Node program** on *copies* of files
+The AI can run a **short Python or Node program** on *copies* of files
 you already picked and hand the result back as files — a chart from a CSV, a
 merged spreadsheet, a renamed folder of PDFs. The program runs in an isolated
 sidecar. PHP never talks to Docker.

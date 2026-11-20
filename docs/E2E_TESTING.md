@@ -320,7 +320,7 @@ Assert the **stable terminal DOM**, never an intermediate signal the app discard
 ### AI-Specific Assertions
 
 * **Real (non-deterministic) AI providers** — never assert on specific AI-generated words. Valid assertions:
-  1. Assistant message exists.
+  1. The reply exists.
   2. Terminal `done` state reached.
   3. No deterministic error.
   4. Final text is non-empty.

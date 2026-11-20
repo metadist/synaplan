@@ -2,7 +2,7 @@
 
 <a href="https://www.synaplan.com"><img src="docs/images/hero.svg" alt="Synaplan. Own the flow. Your knowledge, your models, your channels." width="100%"></a>
 
-Build AI assistants on your own documents and put them wherever work happens: web, WhatsApp, email, Outlook, Nextcloud and ownCloud. Mix local models with the best cloud AI, see what every answer costs, and decide what the AI is allowed to do – open source, on your server or ours.
+Build agents on your own documents and put them wherever work happens: web, WhatsApp, email, Outlook, Nextcloud and ownCloud. Mix local models with the best cloud AI, see what every answer costs, and decide what the AI is allowed to do – open source, on your server or ours.
 
 [**Run it in up to five minutes**](#quickstart) &nbsp;·&nbsp; [**Try it hosted**](https://web.synaplan.com/) &nbsp;·&nbsp; [**Docs**](https://docs.synaplan.com/) &nbsp;·&nbsp; [**Discord**](https://discord.com/invite/kQB3eDjWfF)
 
@@ -24,7 +24,7 @@ Build AI assistants on your own documents and put them wherever work happens: we
 
 ## Why Synaplan
 
-- **Own your channels.** One assistant answers on your website, in WhatsApp, by email, in Outlook and inside Nextcloud and ownCloud – with the same knowledge and the same rules everywhere.
+- **Own your channels.** The AI answers on your website, in WhatsApp, by email, in Outlook and inside Nextcloud and ownCloud – with the same knowledge and the same rules everywhere.
 - **Own your models.** Hundreds of models from OpenAI, Anthropic, Google, Mistral, sovereign EU providers or locally via Ollama. Mix them per task: sensitive work stays local, everything else gets the best model for the job.
 - **Own your costs.** Every answer shows its model and price. A planner splits bigger requests into steps and spends the expensive model only where it matters.
 - **Own the decisions.** Actions like sending mail or creating tickets wait for your approval, and every step is logged.
@@ -82,10 +82,10 @@ People usually arrive comparing Synaplan with a chat window or an app builder. T
 
 | | Synaplan | Open WebUI | LibreChat | Dify |
 | --- | --- | --- | --- | --- |
-| What it is | A team platform: chat, your files as knowledge, a site widget, and the same assistant on WhatsApp and email | A chat interface for local and cloud models | A chat app for many providers | A builder for AI apps and workflows |
+| What it is | A team platform: chat, your files as knowledge, a site widget, and the same AI on WhatsApp and email | A chat interface for local and cloud models | A chat app for many providers | A builder for AI apps and workflows |
 | First run | Several containers, about 4 GB | One container | A Compose stack | A Compose stack, and a hosted cloud |
 | Cost of an answer | Shown on the answer | Not on the answer | Not on the answer | In the builder's usage logs, not on the chat answer |
-| Same assistant on your site, WhatsApp and email | Yes | No | No | Site widget yes. WhatsApp and email are not built in |
+| Same AI on your site, WhatsApp and email | Yes | No | No | Site widget yes. WhatsApp and email are not built in |
 
 If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
@@ -157,16 +157,16 @@ If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
 ## One AI, everywhere you work
 
-The same assistant, the same knowledge, the same model policy – on every channel your team and your customers already use.
+The same AI, the same knowledge, the same model policy – on every channel your team and your customers already use.
 
 | Surface | What it does | Get it |
 | --- | --- | --- |
 | **Web app** | Full chat and admin UI, light and dark, five languages | This repo |
 | **Mobile apps** | Chat, documents and voice on iPhone and Android – on web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
 | **Outlook add-in** | Find and process mail inside Outlook (Web, new & classic, Mac) without sending it anywhere | [Synamail](https://github.com/metadist/Synamail) |
-| **Chat widget** | Your assistant on any website with one snippet, human takeover included | [Widget guide](https://docs.synaplan.com/widget) |
+| **Chat widget** | An AI chat on any website with one snippet, human takeover included | [Widget guide](https://docs.synaplan.com/widget) |
 | **WhatsApp & email** | The AI answers on the channel the question came in on | [WhatsApp](docs/WHATSAPP.md) · [Email](docs/EMAIL.md) |
-| **Nextcloud, ownCloud & OpenCloud** | Use your assistants inside your file cloud, with its files as knowledge – your file store stays in charge | [Nextcloud](https://web.synaplan.com/apps/nextcloud) · [ownCloud](https://web.synaplan.com/apps/owncloud) · [OpenCloud](https://github.com/metadist/synaplan-opencloud) |
+| **Nextcloud, ownCloud & OpenCloud** | Use the AI inside your file cloud, with its files as knowledge – your file store stays in charge | [Nextcloud](https://web.synaplan.com/apps/nextcloud) · [ownCloud](https://web.synaplan.com/apps/owncloud) · [OpenCloud](https://github.com/metadist/synaplan-opencloud) |
 | **Synaplan Desktop** | Pair a computer and run skills on it (no installer yet – build from source) | [synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
 | **MCP & Claude Code** | Your knowledge and memories as MCP tools, plus an Anthropic-compatible endpoint | [MCP guide](https://docs.synaplan.com/mcp) |
 
