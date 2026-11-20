@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (3/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (3/9)**  
 > **← Previous:** [1.2 Installation & Deployment](INSTALLATION.md) · **Next:** [1.4 Feature Flags & Module Gates →](FEATURE_FLAGS.md)
 
 # Configuration & AI Providers
@@ -1035,5 +1035,5 @@ See `backend/.env.example` for the complete list with descriptions.
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (3/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (3/9)**  
 > **← Previous:** [1.2 Installation & Deployment](INSTALLATION.md) · **Next:** [1.4 Feature Flags & Module Gates →](FEATURE_FLAGS.md)

@@ -26,7 +26,8 @@ parameters:
     # Deployment platform hint for the release-notice guide link. Optional and
     # additive: an unset (or unknown) value means the self-hosted guide, so
     # nothing breaks when a deployment does not set it. deploy/compose.yaml
-    # passes it through; elestio.yml sets it to 'elestio'.
+    # passes it through; elestio.yml sets it to 'elestio' and
+    # deploy/coolify/synaplan.yaml to 'coolify'.
     env(SYNAPLAN_PLATFORM): 'selfhost'
 
     # Set by Kubernetes in every pod. The service readiness list never names a

@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (1/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (1/9)**  
 > **← Previous:** [Documentation Index](README.md) · **Next:** [1.2 Installation & Deployment →](INSTALLATION.md)
 
 # Platform Capabilities & Mental Model
@@ -101,5 +101,5 @@ The same assistant, knowledge folders, and model policies are reachable from eve
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (1/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (1/9)**  
 > **← Previous:** [Documentation Index](README.md) · **Next:** [1.2 Installation & Deployment →](INSTALLATION.md)

@@ -19,15 +19,18 @@ final readonly class UpdatePlatformGuide
     public const PLATFORM_SELFHOST = 'selfhost';
     public const PLATFORM_ELESTIO = 'elestio';
     public const PLATFORM_AWS = 'aws';
+    public const PLATFORM_COOLIFY = 'coolify';
 
     public const GUIDE_URL_SELFHOST = 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_SELFHOST.md';
     public const GUIDE_URL_ELESTIO = 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_ELESTIO.md';
     public const GUIDE_URL_AWS = 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_AWS.md';
+    public const GUIDE_URL_COOLIFY = 'https://github.com/metadist/synaplan/blob/main/docs/UPDATE_COOLIFY.md';
 
     private const GUIDES = [
         self::PLATFORM_SELFHOST => self::GUIDE_URL_SELFHOST,
         self::PLATFORM_ELESTIO => self::GUIDE_URL_ELESTIO,
         self::PLATFORM_AWS => self::GUIDE_URL_AWS,
+        self::PLATFORM_COOLIFY => self::GUIDE_URL_COOLIFY,
     ];
 
     public function __construct(

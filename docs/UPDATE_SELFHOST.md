@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (6/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (6/9)**  
 > **← Previous:** [1.5 Runtime & Outbound Options](RUNTIME_OPTIONS.md) · **Next:** [1.7 Updating on Elestio →](UPDATE_ELESTIO.md)
 
 # Update a Self-Hosted Deployment
@@ -96,5 +96,5 @@ A container restart or redeploy on its own never installs a newer version—the 
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (6/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (6/9)**  
 > **← Previous:** [1.5 Runtime & Outbound Options](RUNTIME_OPTIONS.md) · **Next:** [1.7 Updating on Elestio →](UPDATE_ELESTIO.md)

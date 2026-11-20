@@ -35,6 +35,11 @@ final class UpdatePlatformGuideTest extends TestCase
             UpdatePlatformGuide::PLATFORM_AWS,
             UpdatePlatformGuide::GUIDE_URL_AWS,
         ];
+        yield 'coolify' => [
+            'coolify',
+            UpdatePlatformGuide::PLATFORM_COOLIFY,
+            UpdatePlatformGuide::GUIDE_URL_COOLIFY,
+        ];
         yield 'selfhost' => [
             'selfhost',
             UpdatePlatformGuide::PLATFORM_SELFHOST,

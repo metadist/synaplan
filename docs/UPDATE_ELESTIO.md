@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (7/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (7/9)**  
 > **← Previous:** [1.6 Updating a Self-Hosted Instance](UPDATE_SELFHOST.md) · **Next:** [1.8 Updating on AWS Marketplace →](UPDATE_AWS.md)
 
 # Update on Elestio
@@ -40,5 +40,5 @@ Set `SYNAPLAN_VERSION` back to the previous version and redeploy. If the new ver
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (7/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (7/9)**  
 > **← Previous:** [1.6 Updating a Self-Hosted Instance](UPDATE_SELFHOST.md) · **Next:** [1.8 Updating on AWS Marketplace →](UPDATE_AWS.md)

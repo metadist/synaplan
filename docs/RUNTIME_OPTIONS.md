@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (5/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (5/9)**  
 > **← Previous:** [1.4 Feature Flags & Module Gates](FEATURE_FLAGS.md) · **Next:** [1.6 Updating a Self-Hosted Instance →](UPDATE_SELFHOST.md)
 
 # Runtime and Outbound Options
@@ -32,5 +32,5 @@
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (5/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (5/9)**  
 > **← Previous:** [1.4 Feature Flags & Module Gates](FEATURE_FLAGS.md) · **Next:** [1.6 Updating a Self-Hosted Instance →](UPDATE_SELFHOST.md)

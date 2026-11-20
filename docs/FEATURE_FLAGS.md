@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (4/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (4/9)**  
 > **← Previous:** [1.3 Configuration & AI Providers](CONFIGURATION.md) · **Next:** [1.5 Runtime & Outbound Options →](RUNTIME_OPTIONS.md)
 
 # Feature Flags & Module Gates
@@ -170,5 +170,5 @@ See also [CONFIGURATION.md](CONFIGURATION.md), [ADMIN.md](ADMIN.md),
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (4/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (4/9)**  
 > **← Previous:** [1.3 Configuration & AI Providers](CONFIGURATION.md) · **Next:** [1.5 Runtime & Outbound Options →](RUNTIME_OPTIONS.md)

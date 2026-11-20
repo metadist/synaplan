@@ -1,5 +1,5 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (8/8)**  
-> **← Previous:** [1.7 Updating on Elestio](UPDATE_ELESTIO.md) · **Next:** [2.1 Day-2 Operations & Governance →](ADMIN.md)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (8/9)**  
+> **← Previous:** [1.7 Updating on Elestio](UPDATE_ELESTIO.md) · **Next:** [1.9 Updating on Coolify →](UPDATE_COOLIFY.md)
 
 # Update on AWS (Marketplace AMI)
 
@@ -72,5 +72,5 @@ If the new version already applied database migrations, also restore the EBS sna
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (8/8)**  
-> **← Previous:** [1.7 Updating on Elestio](UPDATE_ELESTIO.md) · **Next:** [2.1 Day-2 Operations & Governance →](ADMIN.md)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (8/9)**  
+> **← Previous:** [1.7 Updating on Elestio](UPDATE_ELESTIO.md) · **Next:** [1.9 Updating on Coolify →](UPDATE_COOLIFY.md)
