@@ -73,10 +73,12 @@ final class FileGenerationEnvelope
         $patterns = [
             'xlsx' => '/\b\.?xlsx?\b|\bexcel\b|\bspreadsheet\b/i',
             'docx' => '/\b\.?docx?\b|word-dokument|word-datei|microsoft word|\bals word\b|\bas word\b|\bword document\b/i',
-            'pptx' => '/\b\.?pptx?\b|powerpoint|präsentation|presentation/i',
+            // "Power Point" is two words in casual German and English. "Folien"
+            // is the everyday word for slides. /u so "Präsentation" matches.
+            'pptx' => '/\b\.?pptx?\b|power\s*points?|folien?\b|präsentation|praesentation|presentation/iu',
             'csv' => '/\b\.?csv\b/i',
-            // Extension only. "text file … counter_weekday.txt" must stay one
-            // match: this loop ignores a pattern that hits more than once.
+            // Extension only. The phrase "text file" is a separate pattern
+            // below, so "text file … counter_weekday.txt" can still elect txt.
             'txt' => '/\.txt\b/i',
             'md' => '/\.md\b/i',
         ];
@@ -84,7 +86,11 @@ final class FileGenerationEnvelope
         $winner = null;
         $winnerPos = -1;
         foreach ($patterns as $extension => $pattern) {
-            if (1 !== preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE)) {
+            // Several synonyms of one format in the same sentence ("PowerPoint-
+            // Präsentation", "power point" plus "Präsentation") are still that
+            // format. Only a pattern with no hit is skipped. The last hit
+            // across patterns wins, so a later phrase can still override.
+            if (preg_match_all($pattern, $text, $matches, PREG_OFFSET_CAPTURE) < 1) {
                 continue;
             }
             foreach ($matches[0] as [$match, $pos]) {
@@ -130,7 +136,28 @@ final class FileGenerationEnvelope
         $start = max(0, $pos - 30);
         $before = substr($text, $start, $pos - $start);
 
-        return 1 === preg_match('/\b(from|aus|vom|von|de|del|desde|du|depuis)\b\s*(\w+\s*){0,1}$/iu', $before);
+        if (1 === preg_match('/\b(from|aus|vom|von|de|del|desde|du|depuis)\b\s*(\w+\s*){0,1}$/iu', $before)) {
+            return true;
+        }
+
+        // "from this Excel spreadsheet": the second word continues the source
+        // named immediately before it. "von CSV nach Excel" does not, because
+        // "nach" is not itself a format word.
+        if (1 === preg_match('/\b(\w+)\s+$/u', $before, $previous) && self::isFormatWord($previous[1])) {
+            $previousPos = $pos - strlen($previous[0]);
+
+            return self::isSourceMention($text, $previousPos);
+        }
+
+        return false;
+    }
+
+    private static function isFormatWord(string $word): bool
+    {
+        return 1 === preg_match(
+            '/^(xlsx?|excel|spreadsheet|csv|docx?|pptx?|powerpoint|presentation|präsentation|praesentation|folie|folien)$/iu',
+            $word,
+        );
     }
 
     /**

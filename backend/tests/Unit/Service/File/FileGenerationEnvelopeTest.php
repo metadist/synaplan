@@ -142,6 +142,9 @@ class FileGenerationEnvelopeTest extends TestCase
         yield 'word document' => ['Write it as a Word document.', 'docx'];
         yield 'german word compound' => ['Schreib mir ein Word-Dokument dazu.', 'docx'];
         yield 'powerpoint' => ['Make me a PowerPoint deck from this.', 'pptx'];
+        yield 'power point two words' => ['kannst du mir eine power point präsentation erstellen, nur ganz kurz', 'pptx'];
+        yield 'capitalised german presentation' => ['Erstelle eine PowerPoint-Präsentation mit Überblick über Synaplan', 'pptx'];
+        yield 'folien' => ['Mach mir ein paar Folien zum Überblick.', 'pptx'];
         yield 'bare word is not a format' => ['In other words, summarize it.', null];
         yield 'pdf stays with the export logic' => ['Create a PDF agenda.', null];
         yield 'no format named' => ['Vergleich Plan und Ist.', null];

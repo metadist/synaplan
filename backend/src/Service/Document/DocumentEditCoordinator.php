@@ -15,6 +15,7 @@ use App\Service\Document\Render\DocumentRenderer;
 use App\Service\Document\Serializer\DocumentModelSerializer;
 use App\Service\Document\Tool\DocumentSession;
 use App\Service\Document\Tool\DocumentToolResult;
+use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
 use App\Service\File\GeneratedDocumentStore;
 use App\Service\File\UserUploadPathBuilder;
@@ -194,10 +195,21 @@ final readonly class DocumentEditCoordinator
 
     private function inferKind(string $text): string
     {
+        // The same detector the envelope path uses. Without it a casual
+        // "Power Point Präsentation" missed every English keyword below and
+        // the empty session was born as workbook.xlsx.
+        $requested = FileGenerationEnvelope::requestedFormat($text);
+        if (null !== $requested) {
+            $kind = DocumentKind::fromExtension($requested);
+            if (null !== $kind) {
+                return $kind;
+            }
+        }
+
         if (preg_match('/\b(xlsx|excel|spreadsheet|csv|workbook)\b/i', $text)) {
             return DocumentKind::XLSX;
         }
-        if (preg_match('/\b(pptx|powerpoint|slides?|deck|presentation)\b/i', $text)) {
+        if (preg_match('/\b(pptx|powerpoint|slides?|deck|presentation)\b/iu', $text)) {
             return DocumentKind::PPTX;
         }
         if (preg_match('/\b(docx|word|document)\b/i', $text)) {
