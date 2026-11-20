@@ -51,12 +51,14 @@ case, upper case and a digit. Once you have signed in, delete **both**
 variables and redeploy. The account keeps its password, and the password no
 longer sits in the container environment.
 
-Without the setup wizard nobody decides on sign-up and guest chat, so both
-stay **on**: anyone who reaches the address can create an account or chat as a
-guest. For a server only your team uses, switch them off right after the
-first sign-in under **Admin → Configuration**, or set
-`REGISTRATION_ENABLED=false` and `GUEST_CHAT_ENABLED=false` before the first
-deployment.
+Without the setup wizard nobody decides on sign-up and guest chat. Since
+5.8.9 the first start stores closed defaults: sign-up is **off**, and the Free
+plan allows nothing, so a new account cannot use your provider keys until you
+raise its level under **Admin → Users**. Guest chat stays **on**: anyone who
+reaches the address can chat as a guest. For a server only your team uses,
+switch it off right after the first sign-in under **Admin → Configuration**,
+or set `GUEST_CHAT_ENABLED=false` before the first deployment.
+`REGISTRATION_ENABLED=true` opens sign-up from the start.
 
 ## Secrets
 
