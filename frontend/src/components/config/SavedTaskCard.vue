@@ -13,6 +13,7 @@ import { useDialog } from '@/composables/useDialog'
 import { isIamSharingEnabled } from '@/composables/useIamFeature'
 import { isWorkflowsBuilderEnabled } from '@/composables/useWorkflowsFeature'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
+import DeliveryChoice from '@/components/config/DeliveryChoice.vue'
 import SharedResourceBanner from '@/components/iam/SharedResourceBanner.vue'
 import SavedTaskStepsEditor from '@/components/config/workflows/SavedTaskStepsEditor.vue'
 import FolderFetchCard from '@/components/multitask/FolderFetchCard.vue'
@@ -22,6 +23,7 @@ import {
   savedTasksApi,
   type SavedTask,
   type SavedTaskCopyChecklistItem,
+  type SavedTaskDeliveryChoice,
   type SavedTaskRun,
 } from '@/services/api/savedTasksApi'
 import { getApiBaseUrl } from '@/services/api/httpClient'
@@ -323,6 +325,14 @@ const onSchedule = async () => {
   }
 }
 
+const onDeliveryChange = async (delivery: SavedTaskDeliveryChoice) => {
+  try {
+    emit('updated', await savedTasksApi.update(props.task.id, { delivery }))
+  } catch {
+    showError(t('config.savedTasks.delivery.changeFailed'))
+  }
+}
+
 const onResume = async () => {
   try {
     emit('updated', await savedTasksApi.resume(props.task.id))
@@ -469,6 +479,13 @@ const onRunCopy = async () => {
       {{ $t('config.savedTasks.waitingApproval') }}
       <span class="txt-secondary">{{ task.waitingApprovalCount }}</span>
     </button>
+    <p
+      v-if="task.waitingApprovalCount > 0"
+      class="text-sm text-red-600 dark:text-red-400"
+      data-testid="saved-task-waiting-notice"
+    >
+      {{ $t('config.savedTasks.waitingNotice') }}
+    </p>
 
     <div v-if="task.autoPaused" class="alert-warning text-sm" data-testid="saved-task-auto-pause">
       <p class="alert-warning-text">
@@ -562,6 +579,12 @@ const onRunCopy = async () => {
     <p class="text-sm txt-secondary" data-testid="saved-task-timezone-switch">
       {{ timezoneSwitchHint }}
     </p>
+
+    <DeliveryChoice
+      v-if="!sharedView && (task.delivery === 'email' || task.delivery === 'reply')"
+      :model-value="task.delivery === 'email' ? 'email' : 'chat'"
+      @update:model-value="onDeliveryChange"
+    />
 
     <div
       v-if="!sharedView"

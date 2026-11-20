@@ -602,6 +602,15 @@
       },
       "waitingApproval": "En attente d’approbation",
       "waitingApprovalCount": "{count} exécution en attente d’approbation | {count} exécutions en attente d’approbation",
+      "delivery": {
+        "label": "Où le résultat doit-il arriver ?",
+        "chat": "Réponse dans le chat",
+        "chatHint": "Le résultat reste dans le chat de cette tâche.",
+        "email": "E-mail pour moi",
+        "emailHint": "Chaque exécution vous envoie le résultat par e-mail. Aucune approbation nécessaire — il n'y a que vous.",
+        "changeFailed": "Impossible de changer la destination du résultat."
+      },
+      "waitingNotice": "Rien qui envoie ou enregistre n'a encore tourné — cette exécution attend votre approbation. Tant que vous ne l'approuvez pas sous Approbations, rien n'est envoyé.",
       "approvalExpired": "Approbation expirée",
       "rejectedBy": "Refusé par {name}",
       "tabs": {

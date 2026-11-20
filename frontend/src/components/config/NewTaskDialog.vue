@@ -83,6 +83,7 @@
               />
             </label>
           </div>
+          <DeliveryChoice v-if="schedule !== 'off'" v-model="delivery" />
           <p class="text-xs txt-secondary">{{ $t('config.savedTasks.newTask.hint') }}</p>
         </div>
 
@@ -119,7 +120,12 @@ import { useNotification } from '@/composables/useNotification'
 import { useFullscreenTeleportTarget } from '@/composables/useFullscreenTeleportTarget'
 import { ensureAccountTimezone } from '@/composables/useAccountTimezone'
 import { promptsApi } from '@/services/api/promptsApi'
-import { savedTasksApi, type SavedTask } from '@/services/api/savedTasksApi'
+import {
+  savedTasksApi,
+  type SavedTask,
+  type SavedTaskDeliveryChoice,
+} from '@/services/api/savedTasksApi'
+import DeliveryChoice from '@/components/config/DeliveryChoice.vue'
 
 type ScheduleKind = 'off' | 'interval' | 'daily' | 'weekly'
 
@@ -140,6 +146,7 @@ const { teleportTarget } = useFullscreenTeleportTarget()
 const name = ref('')
 const instruction = ref('')
 const schedule = ref<ScheduleKind>('off')
+const delivery = ref<SavedTaskDeliveryChoice>('chat')
 const at = ref(DEFAULT_AT)
 const saving = ref(false)
 
@@ -150,6 +157,7 @@ watch(
     name.value = ''
     instruction.value = ''
     schedule.value = 'off'
+    delivery.value = 'chat'
     at.value = DEFAULT_AT
   }
 )
@@ -185,6 +193,7 @@ async function applySchedule(task: SavedTask): Promise<SavedTask> {
     triggerType: 'schedule',
     triggerConfig,
     allowUnattended: true,
+    delivery: delivery.value,
   })
 }
 

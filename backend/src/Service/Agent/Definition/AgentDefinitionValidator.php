@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Agent\Definition;
 
 use App\Service\Agent\Exception\AgentDefinitionException;
+use App\Service\SavedTask\SavedTaskDelivery;
 
 /**
  * Deny-unknown-fields validator for `agent.v1`.
@@ -71,6 +72,7 @@ final class AgentDefinitionValidator
         'tz',
         'instruction',
         'allowUnattended',
+        'delivery',
         'enabled',
     ];
 
@@ -484,6 +486,11 @@ final class AgentDefinitionValidator
             throw $this->fail($path.'.cron', 'shortest interval is 15 minutes');
         }
 
+        $delivery = $item['delivery'] ?? SavedTaskDelivery::CHAT;
+        if (!is_string($delivery) || !in_array($delivery, SavedTaskDelivery::CHOICES, true)) {
+            throw $this->fail($path.'.delivery', 'delivery must be chat or email');
+        }
+
         $out = [
             'id' => $id,
             'name' => trim($name),
@@ -491,6 +498,7 @@ final class AgentDefinitionValidator
             'tz' => $tz,
             'instruction' => trim($instruction),
             'allowUnattended' => (bool) ($item['allowUnattended'] ?? false),
+            'delivery' => $delivery,
             'enabled' => !array_key_exists('enabled', $item) || (bool) $item['enabled'],
         ];
         if (null !== $every) {

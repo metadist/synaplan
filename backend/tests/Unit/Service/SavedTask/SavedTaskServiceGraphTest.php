@@ -94,8 +94,8 @@ final class SavedTaskServiceGraphTest extends TestCase
 
         $service = $this->service($this->createStub(SavedTaskRepository::class), $this->createStub(SavedTaskGraphCapture::class), $parser);
 
-        // The card sends allowUnattended alongside the schedule: the pinned
-        // email_me step is a mutating action and must be confirmed once.
+        // Mailing the result to the account owner needs no confirmation, so
+        // pinning an email_me step no longer blocks the schedule.
         $service->update($task, [
             'triggerType' => SavedTask::TRIGGER_SCHEDULE,
             'triggerConfig' => ['kind' => 'daily', 'at' => '09:15', 'tz' => 'Europe/Berlin'],
@@ -133,12 +133,29 @@ final class SavedTaskServiceGraphTest extends TestCase
         self::assertEquals($next, $task->getNextRunAt());
     }
 
-    public function testSchedulingPinnedMailStepsNeedsTheUnattendedConfirmation(): void
+    public function testSchedulingPinnedMailStepsNeedsNoConfirmation(): void
     {
-        // Before the steps were pinned the graph was empty and this guard never
-        // fired for chat-saved tasks; now the mail step is visible to it.
+        // Mail goes to the account owner only, so a pinned email_me step is
+        // not an outside write and must not block the schedule.
         $task = new SavedTask(9, 5, 'RioTinto');
         $task->setGraph(self::GRAPH);
+
+        $service = $this->service($this->createStub(SavedTaskRepository::class), $this->createStub(SavedTaskGraphCapture::class));
+
+        $service->update($task, [
+            'triggerType' => SavedTask::TRIGGER_SCHEDULE,
+            'triggerConfig' => ['kind' => 'daily', 'at' => '09:15', 'tz' => 'Europe/Berlin'],
+        ]);
+
+        self::assertSame(SavedTask::TRIGGER_SCHEDULE, $task->getTriggerType());
+    }
+
+    public function testSchedulingPinnedSaveStepsStillNeedsTheUnattendedConfirmation(): void
+    {
+        $task = new SavedTask(9, 5, 'RioTinto');
+        $graph = self::GRAPH;
+        $graph['nodes'][2]['capability'] = 'save_to_folder';
+        $task->setGraph($graph);
 
         $service = $this->service($this->createStub(SavedTaskRepository::class), $this->createStub(SavedTaskGraphCapture::class));
 
@@ -149,6 +166,20 @@ final class SavedTaskServiceGraphTest extends TestCase
             'triggerType' => SavedTask::TRIGGER_SCHEDULE,
             'triggerConfig' => ['kind' => 'daily', 'at' => '09:15', 'tz' => 'Europe/Berlin'],
         ]);
+    }
+
+    public function testChoosingEmailDeliveryRetiresThePinnedMailStep(): void
+    {
+        $task = new SavedTask(9, 5, 'RioTinto');
+        $task->setGraph(self::GRAPH);
+
+        $service = $this->service($this->createStub(SavedTaskRepository::class), $this->createStub(SavedTaskGraphCapture::class));
+        $service->update($task, ['delivery' => 'email']);
+
+        $graph = $task->getGraph();
+        self::assertNotNull($graph);
+        self::assertSame(['url_fetch', 'chat'], array_column($graph['nodes'], 'capability'));
+        self::assertSame('email', $task->getTriggerConfig()['delivery'] ?? null);
     }
 
     private function service(SavedTaskRepository $tasks, SavedTaskGraphCapture $capture, ?ScheduleParser $parser = null): SavedTaskService

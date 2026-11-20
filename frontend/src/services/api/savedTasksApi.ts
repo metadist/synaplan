@@ -25,6 +25,12 @@ export interface SavedTaskSummary {
   params: Record<string, string>
 }
 
+/** Where a run's result goes, as derived on the server (SavedTaskDelivery). */
+export type SavedTaskDelivery = 'email' | 'folder' | 'notion' | 'calendar' | 'reply'
+
+/** The targets a person can pick; the rest only come from authored steps. */
+export type SavedTaskDeliveryChoice = 'chat' | 'email'
+
 export interface SavedTask {
   id: number
   promptId: number
@@ -34,6 +40,7 @@ export interface SavedTask {
   triggerConfig: Record<string, unknown> | null
   graph: Record<string, unknown> | null
   allowUnattended: boolean
+  delivery: SavedTaskDelivery
   chatId: number | null
   nextRunAt: string | null
   lastRunAt: string | null
@@ -91,6 +98,7 @@ function asTask(raw: RawTask | undefined): SavedTask {
     triggerConfig: asRecord(raw.triggerConfig),
     graph: asRecord(raw.graph),
     allowUnattended: raw.allowUnattended === true,
+    delivery: raw.delivery ?? 'reply',
     chatId: raw.chatId ?? null,
     nextRunAt: raw.nextRunAt ?? null,
     lastRunAt: raw.lastRunAt ?? null,

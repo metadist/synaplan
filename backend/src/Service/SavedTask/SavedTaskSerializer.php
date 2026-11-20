@@ -24,6 +24,7 @@ final readonly class SavedTaskSerializer
         private SavedTaskSummary $summary,
         private PromptRepository $prompts,
         private ?SavedTaskRunRepository $runs = null,
+        private SavedTaskDelivery $delivery = new SavedTaskDelivery(),
     ) {
     }
 
@@ -52,6 +53,7 @@ final readonly class SavedTaskSerializer
             'consecutiveFailures' => $task->getConsecutiveFailures(),
             'autoPaused' => $task->isAutoPaused(),
             'summary' => $summary,
+            'delivery' => $this->delivery->summaryCode($task),
             'instructionPreview' => $this->instructionPreview($task->getPromptId()),
             'waitingApprovalCount' => $this->waitingApprovalCount($task),
         ];

@@ -42,6 +42,7 @@ final readonly class SavedTaskService
         private ?ToolRegistry $toolRegistry = null,
         private ?SavedTaskGraphPortability $portability = null,
         private ?AgentRepository $agents = null,
+        private SavedTaskDelivery $delivery = new SavedTaskDelivery(),
     ) {
     }
 
@@ -319,6 +320,13 @@ final readonly class SavedTaskService
             $this->applyTrigger($task, $task->getTriggerType(), $task->getTriggerConfig(), $data);
         }
 
+        // Where the result goes is a choice of its own, independent of the
+        // steps: applying it also retires any authored mail step so the
+        // result is never sent twice.
+        if (array_key_exists('delivery', $data) && is_string($data['delivery'])) {
+            $this->delivery->apply($task, $data['delivery']);
+        }
+
         // The graph carries the trigger it was authored for and the factory
         // rejects a mismatch — silently, falling back to the planner. Switching
         // "Run now" → "Every day" must keep the pinned steps, so follow along.
@@ -455,7 +463,8 @@ final readonly class SavedTaskService
     /**
      * A schedule or an inbound webhook runs with nobody watching. Steps that
      * send or save need the owner's explicit "runs on its own" — or approvals,
-     * which pause the run instead.
+     * which pause the run instead. Mailing the result to the account owner
+     * is exempt: sending to yourself is not an outside write.
      */
     private function assertUnattendedAllowed(SavedTask $task): void
     {
@@ -471,7 +480,7 @@ final readonly class SavedTaskService
                 continue;
             }
             $capability = (string) ($node['capability'] ?? '');
-            if (in_array($capability, ['email_me', 'save_to_folder', 'save_to_notion', 'outbound_webhook', 'mcp_action', 'tool_call'], true)) {
+            if (in_array($capability, ['save_to_folder', 'save_to_notion', 'outbound_webhook', 'mcp_action', 'tool_call'], true)) {
                 $mutating = true;
                 break;
             }

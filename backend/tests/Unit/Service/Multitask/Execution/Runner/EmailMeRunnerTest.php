@@ -283,7 +283,7 @@ final class EmailMeRunnerTest extends TestCase
         self::assertStringContainsString('email delivery failed: smtp down', (string) $result->error);
     }
 
-    public function testPausesForApprovalAndDoesNotSend(): void
+    public function testGateCanStillPauseForAnExplicitApprovalAndDoesNotSend(): void
     {
         $ctx = $this->context();
         $ctx->setResult('n1', NodeResult::ok('THE POEM'));
@@ -298,6 +298,8 @@ final class EmailMeRunnerTest extends TestCase
                 self::callback(static fn (TaskNode $node): bool => Capability::EmailMe === $node->capability),
                 'skill:email_me',
                 self::callback(static fn (array $args): bool => 'alice@example.com' === ($args['to'] ?? null)),
+                null,
+                true,
             )
             ->willReturn(NodeResult::waitingApproval(42, ['to' => 'alice@example.com']));
 

@@ -107,7 +107,7 @@ final readonly class EmailMeRunner implements TaskRunner
             'to' => $address,
             'subject' => $subject,
             'attachment_count' => count($attachments),
-        ]);
+        ], deliversToOwner: true);
         if (null !== $gated) {
             return $gated;
         }

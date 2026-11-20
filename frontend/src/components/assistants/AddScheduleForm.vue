@@ -47,6 +47,7 @@
         data-testid="input-schedule-instruction"
       />
     </label>
+    <DeliveryChoice v-model="delivery" />
     <p class="txt-secondary text-sm">{{ $t('assistants.triggers.scheduleHint') }}</p>
     <details class="txt-secondary text-sm">
       <summary class="cursor-pointer">{{ $t('assistants.triggers.advancedCron') }}</summary>
@@ -85,6 +86,8 @@ import {
   ensureAccountTimezone,
   type EnsuredAccountTimezone,
 } from '@/composables/useAccountTimezone'
+import DeliveryChoice from '@/components/config/DeliveryChoice.vue'
+import type { SavedTaskDeliveryChoice } from '@/services/api/savedTasksApi'
 
 const emit = defineEmits<{
   cancel: []
@@ -96,6 +99,7 @@ const unit = ref<'hour' | 'day' | 'weekday' | 'week' | 'month'>('week')
 const on = ref('monday')
 const at = ref('08:00')
 const instruction = ref('')
+const delivery = ref<SavedTaskDeliveryChoice>('chat')
 const cron = ref('')
 const resolving = ref(true)
 const ensured = ref<EnsuredAccountTimezone | null>(null)
@@ -138,6 +142,7 @@ function onSave(): void {
     tz: zone.value,
     instruction: instruction.value.trim(),
     allowUnattended: false,
+    delivery: delivery.value,
     enabled: true,
   }
   if (cron.value.trim()) {
