@@ -29,6 +29,8 @@ use App\Service\Tool\ToolSource;
 
 final readonly class SavedTaskService
 {
+    private SavedTaskDelivery $delivery;
+
     public function __construct(
         private SavedTaskRepository $tasks,
         private SavedTaskRunRepository $runs,
@@ -42,8 +44,10 @@ final readonly class SavedTaskService
         private ?ToolRegistry $toolRegistry = null,
         private ?SavedTaskGraphPortability $portability = null,
         private ?AgentRepository $agents = null,
-        private SavedTaskDelivery $delivery = new SavedTaskDelivery(),
     ) {
+        // Stateless derivation; kept out of the constructor on purpose so the
+        // frozen constructor size (size ratchet) does not grow.
+        $this->delivery = new SavedTaskDelivery();
     }
 
     /**
