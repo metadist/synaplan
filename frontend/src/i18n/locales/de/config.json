@@ -603,6 +603,15 @@
       },
       "waitingApproval": "Wartet auf Freigabe",
       "waitingApprovalCount": "{count} Ausführung wartet auf Freigabe | {count} Ausführungen warten auf Freigabe",
+      "delivery": {
+        "label": "Wohin soll das Ergebnis?",
+        "chat": "Antwort im Chat",
+        "chatHint": "Das Ergebnis bleibt im Chat dieser Aufgabe.",
+        "email": "E-Mail an mich",
+        "emailHint": "Jede Ausführung mailt dir das Ergebnis. Keine Freigabe nötig — es geht nur an dich.",
+        "changeFailed": "Das Ziel für das Ergebnis konnte nicht geändert werden."
+      },
+      "waitingNotice": "Es wurde noch nichts versendet oder gespeichert — diese Ausführung wartet auf deine Freigabe. Erst wenn du unter Freigaben zustimmst, wird etwas gesendet.",
       "approvalExpired": "Freigabe abgelaufen",
       "rejectedBy": "Abgelehnt von {name}",
       "tabs": {

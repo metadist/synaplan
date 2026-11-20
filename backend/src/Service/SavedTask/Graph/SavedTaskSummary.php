@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\SavedTask\Graph;
 
 use App\Entity\SavedTask;
+use App\Service\SavedTask\SavedTaskDelivery;
 
 /**
  * Machine-readable summary for the Saved Task card.
@@ -25,6 +26,11 @@ final class SavedTaskSummary
     public const KEY_SIMPLE = 'config.savedTasks.summary.simple';
     public const KEY_WITH_STEPS = 'config.savedTasks.summary.template';
 
+    public function __construct(
+        private SavedTaskDelivery $delivery = new SavedTaskDelivery(),
+    ) {
+    }
+
     /**
      * @return array{key: string, params: array<string, string>}
      */
@@ -34,25 +40,19 @@ final class SavedTaskSummary
 
         $graph = $task->getGraph();
         $nodes = is_array($graph) && is_array($graph['nodes'] ?? null) ? $graph['nodes'] : null;
-        if (null === $nodes) {
+        if (null === $nodes && null === ($task->getTriggerConfig()['delivery'] ?? null)) {
             return ['key' => self::KEY_SIMPLE, 'params' => $params];
         }
 
         $caps = [];
-        foreach ($nodes as $node) {
+        foreach ($nodes ?? [] as $node) {
             if (is_array($node) && is_string($node['capability'] ?? null)) {
                 $caps[] = $node['capability'];
             }
         }
 
         $params['reads'] = in_array('email_search', $caps, true) ? 'mailbox' : 'instruction';
-        $params['saves'] = match (true) {
-            in_array('email_me', $caps, true) => 'email',
-            in_array('save_to_folder', $caps, true) => 'folder',
-            in_array('save_to_notion', $caps, true) => 'notion',
-            in_array('calendar_event', $caps, true) => 'calendar',
-            default => 'reply',
-        };
+        $params['saves'] = $this->delivery->summaryCode($task);
 
         return ['key' => self::KEY_WITH_STEPS, 'params' => $params];
     }

@@ -141,6 +141,7 @@ use OpenApi\Attributes as OA;
                             new OA\Property(property: 'tz', type: 'string'),
                             new OA\Property(property: 'instruction', type: 'string'),
                             new OA\Property(property: 'allowUnattended', type: 'boolean'),
+                            new OA\Property(property: 'delivery', type: 'string', enum: ['chat', 'email']),
                             new OA\Property(property: 'enabled', type: 'boolean'),
                         ],
                     ),

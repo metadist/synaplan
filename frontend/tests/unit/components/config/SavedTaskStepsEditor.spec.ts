@@ -42,6 +42,7 @@ function task(): SavedTask {
     autoPaused: false,
     summary: { key: 'config.savedTasks.summary.simple', params: { when: 'manual' } },
     instructionPreview: null,
+    delivery: 'reply',
     waitingApprovalCount: 0,
   }
 }

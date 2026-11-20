@@ -72,6 +72,17 @@ describe('AddScheduleForm', () => {
     expect(payload.tz).toBe('Europe/Berlin')
   })
 
+  it('asks where the result goes and stores the choice on the schedule', async () => {
+    const wrapper = mountForm()
+    await flushPromises()
+    await wrapper.get('[data-testid="input-schedule-instruction"]').setValue('Mail me a summary')
+    await wrapper.get('[data-testid="btn-delivery-email"]').trigger('click')
+    await wrapper.get('[data-testid="btn-save-schedule"]').trigger('click')
+
+    const payload = wrapper.emitted('save')?.[0]?.[0] as { delivery: string }
+    expect(payload.delivery).toBe('email')
+  })
+
   it('saves the device zone into the profile and uses it for the schedule', async () => {
     mockGetProfile.mockResolvedValue({ success: true, profile: { timezone: '' } })
     const wrapper = mountForm()

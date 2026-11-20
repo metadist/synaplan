@@ -604,6 +604,15 @@
       },
       "waitingApproval": "Waiting for approval",
       "waitingApprovalCount": "{count} run waiting for approval | {count} runs waiting for approval",
+      "delivery": {
+        "label": "Where should the result go?",
+        "chat": "Reply in the chat",
+        "chatHint": "The result stays in this task's chat.",
+        "email": "Email to me",
+        "emailHint": "Each run mails you the result. No approval needed — it only goes to you.",
+        "changeFailed": "Could not change where the result goes."
+      },
+      "waitingNotice": "Nothing that sends or saves has run yet — this run is waiting for your approval. Until you approve it under Approvals, nothing is sent.",
       "approvalExpired": "Approval expired",
       "rejectedBy": "Rejected by {name}",
       "tabs": {

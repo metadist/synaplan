@@ -138,6 +138,15 @@
       },
       "waitingApproval": "Esperando aprobación",
       "waitingApprovalCount": "{count} ejecución esperando aprobación | {count} ejecuciones esperando aprobación",
+      "delivery": {
+        "label": "¿Dónde debe llegar el resultado?",
+        "chat": "Respuesta en el chat",
+        "chatHint": "El resultado se queda en el chat de esta tarea.",
+        "email": "Correo para mí",
+        "emailHint": "Cada ejecución te envía el resultado por correo. No hace falta aprobación: solo va para ti.",
+        "changeFailed": "No se pudo cambiar el destino del resultado."
+      },
+      "waitingNotice": "Todavía no se ha enviado ni guardado nada: esta ejecución espera tu aprobación. Hasta que la apruebes en Aprobaciones, no se envía nada.",
       "approvalExpired": "La aprobación caducó",
       "rejectedBy": "Rechazado por {name}",
       "tabs": {

@@ -138,6 +138,15 @@
       },
       "waitingApproval": "Onay bekleniyor",
       "waitingApprovalCount": "{count} çalışma onay bekliyor",
+      "delivery": {
+        "label": "Sonuç nereye gitsin?",
+        "chat": "Sohbette yanıt",
+        "chatHint": "Sonuç bu görevin sohbetinde kalır.",
+        "email": "Bana e-posta",
+        "emailHint": "Her çalışma sonucu sana e-postayla gönderir. Onay gerekmez — yalnızca sana gider.",
+        "changeFailed": "Sonucun hedefi değiştirilemedi."
+      },
+      "waitingNotice": "Henüz gönderen veya kaydeden hiçbir şey çalışmadı — bu çalışma onayını bekliyor. Onaylar altında onaylamadan hiçbir şey gönderilmez.",
       "approvalExpired": "Onayın süresi doldu",
       "rejectedBy": "{name} tarafından reddedildi",
       "tabs": {

@@ -32,13 +32,24 @@ final readonly class StepApprovalGate
      *                                         waits for approval even with `allow_unattended`; a chat
      *                                         reply cannot ask yet, so the step fails with this text
      */
-    public function consult(NodeContext $context, TaskNode $node, string $toolName, array $arguments, ?string $askRefusal = null): ?NodeResult
+    public function consult(NodeContext $context, TaskNode $node, string $toolName, array $arguments, ?string $askRefusal = null, bool $deliversToOwner = false): ?NodeResult
     {
         $override = is_string($node->params['approval'] ?? null) ? $node->params['approval'] : null;
         if ($context->isApproved($node->id)) {
             return null;
         }
         $connectionAsks = null !== $askRefusal;
+        // Mailing the account their own result is not an outside write: the
+        // default write policy must not pause it. An explicit "block" on the
+        // step still wins, and an explicit "ask before" still asks.
+        if ($deliversToOwner) {
+            if (PolicyOutcome::Block === PolicyOutcome::tryFrom((string) $override)) {
+                return NodeResult::failed(ToolExecutionGate::NODE_BLOCK_REFUSAL);
+            }
+            if (!$connectionAsks && PolicyOutcome::Approve !== PolicyOutcome::tryFrom((string) $override)) {
+                return null;
+            }
+        }
         if ($connectionAsks && PolicyOutcome::Block !== PolicyOutcome::tryFrom((string) $override)) {
             $override = PolicyOutcome::Approve->value;
         }
