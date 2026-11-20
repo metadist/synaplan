@@ -112,7 +112,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-11-02 | AU24 | [#2936](https://github.com/metadist/synaplan/pull/2936) | merged (`926d7e4e3`) | Every loop and runner calls `ToolInvoker`. `tool_loops.json` matches the merged AU23 snapshot. `GatewayToolLoop` 1,431 → 1,274 lines; `McpServerFactory` 1,128 → 1,100 |
 | 2026-11-04 | AU25 | [#2980](https://github.com/metadist/synaplan/pull/2980) | merged (`2026-11-04`) | The gate runs on every call. Writes are audited. The OpenAI loop and custom HTTP gain `TOOLS`. Own-file edits stay allowed |
 | 2026-11-08 | AU25b | [#3035](https://github.com/metadist/synaplan/pull/3035) | merged | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
-| 2026-11-19 | AU26 | this branch | open | One `AgentToolLoop` under document chat and both gateways; limits are `ToolLoopLimits` (profile input, `ToolLimits` the defaults). `tool_loops.json` unchanged. `GatewayToolLoop` 1,274 → 223 lines, out of the size ledger |
+| 2026-11-19 | AU26 | #3193 | merged | One `AgentToolLoop` under document chat and both gateways; limits are `ToolLoopLimits` (profile input, `ToolLimits` the defaults). `tool_loops.json` unchanged. `GatewayToolLoop` 1,274 → 223 lines, out of the size ledger |
 | 2026-11-14 | S5 web chat | this branch | open | Pump role, run stream, watchdog relay behind `SYNAPLAN_RELAY`, live re-attach. Flags stay off. Gateways, widget, guest and incognito stay in the request. AU32 waits for the soak |
 
 ## 2026-11-19 — AU26: one agent loop
