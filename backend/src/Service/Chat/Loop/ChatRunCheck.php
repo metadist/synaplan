@@ -38,7 +38,7 @@ final readonly class ChatRunCheck
     public const MAX_MODEL_CALLS = 3;
 
     /** Runs that end with an answer of the model. */
-    private const CHECKED = [ChatRunEnd::Answered, ChatRunEnd::Finished, ChatRunEnd::FinishFallback, ChatRunEnd::NoProgress];
+    private const CHECKED = [ChatRunEnd::Answered, ChatRunEnd::Finished, ChatRunEnd::FinishFallback, ChatRunEnd::NoProgress, ChatRunEnd::CostLimit, ChatRunEnd::PayerEmpty, ChatRunEnd::Circling];
 
     /** A statement whose words outside its links are fewer than this only names a source. */
     private const MIN_OWN_CHARS = 12;
@@ -74,7 +74,9 @@ final readonly class ChatRunCheck
         }
         $failed = $this->freeCheck($cited['report'], $cited['passages'], $statements);
         $ask = array_values(array_filter($statements, static fn (array $s): bool => !isset($failed[$s['id']])));
-        $checker = [] === $ask ? null : $this->checkers->pick($state);
+        // A run that ended at a cost limit gets the free check only: the checker would go past the limit.
+        $paid = !\in_array($state->end, [ChatRunEnd::CostLimit, ChatRunEnd::PayerEmpty], true);
+        $checker = [] === $ask || !$paid ? null : $this->checkers->pick($state);
         $asked = null !== $checker && $this->modelCheck($state, $claim, $checker, $ask, $failed);
         $listed = [];
         foreach ($statements as $item) {
@@ -178,7 +180,7 @@ final readonly class ChatRunCheck
         $answered = false;
         $groups = $this->batches->groups($ask, $this->inputs->tokens('checker', $checker->contextWindow) * 4);
         foreach (\array_slice($groups, 0, self::MAX_MODEL_CALLS) as $group) {
-            if ($claim->cancelled() || !$this->budget->allows($scope->user)) {
+            if ($claim->cancelled() || !$this->mayPay($state, $scope)) {
                 break;
             }
             $reply = $this->caller->answer(
@@ -205,6 +207,14 @@ final readonly class ChatRunCheck
         }
 
         return $answered;
+    }
+
+    /** The payer's budget allows it, and the run is still under the share it may spend. */
+    private function mayPay(ChatRunState $state, ChatRunScope $scope): bool
+    {
+        $allowance = $this->budget->allowance($scope->user);
+
+        return $allowance->allowed && (null === $allowance->runCapMicro || $state->costMicro + $state->dearestMicro < $allowance->runCapMicro);
     }
 
     /**

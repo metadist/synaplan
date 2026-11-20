@@ -757,6 +757,17 @@
       "saved": "Your search provider was saved.",
       "saveFailed": "Your search provider could not be saved"
     },
+    "chatRunLimit": {
+      "title": "Cost limit per long answer",
+      "description": "When the chat works through several steps for one answer, it may spend at most this share of your monthly budget. At the limit it stops searching and answers with what it has found.",
+      "share": "Share of your monthly budget",
+      "option": "{percent} % – up to {amount} per answer",
+      "default": "default",
+      "monthly": "Your monthly budget: {amount}",
+      "noBudget": "Your plan has no monthly budget, so there is no cost limit per answer. A long answer still ends when it goes in circles.",
+      "saved": "Your cost limit was saved.",
+      "saveFailed": "Your cost limit could not be saved"
+    },
     "account": {
       "title": "Account",
       "email": "Email",

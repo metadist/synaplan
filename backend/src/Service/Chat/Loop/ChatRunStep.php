@@ -11,7 +11,8 @@ use App\Service\Tool\Execution\ToolLimits;
  * One unit of a chat run: re-check who and what the run may use, run the
  * tool calls of the last model answer, then make one model call.
  *
- * Before the paid call it reads the stop flag and the payer's budget. A
+ * Before the paid call it reads the stop flag, the cost limit and circle
+ * detection; a limit or a second circle turns the call into the wrap-up. A
  * write that needs approval parks the run; nothing here approves it.
  */
 final readonly class ChatRunStep
@@ -22,15 +23,20 @@ final readonly class ChatRunStep
     public const DECLINED = 'The person did not approve this action. Do not try it again in this run.';
 
     private ChatRunAnswer $answers;
+    private ChatRunCostGuard $cost;
+    private ChatRunStallDetector $stall;
 
     public function __construct(
         private ChatRunWorld $world,
         private ChatRunModel $model,
-        private ChatRunBudget $budget,
+        ChatRunBudget $budget,
         private ChatRunToolbox $tools,
         private ChatRunEvents $events,
+        ChatRunLoopLimits $limits,
     ) {
         $this->answers = new ChatRunAnswer($events, ChatRunProfile::limits()->maxToolsPerTurn);
+        $this->cost = new ChatRunCostGuard($budget, $limits);
+        $this->stall = new ChatRunStallDetector($limits);
     }
 
     /**
@@ -52,10 +58,8 @@ final readonly class ChatRunStep
 
             return null;
         }
-        if (!$this->budget->allows($scope->user)) {
-            $this->answers->end($state, ChatRunEnd::BudgetUsed);
-
-            return null;
+        if (ChatRunState::MODE_WRAP_UP !== $state->mode) {
+            $this->guard($state, $scope);
         }
         $claim->renew();
 
@@ -74,16 +78,31 @@ final readonly class ChatRunStep
         $this->answers->end($state, ChatRunEnd::WorkerLost);
     }
 
+    /** The cost limit first, then circle detection, which only watches working steps. */
+    private function guard(ChatRunState $state, ChatRunScope $scope): void
+    {
+        $reason = $this->cost->check($state, $scope->user);
+        if (null === $reason && ChatRunState::MODE_FREE === $state->mode && $this->stall->check($state, $this->events)) {
+            $reason = ChatRunEnd::Circling;
+        }
+        if (null !== $reason) {
+            ChatRunWrapUp::begin($state, $reason, $this->events);
+        }
+    }
+
     private function call(ChatRunState $state, ChatRunScope $scope): ?string
     {
         $messages = [['role' => 'system', 'content' => ChatLoopPrompt::system($state, $scope)], ...$state->messages];
         [$tools, $choice] = match ($state->mode) {
             ChatRunState::MODE_FINISH => [[ChatLoopTools::finish()], 'required'],
-            ChatRunState::MODE_FINISH_JSON => [[], null],
+            ChatRunState::MODE_FINISH_JSON, ChatRunState::MODE_WRAP_UP => [[], null],
             default => [[...$this->tools->declarations($scope, $state->opened), ChatLoopTools::updatePlan()], 'auto'],
         };
         if (ChatRunState::MODE_FINISH_JSON === $state->mode) {
             $messages[] = ['role' => 'user', 'content' => ChatRunAnswer::JSON_REQUEST];
+        }
+        if (ChatRunState::MODE_WRAP_UP === $state->mode) {
+            $messages[] = ['role' => 'user', 'content' => ChatRunWrapUp::instruction($state->wrapUp ?? ChatRunEnd::CostLimit)];
         }
         $this->events->append($state->runId, ChatRunEvents::STEP, ['step' => $state->steps + 1]);
         // The finish call writes its answer into a tool call or a JSON object: neither is shown as it comes.
@@ -132,9 +151,11 @@ final readonly class ChatRunStep
                 return false;
             }
             $this->record($state, $call, $result->text);
+            $this->stall->record($state, $call, $result);
             array_shift($state->pending);
             $claim->renew();
         }
+        $this->stall->endStep($state);
 
         return true;
     }

@@ -50,8 +50,8 @@ With the loop on, the web chat does not call `TurnWebSearch`,
 | Minutes | none |
 | Tools per step | `ToolLimits::MAX_TOOLS_PER_TURN` (16), per step, not per run |
 | Result size per tool | `ToolLimits::RESULT_CHARS` (12,000) |
-| Cost | `LOOP.RUN_COST_CAP`, §1.3. Until PJ6: the payer's monthly budget (`RateLimitService::checkCostBudget`) before every model call, not only before the turn (§0 #70) |
-| Tokens (unpriced models) | `LOOP.RUN_TOKEN_CAP`, §1.3 |
+| Cost | the share of the monthly budget the person chose, §1.3, and what the payer has left, both before every model call (§0 #70) |
+| Tokens (unpriced models) | none (§0 #14); circle detection, §1.4 |
 | Provider timeout per call | as today; a call that times out is a tool or model error, not a run limit |
 | Active runs | `RUNS.MAX_ACTIVE_PER_PERSON`, `RUNS.MAX_ACTIVE`; above them a promoted turn is `queued` and the card says so |
 
@@ -62,12 +62,21 @@ plan §4.
 ### 1.3 Cost limit and wrap-up
 
 ```
-cap     = min(LOOP.RUN_COST_CAP, what the payer has left)      re-read before every call
+cap     = monthly budget × the person's share / 100           re-read before every call
+          (BCONFIG owner = person, LOOP.RUN_COST_PERCENT; 5, 10, 20, 25, 50 or 100; default 10)
 reserve = max(cap × LOOP.WRAPUP_RESERVE_PERCENT / 100,
               the dearest model call of this run so far)
 before every model call:
-    spent + reserve ≥ cap  ──► wrap-up call
+    payer's budget used up, or left ≤ reserve  ──► wrap-up call (payer_empty)
+    spent + reserve ≥ cap                      ──► wrap-up call (cost_limit)
 ```
+
+Money is what the person is billed (with markup), the same figure as the
+monthly budget. A plan with no monthly budget (budget 0) has no cap per run.
+The person reads and sets the share with `GET` / `PUT
+/api/v1/config/chat-run-limit` (`{percent: int|null}`, null goes back to the
+default; a share that is not offered is 422). The setting shows what each
+share means in money.
 
 - The wrap-up call has no tools. Its instruction: write the result from the
   notes and the transcript, start with the fixed opening line for the
@@ -75,7 +84,8 @@ before every model call:
 - A tool call that is running when the limit is reached finishes. No new
   one starts.
 - Overshoot is bounded by one model call.
-- Models with no price: the same rule on tokens with `LOOP.RUN_TOKEN_CAP`.
+- Models with no price cost nothing here and never reach the cap (§0 #14);
+  circle detection ends a stuck run.
 
 | Wrap-up reason | Trigger | Terminal status |
 | -------------- | ------- | --------------- |
@@ -648,8 +658,7 @@ existing installs ships as a migration `UPDATE`.
 | Group | Key | Default | Meaning |
 | ----- | --- | ------- | ------- |
 | `LOOP` | `ENABLED` | 0 | the chat turn runs on the loop |
-| `LOOP` | `RUN_COST_CAP` | 5.00 | per run, §1.3 |
-| `LOOP` | `RUN_TOKEN_CAP` | 2000000 | per run, unpriced models |
+| `LOOP` | `RUN_COST_PERCENT` | 10 | owner = the person, share of their monthly budget per run, §1.3 |
 | `LOOP` | `WRAPUP_RESERVE_PERCENT` | 10 | |
 | `LOOP` | `STALL_REPEAT` / `STALL_NO_NEW` / `STALL_ERRORS` | 3 / 6 / 5 | §1.4 |
 | `LOOP` | `COMPACT_AT_PERCENT` / `COMPACT_KEEP_STEPS` | 70 / 4 | §1.5 |

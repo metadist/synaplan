@@ -90,7 +90,7 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
         }
         $descriptor = $this->find($scope, $call['name']);
         if (null === $descriptor) {
-            return ChatToolResult::text(self::NOT_AVAILABLE);
+            return ChatToolResult::failed(self::NOT_AVAILABLE);
         }
         $args = $call['args'];
         if (null !== $approvalId) {
@@ -117,7 +117,9 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
             return ChatToolResult::waitsFor($outcome->approvalId);
         }
 
-        return ChatToolResult::text('' !== $outcome->resultText ? $outcome->resultText : 'The tool returned nothing.');
+        $text = '' !== $outcome->resultText ? $outcome->resultText : 'The tool returned nothing.';
+
+        return ToolOutcomeKind::Done === $outcome->kind ? ChatToolResult::text($text) : ChatToolResult::failed($text);
     }
 
     public function isRead(string $name): bool

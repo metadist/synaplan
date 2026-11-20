@@ -12,6 +12,7 @@ use App\Service\Chat\Loop\ChatRunCheck;
 use App\Service\Chat\Loop\ChatRunCheckModel;
 use App\Service\Chat\Loop\ChatRunDelivery;
 use App\Service\Chat\Loop\ChatRunEvents;
+use App\Service\Chat\Loop\ChatRunLoopLimits;
 use App\Service\Chat\Loop\ChatRunRecords;
 use App\Service\Chat\Loop\ChatRunScope;
 use App\Service\Chat\Loop\ChatRunState;
@@ -87,7 +88,7 @@ abstract class ChatLoopCase extends TestCase
 
     protected function model(ScriptedChatRunModel $model): ScriptedChatRunModel
     {
-        $this->step = new ChatRunStep($this->world, $model, $this->budget, $this->tools, $this->events);
+        $this->step = new ChatRunStep($this->world, $model, $this->budget, $this->tools, $this->events, new ChatRunLoopLimits());
         $records = $this->createStub(ChatRunRecords::class);
         $records->method('sync')->willReturnCallback(function (ChatRunState $state): void {
             $this->synced[] = $state->status->value;

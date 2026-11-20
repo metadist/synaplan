@@ -33,9 +33,10 @@ final readonly class ChatRunAnswer
     {
         ++$state->steps;
         $state->modelFailures = 0;
-        $state->costMicro += max(0, $reply->costMicro);
+        $this->spent($state, $reply);
 
         return match ($state->mode) {
+            ChatRunState::MODE_WRAP_UP => $this->wrappedUp($state, $reply->content),
             ChatRunState::MODE_FINISH => $this->finishCall($state, $reply),
             ChatRunState::MODE_FINISH_JSON => $this->finishJson($state, $reply),
             default => [] === $reply->toolCalls ? $this->noTool($state, $reply) : $this->toolCalls($state, $reply),
@@ -55,6 +56,9 @@ final readonly class ChatRunAnswer
      */
     public function failed(ChatRunState $state): ?string
     {
+        if (ChatRunState::MODE_WRAP_UP === $state->mode) {
+            return $this->wrappedUp($state, null);
+        }
         if (ChatRunState::MODE_FINISH === $state->mode) {
             $state->mode = ChatRunState::MODE_FINISH_JSON;
 
@@ -79,6 +83,22 @@ final readonly class ChatRunAnswer
     {
         $state->finish($end, $answer);
         $this->events->append($state->runId, ChatRunEvents::ENDED, ['status' => $state->status->value, 'reason' => $end->value]);
+    }
+
+    /** The wrap-up call answered or failed: the run ends either way, with what it has. */
+    private function wrappedUp(ChatRunState $state, ?string $text): null
+    {
+        $reason = $state->wrapUp ?? ChatRunEnd::CostLimit;
+        $this->end($state, $reason, ChatRunWrapUp::answer($state, $reason, $text));
+
+        return null;
+    }
+
+    private function spent(ChatRunState $state, ChatRunReply $reply): void
+    {
+        $cost = max(0, $reply->costMicro);
+        $state->costMicro += $cost;
+        $state->dearestMicro = max($state->dearestMicro, $cost);
     }
 
     private function noTool(ChatRunState $state, ChatRunReply $reply): ?string
@@ -115,7 +135,7 @@ final readonly class ChatRunAnswer
     public function seed(ChatRunState $state, ChatRunReply $reply): void
     {
         ++$state->steps;
-        $state->costMicro += max(0, $reply->costMicro);
+        $this->spent($state, $reply);
         // The request streamed it already; the stored answer starts with it.
         $state->said = ChatRunSpeaker::cap($reply->content);
         $this->toolCalls($state, $reply, false);

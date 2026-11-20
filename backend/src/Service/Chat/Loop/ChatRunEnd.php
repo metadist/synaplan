@@ -25,6 +25,27 @@ enum ChatRunEnd: string
             'fr' => 'Je n\'ai pas pu écrire le résumé final ; voici ma dernière réponse.',
             'tr' => 'Son özeti yazamadım; elimdeki son cevap bu.',
         ],
+        'cost_limit' => [
+            'en' => 'I stopped at the cost limit you set for one answer.',
+            'de' => 'Ich habe beim Kostenlimit aufgehört, das du für eine Antwort festgelegt hast.',
+            'es' => 'Me detuve en el límite de coste que fijaste para una respuesta.',
+            'fr' => 'Je me suis arrêté à la limite de coût que vous avez fixée pour une réponse.',
+            'tr' => 'Bir cevap için belirlediğin maliyet sınırında durdum.',
+        ],
+        'payer_empty' => [
+            'en' => 'I stopped because the monthly budget is almost used up.',
+            'de' => 'Ich habe aufgehört, weil das Monatsbudget fast aufgebraucht ist.',
+            'es' => 'Me detuve porque el presupuesto mensual está casi agotado.',
+            'fr' => 'Je me suis arrêté, car le budget mensuel est presque épuisé.',
+            'tr' => 'Aylık bütçe neredeyse tükendiği için durdum.',
+        ],
+        'circling' => [
+            'en' => 'I stopped because I was going in circles.',
+            'de' => 'Ich habe aufgehört, weil ich mich im Kreis gedreht habe.',
+            'es' => 'Me detuve porque estaba dando vueltas en círculo.',
+            'fr' => 'Je me suis arrêté, car je tournais en rond.',
+            'tr' => 'Aynı yerde döndüğüm için durdum.',
+        ],
         'stopped_by_user' => [
             'en' => 'Stopped. Nothing more was done after you stopped it.',
             'de' => 'Gestoppt. Nach dem Stopp wurde nichts mehr getan.',
@@ -80,6 +101,9 @@ enum ChatRunEnd: string
     case Finished = 'finished';
     case NoProgress = 'no_progress';
     case FinishFallback = 'finish_fallback';
+    case CostLimit = 'cost_limit';
+    case PayerEmpty = 'payer_empty';
+    case Circling = 'circling';
     case StoppedByUser = 'stopped_by_user';
     case LoopOff = 'loop_off';
     case BudgetUsed = 'budget_used';
@@ -91,9 +115,9 @@ enum ChatRunEnd: string
     public function status(): ChatRunStatus
     {
         return match ($this) {
-            self::Answered, self::Finished, self::NoProgress, self::FinishFallback => ChatRunStatus::Completed,
+            self::Answered, self::Finished, self::NoProgress, self::FinishFallback, self::Circling => ChatRunStatus::Completed,
             self::StoppedByUser, self::LoopOff => ChatRunStatus::Stopped,
-            self::BudgetUsed => ChatRunStatus::BudgetUsed,
+            self::BudgetUsed, self::CostLimit, self::PayerEmpty => ChatRunStatus::BudgetUsed,
             self::AccountGone, self::ChatGone, self::WorkerLost => ChatRunStatus::Interrupted,
             self::ModelFailed => ChatRunStatus::Failed,
         };

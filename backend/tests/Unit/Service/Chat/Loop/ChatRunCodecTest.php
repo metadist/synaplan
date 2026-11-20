@@ -66,6 +66,35 @@ final class ChatRunCodecTest extends TestCase
         self::assertNull($read->replyMessageId);
     }
 
+    public function testAWrapUpAndTheCircleCountersSurviveACheckpoint(): void
+    {
+        $state = new ChatRunState(self::RUN_ID, 7, 11, null, null, null, 'en', '', [], 1);
+        $state->mode = ChatRunState::MODE_WRAP_UP;
+        $state->wrapUp = ChatRunEnd::Circling;
+        $state->dearestMicro = 20_000;
+        $state->stall = ['calls' => ['c:x' => ['tool' => 'web_search', 'n' => 2]], 'seen' => ['o:y' => true], 'stale' => 4, 'errors' => 1, 'nudged' => true, 'found' => false, 'ran' => false];
+
+        $read = (new ChatRunCodec())->decode($state->stored(2, 1, 5, null));
+
+        self::assertInstanceOf(ChatRunState::class, $read);
+        self::assertSame([ChatRunState::MODE_WRAP_UP, ChatRunEnd::Circling, 20_000], [$read->mode, $read->wrapUp, $read->dearestMicro]);
+        self::assertSame($state->stall, $read->stall);
+    }
+
+    public function testAStoredWrapUpThatIsNoWrapUpReasonIsDropped(): void
+    {
+        $state = new ChatRunState(self::RUN_ID, 7, 11, null, null, null, 'en', '', [], 1);
+        $stored = json_decode($state->stored(1, 0, 5, null), true);
+        $stored['wrapUp'] = 'answered';
+        $stored['stall'] = ['calls' => ['c:x' => ['tool' => 1, 'n' => 'many']], 'seen' => [3], 'stale' => -2];
+
+        $read = (new ChatRunCodec())->decode((string) json_encode($stored));
+
+        self::assertInstanceOf(ChatRunState::class, $read);
+        self::assertNull($read->wrapUp);
+        self::assertSame([[], [], 0], [$read->stall['calls'], $read->stall['seen'], $read->stall['stale']]);
+    }
+
     public function testDeeplyNestedToolArgumentsDoNotLoseTheRun(): void
     {
         $args = ['leaf' => true];

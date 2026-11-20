@@ -13,6 +13,7 @@ use App\Service\Chat\Loop\ChatRunReply;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunStatus;
 use App\Service\Chat\Loop\ChatRunStep;
+use App\Service\Chat\Loop\ChatRunWrapUp;
 use App\Service\Chat\Loop\ConnectedToolCatalog;
 use App\Service\Project\ProjectTurnContext;
 
@@ -217,9 +218,12 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertSame([], $this->tools->runs);
     }
 
-    public function testAnEmptyBudgetStopsBeforeTheNextPaidCall(): void
+    public function testAnEmptyBudgetEndsWithOneWrapUpCall(): void
     {
-        $model = $this->model(new ScriptedChatRunModel(ScriptedChatRunModel::calls('web_search', ['query' => 'x'])));
+        $model = $this->model(new ScriptedChatRunModel(
+            ScriptedChatRunModel::calls('web_search', ['query' => 'x']),
+            ScriptedChatRunModel::says('What I found so far.'),
+        ));
         $state = $this->open();
         $unit = new \App\Service\Run\RunUnit($this->store->runs(), $this->handler, $this->bus);
         $first = array_shift($this->bus->queued);
@@ -230,7 +234,10 @@ final class ChatRunStepTest extends ChatLoopCase
 
         $stored = $this->stored($state->runId);
         self::assertSame(ChatRunStatus::BudgetUsed, $stored->status);
-        self::assertCount(1, $model->calls);
+        self::assertSame(ChatRunEnd::PayerEmpty, $stored->end);
+        self::assertCount(2, $model->calls);
+        self::assertSame([], $model->calls[1]['tools']);
+        self::assertSame(ChatRunWrapUp::opening(ChatRunEnd::PayerEmpty, 'de')."\n\nWhat I found so far.", $stored->answer);
         self::assertSame(2, $this->budget->checks);
     }
 

@@ -7,10 +7,11 @@ namespace App\Service\Chat\Loop;
 use App\Entity\User;
 
 /**
- * Whether the payer may pay for the next model call. Asked before every
- * call of a run, not only before the turn.
+ * What the payer may pay for. Asked before every call of a run, not only
+ * before the turn.
  */
 interface ChatRunBudget
 {
-    public function allows(User $payer): bool;
+    /** The monthly budget left and the share one run may spend, read fresh. */
+    public function allowance(User $payer): ChatRunAllowance;
 }

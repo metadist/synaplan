@@ -13,8 +13,80 @@ to them.
 | PJ4 | merged | #3186 | Project page `/projects/:id` (Chats, Sources, Instructions), a "Projects" section in the Chats panel, the Add-source dialog (file, link, text), the project name above the composer of a project chat, and move in/out of a project from the chat menu, pinned projects first (`BPROJECTS.BPINNEDAT`, migration `Version20261119120000`). A flag-off module answers 404 `feature_not_configured` and the UI shows nothing. `PROJECTS_ENABLED=1` is set in `backend/.env.test` so the E2E spec can run. |
 | PJ5a | merged | #3216 | A chat run on the run kernel, flag off (`LOOP.ENABLED` = 0). See 2026-11-20 below. The owner split PJ5 into PJ5a (the run) and PJ5b (the hand-over in the request). |
 | PJ5b | merged | #3218 | The hand-over in the request, flag off. G1 accepted by the owner (+10.1 % cost, first token faster). See "2026-11-20 — PJ5b" below. |
-| PJ5c | PR open | branch `feat/chat-loop-check` | The check before delivery (03 §3.2), flag off. A note under the answer, nothing removed (owner). See "2026-11-20 — PJ5c" below. |
-| PJ6–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+| PJ5c | merged | #3221 | The check before delivery (03 §3.2), flag off. A note under the answer, nothing removed (owner). See "2026-11-20 — PJ5c" below. |
+| PJ6 | PR open | branch `feat/chat-loop-guards` | Cost limit as a share of the person's monthly budget, and circle detection, flag off. See "2026-11-20 — PJ6" below. |
+| PJ7–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+
+---
+
+## 2026-11-20 — PJ6: cost limit with a result, and circle detection
+
+Both guards end a run with an answer, never with a bare stop. The flag stays 0.
+
+**Owner decisions (2026-11-20):** the person sets the cost limit, not the
+admin, as a share of their own monthly budget; it can never be more than that
+budget. No token limit for models without a price. Circle detection 3 / 6 / 5
+as planned. §0 #12, #14, #15 are updated.
+
+**What happens** (`backend/src/Service/Chat/Loop/`):
+
+- `ChatRunCostLimit`: the share the person chose (`BCONFIG` owner = person,
+  `LOOP.RUN_COST_PERCENT`; 5, 10, 20, 25, 50 or 100; default 10, no row
+  stored for the default). A stored value that is not offered reads as the
+  default. Cap = monthly budget with top-ups × share / 100, in billed money
+  (with markup), the same figure as the budget. A plan without a monthly
+  budget has no cap per run. No schema change.
+- `ChatRunCostGuard`, read fresh before every model call: reserve = max(10 %
+  of the cap, the dearest call so far). Budget used up or left ≤ reserve →
+  wrap-up `payer_empty`; spent + reserve ≥ cap → wrap-up `cost_limit`. A model
+  without a price costs 0 and never reaches it.
+- `ChatRunStallDetector`, deterministic: the same call with the same
+  normalised input 3 times, 6 steps in a row without a new result, 5 failed
+  tool calls in a row. The first signal adds one user message that names the
+  repetition ("You are going in circles: …") and resets the counters (seen
+  results stay); event `run.circling`. The second signal → wrap-up
+  `circling`. A run that keeps finding new things never stops (tested to 200
+  steps). Admin keys `LOOP.STALL_REPEAT`, `STALL_NO_NEW`, `STALL_ERRORS`,
+  `WRAPUP_RESERVE_PERCENT` (owner 0), defaults in code.
+- `ChatRunWrapUp`: one call without tools; the answer starts with a fixed
+  opening line per reason in the person's language (five), then the model's
+  text, or the run's last text if the call fails. Event `run.wrap_up`. Ends
+  `cost_limit` / `payer_empty` → `budget_used`, `circling` → `completed`.
+- PJ5c's check after a cost or budget end runs the free part only (no paid
+  checker); otherwise the checker is paid only while it fits under the cap.
+- The person's setting: Settings → Chat & AI → "Cost limit per long answer",
+  `GET`/`PUT /api/v1/config/chat-run-limit`. Each share shows what it means
+  in money; without a monthly budget the card says there is no limit per
+  answer. Hidden while `LOOP.ENABLED` is 0.
+
+**Not in PJ6:** "Answer now" (`answer_now`) needs PJ8's button; "Keep going"
+(`continueFrom`) needs the run notes of PJ7. Both stay planned there.
+
+**Walk (dev stack, 2026-11-20):**
+
+- Settings as admin (no monthly budget): the card says there is no limit
+  per answer. As demo (PRO, $10.00) by impersonation: "10 % – up to $1.00
+  per answer · default"; chose 25 % → toast, row `2.LOOP.RUN_COST_PERCENT =
+  25`, reload shows "25 % – up to $2.50"; back to 10 % → row deleted. In the
+  page: `PUT` 150 or −10 → 422; `"25"`, 12.5, `[]`, no JSON → 400; without a
+  sign-in `GET`/`PUT` → 401.
+- Live wrap-up: a temporary ADMIN plan with a budget $0.12 above what admin
+  had used (removed afterwards). "Suche im Web gründlich: Vergleiche die
+  Einwohnerzahlen von Langenfeld …, Monheim am Rhein, Leichlingen und Hilden
+  …, Jahr für Jahr" on the admin's chat model (a priced frontier model).
+  Run 10: 5 steps, `budget_used`, outcome `payer_empty`, run cost $0.064; the
+  answer began "Das Monatsbudget ist fast aufgebraucht. Hier ist, was ich
+  bisher habe." and ended with what is still open. Used went from $8.15 to
+  $8.25 of $8.27: not exceeded.
+
+**Limits:**
+
+- `cost_limit` and `circling` were not triggered live (the smallest share of
+  the smallest seeded budget is $0.50 a run); the unit tests cover them,
+  including G4's "at most one call over" and G5's two planted circles.
+- The message footer of the walk showed $0.04 while the run itself cost
+  $0.064: it does not count the run's calls. Seen, not changed here; PJ8's
+  run card is where the whole cost belongs.
 
 ---
 

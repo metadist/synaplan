@@ -20,6 +20,10 @@ final class ChatRunState implements RunState
     public const MODE_FINISH = 'finish';
     public const MODE_FINISH_JSON = 'finish_json';
 
+    /** One last call without tools that writes the result from what the run has (03 §1.3). */
+    public const MODE_WRAP_UP = 'wrap_up';
+    public const MODES = [self::MODE_FREE, self::MODE_FINISH, self::MODE_FINISH_JSON, self::MODE_WRAP_UP];
+
     public const PLAN_PENDING = 'pending';
     public const PLAN_ACTIVE = 'in_progress';
     public const PLAN_DONE = 'done';
@@ -47,6 +51,22 @@ final class ChatRunState implements RunState
     public int $steps = 0;
     public int $costMicro = 0;
     public int $nudges = 0;
+
+    /** The dearest single model call of this run, in what the person is billed. */
+    public int $dearestMicro = 0;
+
+    /** Why the run wraps up; set once, when the wrap-up call is asked for. */
+    public ?ChatRunEnd $wrapUp = null;
+
+    /**
+     * What circle detection counts (03 §1.4): calls by their normalised
+     * input, the results seen so far, steps in a row with nothing new, tool
+     * errors in a row, whether the model was told once already, and whether
+     * the step under way found something.
+     *
+     * @var array{calls: array<string, array{tool: string, n: int}>, seen: array<string, true>, stale: int, errors: int, nudged: bool, found: bool, ran: bool}
+     */
+    public array $stall = ChatRunStallDetector::EMPTY;
 
     /** Model calls that failed in a row; a call that answers clears it. */
     public int $modelFailures = 0;
