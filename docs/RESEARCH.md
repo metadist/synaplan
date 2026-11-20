@@ -45,7 +45,7 @@ There is no separate "research mode" button or menu entry. Instead, the chat dec
 
 ### How an Automatic Run Behaves in Chat
 
-1. **Stream start:** When `BEFFORT` is `research`, the turn starts a run with depth `auto`. The SSE stream emits `research_started` with the run ID first, and the assistant reply carries `researchRunId` (meta `research_run_id`), both live and after a page reload. Non-UI channels receive the fallback notice sentence (*"I am looking through several sources for this — about N minutes. The question has several parts."*).
+1. **Stream start:** When `BEFFORT` is `research`, the turn starts a run with depth `auto`. The SSE stream emits `research_started` with the run ID first, and the reply carries `researchRunId` (meta `research_run_id`), both live and after a page reload. Non-UI channels receive the fallback notice sentence (*"I am looking through several sources for this — about N minutes. The question has several parts."*).
 2. **Five live phases in the reply bubble:**
    - *Understanding the question* → *Planning the answer* → *Searching and reading* → *Writing the answer* → *Checking every statement*.
    - The headline shows the current step count and elapsed time (hidden when the admin timing switch is off).

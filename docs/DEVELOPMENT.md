@@ -104,7 +104,7 @@ block.
 
 ### Secure compute
 
-Short Python or Node file work for the assistant. `make up` starts
+Short Python or Node file work for the AI. `make up` starts
 the sidecar, builds the Python/Node runtimes from this repo, and turns the
 feature on. PHP never talks to Docker. Never publish port 8080.
 

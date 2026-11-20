@@ -115,7 +115,7 @@ Deep-dive into how Synaplan processes documents, maintains short- and long-term 
 | **3.3** | **[Session Files & Follow-Up Edits](SESSION_FILES.md)** | How `ConversationFileCatalog` tracks uploaded and generated files across a thread so follow-up questions and image edits find the right file. |
 | **3.4** | **[Multi-Task Planner & Data Nodes](MULTITASK_DATA_NODES.md)** | How `TaskPlanner` builds a capability DAG, pulls live external data (`web_search`, `url_fetch`, `mcp_fetch`, `email_search`), and guarantees handover. |
 | **3.5** | **[Deep & Automatic Research](RESEARCH.md)** | How `tools:sort` rates question effort (`answer` / `lookup` / `research`), runs a 5-phase investigation, verifies every citation with a second model, and writes the report. |
-| **3.6** | **[Secure Compute (File Work)](COMPUTE.md)** | How the assistant runs isolated Python and Node scripts on copies of user files, manages per-user workspaces, and enforces quotas and egress rules. |
+| **3.6** | **[Secure Compute (File Work)](COMPUTE.md)** | How the AI runs isolated Python and Node scripts on copies of user files, manages per-user workspaces, and enforces quotas and egress rules. |
 
 ---
 

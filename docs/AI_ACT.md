@@ -16,7 +16,7 @@ Synaplan is a tool an organisation deploys. This note says what the product does
 
 ## What the deployer still does
 
-- Tell people, in their own channels, who is responsible for the assistant.
+- Tell people, in their own channels, who is responsible for the AI.
 - Decide which data may be pasted into a chat.
 - Keep a person in the loop before a draft is sent, published, or filed.
 - Mount the signer key and certificate at `/certs` when content credentials must be trusted outside this server. The development certificate is not a public trust anchor.

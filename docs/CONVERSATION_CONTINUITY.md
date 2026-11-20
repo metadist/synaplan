@@ -51,7 +51,7 @@ A daily job walks each user's new messages and asks the memory model to pick
 the **KEY messages** — documents with their content, results, decisions,
 important facts/amounts/dates — and write one searchable title per message
 ("office rent letter to realtor about the increase of payments"). Requests to
-the assistant ("make a chart of this") and notes that a file was created are
+the AI ("make a chart of this") and notes that a file was created are
 skipped; only the facts they contain count. Titles are written in the language
 the user writes in, so a German question also finds an English contract. The
 model sees the existing titles

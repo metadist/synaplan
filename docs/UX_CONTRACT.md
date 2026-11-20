@@ -35,7 +35,7 @@ flow. What was missing, and what this contract demands of every plan:
   If the everyday list does not surface the new thing, the plan names the
   inbox, badge or empty-state path *before* the first UI PR.
 - **Kind-specific meaning.** "Can use" on a chat is not "Can use" on an
-  assistant or a tool. Primary copy says what happens *here*.
+  agent or a tool. Primary copy says what happens *here*.
 - **Familiar interaction.** Professional share UIs (Drive, Notion, Slack)
   add a person and a permission in **one row** and explain the
   consequence in one sentence.
@@ -55,7 +55,7 @@ clean UI.
 1. The rail is **Chats · Library · Agents · Apps · Admin** — one home
    per job (UX overhaul, [#2431](https://github.com/metadist/synaplan/pull/2431)).
    Everyday work stays in Chats and Library.
-2. What a user builds or decides (assistants, shortcuts, tasks, approvals,
+2. What a user builds or decides (agents, shortcuts, tasks, approvals,
    AI settings) lives under **Agents**; everything connected from
    outside is an **App**.
 3. Installation-wide controls live in **Admin**, administrators only.
@@ -76,7 +76,7 @@ you."
 | - | ---- | ------------ |
 | **U1** | **Journey before Vue.** The plan names the journey (§5) and a reviewer walks the ASCII/wireframe before the first `*.vue` for that surface. Copy in all five locales is in the same PR as the first paint. | The PR invents the screen while writing it |
 | **U2** | **The other person finds it in ten seconds.** Owner path *and* recipient / later-self path are specified. If the existing list cannot surface it, the plan names the inbox, badge or empty-state CTA. | "Shared with me chip on the list" with no proof the list is the one people open |
-| **U3** | **Kind-specific consequence.** Every permission, status and button says what happens *on this kind*, in one sentence the average user understands. | One generic "Can use" for chat, assistant, tool and task |
+| **U3** | **Kind-specific consequence.** Every permission, status and button says what happens *on this kind*, in one sentence the average user understands. | One generic "Can use" for chat, agent, tool and task |
 | **U4** | **Familiar pattern, house skin.** Share = one-row add + live list (Drive-class). Inbox = pending / done. Gallery = cards + chips. Connect = one confirm card. Chat results = a card, not a new page. | A stacked form that looks like an admin tool |
 | **U5** | **Empty state is a next action.** One sentence + one primary button. Flag off ⇒ the surface is absent (no teaser, no dead control). | Blank card, or a control that 404s |
 | **U6** | **Arrival signal without a new rail.** Red-dot, badge count, or a child entry under an existing section. Chats stay a work list, not a notification dump. | Silent grant, or a new top-level item |
@@ -158,7 +158,7 @@ deep link to the run.
 
 ### 4.4 Catalog / gallery
 
-Cards, not tables, for things people *pick*: assistants, templates,
+Cards, not tables, for things people *pick*: agents, templates,
 custom tools, apps. Chips: Mine / Shared with me / From plugins. Primary
 action on the card is the verb the user came for (**Start chat**,
 **Use template**, **Try it**), not **Edit**.
@@ -186,21 +186,21 @@ No new page. Quota / refusal is a sentence on the card.
 ### 4.8 Triggers: event or schedule
 
 Anything that starts the AI without a chat message uses **one**
-vocabulary across assistants and tasks. A **trigger** is either an
+vocabulary across agents and tasks. A **trigger** is either an
 **event** (something arrives — mail, WhatsApp, a website visitor, an app
 or coding tool, a connected app, Synaplan Desktop, a web hook) or a
 **schedule** (a point in time).
 
 | Concept | en | de | es | fr | tr |
 | ------- | -- | -- | -- | -- | -- |
-| What starts the assistant | **Trigger** | Auslöser | Activador | Déclencheur | Tetikleyici |
+| What starts the agent | **Trigger** | Auslöser | Activador | Déclencheur | Tetikleyici |
 | Something arrives | **Event** | Ereignis | Evento | Événement | Olay |
 | A point in time | **Schedule** | Zeitplan | Programación | Planification | Zamanlama |
 | Acts without the user present | **Runs on its own** | Läuft selbstständig | Se ejecuta por sí sola | S'exécute seul | Kendi başına çalışır |
 
 Every trigger row is one generated sentence (what arrives / when, what it
 does, **who it runs as**), one visible on/off, and a last-run status. A
-task card and an assistant's trigger row must be indistinguishable in
+task card and an agent's trigger row must be indistinguishable in
 wording. Who it runs as, in three words on the row:
 
 | Trigger | Runs as |

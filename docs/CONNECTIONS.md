@@ -253,7 +253,7 @@ declare as read-only is treated as destructive until you choose otherwise.
   connection says so; destructive tools still ask.
 
 **Connection choice vs. group policy.** The choice on the connection replaces
-the instance default for its tools. A group policy and an assistant policy can
+the instance default for its tools. A group policy and an agent policy can
 only tighten it: a tool a group blocks shows as locked in the list and cannot
 be raised there.
 

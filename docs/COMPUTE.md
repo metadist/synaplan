@@ -12,7 +12,7 @@
 
 ## What it is
 
-File work lets the assistant run a short Python or Node program on copies of
+File work lets the AI run a short Python or Node program on copies of
 files you already picked. The result comes back as files on the same chat
 card and in **Files** (`source=compute`). The program runs in an isolated
 sidecar — PHP never talks to Docker.
@@ -131,11 +131,11 @@ are refused on save.
 ## Policy
 
 Interactive (the owner is present): default `auto`. Unattended (a saved
-task): default `approve`. An assistant cannot loosen the instance policy.
+task): default `approve`. An agent cannot loosen the instance policy.
 A run that will fetch from the web additionally asks first when
 `COMPUTE.EGRESS_REQUIRES_APPROVAL` is on (default on); the approval preview
 names the websites (`websites: api.example.com`). That ask is a floor the
-gate applies after the policy decided (`requireApproval`): an assistant's
+gate applies after the policy decided (`requireApproval`): an agent's
 always-allow rule or a saved task's `allow_unattended` cannot lower it back
 to `auto`, while a `block` still wins. If that switch is on but approvals
 cannot be produced (`TOOLS.APPROVALS_ENABLED` off), the run is **refused**,

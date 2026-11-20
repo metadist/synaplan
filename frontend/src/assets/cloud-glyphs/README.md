@@ -1,6 +1,6 @@
 # Cloud glyphs
 
-The bird marks a file the assistant can search. Drawn on a 24 px grid with a
+The bird marks a file the AI can search. Drawn on a 24 px grid with a
 1.5 px stroke and `currentColor`, in the same outline style as Heroicons.
 The apps copy these shapes. Do not recolour them: the surrounding text colour
 is the contrast.

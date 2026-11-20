@@ -67,7 +67,7 @@ search or vision:
 | `MCP_TOOLS_WITH_CLIENT_TOOLS` | `0` | Also inject when the client already sent `tools` (off — Claude Code brings its own) |
 | `MCP_MAX_ITERATIONS` | `8` | Max LLM↔tool rounds per request (applies to every server-side tool) |
 | `WEB_SEARCH_MODE` | `auto` | How to answer Anthropic’s `web_search_*` server tool — `auto`, `synaplan`, `passthrough` or `off` (see [Web search](#web-search)) |
-| `WEB_SEARCH_MAX_ROUNDS` | `4` | How many Synaplan web searches one message may run before the assistant answers from what it found, as fully as the question needs, and cites the https URLs. Range 1–6. Installs that still held the old seed of `2` were raised to `4` by migration; a value an administrator chose stays. |
+| `WEB_SEARCH_MAX_ROUNDS` | `4` | How many Synaplan web searches one message may run before the AI answers from what it found, as fully as the question needs, and cites the https URLs. Range 1–6. Installs that still held the old seed of `2` were raised to `4` by migration; a value an administrator chose stays. |
 | `WEB_FETCH_MODE` | `auto` | Who reads a page. `auto`: Anthropic on Anthropic routes, Synaplan on every other route. `passthrough`: only Anthropic. `off`: drop the tool (see [Web fetch](#web-fetch)) |
 | `WEB_FETCH_MAX_PER_TURN` | `3` | How many pages Synaplan may open in one message on a non-Anthropic route. Range 0–10. `0` opens none. Anthropic routes keep Anthropic’s own limit |
 | `KNOWLEDGE_TOOLS` | `desktop` | Who can search a pinned knowledge folder. `desktop`: paired desktop keys. `all`: every coding client. `off`: neither tool. A folder still has to be pinned on the message (see [Knowledge tools](#knowledge-tools)) |
@@ -154,7 +154,7 @@ A client that wants the chat's judgement sends `x-synaplan-effort: auto`. The ga
 | Rating | What happens |
 | ------ | ------------ |
 | `answer`, `lookup`, no vote | The turn runs as it always did, within the search ceiling above. |
-| `research`, a run started | No model call. The reply is one assistant message with the notice sentence in the person's language ("I am looking through several sources for this — about N minutes. …"), shaped like any upstream reply: JSON when `stream` is false, the Anthropic SSE sequence (`message_start` … `message_stop`) when it is true. The report stays on the research run; read it with `GET /v1/research/{id}` (API key) and follow `GET /v1/research/{id}/events`. The pinned folder (`x-synaplan-rag-group-key`) and assistant (`x-synaplan-agent-id`) go into the run. |
+| `research`, a run started | No model call. The reply is one assistant message with the notice sentence in the person's language ("I am looking through several sources for this — about N minutes. …"), shaped like any upstream reply: JSON when `stream` is false, the Anthropic SSE sequence (`message_start` … `message_stop`) when it is true. The report stays on the research run; read it with `GET /v1/research/{id}` (API key) and follow `GET /v1/research/{id}/events`. The pinned folder (`x-synaplan-rag-group-key`) and the pinned agent (`x-synaplan-agent-id`) go into the run. |
 | `research`, held back | The turn runs as usual and the response names why no run started. |
 
 Response headers, only when the request carried the header:
@@ -187,7 +187,7 @@ Synaplan reads pages through the same SSRF guard as every other user-initiated f
 
 ### Knowledge tools
 
-When a message pins a knowledge folder (`x-synaplan-rag-group-key`) or an assistant that already has knowledge folders, and `KNOWLEDGE_TOOLS` allows the key, Synaplan offers two tools it runs itself:
+When a message pins a knowledge folder (`x-synaplan-rag-group-key`) or an agent that already has knowledge folders, and `KNOWLEDGE_TOOLS` allows the key, Synaplan offers two tools it runs itself:
 
 | Tool | What it does |
 | ---- | ------------ |

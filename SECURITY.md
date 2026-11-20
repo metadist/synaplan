@@ -120,7 +120,7 @@ anything beyond that, ask first.
 A software weakness and an AI incident are different reports. Use the
 process above for a weakness in the code.
 
-An AI incident means the assistant discloses data it should not, a
+An AI incident means the AI discloses data it should not, a
 generated file is marked in a way that misleads people, or an answer causes
 harm that the organisation running Synaplan reports to us.
 

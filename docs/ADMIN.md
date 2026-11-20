@@ -636,7 +636,7 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
 (both are on by default; **Features → Users & sharing** or
 `FEATURE_IAM_SHARING_ENABLED`). When they are on:
 
-- An owner can share a knowledge folder, a conversation, an **AI assistant**,
+- An owner can share a knowledge folder, a conversation, an **agent**,
   a **saved task**, or a **chat widget** with a user, a group, or everyone
   on the instance.
 - Conversation permissions are **Can view** and **Can use**. **Can use** lets
@@ -656,8 +656,8 @@ Sharing needs both `IAM.GROUPS_ENABLED` and `IAM.SHARING_ENABLED` set to `1`
     until you pick another value. The users they reached lose access without
     being told. Nothing is deleted: the owner still sees the share in the
     Share dialog, marked as not in effect, and can remove it; switching back
-    to `any_owner` or `admins_only` restores it. System assistants and
-    plugin-pack assistants are the platform's own shares and stay available
+    to `any_owner` or `admins_only` restores it. System agents and
+    plugin-pack agents are the platform's own shares and stay available
     to every account on every value.
   - Which value an install has: the upgrade sets `disabled` where sign-up is
     open (no `REGISTRATION_ENABLED=false`, no stored "off" under Access) and
@@ -702,7 +702,7 @@ never include content. `app:iam:reap-audit` deletes rows older than
 ### Admin privacy and impersonation
 
 Administrators can share, unshare and delete (manage) but they cannot read
-another user's chats, files or assistants unless those items are shared with
+another user's chats, files or agents unless those items are shared with
 them. **Admin → Users** has **View as user** for audited
 impersonation (`IAM.ADMIN_IMPERSONATION` = `audited`). Set it to `disabled`
 to hide that action.
@@ -761,26 +761,26 @@ ON DUPLICATE KEY UPDATE BVALUE = '1';
 Each MCP connection carries its own per-tool choice (Auto, Approve, Block;
 see [Tool permissions](CONNECTIONS.md#tool-permissions-every-mcp-connection)).
 For the tools of a connection that choice **replaces the instance default**
-set under **Features & tools → tools & automation**. Group and assistant
+set under **Features & tools → tools & automation**. Group and agent
 policies still apply on top and can only tighten: a tool a group blocks is
 locked in the connection's list. With tool approvals switched off
 (`TOOLS.APPROVALS_ENABLED`), Block still holds, Approve tools are refused and
 Auto tools run. Existing connections moved to the new defaults (writes Auto,
 destructive Approve) and show a one-time notice to their owner.
 
-### Publishing an assistant to a group
+### Publishing an agent to a group
 
 1. Turn groups and sharing on (both flags above).
 2. Create a custom agent under **AI → Agents** (**AI → Instructions**
-   while `FEATURE_AGENTS_ENABLED` is off). System assistants with owner `0`
+   while `FEATURE_AGENTS_ENABLED` is off). System agents with owner `0`
    cannot be shared — everyone can already use them.
 3. Open **Share** and grant **Can use** to the group (for example Sales).
-4. Members of that group see the assistant in their list and the classifier
+4. Members of that group see the agent in their list and the classifier
    may pick it. Its knowledge folder `TASKPROMPT:{topic}` rides with the
    share. Users outside the group get **403** on `GET /api/v1/prompts/{id}`.
 5. A shared **saved task** is run as the member's own copy
    (`POST /api/v1/saved-tasks/{id}/copy`) — trigger resets to manual. The
-   assistant on that task must also be usable (owned, system, or shared
+   agent on that task must also be usable (owned, system, or shared
    `use`), otherwise the copy returns **409** `iam.assistantNotShared`.
 6. A shared **widget** can be opened read-only (`read`) or co-edited (`edit`).
    Embed code, visitor sessions, and transcripts stay with the owner.
@@ -812,7 +812,7 @@ the field. Shared rows are loaded with
 `PluginDataRepository::findSharedWith($userId, $pluginId, $dataType)`.
 
 Public token links are unchanged. Admins do not see other users' chats,
-files, assistants, tasks, or widget transcripts unless those items are shared
+files, agents, tasks, or widget transcripts unless those items are shared
 with them.
 
 **Users & groups** is on by default (`FEATURE_IAM_GROUPS_ENABLED` on the
@@ -827,7 +827,7 @@ opts into `iam:read` or `iam:manage` is limited to those Users routes.
 
 ## Self-awareness (`SELF_AWARE`)
 
-The assistant can answer "what can you do here?" from a live capability
+The AI can answer "what can you do here?" from a live capability
 inventory, and "how do I …?" from a system-owned copy of
 [docs.synaplan.com](https://docs.synaplan.com/). Both are gated by the
 `SELF_AWARE` BCONFIG group (owner 0). Rows are insert-if-missing on
@@ -878,7 +878,7 @@ review `PlatformCapabilityInventory::KNOWN_ABSENT`:
    the missing piece) for anything newly and deliberately unsupported.
 
 This is the only hand-maintained list in the feature. Leaving a stale
-entry makes the assistant deny something the install can do; missing an
+entry makes the AI deny something the install can do; missing an
 entry makes it invent a capability.
 
 ---

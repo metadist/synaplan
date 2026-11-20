@@ -55,7 +55,7 @@ Configuration: [CONFIGURATION.md → Multi-Task Routing](CONFIGURATION.md#multi-
 
 ## 3. Knowledge Base (RAG), Session Files & Memory
 
-Synaplan combines three distinct memory layers so the assistant can read your documents, keep track of files in the current thread, and remember facts across months of conversations:
+Synaplan combines three distinct memory layers so the AI can read your documents, keep track of files in the current thread, and remember facts across months of conversations:
 
 | Layer | Scope | How It Works | Guide |
 | ----- | ----- | ------------ | ----- |
@@ -70,14 +70,14 @@ Synaplan combines three distinct memory layers so the assistant can read your do
 Every tool execution across the platform passes through a single gate (`ToolInvoker`):
 
 - **Unified Tool Registry & Approvals** — Built-in tools, connected MCP servers, and user-defined HTTP/OpenAPI tools share one policy engine. Read-only calls run immediately; write-class actions pause with an approval card in chat and in the **Approvals** inbox, and record a `tool.executed` row in the audit log.
-- **File Work (Secure Compute)** — The assistant can run short Python or Node scripts on *copies* of user-selected files inside an isolated container sidecar (`sidecars/synaplan-compute`), returning generated charts, spreadsheets, or archives to chat and the user's persistent **Workspace**. See [COMPUTE.md](COMPUTE.md).
+- **File Work (Secure Compute)** — The AI can run short Python or Node scripts on *copies* of user-selected files inside an isolated container sidecar (`sidecars/synaplan-compute`), returning generated charts, spreadsheets, or archives to chat and the user's persistent **Workspace**. See [COMPUTE.md](COMPUTE.md).
 - **Office Document Engine** — Generates and revises `.docx`, `.xlsx`, and `.pptx` files step by step. When the optional **Collabora CODE** sidecar is running, Synaplan adds thumbnails, inline preview, "Download as PDF", "Combine as PDF", and browser editing.
 
 ---
 
 ## 5. Channels, Gateways & Companion Apps
 
-The same assistant, knowledge folders, and model policies are reachable from every surface your team uses:
+The same AI, knowledge folders, and model policies are reachable from every surface your team uses:
 
 | Surface | What It Does | Guide |
 | ------- | ------------ | ----- |
@@ -95,9 +95,9 @@ The same assistant, knowledge folders, and model policies are reachable from eve
 ## 6. Users, Groups, Sharing & Governance
 
 - **Groups & Directory Sync (`IAM`)** — Create manual groups or sync memberships automatically from OIDC `groups` claims on sign-in.
-- **Resource Sharing** — Share conversations, knowledge folders, AI assistants, Saved Tasks, and chat widgets with specific people, groups, or the whole instance (**Can view** vs. **Can use**).
+- **Resource Sharing** — Share conversations, knowledge folders, agents, Saved Tasks, and chat widgets with specific people, groups, or the whole instance (**Can view** vs. **Can use**).
 - **Group Policies & Locked Defaults** — Assign default models, allowed model allowlists, feature switches, and rate-limit tiers per group, or lock instance-wide defaults so users cannot override them.
-- **Privacy by Default** — Administrators manage users, quotas, and audited impersonation (`View as user`), but cannot read another user's private chats, files, or assistants unless shared. See [ADMIN.md](ADMIN.md#users-and-groups).
+- **Privacy by Default** — Administrators manage users, quotas, and audited impersonation (`View as user`), but cannot read another user's private chats, files, or agents unless shared. See [ADMIN.md](ADMIN.md#users-and-groups).
 
 ---
 
