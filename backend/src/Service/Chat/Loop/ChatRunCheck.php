@@ -138,7 +138,7 @@ final readonly class ChatRunCheck
      * The free check of the research engine. A statement that cites nothing
      * is not this check's business: the chat may answer from what it knows.
      *
-     * @param array<string, string>                                                                    $passages
+     * @param array<string, string>                                                                                           $passages
      * @param list<array{id: string, sentence: string, bare: string, passages: string, shown: string, sources: list<string>}> $statements
      *
      * @return array<string, true> failed statements by id
@@ -165,7 +165,7 @@ final readonly class ChatRunCheck
      * Asks the checking model, batch by batch, while the payer's budget allows.
      *
      * @param list<array{id: string, sentence: string, bare: string, passages: string, shown: string, sources: list<string>}> $ask
-     * @param array<string, true>                                                                      $failed by id
+     * @param array<string, true>                                                                                             $failed by id
      *
      * @return bool whether the model answered at least once
      */
