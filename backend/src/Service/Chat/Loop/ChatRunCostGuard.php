@@ -14,7 +14,8 @@ use App\Entity\User;
  * reserve, the larger of a share of the run's limit and the dearest call
  * so far, so the wrap-up call still fits. When a limit is reached the run
  * wraps up instead of making another working call: it may go past a limit
- * by at most that one call.
+ * by at most that one call. A budget that is already used up (another
+ * chat spent it meanwhile) pays for nothing more: the run ends at once.
  *
  * A model without a price costs nothing here; circle detection ends a
  * stuck run of such a model (owner decision: no token limit).
@@ -27,16 +28,23 @@ final readonly class ChatRunCostGuard
     ) {
     }
 
-    /** The reason to wrap up now, or null while the run may go on. */
+    /**
+     * The reason to stop now, or null while the run may go on. BudgetUsed
+     * ends the run without another call; any other reason asks for the
+     * wrap-up call.
+     */
     public function check(ChatRunState $state, User $payer): ?ChatRunEnd
     {
         $allowance = $this->budget->allowance($payer);
+        if (!$allowance->allowed) {
+            return ChatRunEnd::BudgetUsed;
+        }
         $runCap = $allowance->runCapMicro;
         $reserve = max(
             null === $runCap ? 0 : intdiv($runCap * $this->limits->reservePercent(), 100),
             $state->dearestMicro,
         );
-        if (!$allowance->allowed || (null !== $allowance->leftMicro && $allowance->leftMicro <= $reserve)) {
+        if (null !== $allowance->leftMicro && $allowance->leftMicro <= $reserve) {
             return ChatRunEnd::PayerEmpty;
         }
         if (null !== $runCap && $state->costMicro + $reserve >= $runCap) {

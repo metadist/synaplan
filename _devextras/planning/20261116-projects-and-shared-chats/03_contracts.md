@@ -67,7 +67,8 @@ cap     = monthly budget × the person's share / 100           re-read before ev
 reserve = max(cap × LOOP.WRAPUP_RESERVE_PERCENT / 100,
               the dearest model call of this run so far)
 before every model call:
-    payer's budget used up, or left ≤ reserve  ──► wrap-up call (payer_empty)
+    payer's budget already used up             ──► end at once, no call (budget_used)
+    payer's left ≤ reserve                     ──► wrap-up call (payer_empty)
     spent + reserve ≥ cap                      ──► wrap-up call (cost_limit)
 ```
 
@@ -90,7 +91,7 @@ share means in money.
 | Wrap-up reason | Trigger | Terminal status |
 | -------------- | ------- | --------------- |
 | `cost_limit` | rule above | `budget_used` |
-| `payer_empty` | the payer's monthly budget is empty | `budget_used` |
+| `payer_empty` | what the payer has left is within the reserve (a budget already used up ends the run without a call, `budget_used`) | `budget_used` |
 | `circling` | §1.4, second trigger | `completed` |
 | `answer_now` | the person pressed "Answer now" | `completed` |
 
@@ -396,7 +397,7 @@ PayerResolver::resolve(chat, sender)
 - First call that falls back to the sender: set `BEXHAUSTEDAT`, post the
   notice line once, send `payer.changed`.
 - A sender with no budget and no allowance: the turn is refused as today
-  (`COST_BUDGET_EXCEEDED`); inside a run it is the wrap-up `payer_empty`.
+  (`COST_BUDGET_EXCEEDED`); inside a run it is the wrap-up `payer_empty`, or `budget_used` without a call once nothing is left.
 - The Chat model is the sender's, also when the owner pays (§0 #67).
 
 ## 6. Shared chats

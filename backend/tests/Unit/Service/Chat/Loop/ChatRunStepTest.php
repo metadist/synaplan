@@ -218,11 +218,11 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertSame([], $this->tools->runs);
     }
 
-    public function testAnEmptyBudgetEndsWithOneWrapUpCall(): void
+    public function testAnEmptyBudgetEndsWithoutAnotherPaidCall(): void
     {
         $model = $this->model(new ScriptedChatRunModel(
             ScriptedChatRunModel::calls('web_search', ['query' => 'x']),
-            ScriptedChatRunModel::says('What I found so far.'),
+            ScriptedChatRunModel::says('Never asked for.'),
         ));
         $state = $this->open();
         $unit = new \App\Service\Run\RunUnit($this->store->runs(), $this->handler, $this->bus);
@@ -234,11 +234,33 @@ final class ChatRunStepTest extends ChatLoopCase
 
         $stored = $this->stored($state->runId);
         self::assertSame(ChatRunStatus::BudgetUsed, $stored->status);
+        self::assertSame(ChatRunEnd::BudgetUsed, $stored->end);
+        self::assertCount(1, $model->calls);
+        self::assertNull($stored->wrapUp);
+        self::assertSame(2, $this->budget->checks);
+    }
+
+    public function testABudgetNearlyUsedUpEndsWithOneWrapUpCall(): void
+    {
+        $model = $this->model(new ScriptedChatRunModel(
+            ScriptedChatRunModel::calls('web_search', ['query' => 'x']),
+            ScriptedChatRunModel::says('What I found so far.'),
+        ));
+        $state = $this->open();
+        $unit = new \App\Service\Run\RunUnit($this->store->runs(), $this->handler, $this->bus);
+        $first = array_shift($this->bus->queued);
+        $unit->handle($first['runId'], $first['unit'], $first['seq']);
+
+        // Allowed, but nothing is left beyond the reserve of the wrap-up call.
+        $this->budget->leftMicro = 0;
+        $this->drain();
+
+        $stored = $this->stored($state->runId);
+        self::assertSame(ChatRunStatus::BudgetUsed, $stored->status);
         self::assertSame(ChatRunEnd::PayerEmpty, $stored->end);
         self::assertCount(2, $model->calls);
         self::assertSame([], $model->calls[1]['tools']);
         self::assertSame(ChatRunWrapUp::opening(ChatRunEnd::PayerEmpty, 'de')."\n\nWhat I found so far.", $stored->answer);
-        self::assertSame(2, $this->budget->checks);
     }
 
     public function testAStopEndsTheRunWithoutAnotherCall(): void

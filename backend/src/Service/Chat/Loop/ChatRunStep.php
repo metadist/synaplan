@@ -58,8 +58,8 @@ final readonly class ChatRunStep
 
             return null;
         }
-        if (ChatRunState::MODE_WRAP_UP !== $state->mode) {
-            $this->guard($state, $scope);
+        if (ChatRunState::MODE_WRAP_UP !== $state->mode && !$this->guard($state, $scope)) {
+            return null;
         }
         $claim->renew();
 
@@ -78,16 +78,27 @@ final readonly class ChatRunStep
         $this->answers->end($state, ChatRunEnd::WorkerLost);
     }
 
-    /** The cost limit first, then circle detection, which only watches working steps. */
-    private function guard(ChatRunState $state, ChatRunScope $scope): void
+    /**
+     * The cost limit first, then circle detection, which only watches working steps.
+     *
+     * @return bool false when the run ended here without another call
+     */
+    private function guard(ChatRunState $state, ChatRunScope $scope): bool
     {
         $reason = $this->cost->check($state, $scope->user);
+        if (ChatRunEnd::BudgetUsed === $reason) {
+            $this->answers->end($state, ChatRunEnd::BudgetUsed);
+
+            return false;
+        }
         if (null === $reason && ChatRunState::MODE_FREE === $state->mode && $this->stall->check($state, $this->events)) {
             $reason = ChatRunEnd::Circling;
         }
         if (null !== $reason) {
             ChatRunWrapUp::begin($state, $reason, $this->events);
         }
+
+        return true;
     }
 
     private function call(ChatRunState $state, ChatRunScope $scope): ?string

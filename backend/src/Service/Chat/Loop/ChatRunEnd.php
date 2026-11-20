@@ -26,11 +26,11 @@ enum ChatRunEnd: string
             'tr' => 'Son özeti yazamadım; elimdeki son cevap bu.',
         ],
         'cost_limit' => [
-            'en' => 'I stopped at the cost limit you set for one answer.',
-            'de' => 'Ich habe beim Kostenlimit aufgehört, das du für eine Antwort festgelegt hast.',
-            'es' => 'Me detuve en el límite de coste que fijaste para una respuesta.',
-            'fr' => 'Je me suis arrêté à la limite de coût que vous avez fixée pour une réponse.',
-            'tr' => 'Bir cevap için belirlediğin maliyet sınırında durdum.',
+            'en' => 'I stopped at the cost limit for one answer.',
+            'de' => 'Ich habe beim Kostenlimit für eine Antwort aufgehört.',
+            'es' => 'Me detuve en el límite de coste por respuesta.',
+            'fr' => 'Je me suis arrêté à la limite de coût par réponse.',
+            'tr' => 'Cevap başına maliyet sınırında durdum.',
         ],
         'payer_empty' => [
             'en' => 'I stopped because the monthly budget is almost used up.',

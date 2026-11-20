@@ -37,8 +37,9 @@ as planned. §0 #12, #14, #15 are updated.
   (with markup), the same figure as the budget. A plan without a monthly
   budget has no cap per run. No schema change.
 - `ChatRunCostGuard`, read fresh before every model call: reserve = max(10 %
-  of the cap, the dearest call so far). Budget used up or left ≤ reserve →
-  wrap-up `payer_empty`; spent + reserve ≥ cap → wrap-up `cost_limit`. A model
+  of the cap, the dearest call so far). Budget already used up → ends at once
+  with `budget_used`, no further paid call; left ≤ reserve → wrap-up
+  `payer_empty`; spent + reserve ≥ cap → wrap-up `cost_limit`. A model
   without a price costs 0 and never reaches it.
 - `ChatRunStallDetector`, deterministic: the same call with the same
   normalised input 3 times, 6 steps in a row without a new result, 5 failed

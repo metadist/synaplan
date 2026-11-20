@@ -17,11 +17,11 @@ final class ChatRunWrapUp
 
     private const OPENINGS = [
         'cost_limit' => [
-            'en' => 'I reached the cost limit you set for one answer, so here is what I have so far.',
-            'de' => 'Ich habe das Kostenlimit erreicht, das du für eine Antwort festgelegt hast. Hier ist, was ich bisher habe.',
-            'es' => 'He llegado al límite de coste que fijaste para una respuesta. Esto es lo que tengo hasta ahora.',
-            'fr' => 'J\'ai atteint la limite de coût que vous avez fixée pour une réponse. Voici ce que j\'ai jusqu\'ici.',
-            'tr' => 'Bir cevap için belirlediğin maliyet sınırına ulaştım. Şu ana kadar elimde olanlar şunlar.',
+            'en' => 'I reached the cost limit for one answer, so here is what I have so far.',
+            'de' => 'Ich habe das Kostenlimit für eine Antwort erreicht. Hier ist, was ich bisher habe.',
+            'es' => 'He llegado al límite de coste por respuesta. Esto es lo que tengo hasta ahora.',
+            'fr' => 'J\'ai atteint la limite de coût par réponse. Voici ce que j\'ai jusqu\'ici.',
+            'tr' => 'Cevap başına maliyet sınırına ulaştım. Şu ana kadar elimde olanlar şunlar.',
         ],
         'payer_empty' => [
             'en' => 'The monthly budget is almost used up, so here is what I have so far.',
