@@ -11,6 +11,7 @@ use App\Repository\FileRepository;
 use App\Service\Document\ChatToolLoop;
 use App\Service\Document\ChatToolLoopResult;
 use App\Service\Document\DocumentEditCoordinator;
+use App\Service\Document\DocumentKind;
 use App\Service\Document\DocumentToolsConfig;
 use App\Service\Document\Import\DocumentImporter;
 use App\Service\Document\Model\DeckModel;
@@ -149,6 +150,22 @@ final class DocumentEditCoordinatorTest extends TestCase
         self::assertStringContainsString('Landung am internationalen Flughafen', $text);
         self::assertStringNotContainsString('**', $text);
         self::assertStringNotContainsString('Huge reference', $text);
+    }
+
+    public function testCasualPowerPointRequestStartsADeck(): void
+    {
+        $config = $this->createMock(DocumentToolsConfig::class);
+        $coordinator = $this->coordinator($config);
+        $method = new \ReflectionMethod(DocumentEditCoordinator::class, 'inferKind');
+
+        self::assertSame(
+            DocumentKind::PPTX,
+            $method->invoke($coordinator, 'kannst du mir eine power point präsentation erstellen, nur ganz kurz'),
+        );
+        self::assertSame(DocumentKind::XLSX, $method->invoke($coordinator, 'Vergleich als Excel'));
+        self::assertSame(DocumentKind::DOCX, $method->invoke($coordinator, 'mach ein Dokument dazu'));
+        self::assertSame(DocumentKind::PPTX, $method->invoke($coordinator, 'mach ein paar Slides dazu'));
+        self::assertNull($method->invoke($coordinator, 'erzähl mir was über Synaplan'));
     }
 
     private function coordinator(DocumentToolsConfig $config): DocumentEditCoordinator

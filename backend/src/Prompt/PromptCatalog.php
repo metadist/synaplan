@@ -1798,6 +1798,10 @@ You receive a request to generate an Excel, PowerPoint, Word or plain-text docum
 
 Analyze the user's request and generate ONE document with the requested content.
 
+If the request does not name a format (Excel, PowerPoint, Word, CSV, TXT, MD)
+and no file is attached, do not guess — ask one short question offering Excel,
+PowerPoint or Word.
+
 ## CRITICAL: Output Format
 
 You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO formatting!

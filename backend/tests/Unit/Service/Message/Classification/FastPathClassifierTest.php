@@ -53,6 +53,8 @@ final class FastPathClassifierTest extends TestCase
         yield 'a command' => ['/pic a cat', 'a tool prefix'];
         yield 'a long message' => [str_repeat('please tell me more ', 20), 'over 280 characters'];
         yield 'an office format' => ['mach eine excel tabelle', 'the sorter may pick officemaker'];
+        yield 'slides in german' => ['mach mir ein paar Folien zum Überblick', 'the sorter may pick officemaker'];
+        yield 'power point in two words' => ['make me a power point about Synaplan', 'the sorter may pick officemaker'];
         yield 'a PDF while the office engine runs' => ['write it as pdf', 'PDF only with the office engine'];
         yield 'media words' => ['hätte ich gerne das bild einer katze', 'a declarative media request'];
         yield 'audio words' => ['read it aloud please', 'speech needs the planner'];
