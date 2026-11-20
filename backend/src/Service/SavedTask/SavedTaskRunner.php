@@ -532,7 +532,7 @@ final readonly class SavedTaskRunner
      * closes the books. A result that should have been mailed but could not
      * be is a failed run, never a silent success.
      *
-     * @param array<string, mixed> $result
+     * @param array<string, mixed>                            $result
      * @param list<array<string, mixed>>|array<string, mixed> $snapshot
      *
      * @return array{run: SavedTaskRun, task: SavedTask}
