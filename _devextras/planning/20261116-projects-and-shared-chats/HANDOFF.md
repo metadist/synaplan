@@ -1,6 +1,6 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-20, `main` @ `e52bbb189`. Geschrieben für einen Agenten ohne Zugriff
+Stand: 2026-11-20, `main` @ `1bfddf111`, PJ5a auf `feat/chat-loop-run`. Geschrieben für einen Agenten ohne Zugriff
 auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Planungsdateien
 geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
@@ -21,8 +21,9 @@ beliebig lange arbeiten darf. 28 Schritte PJ0–PJ28 in Phasen 0, A–F.
 mit Blick auf Usability und vor allem Sicherheit.
 
 **Stand:** Phase 0 und A (PJ0–PJ4) sind fertig. Die Voraussetzungen für Phase B
-(AU26, AH8a, AH8b) sind gemergt. **Nächster Schritt ist PJ5**, aber erst nach einem
-ausdrücklichen "Ja" des Owners (Abschnitt 9).
+(AU26, AH8a, AH8b) sind gemergt. Der Owner hat PJ5 geteilt: **PJ5a** (der Lauf auf
+dem Kernel) liegt als PR vor, **PJ5b** (die Übergabe im Request) ist der nächste
+Schritt, sobald PJ5a gemergt ist (Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
@@ -36,7 +37,8 @@ ausdrücklichen "Ja" des Owners (Abschnitt 9).
 | AU26 ein Agent-Loop (Zeile 22, S4) | gemergt | #3193 |
 | AH8a Run-Kernel und `BRUNS` (Zeile 25) | gemergt | #3198 |
 | AH8b Research läuft auf dem Kernel | gemergt | #3201 |
-| PJ5 Chat-Turn als Lauf auf dem einen Loop | **nächster Schritt, nicht begonnen** | — |
+| PJ5a Chat-Lauf auf dem Kernel (Flag aus, noch nicht aufgerufen) | PR offen | `feat/chat-loop-run` |
+| PJ5b Übergabe Request → Lauf, G1, E2E | **nächster Schritt** | — |
 | PJ6–PJ28 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
@@ -179,8 +181,9 @@ Composer, Chat ins Projekt und heraus über das Chat-Menü, angepinnte Projekte 
 
 ## 4. Betroffene Dateien für PJ5 (Orientierung)
 
-- Neu: `backend/src/Service/Chat/Loop/*` (Profil `chat`, Handler, Codec, Reap-Policy,
-  Übergabe, Check vor der Auslieferung).
+- Vorhanden seit PJ5a: `backend/src/Service/Chat/Loop/*` (Profil `chat`, State, Codec,
+  Einheit, Handler, Reap-Policy, Reaper, Starter, Reader, Auslieferung). PJ5b ergänzt
+  die Übergabe und den Check vor der Auslieferung.
 - Lesen: `ChatStreamOrchestrator`, `MessageProcessor`, `TurnDispatcher`, `ChatHandler`,
   `ToolRegistry`, `PromptCatalog`, `Service/Chat/Run/*` (heutiger re-attachbarer
   Chat-Turn: `ChatRunService`, `RunStream`, `PumpChatRunner`),
@@ -210,20 +213,21 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 **Schalter:**
 
 - `PROJECTS.ENABLED` = 0 (bis PJ28, §0 #73); Env `PROJECTS_ENABLED` gewinnt, wenn gesetzt.
-- `LOOP.ENABLED` existiert noch nicht; PJ5 führt ihn ein, Default 0, und er bleibt 0
-  in jeder Umgebung, bis PJ6 und PJ8 gemergt sind (§0 #70). Ein neuer BCONFIG-Default
-  geht als Migration (`AGENTS.md`, "Flags").
+- `LOOP.ENABLED` = 0 (Migration `Version20261120090000`, PJ5a); Env `LOOP_ENABLED`
+  gewinnt, wenn gesetzt (`ChatLoopConfig`). Er bleibt 0 in jeder Umgebung, bis PJ6
+  und PJ8 gemergt sind (§0 #70).
 
 **Zod:** nach jeder OpenAPI-Änderung `make -C frontend generate-schemas`, dann
 `vue-tsc`. Keine handgeschriebenen Payload-Interfaces.
 
 ## 6. Bekannte Probleme, Einschränkungen, worauf zu achten ist
 
-- **Ask-first vor PJ5 prüfen:** der Messenger-Transport für `RunUnitBus` fehlt. Wenn
-  dafür ein neuer Worker-Container, eine Compose-Zeile oder CI-Konfiguration nötig
-  ist, ist das Docker/Build-Konfiguration → vorher den Owner fragen. Ebenso eine
-  Schemaänderung (z. B. neue Spalte); `BRUNS` mit `BKIND = chat` und `BNOTES` ist
-  bereits freigegeben und gemergt.
+- **Transport (gelöst in PJ5a):** `RunChatUnit` und `ResumeChatRunCommand` laufen
+  auf `async_ai_high` im bestehenden Worker; nur `messenger.yaml`, kein Container.
+  Eine Schemaänderung bleibt Ask-first.
+- **PJ5a-Grenzen:** der Lauf bietet keine Dokument-Tools, keine Skills und keinen
+  Server-Code an (sie lesen ihren Kontext aus dem HTTP-Request). Gemini braucht die
+  `thought_signature` der Tool-Aufrufe; sie wird im Transkript mitgeführt.
 - **Offene §0-Zeilen** (nicht selbst entscheiden): vor PJ6 #12 (Kostenlimit 5.00),
   #14 (Token-Cap für unbepreiste Modelle), #15 (Kreiserkennung 3/6/5); vor PJ7 #27;
   vor PJ9 #31; vor PJ10 #20; vor PJ11 #65. PJ5 selbst hat keine offene Zeile.
@@ -259,7 +263,7 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **PJ5** (Abschnitt 9), nach "Ja" des Owners.
+1. **PJ5a** PR abschließen (Copilot, CI), Owner mergt. Danach **PJ5b** (Abschnitt 9).
 2. **PJ6** Kostenlimit mit Ergebnis und Kreiserkennung (`RunCostGuard`,
    `StallDetector`); braucht §0 #12, #14, #15.
 3. **PJ7–PJ11** (Notizen, Chat-Suche, Dateien per ID, Rückfragekarte usw.); offene
@@ -267,38 +271,30 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 4. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt.
 5. **Phase D (PJ20–PJ22)**, **Phase E (PJ23–PJ27)**, **PJ28** Flags an.
 
-## 9. Exakt nächster Schritt: PJ5
+## 9. Exakt nächster Schritt: PJ5b
 
-Brief: `04_sprints.md` → "PJ5 — a chat turn runs on the one loop as a run".
+Brief: `04_sprints.md` → "PJ5 — a chat turn runs on the one loop as a run", der Teil,
+den PJ5a nicht gemacht hat. PJ5a (`STATUS.md`, 2026-11-20) liefert
+`ChatRunStarter::start(ChatRunRequest)`, `ChatRunReader::events()` und den Worker.
 
-1. Nur auf ausdrückliches "Ja" des Owners: `git checkout main && git pull --ff-only`,
-   neuer Branch (z. B. `feat/chat-loop-run`; Commit-Typ abstimmen: Flag aus,
-   kein sichtbares Verhalten → eher `refactor:` oder `feat:` mit Owner klären, weil
-   `feat` die Minor-Version hebt).
+1. Erst wenn PJ5a gemergt ist: `git checkout main && git pull --ff-only`, neuer Branch.
 2. **Tests zuerst:**
    - einfacher Turn: kein `BRUNS`-Eintrag, genau ein Modellaufruf;
-   - Turn mit Suche: wird zum Lauf und endet `completed`;
-   - Stream über die Übergabe ohne verlorenen oder doppelten Chunk;
-   - getöteter Worker: endet `interrupted` mit einem wahren Satz;
+   - erster Modellaufruf mit Tools im Request; erst ein Tool-Aufruf übergibt an den
+     Lauf (`ChatRunStarter`), der Stream folgt `run:{id}:events` ohne verlorenen oder
+     doppelten Chunk;
+   - fremder Account kann die Events nicht lesen und nicht re-attachen (404);
    - Flag aus und Modell ohne `tool_use`: heutiger Pfad Byte für Byte
      (Characterization-Snapshots unverändert).
-3. **Sicherheitstests:**
-   - fremder Account kann `run:{uuid}:events` nicht lesen und nicht re-attachen (403/404);
-   - Einheit nach dem Verschieben des Chats aus dem Projekt läuft ohne Projektquellen;
-   - Einheit für gelöschten oder gesperrten Account endet `interrupted`;
-   - Schreib-Tool in einer Einheit wartet auf Freigabe, nie automatisch freigegeben;
-   - Budget des Zahlenden leer zwischen zwei Aufrufen → Stopp vor dem nächsten Aufruf;
-   - Checkpoint weg nach terminal + TTL und bei Account-Löschung (`RunEraser`).
-4. **Umsetzen:** Profil `chat` (`ToolLoopLimits::unbounded()`), Prompt
-   `tools:chat_loop`, die Übergabe Request → Lauf, mit Loop an Such-Klassifikator,
-   Auto-Research-Gate und Task-Planer überspringen, Check vor der Auslieferung, Usage
-   pro Aufruf. Ende des Laufs nach §0 #68.
-5. **Exit:** die Tests; PJ1-Gruppe `simple` innerhalb G1 auf dem Dev-Stack
+3. **Umsetzen:** die Übergabe im Request; mit Loop an Such-Klassifikator,
+   Auto-Research-Gate und Task-Planer überspringen; Check vor der Auslieferung.
+   `MessageProcessor` und `TurnDispatcher` dürfen nicht wachsen.
+4. **Exit:** PJ1-Gruppe `simple` innerhalb G1 auf dem Dev-Stack
    (`backend/tests/Eval/ChatLoop/run.php`); `LOOP.ENABLED` = 0 überall.
-6. Gate: `make ci-local` unfiltered; `make test-e2e` (Chat ist betroffen) und
-   `cd frontend && npm run test:e2e:ollama`, falls der Ollama-Pfad berührt wird.
-   Dann Commit, Push, `gh pr create`, Copilot und `All Checks Passed` abwarten, jeden
-   Thread beantworten, **nicht mergen**. `STATUS.md` und diese Datei nachziehen.
+5. Gate: `make ci-local` unfiltered; E2E (Chat ist betroffen), Ollama-E2E, falls der
+   Ollama-Pfad berührt wird. Dann Commit, Push, `gh pr create`, Copilot und
+   `All Checks Passed` abwarten, jeden Thread beantworten, **nicht mergen**.
+   `STATUS.md` und diese Datei nachziehen.
 
 ## 10. Anforderungen und Entscheidungen des Owners
 

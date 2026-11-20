@@ -11,7 +11,72 @@ to them.
 | PJ2 | merged | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
 | PJ3 | merged | #3152 | Projects with sources and instructions (API). Deviation from §10: a chat joins a project through `POST /projects/{uuid}/chats` and `PUT/DELETE /projects/{uuid}/chats/{chatId}`, so `POST /chats` and `PATCH /chats/{id}` are unchanged (no growth of the oversized `ChatController`). The flag is checked in the controller as well as by the module gate. Walked on the stack with a real model: a project chat answered from a text source with its marker, and the instructions shaped the answer. Create takes name and description; instructions go through PATCH. |
 | PJ4 | merged | #3186 | Project page `/projects/:id` (Chats, Sources, Instructions), a "Projects" section in the Chats panel, the Add-source dialog (file, link, text), the project name above the composer of a project chat, and move in/out of a project from the chat menu, pinned projects first (`BPROJECTS.BPINNEDAT`, migration `Version20261119120000`). A flag-off module answers 404 `feature_not_configured` and the UI shows nothing. `PROJECTS_ENABLED=1` is set in `backend/.env.test` so the E2E spec can run. |
-| PJ5–PJ28 | not started | — | Phase B can start: AU26 merged as #3193, AH8a as #3198, AH8b as #3201; PJ5 waits for the owner's go; every other ☐ and Ask row of §0 waits for its step |
+| PJ5a | PR open | branch `feat/chat-loop-run` | A chat run on the run kernel, flag off (`LOOP.ENABLED` = 0); nothing calls it yet. See 2026-11-20 below. The owner split PJ5 into PJ5a (the run) and PJ5b (the hand-over in the request). |
+| PJ5b | not started | — | The hand-over Request → run, skipping the classifier, auto-research and the task planner, the check before delivery, G1, E2E |
+| PJ6–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+
+---
+
+## 2026-11-20 — PJ5a: a chat run on the run kernel
+
+**Split** (owner, 2026-11-20): PJ5a is the run itself, PJ5b the hand-over
+in the request. Commit type `feat(chat)`. Nothing in the request path calls
+the run yet, and `LOOP.ENABLED` is 0, so no turn changes.
+
+**What exists** (`backend/src/Service/Chat/Loop/`):
+
+- `ChatRunState` / `ChatRunCodec` (kind `chat`, v1) on the kernel's `run:`
+  keyspace (`ChatRunStore`, 48 h retention after the end, 72 h while active).
+- One unit (`ChatRunStep`): resolve the world (`ResolvingChatRunWorld`: loop
+  on, account active, chat still the owner's, project resolved again), run the
+  tool calls of the last answer, check the stop flag, check the payer's budget
+  (`MonthlyChatRunBudget`, before every call per §0 #70), renew the lease,
+  make one model call (`FacadeChatRunModel`, billed per call with
+  `usage_turn_id` `chat-run-<id>`). No step cap and no deadline
+  (`ToolLoopLimits::unbounded()`); a step runs at most the per-turn tool cap.
+- `update_plan` and `finish` (`ChatLoopTools`); after five nudges without
+  progress the run ends `no_progress`. A refused forced `finish` falls back to
+  a JSON request once, then to the last text (§0 #68).
+- Tools (`RegistryChatRunToolbox`): web search, web fetch, the person's own
+  HTTP and MCP tools through `ToolInvoker`, so the approval policy holds.
+  Wire names are made provider-safe (`custom:order` → `custom_order`).
+  `knowledge_search` only while the chat is in a project, in the folder
+  resolved for that unit (`KnowledgeSearchTool::executeInFolder`); the project
+  instructions likewise. A repeated read is answered from the transcript.
+- Approvals: a write parks the run `waiting_for_you`. `chat_run:<ulid>` in
+  `BREQUESTEDBY`; approve and reject both reach `ResumeChatRunCommand`
+  (`ResumeApprovalCommandHandler` hands chat-run approvals on and runs none of
+  them itself). The run re-reads the row and runs only an approval of the same
+  owner, run and tool, with the arguments on the card. Nothing approves on its
+  own.
+- `BRUNS`: `ChatRunRecords` opens the row (`kind` chat, `origin` web_chat)
+  and syncs status, steps, cost and outcome after every unit.
+- Delivery (`ChatRunDelivery`, once per run): the answer, or one true
+  sentence per end in en/de/es/fr/tr.
+- Reaper (`ChatRunReaper`, tagged `app.run_reaper`): a unit lost twice ends
+  `interrupted`; a waiting run takes the decision once the row has one, an
+  expired or missing row counts as declined, and after 70 h without a
+  decision the run goes on as declined; a stopped waiting run ends `stopped`.
+- Messenger: `RunChatUnit` and `ResumeChatRunCommand` on `async_ai_high` (the
+  existing worker; no new container), `sync` in test.
+- Migration `Version20261120090000` seeds `LOOP.ENABLED` = 0; env
+  `LOOP_ENABLED` pins it.
+- Prompt `tools:chat_loop`.
+
+**Tests:** `backend/tests/Unit/Service/Chat/Loop/` (57), on the real kernel
+with an in-memory Redis: plain answer, search then answer, repeated read,
+write waits and is never run without approval, redelivery does not repeat
+it, approved / declined / timed-out decisions, approval of another run or
+owner refused, moved-out chat loses sources and instructions, deleted or
+suspended account and deleted chat end `interrupted`, loop off ends
+`stopped`, empty budget stops before the next call, stop, plan → finish, JSON
+fallback, broken JSON, five nudges, lost unit twice, idempotent start, loop
+off refuses a start, foreign caller gets 404 from the reader.
+
+**Gate:** `make ci-local` green (PHPStan, deptrac, size ratchet, PHPUnit,
+Vitest, vue-tsc); characterization snapshots unchanged.
+
+**Not verified:** a real model through the run (PJ5b wires it); G1.
 
 ---
 

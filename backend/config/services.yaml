@@ -230,6 +230,8 @@ parameters:
     env(PROJECTS_ENABLED): ''
     # Research runs. Empty = off. Set to 1 to pin research on.
     env(RESEARCH_ENABLED): ''
+    # Chat loop (a chat turn as a run). Empty = the admin row decides, off by default.
+    env(LOOP_ENABLED): ''
     # Searchable state for cloud files. Empty = off. Set to 1 to pin it on.
     env(CLOUD_FILES_ENABLED): ''
     env(CLOUD_FILES_GLYPH_BIRD): ''
@@ -1409,6 +1411,15 @@ services:
     App\Service\Research\Run\ResearchConfig:
         arguments:
             $envValue: '%env(RESEARCH_ENABLED)%'
+
+    App\Service\Chat\Loop\ChatLoopConfig:
+        arguments:
+            $envValue: '%env(LOOP_ENABLED)%'
+
+    App\Service\Chat\Loop\ChatRunWorld: '@App\Service\Chat\Loop\ResolvingChatRunWorld'
+    App\Service\Chat\Loop\ChatRunModel: '@App\Service\Chat\Loop\FacadeChatRunModel'
+    App\Service\Chat\Loop\ChatRunBudget: '@App\Service\Chat\Loop\MonthlyChatRunBudget'
+    App\Service\Chat\Loop\ChatRunToolbox: '@App\Service\Chat\Loop\RegistryChatRunToolbox'
 
     # Research keys extend the kernel's; a plain RunKeys stays the kernel store.
     App\Service\Run\RunKeys: '@App\Service\Run\RedisRunKeys'

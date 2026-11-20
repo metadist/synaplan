@@ -82,6 +82,29 @@ final readonly class KnowledgeSearchTool
      */
     public function execute(array $input, User $user, ?RuntimeProfile $assistant): array
     {
+        return $this->search($input, $user, $assistant, $this->ragGroupKey());
+    }
+
+    /**
+     * The same search in a folder the caller resolved on the server, for a
+     * run that has no request to read the folder from.
+     *
+     * @param array<string, mixed> $input
+     *
+     * @return array{text: string, isError: bool, summary: string}
+     */
+    public function executeInFolder(array $input, User $user, string $ragGroupKey): array
+    {
+        return $this->search($input, $user, null, $ragGroupKey);
+    }
+
+    /**
+     * @param array<string, mixed> $input
+     *
+     * @return array{text: string, isError: bool, summary: string}
+     */
+    private function search(array $input, User $user, ?RuntimeProfile $assistant, ?string $ragGroupKey): array
+    {
         $query = \is_string($input['query'] ?? null) ? trim($input['query']) : '';
         if ('' === $query) {
             return $this->error('', 'knowledge_search requires a query.');
@@ -91,7 +114,7 @@ final readonly class KnowledgeSearchTool
             $found = $this->knowledge->searchForTool(
                 (int) $user->getId(),
                 $query,
-                $this->ragGroupKey(),
+                $ragGroupKey,
                 $assistant,
                 $this->limit($input['limit'] ?? null),
             );

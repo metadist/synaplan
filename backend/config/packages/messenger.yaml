@@ -142,6 +142,10 @@ framework:
             # on a delay so a long run cannot pin the queue.
             'App\Message\RunResearchUnit': async_ai_high
             'App\Message\ContinueSavedTaskAfterResearch': async_ai_high
+            # One chat run unit (tools, then one model call), then the worker
+            # returns. The next unit waits on a delay, like research.
+            'App\Message\RunChatUnit': async_ai_high
+            'App\Message\ResumeChatRunCommand': async_ai_high
             # Finished chat turn → realtime fan-out. Off the HTTP stream so a
             # slow gateway cannot hold the reply, and one worker broadcast
             # reaches the owner plus current share subjects.
@@ -191,6 +195,9 @@ when@test:
                 # The test stack has no messenger worker. A research unit runs
                 # inside the test that dispatched it.
                 'App\Message\RunResearchUnit': sync
+                # A chat run unit runs inside the test that dispatched it.
+                'App\Message\RunChatUnit': sync
+                'App\Message\ResumeChatRunCommand': sync
                 # The test stack has no messenger worker; the sign-in link
                 # mail is sent inside the request that asked for it.
                 'App\Message\SendLoginLinkMessage': sync

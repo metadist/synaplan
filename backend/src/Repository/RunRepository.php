@@ -18,6 +18,17 @@ class RunRepository extends ServiceEntityRepository
         parent::__construct($registry, Run::class);
     }
 
+    public function findOneByUuid(string $uuid): ?Run
+    {
+        return $this->findOneBy(['uuid' => $uuid]);
+    }
+
+    public function save(Run $run): void
+    {
+        $this->getEntityManager()->persist($run);
+        $this->getEntityManager()->flush();
+    }
+
     /** One run, only when it belongs to $userId. */
     public function findOneForUser(string $uuid, int $userId): ?Run
     {

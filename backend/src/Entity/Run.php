@@ -164,6 +164,73 @@ class Run
         return \in_array($this->status, self::TERMINAL, true);
     }
 
+    public function getStartedBy(): ?int
+    {
+        return null === $this->startedBy ? null : (int) $this->startedBy;
+    }
+
+    public function setStartedBy(?int $startedBy): void
+    {
+        $this->startedBy = $startedBy;
+    }
+
+    public function setIdempotency(?string $key): void
+    {
+        $this->idempotency = $key;
+    }
+
+    public function getWaitReason(): ?string
+    {
+        return $this->waitReason;
+    }
+
+    public function getOutcome(): ?string
+    {
+        return $this->outcome;
+    }
+
+    public function getSteps(): int
+    {
+        return $this->steps;
+    }
+
+    public function getCostMicro(): int
+    {
+        return (int) $this->costMicro;
+    }
+
+    public function getStarted(): ?int
+    {
+        return $this->started;
+    }
+
+    public function getFinished(): ?int
+    {
+        return $this->finished;
+    }
+
+    /**
+     * Where the run stands after a unit. A terminal status stamps the finish
+     * time once; $outcome is the short reason it ended.
+     */
+    public function progress(string $status, ?string $waitReason, int $steps, int $costMicro, ?string $outcome, int $now): void
+    {
+        if (!\in_array($status, [self::STATUS_QUEUED, self::STATUS_RUNNING, self::STATUS_WAITING, ...self::TERMINAL], true)) {
+            throw new \InvalidArgumentException('Unknown run status.');
+        }
+        $this->status = $status;
+        $this->waitReason = $waitReason;
+        $this->steps = max(0, $steps);
+        $this->costMicro = max(0, $costMicro);
+        $this->started ??= $now;
+        if (null !== $outcome) {
+            $this->outcome = $outcome;
+        }
+        if ($this->isTerminal()) {
+            $this->finished ??= $now;
+        }
+    }
+
     public function getChatId(): ?int
     {
         return null === $this->chatId ? null : (int) $this->chatId;

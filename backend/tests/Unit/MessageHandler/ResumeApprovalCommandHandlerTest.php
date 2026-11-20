@@ -8,6 +8,7 @@ use App\Entity\Approval;
 use App\Entity\CustomTool;
 use App\Entity\User;
 use App\Message\ResumeApprovalCommand;
+use App\Message\ResumeChatRunCommand;
 use App\MessageHandler\ResumeApprovalCommandHandler;
 use App\Repository\ApprovalRepository;
 use App\Repository\CustomToolRepository;
@@ -24,6 +25,7 @@ use App\Service\Tool\ToolSource;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ResumeApprovalCommandHandlerTest extends TestCase
@@ -112,6 +114,21 @@ final class ResumeApprovalCommandHandlerTest extends TestCase
         $handler->__invoke(new ResumeApprovalCommand(42));
     }
 
+    public function testChatRunApprovalIsHandedToItsRunAndNotExecutedHere(): void
+    {
+        [$handler, $mocks] = $this->handler();
+        $approval = $this->approval('chat_run:01JD6Q3Z8Y9X7W6V5T4S3R2Q1P');
+        $mocks['approvals']->expects(self::any())->method('find')->with(42)->willReturn($approval);
+        $mocks['registry']->expects(self::never())->method('get');
+        $mocks['httpExecutor']->expects(self::never())->method('execute');
+        $approval->expects(self::never())->method('markExecuted');
+        $mocks['bus']->expects(self::once())->method('dispatch')
+            ->with(self::callback(static fn (object $m): bool => $m instanceof ResumeChatRunCommand && 42 === $m->approvalId))
+            ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+
+        $handler->__invoke(new ResumeApprovalCommand(42));
+    }
+
     /**
      * @return Approval&MockObject
      */
@@ -181,6 +198,7 @@ final class ResumeApprovalCommandHandlerTest extends TestCase
             'httpExecutor' => $httpExecutor,
             'notifier' => $notifier,
             'continuation' => $continuation,
+            'bus' => $bus,
         ]];
     }
 }

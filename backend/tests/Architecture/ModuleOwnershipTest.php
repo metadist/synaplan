@@ -198,6 +198,11 @@ final class ModuleOwnershipTest extends TestCase
             'REALTIME_API_KEY',
             'REALTIME_TOKEN_SECRET',
         ],
+        // The chat loop runs the core chat turn as a run; not an add-on, so
+        // no module. The switch stays off until the loop is ready (PJ6/PJ8).
+        'chat_loop' => [
+            'LOOP_ENABLED',
+        ],
         // Vector storage — RAG is core; the provider choice is infrastructure.
         'vector_store' => [
             'VECTOR_STORAGE_PROVIDER',
