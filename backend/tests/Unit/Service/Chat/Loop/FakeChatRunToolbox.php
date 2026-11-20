@@ -21,6 +21,9 @@ final class FakeChatRunToolbox implements ChatRunToolbox
     /** @var list<array{name: string, args: array<string, mixed>, approvalId: ?int}> */
     public array $runs = [];
 
+    /** @var array<string, string> what a read tool returns, by name, instead of the default */
+    public array $results = [];
+
     /** @var list<list<string>> the opened tools each declaration was asked with */
     public array $openedSeen = [];
 
@@ -50,7 +53,7 @@ final class FakeChatRunToolbox implements ChatRunToolbox
             return ChatToolResult::text('This tool is not available in this chat.');
         }
 
-        return ChatToolResult::text('result of '.$call['name']);
+        return ChatToolResult::text($this->results[$call['name']] ?? 'result of '.$call['name']);
     }
 
     public function isRead(string $name): bool

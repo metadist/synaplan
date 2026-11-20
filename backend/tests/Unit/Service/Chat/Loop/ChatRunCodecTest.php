@@ -29,6 +29,7 @@ final class ChatRunCodecTest extends TestCase
         $state->replyMessageId = 31;
         $state->opened = ['notion-search', 'custom_order'];
         $state->said = "Let me look.\n\nFound it.";
+        $state->note = "---\n\nNot backed.";
         $state->waitForApproval();
 
         $read = (new ChatRunCodec())->decode($state->stored(4, 3, 200, 9_999));
@@ -45,6 +46,7 @@ final class ChatRunCodecTest extends TestCase
         self::assertSame(31, $read->replyMessageId);
         self::assertSame(['notion-search', 'custom_order'], $read->opened);
         self::assertSame("Let me look.\n\nFound it.", $read->said);
+        self::assertSame("---\n\nNot backed.", $read->note);
         self::assertSame([4, 3, 200, 9_999], [$read->expectedSeq(), $read->checkpointSeq(), $read->updatedAt(), $read->expiresAt()]);
     }
 
@@ -58,6 +60,7 @@ final class ChatRunCodecTest extends TestCase
         self::assertInstanceOf(ChatRunState::class, $read);
         self::assertSame(ChatRunEnd::Finished, $read->end);
         self::assertSame('The answer.', $read->answer);
+        self::assertNull($read->note, 'a run that was not checked yet is checked once it ends');
         self::assertTrue($read->isTerminal());
         self::assertNull($read->incomingMessageId);
         self::assertNull($read->replyMessageId);

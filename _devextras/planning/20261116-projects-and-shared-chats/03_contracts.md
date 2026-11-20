@@ -334,6 +334,10 @@ When the final answer cites web sources of this run, the research engine's
 `check` unit runs on it through an adapter, unchanged in what it does. The
 model-based part runs only when an admin has set a checking model.
 
+The answer has already streamed, so the check removes nothing from it. A
+note under the answer names the statements the sources do not back (owner,
+2026-11-20).
+
 ## 4. Prompt
 
 One prompt, `tools:chat_loop`, in `PromptCatalog`. Its rules, in order:

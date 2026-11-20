@@ -37,6 +37,12 @@ final class ChatRunState implements RunState
 
     /** What the person already saw of this run, the first answer made in the request included. */
     public string $said = '';
+
+    /**
+     * The note the check before delivery adds under the answer: null until the
+     * check ran, empty when it found nothing to note.
+     */
+    public ?string $note = null;
     public string $mode = self::MODE_FREE;
     public int $steps = 0;
     public int $costMicro = 0;
