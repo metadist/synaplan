@@ -67,48 +67,58 @@
         {{ $t('templates.noResults', { query: search.trim() }) }}
       </p>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" data-testid="list-template-cards">
-        <button
-          v-for="template in visible"
-          :key="template.id"
-          type="button"
-          class="btn-secondary rounded-xl p-5 text-left space-y-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          :data-testid="`card-template-${template.id}`"
-          @click="selectedId = template.id ?? null"
+      <div v-for="group in groups" :key="group.id" class="mb-6 last:mb-0">
+        <h3
+          v-if="group.label"
+          class="txt-primary font-medium mb-3"
+          :data-testid="`heading-template-group-${group.id}`"
         >
-          <h3 class="txt-primary font-medium">{{ templateTitle(template, t) }}</h3>
-          <p class="txt-secondary text-sm">{{ templateSummary(template, t) }}</p>
-          <p
-            v-if="!template.pluginName"
-            class="txt-primary text-sm"
-            :data-testid="`text-template-preview-${template.id}`"
+          {{ group.label }}
+        </h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" data-testid="list-template-cards">
+          <button
+            v-for="template in group.items"
+            :key="template.id"
+            type="button"
+            class="btn-secondary rounded-xl p-5 text-left space-y-2 focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            :data-testid="`card-template-${template.id}`"
+            @click="selectedId = template.id ?? null"
           >
-            {{ templatePreview(template, t) }}
-          </p>
-          <p
-            v-if="template.pluginName"
-            class="txt-secondary text-xs"
-            :data-testid="`badge-from-plugin-${template.id}`"
+            <h4 class="txt-primary font-medium">{{ templateTitle(template, t) }}</h4>
+            <p class="txt-secondary text-sm">{{ templateSummary(template, t) }}</p>
+            <p
+              v-if="!template.pluginName"
+              class="txt-primary text-sm"
+              :data-testid="`text-template-preview-${template.id}`"
+            >
+              {{ templatePreview(template, t) }}
+            </p>
+            <p
+              v-if="template.pluginName"
+              class="txt-secondary text-xs"
+              :data-testid="`badge-from-plugin-${template.id}`"
+            >
+              {{ $t('templates.fromPlugin', { name: template.pluginName }) }}
+            </p>
+            <p v-else class="txt-secondary text-xs">
+              {{
+                (template.usedBy ?? 0) > 0
+                  ? $t('templates.usedBy', { count: template.usedBy ?? 0 })
+                  : $t('templates.usedByZero')
+              }}
+            </p>
+          </button>
+          <button
+            v-if="group.id === 'chat'"
+            type="button"
+            class="btn-secondary rounded-xl p-5 text-left space-y-2 border-dashed focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+            data-testid="card-template-empty"
+            @click="emit('start-empty')"
           >
-            {{ $t('templates.fromPlugin', { name: template.pluginName }) }}
-          </p>
-          <p v-else class="txt-secondary text-xs">
-            {{
-              (template.usedBy ?? 0) > 0
-                ? $t('templates.usedBy', { count: template.usedBy ?? 0 })
-                : $t('templates.usedByZero')
-            }}
-          </p>
-        </button>
-        <button
-          type="button"
-          class="btn-secondary rounded-xl p-5 text-left space-y-2 border-dashed focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-          data-testid="card-template-empty"
-          @click="emit('start-empty')"
-        >
-          <h3 class="txt-primary font-medium">{{ $t('templates.startEmpty') }}</h3>
-          <p class="txt-secondary text-sm">{{ $t('templates.startEmptyHint') }}</p>
-        </button>
+            <h4 class="txt-primary font-medium">{{ $t('templates.startEmpty') }}</h4>
+            <p class="txt-secondary text-sm">{{ $t('templates.startEmptyHint') }}</p>
+          </button>
+        </div>
       </div>
     </template>
   </div>
@@ -170,6 +180,24 @@ const visible = computed(() => {
       previewText.includes(query)
     )
   })
+})
+
+/**
+ * Examples grouped by how the agent works: what runs by itself comes
+ * first, then what answers in the chat. Grouping only frames the full
+ * list — a category or a search shows one flat list as before.
+ */
+const groups = computed(() => {
+  const grouped = category.value === 'all' && search.value.trim() === ''
+  if (!grouped) {
+    return [{ id: 'chat', label: '', items: visible.value }]
+  }
+  const runsByItself = visible.value.filter((template) => (template.creates?.tasks ?? 0) > 0)
+  const answersInChat = visible.value.filter((template) => (template.creates?.tasks ?? 0) === 0)
+  return [
+    { id: 'schedule', label: t('templates.groups.schedule'), items: runsByItself },
+    { id: 'chat', label: t('templates.groups.chat'), items: answersInChat },
+  ].filter((group) => group.items.length > 0)
 })
 
 async function load(): Promise<void> {
