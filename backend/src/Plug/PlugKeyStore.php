@@ -10,7 +10,7 @@ use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 
 /**
- * Encrypted store for plug API keys (Tavily, Exa, Firecrawl, Jina, Cohere, Voyage).
+ * Encrypted store for plug API keys (Tavily, Exa, Firecrawl, SpecStream, Jina, Cohere, Voyage).
  *
  * Same at-rest shape as {@see \App\AI\Credential\ProviderKeyStore}: BCONFIG
  * group {@see self::CONFIG_GROUP}, AES-256-CBC JSON `{"key","origin"}`.
@@ -29,6 +29,7 @@ final class PlugKeyStore
         'tavily',
         'exa',
         'firecrawl',
+        'specstream',
         'jina',
         'cohere',
         'voyage',

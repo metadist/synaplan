@@ -1,0 +1,33 @@
+{
+  "data": {
+    "id": "ws_test_1",
+    "request_id": "ws_test_1",
+    "kind": "fact",
+    "query": "synaplan",
+    "answer": {
+      "value": "Synaplan is an open-source AI knowledge platform.",
+      "page": "https://www.synaplan.com/",
+      "seen_at": "2026-11-05T12:00:00+00:00"
+    },
+    "sources": [
+      {
+        "title": "Synaplan",
+        "url": "https://www.synaplan.com/",
+        "site": "www.synaplan.com",
+        "snippet": "Open-source AI knowledge platform.",
+        "published": "2026-09-01",
+        "excerpt": "Synaplan is an open-source AI knowledge platform for teams and agents.",
+        "cited": true
+      }
+    ],
+    "passages": [
+      {
+        "url": "https://www.synaplan.com/",
+        "title": "Synaplan",
+        "text": "Synaplan is an open-source AI knowledge platform for teams and agents."
+      }
+    ],
+    "took_ms": 950,
+    "price_usd": 0.005
+  }
+}

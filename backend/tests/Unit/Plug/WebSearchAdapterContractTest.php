@@ -11,11 +11,13 @@ use App\Plug\WebSearch\Adapter\ExaAdapter;
 use App\Plug\WebSearch\Adapter\FirecrawlAdapter;
 use App\Plug\WebSearch\Adapter\PerplexityAdapter;
 use App\Plug\WebSearch\Adapter\SearxngAdapter;
+use App\Plug\WebSearch\Adapter\SpecStreamAdapter;
 use App\Plug\WebSearch\Adapter\TavilyAdapter;
 use App\Plug\WebSearch\Client\ExaClient;
 use App\Plug\WebSearch\Client\FirecrawlClient;
 use App\Plug\WebSearch\Client\PerplexitySearchClient;
 use App\Plug\WebSearch\Client\SearxngClient;
+use App\Plug\WebSearch\Client\SpecStreamClient;
 use App\Plug\WebSearch\Client\TavilyClient;
 use App\Plug\WebSearch\WebSearchQuery;
 use App\Repository\ConfigRepository;
@@ -79,6 +81,25 @@ final class WebSearchAdapterContractTest extends TestCase
         $this->assertTrue($adapter->capabilities()->answer);
     }
 
+    public function testSpecstreamMapsFixtureTitlesAndAnswer(): void
+    {
+        $adapter = new SpecStreamAdapter($this->specstreamClient(), $this->plugConfig());
+        $set = $adapter->search(new WebSearchQuery('synaplan', [], true));
+
+        $this->assertSame('Synaplan', $set->results[0]['title'] ?? null);
+        $this->assertSame('https://www.synaplan.com/', $set->results[0]['url'] ?? null);
+        $this->assertSame('2026-09-01', $set->results[0]['age'] ?? null);
+        $this->assertStringContainsString('open-source AI knowledge platform', (string) ($set->results[0]['content'] ?? ''));
+        $this->assertSame('Synaplan is an open-source AI knowledge platform.', $set->answer?->text);
+        $this->assertTrue($adapter->capabilities()->freshness);
+        $this->assertTrue($adapter->capabilities()->country);
+        $this->assertTrue($adapter->capabilities()->language);
+        $this->assertTrue($adapter->capabilities()->siteFilter);
+        $this->assertTrue($adapter->capabilities()->fullContent);
+        $this->assertTrue($adapter->capabilities()->answer);
+        $this->assertTrue($adapter->health()->available);
+    }
+
     public function testExaGarbageKeyIsUnavailableOnProbe(): void
     {
         $http = new MockHttpClient([new MockResponse('unauthorized', ['http_code' => 401])]);
@@ -124,6 +145,11 @@ final class WebSearchAdapterContractTest extends TestCase
     private function firecrawlClient(): FirecrawlClient
     {
         return new FirecrawlClient($this->mockClient('firecrawl/search.json'), $this->plugKeys('firecrawl'), $this->plugConfig());
+    }
+
+    private function specstreamClient(): SpecStreamClient
+    {
+        return new SpecStreamClient($this->mockClient('specstream/search.json'), $this->plugKeys('specstream'), $this->plugConfig());
     }
 
     private function perplexityClient(): PerplexitySearchClient

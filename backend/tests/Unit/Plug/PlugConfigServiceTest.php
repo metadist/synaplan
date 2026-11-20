@@ -74,6 +74,7 @@ final class PlugConfigServiceTest extends TestCase
         ]));
 
         $this->assertSame('brave', $service->webSearchProvider(null));
+        $this->assertSame('specstream', $service->requireKnownProvider('specstream'));
     }
 
     public function testExtraExtractorKeysAreKeysNotInTheBuiltinList(): void

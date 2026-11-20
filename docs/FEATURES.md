@@ -30,7 +30,7 @@ Instead of locking a workspace to one vendor, Synaplan routes each capability sl
 - **14+ Cloud & Local Providers** — OpenAI, Anthropic, Google Gemini, Groq, Mistral, xAI, Meta, Cerebras, TrustedTokens (German sovereign GPUs), A2Agent, HuggingFace, TheHive, Higgsfield, Cloudflare Workers AI, and local **Ollama** (`gpt-oss`, `llama`, `bge-m3`, etc.).
 - **Real Cost on Every Answer** — Every model carries its official provider rate (`priceIn` / `priceOut` per 1M tokens, or per image/second/character). The model picker displays a **Free / Low / Mid / High** badge, and every chat reply records the exact cost in USD.
 - **Adaptive Effort Routing** — On each message, the sorter (`tools:sort`) decides whether the question needs a direct **answer**, a quick web **lookup**, or a multi-round **[Deep Research](RESEARCH.md)** run with cross-model fact checking.
-- **Web Search Plugs** — Administrators choose between Brave, self-hosted **SearXNG**, Tavily, Exa, Firecrawl, or Perplexity under **Admin → System configuration → Web search**, with an optional fallback and per-user override.
+- **Web Search Plugs** — Administrators choose between Brave, self-hosted **SearXNG**, Tavily, Exa, Firecrawl, SpecStream, or Perplexity under **Admin → System configuration → Web search**, with an optional fallback and per-user override.
 - **Self-Aware `/help`** — Ask *"What can you do here?"* or type `/help`; the AI answers from a live capability inventory of this specific installation (`PlatformCapabilityInventory`) and the synced documentation corpus, never from a generic brochure.
 
 ---
