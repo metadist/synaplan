@@ -60,8 +60,10 @@ abstract class ChatLoopCase extends TestCase
         $this->bus = new RecordingRunUnitBus();
         $this->tools = new FakeChatRunToolbox();
         $this->budget = new SwitchedChatRunBudget();
-        $this->user = $this->createStub(User::class);
-        $this->user->method('getId')->willReturn(self::USER_ID);
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(self::USER_ID);
+        $user->method('isActive')->willReturn(true);
+        $this->user = $user;
         $this->world = new FixedChatRunWorld($this->scope());
     }
 

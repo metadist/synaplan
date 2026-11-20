@@ -80,16 +80,20 @@ final readonly class ChatRunStep
         [$tools, $choice] = match ($state->mode) {
             ChatRunState::MODE_FINISH => [[ChatLoopTools::finish()], 'required'],
             ChatRunState::MODE_FINISH_JSON => [[], null],
-            default => [[...$this->tools->declarations($scope), ChatLoopTools::updatePlan()], 'auto'],
+            default => [[...$this->tools->declarations($scope, $state->opened), ChatLoopTools::updatePlan()], 'auto'],
         };
         if (ChatRunState::MODE_FINISH_JSON === $state->mode) {
             $messages[] = ['role' => 'user', 'content' => ChatRunAnswer::JSON_REQUEST];
         }
         $this->events->append($state->runId, ChatRunEvents::STEP, ['step' => $state->steps + 1]);
+        // The finish call writes its answer into a tool call or a JSON object: neither is shown as it comes.
+        $speaker = ChatRunState::MODE_FREE === $state->mode ? new ChatRunSpeaker($this->events, $state) : null;
         try {
-            $reply = $this->model->call($state, $messages, $tools, $choice);
+            $reply = $this->model->call($state, $messages, $tools, $choice, $speaker);
         } catch (ChatRunModelFailed) {
             return $this->answers->failed($state);
+        } finally {
+            $speaker?->close();
         }
 
         return $this->answers->apply($state, $reply);

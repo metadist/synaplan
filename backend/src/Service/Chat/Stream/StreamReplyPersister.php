@@ -6,6 +6,7 @@ namespace App\Service\Chat\Stream;
 
 use App\Entity\File;
 use App\Entity\Message;
+use App\Service\Chat\Loop\ChatLoopTurn;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\GeneratedDocumentBundle;
 use App\Service\File\UnreadSourceGuard;
@@ -56,10 +57,15 @@ final readonly class StreamReplyPersister
         $taskFiles = $this->announceHandlerFiles($sse, $turn, $metadata);
 
         $generatedFile = null;
+        $handedOver = $this->handedOver($turn, $state, $metadata);
         if ($state->continued) {
             $state->continued->setText($state->continued->getText().$relay->responseText);
             $this->em->flush();
             $outgoing = $state->continued;
+            $text = $relay->responseText;
+        } elseif (null !== $handedOver) {
+            // The run posts its answer into this row itself; its text is not the stream's to write.
+            $outgoing = $handedOver;
             $text = $relay->responseText;
         } else {
             [$outgoing, $text, $generatedFile] = $this->newReply($sse, $turn, $state, $classification, $metadata, $relay, $taskFiles);
@@ -123,6 +129,23 @@ final readonly class StreamReplyPersister
         }
 
         return $taskFiles;
+    }
+
+    /**
+     * The row a turn handed over to a run wrote for its answer: in this chat,
+     * the caller's, and an answer.
+     *
+     * @param array<string, mixed> $metadata
+     */
+    private function handedOver(StreamTurnRequest $turn, StreamTurnState $state, array $metadata): ?Message
+    {
+        $id = $metadata[ChatLoopTurn::REPLY_ID] ?? null;
+        $row = \is_int($id) ? $this->em->find(Message::class, $id) : null;
+        if (!$row instanceof Message || $row->getChatId() !== $state->chat?->getId() || $row->getUserId() !== $turn->caller->user->getId() || 'OUT' !== $row->getDirection()) {
+            return null;
+        }
+
+        return $row;
     }
 
     /**

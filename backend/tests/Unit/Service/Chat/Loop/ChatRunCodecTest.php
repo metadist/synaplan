@@ -8,6 +8,7 @@ use App\Service\Chat\Loop\ChatRunCodec;
 use App\Service\Chat\Loop\ChatRunEnd;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunStatus;
+use App\Service\Chat\Loop\ConnectedToolCatalog;
 use PHPUnit\Framework\TestCase;
 
 final class ChatRunCodecTest extends TestCase
@@ -25,6 +26,9 @@ final class ChatRunCodecTest extends TestCase
         $state->costMicro = 4_200;
         $state->nudges = 1;
         $state->modelFailures = 1;
+        $state->replyMessageId = 31;
+        $state->opened = ['notion-search', 'custom_order'];
+        $state->said = "Let me look.\n\nFound it.";
         $state->waitForApproval();
 
         $read = (new ChatRunCodec())->decode($state->stored(4, 3, 200, 9_999));
@@ -38,6 +42,9 @@ final class ChatRunCodecTest extends TestCase
         self::assertSame(ChatRunStatus::Waiting, $read->status);
         self::assertSame(ChatRunState::WAIT_APPROVAL, $read->waitReason);
         self::assertSame([ChatRunState::MODE_FINISH, 3, 4_200, 1, 1], [$read->mode, $read->steps, $read->costMicro, $read->nudges, $read->modelFailures]);
+        self::assertSame(31, $read->replyMessageId);
+        self::assertSame(['notion-search', 'custom_order'], $read->opened);
+        self::assertSame("Let me look.\n\nFound it.", $read->said);
         self::assertSame([4, 3, 200, 9_999], [$read->expectedSeq(), $read->checkpointSeq(), $read->updatedAt(), $read->expiresAt()]);
     }
 
@@ -53,6 +60,7 @@ final class ChatRunCodecTest extends TestCase
         self::assertSame('The answer.', $read->answer);
         self::assertTrue($read->isTerminal());
         self::assertNull($read->incomingMessageId);
+        self::assertNull($read->replyMessageId);
     }
 
     public function testDeeplyNestedToolArgumentsDoNotLoseTheRun(): void
@@ -102,5 +110,17 @@ final class ChatRunCodecTest extends TestCase
 
         self::assertInstanceOf(ChatRunState::class, $read);
         self::assertSame([['id' => 'c1', 'name' => 'custom:order', 'args' => []]], $read->pending);
+    }
+
+    public function testForgedOpenedToolsAreDroppedAndCapped(): void
+    {
+        $names = array_map(static fn (int $i): string => 'tool_'.$i, range(1, 12));
+        $stored = json_encode(['kind' => 'chat', 'runId' => self::RUN_ID, 'userId' => 7, 'chatId' => 11, 'status' => 'running', 'messages' => [], 'basePrompt' => '', 'locale' => 'en',
+            'opened' => ['bad name', ['x'], 'tool_1', 'tool_1', ...$names]], \JSON_THROW_ON_ERROR);
+
+        $read = (new ChatRunCodec())->decode($stored);
+
+        self::assertInstanceOf(ChatRunState::class, $read);
+        self::assertSame(\array_slice($names, 0, ConnectedToolCatalog::MAX_OPEN), $read->opened);
     }
 }

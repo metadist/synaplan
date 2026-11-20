@@ -10,13 +10,14 @@ use App\Service\Run\RunKeyspace;
 
 /**
  * The event log of chat runs at `run:{id}:events`. Only the person who started a
- * run reads it ({@see ChatRunReader}). Events carry what the card shows, never a
- * tool's full result.
+ * run reads it ({@see ChatRunReader}). Events carry what the card shows and the
+ * answer's text as it is written, never a tool's full result.
  */
 final readonly class ChatRunEvents
 {
     public const STARTED = 'run.started';
     public const STEP = 'step';
+    public const TEXT = 'text.delta';
     public const TOOL_CALL = 'tool.call';
     public const TOOL_RESULT = 'tool.result';
     public const PLAN = 'plan.updated';
@@ -24,7 +25,7 @@ final readonly class ChatRunEvents
     public const RESUMED = 'run.resumed';
     public const ENDED = 'run.ended';
 
-    public const NAMES = [self::STARTED, self::STEP, self::TOOL_CALL, self::TOOL_RESULT, self::PLAN, self::WAITING, self::RESUMED, self::ENDED];
+    public const NAMES = [self::STARTED, self::STEP, self::TEXT, self::TOOL_CALL, self::TOOL_RESULT, self::PLAN, self::WAITING, self::RESUMED, self::ENDED];
 
     private RunEventLog $log;
 
@@ -41,6 +42,12 @@ final readonly class ChatRunEvents
     public function append(string $runId, string $event, array $data = []): int
     {
         return $this->log->append($runId, $event, $data);
+    }
+
+    /** Returns once an event after `$after` exists, or after `$blockMs`. */
+    public function await(string $runId, int $after, int $blockMs): void
+    {
+        $this->log->await($runId, $after, $blockMs);
     }
 
     /**

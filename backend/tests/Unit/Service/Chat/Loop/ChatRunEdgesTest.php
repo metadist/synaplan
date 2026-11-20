@@ -67,6 +67,30 @@ final class ChatRunEdgesTest extends TestCase
         self::assertSame([], $reply->toolCalls);
     }
 
+    public function testWithAListenerTheCallStreamsAndPassesOnlyTheVisibleText(): void
+    {
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects(self::never())->method('chat');
+        $ai->expects(self::once())->method('chatStream')
+            ->with(self::anything(), self::isCallable(), 7, self::callback(static fn (array $o): bool => 'auto' === $o['tool_choice'] && 1 === \count($o['tools'])))
+            ->willReturnCallback(static function (array $messages, callable $chunk): array {
+                $chunk(['type' => 'reasoning', 'content' => 'thinking']);
+                $chunk(['type' => 'content', 'content' => 'Hel']);
+                $chunk('lo.');
+
+                return ['content' => 'Hello.', 'tool_calls' => [], 'facade_charged_cost' => '0.001'];
+            });
+        $heard = [];
+
+        $reply = $this->model($ai, true)->call($this->state('anthropic'), [], [['type' => 'function', 'function' => ['name' => 'web_search']]], 'auto', static function (string $text) use (&$heard): void {
+            $heard[] = $text;
+        });
+
+        self::assertSame('Hello.', $reply->content);
+        self::assertSame('Hello.', implode('', $heard), 'reasoning is never shown as the answer');
+        self::assertSame(1_000, $reply->costMicro);
+    }
+
     public function testAProviderFailureBecomesAModelFailure(): void
     {
         $ai = $this->createStub(AiFacade::class);
