@@ -50,6 +50,7 @@ final readonly class ChatRunReapPolicy implements RunReapPolicy
         $decision = $approval instanceof Approval ? $this->runApprovals->decision($approval) : ChatRunState::DECISION_REJECTED;
         if (null === $decision && $ageSeconds >= self::MAX_WAIT_SECONDS) {
             $decision = ChatRunState::DECISION_REJECTED;
+            $this->runApprovals->expire($approvalId);
         }
 
         return null !== $decision && $this->resume->continue($state, $approvalId, $decision);

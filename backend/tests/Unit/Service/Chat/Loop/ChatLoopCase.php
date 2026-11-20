@@ -6,6 +6,8 @@ namespace App\Tests\Unit\Service\Chat\Loop;
 
 use App\Entity\Chat;
 use App\Entity\User;
+use App\Repository\ApprovalRepository;
+use App\Service\Chat\Loop\ChatRunApprovals;
 use App\Service\Chat\Loop\ChatRunDelivery;
 use App\Service\Chat\Loop\ChatRunEvents;
 use App\Service\Chat\Loop\ChatRunRecords;
@@ -80,9 +82,15 @@ abstract class ChatLoopCase extends TestCase
             $this->synced[] = $state->status->value;
         });
         $this->delivery = $this->createStub(ChatRunDelivery::class);
-        $this->handler = new ChatRunUnitHandler($this->step, $records, $this->delivery, new NullLogger());
+        $this->handler = new ChatRunUnitHandler($this->step, $records, $this->delivery, new ChatRunApprovals($this->approvalRows(), $this->clock), new NullLogger());
 
         return $model;
+    }
+
+    /** The approval rows the run's handler sees; a test that needs some overrides this. */
+    protected function approvalRows(): ApprovalRepository
+    {
+        return $this->createStub(ApprovalRepository::class);
     }
 
     protected function open(string $question = 'What changed in the release?'): ChatRunState

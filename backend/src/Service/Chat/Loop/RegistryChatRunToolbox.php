@@ -34,10 +34,13 @@ use App\Service\Tool\ToolSource;
 final readonly class RegistryChatRunToolbox implements ChatRunToolbox
 {
     public const NOT_AVAILABLE = 'This tool is not available in this chat.';
+    public const ALREADY_RAN = 'This action already ran earlier in this run, but its result was lost. Do not run it again; tell the person to check the outcome.';
     public const SOURCES_DESCRIPTION = 'Search the sources of this chat\'s project. Returns the file name, file id, chunk id, score and text.';
 
     private const BUILTINS = [WebSearchTool::NAME, WebFetchTool::NAME];
     private const MAX_NAME_LENGTH = 64;
+    /** The loop answers these itself; a registry tool of the same name would be declared twice. */
+    private const RESERVED = [KnowledgeSearchTool::NAME, ChatLoopTools::UPDATE_PLAN, ChatLoopTools::FINISH];
     private const READS = [WebSearchTool::NAME, WebFetchTool::NAME, KnowledgeSearchTool::NAME];
 
     public function __construct(
@@ -77,7 +80,7 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
         if (null !== $approvalId) {
             $approved = $this->approvals->approvedArgs($approvalId, $state, $descriptor->name);
             if (null === $approved) {
-                return ChatToolResult::text(ChatRunStep::DECLINED);
+                return ChatToolResult::text($this->approvals->alreadyRan($approvalId, $state) ? self::ALREADY_RAN : ChatRunStep::DECLINED);
             }
             $args = $approved;
         }
@@ -140,7 +143,7 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
         $out = [];
         foreach ($this->registry->forUser($userId) as $descriptor) {
             $wire = self::wire($descriptor->callName());
-            if (self::allowed($descriptor) && KnowledgeSearchTool::NAME !== $wire && !isset($out[$wire])) {
+            if (self::allowed($descriptor) && !\in_array($wire, self::RESERVED, true) && !isset($out[$wire])) {
                 $out[$wire] = $descriptor;
             }
         }

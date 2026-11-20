@@ -24,6 +24,7 @@ final readonly class ChatRunUnitHandler implements RunUnitHandler
         private ChatRunStep $step,
         private ChatRunRecords $records,
         private ChatRunDelivery $delivery,
+        private ChatRunApprovals $approvals,
         private LoggerInterface $logger,
     ) {
     }
@@ -55,12 +56,19 @@ final readonly class ChatRunUnitHandler implements RunUnitHandler
         $this->settle(self::chat($state));
     }
 
-    /** Bring the row up to date and deliver a finished run. Never throws: the checkpoint is already written. */
+    /**
+     * Bring the row up to date and deliver a finished run. A run that ended
+     * while it waited leaves no approval card open. Never throws: the
+     * checkpoint is already written.
+     */
     public function settle(ChatRunState $state): void
     {
         try {
             $this->records->sync($state);
             $this->delivery->deliver($state);
+            if ($state->isTerminal()) {
+                $this->approvals->expireOpen($state->runId);
+            }
         } catch (\Throwable $e) {
             $this->logger->warning('A chat run was not settled after its unit', ['run_id' => $state->runId, 'exception' => $e]);
         }

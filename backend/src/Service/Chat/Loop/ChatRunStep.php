@@ -18,7 +18,8 @@ final readonly class ChatRunStep
 {
     public const UNIT = 'step';
 
-    public const DECLINED = 'The person declined this action. Do not try it again in this run.';
+    /** Said for a declined and for an expired approval alike, so it claims neither. */
+    public const DECLINED = 'The person did not approve this action. Do not try it again in this run.';
 
     private ChatRunAnswer $answers;
 
@@ -87,8 +88,8 @@ final readonly class ChatRunStep
         $this->events->append($state->runId, ChatRunEvents::STEP, ['step' => $state->steps + 1]);
         try {
             $reply = $this->model->call($state, $messages, $tools, $choice);
-        } catch (ChatRunModelFailed $failed) {
-            return $this->answers->failed($state, $failed);
+        } catch (ChatRunModelFailed) {
+            return $this->answers->failed($state);
         }
 
         return $this->answers->apply($state, $reply);

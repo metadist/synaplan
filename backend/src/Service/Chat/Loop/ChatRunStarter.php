@@ -39,7 +39,35 @@ final readonly class ChatRunStarter
         if (!$this->config->isEnabled()) {
             throw new ChatLoopOff();
         }
-        $start = $this->runs->start($request->userId, $request->idempotencyKey, ChatRunStep::UNIT, function (string $runId) use ($request): ChatRunState {
+        $row = null;
+        try {
+            $start = $this->open($request, $row);
+        } catch (\Throwable $e) {
+            // The checkpoint was not written: the row must not stay "running" for a run that does not exist.
+            if (null !== $row) {
+                $this->records->abandon($row);
+            }
+
+            throw $e;
+        }
+        if ($start->opened) {
+            $this->events->append($start->runId, ChatRunEvents::STARTED, ['chat_id' => $request->chatId]);
+        }
+
+        return $start;
+    }
+
+    public function stop(string $runId): void
+    {
+        $this->runs->stop($runId);
+    }
+
+    /**
+     * @param-out string|null $row the run whose row this call wrote
+     */
+    private function open(ChatRunRequest $request, ?string &$row): RunStart
+    {
+        return $this->runs->start($request->userId, $request->idempotencyKey, ChatRunStep::UNIT, function (string $runId) use ($request, &$row): ChatRunState {
             $state = new ChatRunState(
                 $runId,
                 $request->userId,
@@ -53,18 +81,9 @@ final readonly class ChatRunStarter
                 $this->clock->now()->getTimestamp(),
             );
             $this->records->open($state, $request->startedBy, $request->job, $request->idempotencyKey);
+            $row = $runId;
 
             return $state;
         });
-        if ($start->opened) {
-            $this->events->append($start->runId, ChatRunEvents::STARTED, ['chat_id' => $request->chatId]);
-        }
-
-        return $start;
-    }
-
-    public function stop(string $runId): void
-    {
-        $this->runs->stop($runId);
     }
 }

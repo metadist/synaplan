@@ -26,6 +26,7 @@ use App\Service\Chat\Loop\MessengerChatRunUnitBus;
 use App\Service\ModelConfigService;
 use App\Tests\Unit\Service\Run\MemoryRunKeys;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -113,6 +114,30 @@ final class ChatRunEdgesTest extends TestCase
         self::assertSame(11, $saved[0]->getChatId());
     }
 
+    public function testARunThatCouldNotOpenLeavesNoRowRunning(): void
+    {
+        $row = null;
+        $runs = $this->createStub(RunRepository::class);
+        $runs->method('save')->willReturnCallback(static function (Run $run) use (&$row): void {
+            $row = $run;
+        });
+        $runs->method('findOneByUuid')->willReturnCallback(static function () use (&$row): ?Run {
+            return $row;
+        });
+        $bus = $this->createStub(MessageBusInterface::class);
+        $bus->method('dispatch')->willThrowException(new \RuntimeException('queue down'));
+
+        try {
+            $this->starter($runs, '1', $bus)->start($this->request());
+            self::fail('The start must fail with the queue.');
+        } catch (\RuntimeException) {
+        }
+
+        self::assertInstanceOf(Run::class, $row);
+        self::assertSame(Run::STATUS_FAILED, $row->getStatus());
+        self::assertSame(ChatRunRecords::NOT_STARTED, $row->getOutcome());
+    }
+
     private function starter(RunRepository $runs, string $env, MessageBusInterface $bus): ChatRunStarter
     {
         $clock = new MockClock('2026-11-20 09:00:00');
@@ -139,7 +164,7 @@ final class ChatRunEdgesTest extends TestCase
         $capability = $this->createStub(ToolCallingCapability::class);
         $capability->method('supports')->willReturn($tools);
 
-        return new FacadeChatRunModel($ai, $this->createStub(ModelConfigService::class), $capability, new ToolCallParser());
+        return new FacadeChatRunModel($ai, $this->createStub(ModelConfigService::class), $capability, new ToolCallParser(), new NullLogger());
     }
 
     private function state(string $provider): ChatRunState

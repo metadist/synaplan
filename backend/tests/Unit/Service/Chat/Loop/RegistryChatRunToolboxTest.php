@@ -23,6 +23,7 @@ use App\Service\Tool\ToolRegistry;
 use App\Service\Tool\ToolsConfig;
 use App\Service\Tool\ToolSource;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Clock\MockClock;
 
 final class RegistryChatRunToolboxTest extends TestCase
 {
@@ -110,7 +111,35 @@ final class RegistryChatRunToolboxTest extends TestCase
         self::assertSame(ChatRunStep::DECLINED, $result->text);
     }
 
-    private function toolbox(bool $registry, ?KnowledgeSearchTool $knowledge = null, ?ToolInvoker $invoker = null, ?ApprovalRepository $approvals = null): RegistryChatRunToolbox
+    public function testAnApprovedCallThatAlreadyRanIsNotRunAgainAndNotCalledDeclined(): void
+    {
+        $approval = new Approval(7, 'chat_run:'.self::RUN_ID, 'custom:order', 'write', time() + 3600);
+        $approval->markApproved(7);
+        $approval->markExecuted('chat_run');
+        $repo = $this->createStub(ApprovalRepository::class);
+        $repo->method('find')->willReturn($approval);
+        $invoker = $this->createMock(ToolInvoker::class);
+        $invoker->expects(self::never())->method('invoke');
+        $toolbox = $this->toolbox(registry: true, invoker: $invoker, approvals: $repo);
+
+        $result = $toolbox->run($this->scope(), $this->state(), ['id' => 'c1', 'name' => 'custom_order', 'args' => []], 77);
+
+        self::assertSame(RegistryChatRunToolbox::ALREADY_RAN, $result->text);
+    }
+
+    public function testAToolNamedLikeALoopToolIsNotOffered(): void
+    {
+        $toolbox = $this->toolbox(registry: true, extra: [self::descriptor('finish', ToolSource::Custom), self::descriptor('update_plan', ToolSource::Mcp)]);
+
+        $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope()));
+
+        self::assertSame(['web_search', 'custom_order'], $names);
+    }
+
+    /**
+     * @param list<ToolDescriptor> $extra
+     */
+    private function toolbox(bool $registry, ?KnowledgeSearchTool $knowledge = null, ?ToolInvoker $invoker = null, ?ApprovalRepository $approvals = null, array $extra = []): RegistryChatRunToolbox
     {
         $tools = $this->createStub(ToolRegistry::class);
         $tools->method('forUser')->willReturn([
@@ -118,6 +147,7 @@ final class RegistryChatRunToolboxTest extends TestCase
             self::descriptor('code_run', ToolSource::Builtin),
             self::descriptor('document_edit', ToolSource::Document),
             self::descriptor('custom:order', ToolSource::Custom),
+            ...$extra,
         ]);
         $config = $this->createStub(ToolsConfig::class);
         $config->method('isRegistryEnabled')->willReturn($registry);
@@ -132,7 +162,7 @@ final class RegistryChatRunToolboxTest extends TestCase
             $invoker ?? $this->createStub(ToolInvoker::class),
             $knowledge,
             $this->createStub(MessagesGatewayConfig::class),
-            new ChatRunApprovals($approvals ?? $this->createStub(ApprovalRepository::class)),
+            new ChatRunApprovals($approvals ?? $this->createStub(ApprovalRepository::class), new MockClock('2026-11-20 09:00:00')),
         );
     }
 

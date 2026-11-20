@@ -39,6 +39,9 @@ final class ChatRunState implements RunState
     public int $costMicro = 0;
     public int $nudges = 0;
 
+    /** Model calls that failed in a row; a call that answers clears it. */
+    public int $modelFailures = 0;
+
     /** @var list<array<string, mixed>> the transcript after the system prompt */
     public array $messages = [];
 

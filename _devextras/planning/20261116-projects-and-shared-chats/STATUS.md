@@ -37,6 +37,10 @@ the run yet, and `LOOP.ENABLED` is 0, so no turn changes.
 - `update_plan` and `finish` (`ChatLoopTools`); after five nudges without
   progress the run ends `no_progress`. A refused forced `finish` falls back to
   a JSON request once, then to the last text (§0 #68).
+- A failed model call ends its unit normally, so the checkpoint keeps the tool
+  results of that unit and no tool runs twice. The call is tried once more in
+  the next unit; two failures in a row end the run `failed` (`model_failed`)
+  with its own sentence. Only a lost worker goes through the reaper.
 - Tools (`RegistryChatRunToolbox`): web search, web fetch, the person's own
   HTTP and MCP tools through `ToolInvoker`, so the approval policy holds.
   Wire names are made provider-safe (`custom:order` → `custom_order`).
@@ -48,7 +52,10 @@ the run yet, and `LOOP.ENABLED` is 0, so no turn changes.
   (`ResumeApprovalCommandHandler` hands chat-run approvals on and runs none of
   them itself). The run re-reads the row and runs only an approval of the same
   owner, run and tool, with the arguments on the card. Nothing approves on its
-  own.
+  own. A run that ends while it waits (stop, loop off, account or chat gone)
+  and a wait that times out expire the open card, so nobody approves an action
+  that will not run. An approved call that already ran before its unit was
+  lost is not run again and is reported as "already ran", not as declined.
 - `BRUNS`: `ChatRunRecords` opens the row (`kind` chat, `origin` web_chat)
   and syncs status, steps, cost and outcome after every unit.
 - Delivery (`ChatRunDelivery`, once per run): the answer, or one true
@@ -63,7 +70,7 @@ the run yet, and `LOOP.ENABLED` is 0, so no turn changes.
   `LOOP_ENABLED` pins it.
 - Prompt `tools:chat_loop`.
 
-**Tests:** `backend/tests/Unit/Service/Chat/Loop/` (57), on the real kernel
+**Tests:** `backend/tests/Unit/Service/Chat/Loop/` (63), on the real kernel
 with an in-memory Redis: plain answer, search then answer, repeated read,
 write waits and is never run without approval, redelivery does not repeat
 it, approved / declined / timed-out decisions, approval of another run or
@@ -71,7 +78,9 @@ owner refused, moved-out chat loses sources and instructions, deleted or
 suspended account and deleted chat end `interrupted`, loop off ends
 `stopped`, empty budget stops before the next call, stop, plan → finish, JSON
 fallback, broken JSON, five nudges, lost unit twice, idempotent start, loop
-off refuses a start, foreign caller gets 404 from the reader.
+off refuses a start, foreign caller gets 404 from the reader, a failed model
+call retried without a second tool run, two failures end `failed`, the open
+card expires with the run, a start that could not open leaves no row running.
 
 **Gate:** `make ci-local` green (PHPStan, deptrac, size ratchet, PHPUnit,
 Vitest, vue-tsc); characterization snapshots unchanged.

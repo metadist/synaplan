@@ -9,8 +9,8 @@ use App\Service\Run\RunKeys;
 use App\Service\Run\RunKeyspace;
 
 /**
- * The event log of chat runs at `run:{id}:events`. Only the owner of a run
- * reads it ({@see ChatRunReader}). Events carry what the card shows, never a
+ * The event log of chat runs at `run:{id}:events`. Only the person who started a
+ * run reads it ({@see ChatRunReader}). Events carry what the card shows, never a
  * tool's full result.
  */
 final readonly class ChatRunEvents

@@ -9,7 +9,6 @@ use App\Message\RunChatUnit;
 use App\Repository\ApprovalRepository;
 use App\Service\Chat\Loop\ChatRunApprovals;
 use App\Service\Chat\Loop\ChatRunEnd;
-use App\Service\Chat\Loop\ChatRunModelFailed;
 use App\Service\Chat\Loop\ChatRunReapPolicy;
 use App\Service\Chat\Loop\ChatRunResume;
 use App\Service\Chat\Loop\ChatRunState;
@@ -29,9 +28,18 @@ final class ChatRunReapTest extends ChatLoopCase
     /** @var list<RunChatUnit> */
     private array $messages = [];
 
+    /** @var list<int> the approval cards that were taken away */
+    private array $expired = [];
+
+    protected function approvalRows(): ApprovalRepository
+    {
+        return $this->rows();
+    }
+
     public function testAUnitLostTwiceEndsTheRunAsInterrupted(): void
     {
-        $model = $this->model(new ScriptedChatRunModel(new ChatRunModelFailed('down'), new ChatRunModelFailed('down')));
+        // An empty script throws on the call, like a worker that died in it.
+        $model = $this->model(new ScriptedChatRunModel());
         $state = $this->open();
         $this->drainFailing();
 
@@ -90,6 +98,7 @@ final class ChatRunReapTest extends ChatLoopCase
 
         $this->clock->modify('+'.ChatRunReapPolicy::MAX_WAIT_SECONDS.' seconds');
         self::assertSame(1, $this->reaper()->reap()['waited']);
+        self::assertSame([FakeChatRunToolbox::APPROVAL_ID], $this->expired);
         $this->forwardMessages();
         $this->drain();
 
@@ -132,6 +141,7 @@ final class ChatRunReapTest extends ChatLoopCase
         self::assertSame(ChatRunStatus::Stopped, $stored->status);
         self::assertSame(ChatRunEnd::StoppedByUser, $stored->end);
         self::assertCount(1, $this->tools->runs);
+        self::assertSame([FakeChatRunToolbox::APPROVAL_ID], $this->expired);
     }
 
     private function waitingRun(): ChatRunState
@@ -141,6 +151,7 @@ final class ChatRunReapTest extends ChatLoopCase
         $stored = $this->stored($state->runId);
         self::assertSame(ChatRunStatus::Waiting, $stored->status);
         $this->approval = new Approval(self::USER_ID, ChatRunApprovals::requestedBy($state->runId), 'custom:order', 'write', time() + 3600);
+        (new \ReflectionProperty(Approval::class, 'id'))->setValue($this->approval, FakeChatRunToolbox::APPROVAL_ID);
 
         return $stored;
     }
@@ -149,7 +160,7 @@ final class ChatRunReapTest extends ChatLoopCase
     {
         try {
             $this->drain();
-        } catch (ChatRunModelFailed) {
+        } catch (\LogicException) {
         }
     }
 
@@ -163,18 +174,31 @@ final class ChatRunReapTest extends ChatLoopCase
 
     private function reaper(): RunReaper
     {
-        $repo = $this->createStub(ApprovalRepository::class);
-        $repo->method('find')->willReturnCallback(fn (): ?Approval => $this->approval);
-        $policy = new ChatRunReapPolicy($this->store, $repo, new ChatRunApprovals($repo), $this->resume($repo), $this->step, $this->handler);
+        $repo = $this->rows();
+        $policy = new ChatRunReapPolicy($this->store, $repo, new ChatRunApprovals($repo, $this->clock), $this->resume($repo), $this->step, $this->handler);
 
         return new RunReaper($this->store->runs(), $policy, $this->bus, $this->clock, new NullLogger(), ChatRunUnitHandler::LEASE_MS);
+    }
+
+    private function rows(): ApprovalRepository
+    {
+        $repo = $this->createStub(ApprovalRepository::class);
+        $repo->method('find')->willReturnCallback(fn (): ?Approval => $this->approval);
+        $repo->method('findLatestForRequestedBy')->willReturnCallback(fn (): ?Approval => $this->approval);
+        $repo->method('expireIfPending')->willReturnCallback(function (int $id): bool {
+            $this->expired[] = $id;
+            $this->approval?->markExpired();
+
+            return true;
+        });
+
+        return $repo;
     }
 
     private function resume(?ApprovalRepository $repo = null): ChatRunResume
     {
         if (null === $repo) {
-            $repo = $this->createStub(ApprovalRepository::class);
-            $repo->method('find')->willReturnCallback(fn (): ?Approval => $this->approval);
+            $repo = $this->rows();
         }
         $messenger = $this->createStub(MessageBusInterface::class);
         $messenger->method('dispatch')->willReturnCallback(function (object $message): Envelope {
@@ -185,6 +209,6 @@ final class ChatRunReapTest extends ChatLoopCase
             return new Envelope($message);
         });
 
-        return new ChatRunResume($repo, new ChatRunApprovals($repo), $this->store, $this->handler, new MessengerChatRunUnitBus($messenger), $this->events);
+        return new ChatRunResume($repo, new ChatRunApprovals($repo, $this->clock), $this->store, $this->handler, new MessengerChatRunUnitBus($messenger), $this->events);
     }
 }

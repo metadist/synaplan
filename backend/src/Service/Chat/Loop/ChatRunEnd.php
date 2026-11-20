@@ -60,6 +60,13 @@ enum ChatRunEnd: string
             'fr' => 'Interrompu : ce chat n\'existe plus.',
             'tr' => 'Kesildi: bu sohbet artık yok.',
         ],
+        'model_failed' => [
+            'en' => 'The AI model did not answer, so I could not finish. Please send your message again.',
+            'de' => 'Das KI-Modell hat nicht geantwortet, deshalb konnte ich nicht fertig werden. Bitte sende deine Nachricht noch einmal.',
+            'es' => 'El modelo de IA no respondió, así que no pude terminar. Envía tu mensaje de nuevo.',
+            'fr' => 'Le modèle d\'IA n\'a pas répondu, je n\'ai donc pas pu terminer. Renvoyez votre message.',
+            'tr' => 'Yapay zekâ modeli yanıt vermedi, bu yüzden bitiremedim. Lütfen mesajınızı yeniden gönderin.',
+        ],
         'worker_lost' => [
             'en' => 'Interrupted: the work stopped on the server before it was done. Please send your message again.',
             'de' => 'Unterbrochen: Die Arbeit brach auf dem Server ab, bevor sie fertig war. Bitte sende deine Nachricht noch einmal.',
@@ -79,6 +86,7 @@ enum ChatRunEnd: string
     case AccountGone = 'account_gone';
     case ChatGone = 'chat_gone';
     case WorkerLost = 'worker_lost';
+    case ModelFailed = 'model_failed';
 
     public function status(): ChatRunStatus
     {
@@ -87,6 +95,7 @@ enum ChatRunEnd: string
             self::StoppedByUser, self::LoopOff => ChatRunStatus::Stopped,
             self::BudgetUsed => ChatRunStatus::BudgetUsed,
             self::AccountGone, self::ChatGone, self::WorkerLost => ChatRunStatus::Interrupted,
+            self::ModelFailed => ChatRunStatus::Failed,
         };
     }
 

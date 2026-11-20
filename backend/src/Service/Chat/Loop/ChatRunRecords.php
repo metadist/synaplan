@@ -15,6 +15,7 @@ use Psr\Clock\ClockInterface;
 final readonly class ChatRunRecords
 {
     public const ORIGIN = 'web_chat';
+    public const NOT_STARTED = 'not_started';
 
     public function __construct(
         private RunRepository $runs,
@@ -30,6 +31,17 @@ final readonly class ChatRunRecords
         $run->setChatId($state->chatId);
         $run->setIdempotency($idempotencyKey);
         $run->progress(Run::STATUS_RUNNING, null, 0, 0, null, $now);
+        $this->runs->save($run);
+    }
+
+    /** The run never got its checkpoint: close the row, so it does not look like work in progress. */
+    public function abandon(string $runId): void
+    {
+        $run = $this->runs->findOneByUuid($runId);
+        if (!$run instanceof Run || Run::KIND_CHAT !== $run->getKind() || $run->isTerminal()) {
+            return;
+        }
+        $run->progress(Run::STATUS_FAILED, null, 0, 0, self::NOT_STARTED, $this->clock->now()->getTimestamp());
         $this->runs->save($run);
     }
 
@@ -50,7 +62,7 @@ final readonly class ChatRunRecords
         $this->runs->save($run);
     }
 
-    /** The run when $userId started it or owns it; null for everyone else. */
+    /** The run when $userId started it (a row without a starter: its owner); null for everyone else. */
     public function forCaller(string $runId, int $userId): ?Run
     {
         $run = $this->runs->findOneByUuid($runId);

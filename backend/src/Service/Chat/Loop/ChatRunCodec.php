@@ -42,6 +42,7 @@ final readonly class ChatRunCodec implements RunStateCodec
             'steps' => $state->steps,
             'costMicro' => $state->costMicro,
             'nudges' => $state->nudges,
+            'modelFailures' => $state->modelFailures,
             'expected' => $expectedSeq,
             'checkpoint' => $checkpointSeq,
             'updated' => $now,
@@ -52,7 +53,8 @@ final readonly class ChatRunCodec implements RunStateCodec
     public function decode(string $stored): ?RunState
     {
         try {
-            $data = json_decode($stored, true, 64, \JSON_THROW_ON_ERROR);
+            // The default depth, as on the way in: tool arguments nest as deep as the model writes them.
+            $data = json_decode($stored, true, 512, \JSON_THROW_ON_ERROR);
         } catch (\JsonException) {
             return null;
         }
@@ -101,6 +103,7 @@ final readonly class ChatRunCodec implements RunStateCodec
         $state->steps = max(0, (int) ($data['steps'] ?? 0));
         $state->costMicro = max(0, (int) ($data['costMicro'] ?? 0));
         $state->nudges = max(0, (int) ($data['nudges'] ?? 0));
+        $state->modelFailures = max(0, (int) ($data['modelFailures'] ?? 0));
         $state->pending = self::pending($data['pending'] ?? []);
         $state->plan = self::plan($data['plan'] ?? []);
         $state->reads = self::reads($data['reads'] ?? []);

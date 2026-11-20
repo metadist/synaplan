@@ -8,6 +8,7 @@ use App\AI\Service\AiFacade;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\AI\ToolCalling\ToolCallParser;
 use App\Service\ModelConfigService;
+use Psr\Log\LoggerInterface;
 
 /**
  * The model call of a chat run through {@see AiFacade}, on the provider and
@@ -23,6 +24,7 @@ final readonly class FacadeChatRunModel implements ChatRunModel
         private ModelConfigService $models,
         private ToolCallingCapability $capability,
         private ToolCallParser $parser,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -40,6 +42,8 @@ final readonly class FacadeChatRunModel implements ChatRunModel
         try {
             $response = $this->ai->chat($messages, $state->userId, $options);
         } catch (\Throwable $e) {
+            $this->logger->warning('The model call of a chat run failed', ['run_id' => $state->runId, 'provider' => $provider, 'model' => $state->model, 'exception' => $e]);
+
             throw new ChatRunModelFailed('The model call of a chat run failed.', 0, $e);
         }
 

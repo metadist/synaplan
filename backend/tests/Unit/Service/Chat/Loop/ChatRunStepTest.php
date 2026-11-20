@@ -262,19 +262,39 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertSame(6, $stored->steps);
     }
 
-    public function testAFailedCallInFreeModeKeepsTheClaimForTheReaper(): void
+    public function testAFailedCallIsTriedOnceMoreWithoutRunningTheToolsAgain(): void
     {
-        $this->model(new ScriptedChatRunModel(new ChatRunModelFailed('provider down')));
+        $model = $this->model(new ScriptedChatRunModel(
+            ScriptedChatRunModel::calls('web_search', ['query' => 'release']),
+            new ChatRunModelFailed('provider down'),
+            ScriptedChatRunModel::says('It adds the guide.'),
+        ));
         $state = $this->open();
 
-        try {
-            $this->drain();
-            self::fail('The failure must reach the worker.');
-        } catch (ChatRunModelFailed) {
-        }
+        $this->drain();
 
-        self::assertTrue($this->store->runs()->isClaimed($state->runId, 1));
-        self::assertSame(ChatRunStatus::Running, $this->stored($state->runId)->status);
+        $stored = $this->stored($state->runId);
+        self::assertSame(ChatRunEnd::Answered, $stored->end);
+        self::assertSame(0, $stored->modelFailures);
+        self::assertCount(1, $this->tools->runs);
+        self::assertCount(3, $model->calls);
+        self::assertSame('result of web_search', $model->calls[2]['messages'][3]['content']);
+    }
+
+    public function testTwoFailedCallsInARowEndTheRunWithTheReason(): void
+    {
+        $this->model(new ScriptedChatRunModel(new ChatRunModelFailed('provider down'), new ChatRunModelFailed('provider down')));
+        $state = $this->open();
+
+        $this->drain();
+
+        $stored = $this->stored($state->runId);
+        self::assertSame(ChatRunStatus::Failed, $stored->status);
+        self::assertSame(ChatRunEnd::ModelFailed, $stored->end);
+        self::assertNull($stored->answer);
+        self::assertFalse($this->store->runs()->isClaimed($state->runId, $stored->expectedSeq()));
+        self::assertStringContainsString('KI-Modell', \App\Service\Chat\Loop\ChatRunDelivery::text($stored));
+        self::assertSame('failed', end($this->synced));
     }
 
     public function testToolCallsBeyondTheStepLimitAreSkipped(): void

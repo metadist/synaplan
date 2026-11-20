@@ -24,6 +24,7 @@ final class ChatRunCodecTest extends TestCase
         $state->steps = 3;
         $state->costMicro = 4_200;
         $state->nudges = 1;
+        $state->modelFailures = 1;
         $state->waitForApproval();
 
         $read = (new ChatRunCodec())->decode($state->stored(4, 3, 200, 9_999));
@@ -36,7 +37,7 @@ final class ChatRunCodecTest extends TestCase
         self::assertSame($state->reads, $read->reads);
         self::assertSame(ChatRunStatus::Waiting, $read->status);
         self::assertSame(ChatRunState::WAIT_APPROVAL, $read->waitReason);
-        self::assertSame([ChatRunState::MODE_FINISH, 3, 4_200, 1], [$read->mode, $read->steps, $read->costMicro, $read->nudges]);
+        self::assertSame([ChatRunState::MODE_FINISH, 3, 4_200, 1, 1], [$read->mode, $read->steps, $read->costMicro, $read->nudges, $read->modelFailures]);
         self::assertSame([4, 3, 200, 9_999], [$read->expectedSeq(), $read->checkpointSeq(), $read->updatedAt(), $read->expiresAt()]);
     }
 
@@ -52,6 +53,21 @@ final class ChatRunCodecTest extends TestCase
         self::assertSame('The answer.', $read->answer);
         self::assertTrue($read->isTerminal());
         self::assertNull($read->incomingMessageId);
+    }
+
+    public function testDeeplyNestedToolArgumentsDoNotLoseTheRun(): void
+    {
+        $args = ['leaf' => true];
+        for ($i = 0; $i < 80; ++$i) {
+            $args = ['n' => $args];
+        }
+        $state = new ChatRunState(self::RUN_ID, 7, 11, null, null, null, 'en', '', [], 1);
+        $state->pending = [['id' => 'c1', 'name' => 'mcp_deep', 'args' => $args]];
+
+        $read = (new ChatRunCodec())->decode($state->stored(1, 0, 5, null));
+
+        self::assertInstanceOf(ChatRunState::class, $read);
+        self::assertSame($state->pending, $read->pending);
     }
 
     public function testAnotherKindOfRunIsRefused(): void

@@ -8,6 +8,7 @@ use App\Entity\Approval;
 use App\Repository\ApprovalRepository;
 use App\Service\Run\RunIds;
 use App\Service\Tool\ApprovalService;
+use Psr\Clock\ClockInterface;
 
 /**
  * The approvals a chat run asked for. A run only runs a write that its owner
@@ -18,8 +19,10 @@ final readonly class ChatRunApprovals
 {
     public const PREFIX = 'chat_run:';
 
-    public function __construct(private ApprovalRepository $approvals)
-    {
+    public function __construct(
+        private ApprovalRepository $approvals,
+        private ClockInterface $clock,
+    ) {
     }
 
     public static function requestedBy(string $runId): string
@@ -56,6 +59,38 @@ final readonly class ChatRunApprovals
         }
 
         return ApprovalService::executionArgs($approval);
+    }
+
+    /**
+     * This run ran the approved call already. A unit that was lost after the
+     * call comes back to it: the action happened, only its result is gone.
+     */
+    public function alreadyRan(int $approvalId, ChatRunState $state): bool
+    {
+        $approval = $this->approvals->find($approvalId);
+
+        return $approval instanceof Approval
+            && $approval->getOwnerId() === $state->userId
+            && $approval->getRequestedBy() === self::requestedBy($state->runId)
+            && \in_array($approval->getStatus(), [Approval::STATUS_EXECUTED, Approval::STATUS_FAILED], true);
+    }
+
+    /**
+     * The run no longer waits for this approval: take the open card away, so
+     * nobody approves an action that will not run.
+     */
+    public function expire(int $approvalId): void
+    {
+        $this->approvals->expireIfPending($approvalId, $this->clock->now()->getTimestamp());
+    }
+
+    /** The run ended: expire the approval it still had open, if any. A run asks for one at a time. */
+    public function expireOpen(string $runId): void
+    {
+        $approval = $this->approvals->findLatestForRequestedBy(self::requestedBy($runId));
+        if ($approval instanceof Approval && Approval::STATUS_PENDING === $approval->getStatus() && null !== $approval->getId()) {
+            $this->expire($approval->getId());
+        }
     }
 
     public function executed(int $approvalId, bool $ok): void

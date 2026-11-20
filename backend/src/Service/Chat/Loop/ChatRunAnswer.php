@@ -15,6 +15,9 @@ final readonly class ChatRunAnswer
 {
     public const MAX_NUDGES = 5;
 
+    /** Model calls that may fail in a row before the run ends. */
+    public const MAX_MODEL_FAILURES = 2;
+
     public const JSON_REQUEST = 'Reply with only a JSON object {"result": "<the complete final answer>", "outcome": "done" or "partial"} and nothing else.';
 
     public function __construct(
@@ -29,6 +32,7 @@ final readonly class ChatRunAnswer
     public function apply(ChatRunState $state, ChatRunReply $reply): ?string
     {
         ++$state->steps;
+        $state->modelFailures = 0;
         $state->costMicro += max(0, $reply->costMicro);
 
         return match ($state->mode) {
@@ -39,11 +43,17 @@ final readonly class ChatRunAnswer
     }
 
     /**
-     * The provider refused the call. Asking for `finish` may be refused by a
-     * model that takes no required tool choice: ask for plain JSON once. Any
-     * other failure keeps the claim, so the kernel tries the unit again.
+     * The provider refused or failed the call. Asking for `finish` may be
+     * refused by a model that takes no required tool choice: ask for plain
+     * JSON once. Any other failure is tried once more in the next unit and
+     * then ends the run with the reason.
+     *
+     * The unit ends normally either way, so its checkpoint keeps the tool
+     * results of this unit: a retry never runs a tool a second time.
+     *
+     * @return string|null the next unit, or null when the run ended
      */
-    public function failed(ChatRunState $state, ChatRunModelFailed $failed): ?string
+    public function failed(ChatRunState $state): ?string
     {
         if (ChatRunState::MODE_FINISH === $state->mode) {
             $state->mode = ChatRunState::MODE_FINISH_JSON;
@@ -55,8 +65,14 @@ final readonly class ChatRunAnswer
 
             return null;
         }
+        ++$state->modelFailures;
+        if ($state->modelFailures >= self::MAX_MODEL_FAILURES) {
+            $this->end($state, ChatRunEnd::ModelFailed);
 
-        throw $failed;
+            return null;
+        }
+
+        return ChatRunStep::UNIT;
     }
 
     public function end(ChatRunState $state, ChatRunEnd $end, ?string $answer = null): void
