@@ -12,6 +12,9 @@ final class SwitchedChatRunBudget implements ChatRunBudget
 {
     public int $checks = 0;
 
+    /** The checks that may still say yes; past them the budget is empty. */
+    public int $yes = \PHP_INT_MAX;
+
     public function __construct(public bool $left = true)
     {
     }
@@ -20,6 +23,6 @@ final class SwitchedChatRunBudget implements ChatRunBudget
     {
         ++$this->checks;
 
-        return $this->left;
+        return $this->left && $this->checks <= $this->yes;
     }
 }

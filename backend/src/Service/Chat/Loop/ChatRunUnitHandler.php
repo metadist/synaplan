@@ -12,7 +12,8 @@ use Psr\Log\LoggerInterface;
 
 /**
  * Chat run units on the run kernel: one unit is the tool calls of the last
- * model answer and one model call. After the checkpoint the `BRUNS` row
+ * model answer and one model call. A run that ended is checked before its
+ * checkpoint ({@see ChatRunCheck}). After the checkpoint the `BRUNS` row
  * follows, and a finished run is posted into its chat.
  */
 final readonly class ChatRunUnitHandler implements RunUnitHandler
@@ -22,6 +23,7 @@ final readonly class ChatRunUnitHandler implements RunUnitHandler
 
     public function __construct(
         private ChatRunStep $step,
+        private ChatRunCheck $check,
         private ChatRunRecords $records,
         private ChatRunDelivery $delivery,
         private ChatRunApprovals $approvals,
@@ -41,7 +43,13 @@ final readonly class ChatRunUnitHandler implements RunUnitHandler
 
     public function run(RunState $state, string $unit, RunClaim $claim): RunUnitResult
     {
-        return new RunUnitResult($this->step->run(self::chat($state), $claim));
+        $chat = self::chat($state);
+        $next = $this->step->run($chat, $claim);
+        if (null === $next) {
+            $this->checkBeforeDelivery($chat, $claim);
+        }
+
+        return new RunUnitResult($next);
     }
 
     public function cancel(RunState $state): RunUnitResult
@@ -71,6 +79,17 @@ final readonly class ChatRunUnitHandler implements RunUnitHandler
             }
         } catch (\Throwable $e) {
             $this->logger->warning('A chat run was not settled after its unit', ['run_id' => $state->runId, 'exception' => $e]);
+        }
+    }
+
+    /** The check never keeps an answer from its chat: when it breaks, the answer goes without a note. */
+    private function checkBeforeDelivery(ChatRunState $state, RunClaim $claim): void
+    {
+        try {
+            $this->check->apply($state, $claim);
+        } catch (\Throwable $e) {
+            $state->note ??= '';
+            $this->logger->warning('The check of a chat run answer failed', ['run_id' => $state->runId, 'exception' => $e]);
         }
     }
 

@@ -8,6 +8,8 @@ use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ApprovalRepository;
 use App\Service\Chat\Loop\ChatRunApprovals;
+use App\Service\Chat\Loop\ChatRunCheck;
+use App\Service\Chat\Loop\ChatRunCheckModel;
 use App\Service\Chat\Loop\ChatRunDelivery;
 use App\Service\Chat\Loop\ChatRunEvents;
 use App\Service\Chat\Loop\ChatRunRecords;
@@ -17,6 +19,8 @@ use App\Service\Chat\Loop\ChatRunStep;
 use App\Service\Chat\Loop\ChatRunStore;
 use App\Service\Chat\Loop\ChatRunUnitHandler;
 use App\Service\Project\ProjectTurnContext;
+use App\Service\Research\Run\Lead\ScriptedModelCaller;
+use App\Service\Research\Run\ResearchModelChoice;
 use App\Service\Run\RunIds;
 use App\Service\Run\RunUnit;
 use App\Tests\Unit\Service\Run\MemoryRunKeys;
@@ -48,6 +52,10 @@ abstract class ChatLoopCase extends TestCase
     protected ChatRunDelivery $delivery;
     protected User $user;
 
+    /** The checking model's answers; it is asked only while {@see $checkModel} is set. */
+    protected ScriptedModelCaller $checker;
+    protected ?ResearchModelChoice $checkModel = null;
+
     /** @var list<string> the run statuses the row was synced to */
     protected array $synced = [];
 
@@ -65,6 +73,7 @@ abstract class ChatLoopCase extends TestCase
         $user->method('isActive')->willReturn(true);
         $this->user = $user;
         $this->world = new FixedChatRunWorld($this->scope());
+        $this->checker = new ScriptedModelCaller();
     }
 
     protected function scope(?ProjectTurnContext $project = null): ChatRunScope
@@ -84,9 +93,25 @@ abstract class ChatLoopCase extends TestCase
             $this->synced[] = $state->status->value;
         });
         $this->delivery = $this->createStub(ChatRunDelivery::class);
-        $this->handler = new ChatRunUnitHandler($this->step, $records, $this->delivery, new ChatRunApprovals($this->approvalRows(), $this->clock), new NullLogger());
+        $picker = new class($this) implements ChatRunCheckModel {
+            public function __construct(private readonly ChatLoopCase $case)
+            {
+            }
+
+            public function pick(ChatRunState $state): ?ResearchModelChoice
+            {
+                return $this->case->checkModel();
+            }
+        };
+        $check = new ChatRunCheck($this->world, $this->budget, $picker, $this->checker, $this->events);
+        $this->handler = new ChatRunUnitHandler($this->step, $check, $records, $this->delivery, new ChatRunApprovals($this->approvalRows(), $this->clock), new NullLogger());
 
         return $model;
+    }
+
+    public function checkModel(): ?ResearchModelChoice
+    {
+        return $this->checkModel;
     }
 
     /** The approval rows the run's handler sees; a test that needs some overrides this. */

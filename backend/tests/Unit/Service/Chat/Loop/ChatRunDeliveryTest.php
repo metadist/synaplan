@@ -63,6 +63,19 @@ final class ChatRunDeliveryTest extends TestCase
         self::assertSame("Let me look.\n\nThe answer.", $row->getText(), 'the streamed answer is not repeated');
     }
 
+    public function testTheCheckNoteClosesTheStoredTextAndIsAllThatIsLeftToStream(): void
+    {
+        $row = $this->row(self::CHAT_ID, self::OWNER);
+        $state = $this->finished();
+        $state->said = 'The answer.';
+        $state->note = "---\n\nNot backed:\n\n- One.";
+
+        $this->delivery($row)->deliver($state);
+
+        self::assertSame("The answer.\n\n---\n\nNot backed:\n\n- One.", $row->getText());
+        self::assertSame("\n\n---\n\nNot backed:\n\n- One.", ChatRunDelivery::rest($state));
+    }
+
     public function testARunStoppedAfterItSpokeKeepsItsTextAndSaysWhy(): void
     {
         $state = new ChatRunState(self::RUN_ID, self::OWNER, self::CHAT_ID, null, 'anthropic', 'm', 'en', '', [], 1);
