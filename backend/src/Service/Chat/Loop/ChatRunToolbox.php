@@ -11,9 +11,14 @@ namespace App\Service\Chat\Loop;
 interface ChatRunToolbox
 {
     /**
+     * The person's own connected tools are declared by name only, behind
+     * {@see ConnectedToolCatalog}, until the model opens them.
+     *
+     * @param list<string> $opened connected tools the model opened in this run
+     *
      * @return list<array<string, mixed>> function declarations for this unit
      */
-    public function declarations(ChatRunScope $scope): array;
+    public function declarations(ChatRunScope $scope, array $opened = []): array;
 
     /**
      * Runs one call. A write that needs the owner's approval comes back as

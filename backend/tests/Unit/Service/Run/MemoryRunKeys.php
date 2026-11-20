@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Run;
 
 use App\Service\Run\RunKeys;
 use Psr\Clock\ClockInterface;
+use Symfony\Component\Clock\MockClock;
 
 /**
  * In-memory Redis for the run kernel. A key disappears when its time is up,
@@ -33,6 +34,9 @@ final class MemoryRunKeys implements RunKeys
 
     /** Runs once, right before the next claim, to interleave a second worker. */
     public ?\Closure $beforeClaim = null;
+
+    /** Runs while a reader waits for an event, as a worker does meanwhile. */
+    public ?\Closure $whileAwaiting = null;
 
     public function __construct(private readonly ClockInterface $clock)
     {
@@ -181,6 +185,16 @@ final class MemoryRunKeys implements RunKeys
         $this->lists[$listKey] = ['items' => $items, 'expiresAt' => $expiresAt];
 
         return $seq;
+    }
+
+    public function awaitEvent(string $listKey, int $afterSeq, int $blockMs): void
+    {
+        if ($this->clock instanceof MockClock) {
+            $this->clock->sleep($blockMs / 1000);
+        }
+        if (null !== $this->whileAwaiting) {
+            ($this->whileAwaiting)();
+        }
     }
 
     /** Milliseconds until the key expires, -1 when it never does, null when it is gone. */

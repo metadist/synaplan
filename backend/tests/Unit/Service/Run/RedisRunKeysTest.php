@@ -91,4 +91,17 @@ final class RedisRunKeysTest extends TestCase
 
         self::assertNull((new RedisRunKeys($redis))->appendEvent('seq', 'list', 'run', '{}'));
     }
+
+    public function testAnEventWakesAReaderBlockedOnItsRun(): void
+    {
+        $redis = $this->createMock(RedisService::class);
+        $redis->expects(self::once())->method('eval')
+            ->with(self::stringContains("'XADD', KEYS[4]"), ['seq', 'list', 'run', 'list:wake'], ['{}'])
+            ->willReturn(6);
+        $redis->expects(self::once())->method('readStream')->with('list:wake', '0-5', 1000)->willReturn([]);
+        $keys = new RedisRunKeys($redis);
+
+        self::assertSame(6, $keys->appendEvent('seq', 'list', 'run', '{}'));
+        $keys->awaitEvent('list', 5, 1000);
+    }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Message\Effort;
 
 use App\Entity\Message;
+use App\Service\Chat\Loop\ChatLoopGate;
 use App\Service\Message\Processing\TurnStatus;
 
 /**
@@ -29,6 +30,7 @@ final readonly class AutoResearchTurn
     public function __construct(
         private AutoResearchGate $gate,
         private AutoResearchText $texts,
+        private ?ChatLoopGate $loop = null,
     ) {
     }
 
@@ -41,6 +43,10 @@ final readonly class AutoResearchTurn
      */
     public function apply(Message $message, array $classification, array $options, array $history, TurnStatus $status): array
     {
+        // On the loop the turn itself works as long as it needs.
+        if (true === $this->loop?->forTurn($message, $options, $classification)) {
+            return [$classification, null, null];
+        }
         $decision = $this->gate->decide($message, $classification, $options, $history);
         $locale = self::locale($classification);
         if ($decision->startedRun()) {

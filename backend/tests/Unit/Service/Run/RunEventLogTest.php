@@ -25,6 +25,21 @@ final class RunEventLogTest extends RunKernelCase
         self::assertSame([], $log->replay($run->id, 3));
     }
 
+    public function testALogWhoseNumbersDoNotMatchItsPositionsIsReadWhole(): void
+    {
+        $log = $this->log();
+        $run = $this->openRun();
+        $log->append($run->id, 'progress', []);
+        $log->append($run->id, 'progress', []);
+        $log->append($run->id, 'progress', []);
+        // The list went, the numbering did not: event 4 is now the first line.
+        $this->keys->delete($this->keyspace->events($run->id));
+        $log->append($run->id, 'done', []);
+
+        self::assertSame([['seq' => 4, 'event' => 'done', 'data' => []]], $log->replay($run->id, 3));
+        self::assertSame([], $log->replay($run->id, 4));
+    }
+
     public function testAStoredLineWithAForeignNameIsNotReplayed(): void
     {
         $log = $this->log();
