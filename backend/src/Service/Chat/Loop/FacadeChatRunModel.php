@@ -59,22 +59,11 @@ final readonly class FacadeChatRunModel implements ChatRunModel
      */
     private function calls(mixed $wire): array
     {
-        $out = [];
-        foreach ($this->parser->fromWireToolCalls($wire) as $call) {
-            if ('' === $call->name) {
-                continue;
-            }
-            $row = ['id' => '' !== $call->id ? $call->id : 'call_'.bin2hex(random_bytes(6)), 'name' => $call->name, 'args' => $call->arguments];
-            if (null !== $call->thoughtSignature && '' !== $call->thoughtSignature) {
-                $row['signature'] = $call->thoughtSignature;
-            }
-            $out[] = $row;
-        }
-
-        return $out;
+        return ChatRunCalls::read($this->parser, $wire);
     }
 
-    private static function micro(mixed $charged): int
+    /** A charged dollar amount in micro units. */
+    public static function micro(mixed $charged): int
     {
         return is_numeric($charged) ? max(0, (int) round((float) $charged * self::MICRO)) : 0;
     }

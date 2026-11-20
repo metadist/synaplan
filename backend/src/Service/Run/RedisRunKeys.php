@@ -21,12 +21,15 @@ if ttl == -2 or ttl == 0 then
 end
 local seq = redis.call('INCR', KEYS[1])
 redis.call('RPUSH', KEYS[2], seq .. '\n' .. ARGV[1])
-if ttl > 0 then
-  redis.call('PEXPIRE', KEYS[1], ttl)
-  redis.call('PEXPIRE', KEYS[2], ttl)
-else
-  redis.call('PERSIST', KEYS[1])
-  redis.call('PERSIST', KEYS[2])
+redis.call('XADD', KEYS[4], 'MAXLEN', '1', '0-' .. seq, 'seq', seq)
+for i = 1, 4 do
+  if i ~= 3 then
+    if ttl > 0 then
+      redis.call('PEXPIRE', KEYS[i], ttl)
+    else
+      redis.call('PERSIST', KEYS[i])
+    end
+  end
 end
 return seq
 LUA;
@@ -222,9 +225,20 @@ LUA;
 
     public function appendEvent(string $seqKey, string $listKey, string $runKey, string $body): ?int
     {
-        $seq = $this->requiredInteger($this->redis->eval(self::APPEND_EVENT, [$seqKey, $listKey, $runKey], [$body]));
+        $seq = $this->requiredInteger($this->redis->eval(self::APPEND_EVENT, [$seqKey, $listKey, $runKey, self::wakeKey($listKey)], [$body]));
 
         return $seq < 1 ? null : $seq;
+    }
+
+    public function awaitEvent(string $listKey, int $afterSeq, int $blockMs): void
+    {
+        $this->redis->readStream(self::wakeKey($listKey), '0-'.max(0, $afterSeq), $blockMs);
+    }
+
+    /** One entry, the last sequence number, so a waiter can block on it. */
+    private static function wakeKey(string $listKey): string
+    {
+        return $listKey.':wake';
     }
 
     private function requiredInteger(mixed $result): int

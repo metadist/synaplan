@@ -43,6 +43,12 @@ final readonly class ChatRunEvents
         return $this->log->append($runId, $event, $data);
     }
 
+    /** Returns once an event after `$after` exists, or after `$blockMs`. */
+    public function await(string $runId, int $after, int $blockMs): void
+    {
+        $this->log->await($runId, $after, $blockMs);
+    }
+
     /**
      * @return list<array{seq: int, event: string, data: array<string, mixed>}>
      */

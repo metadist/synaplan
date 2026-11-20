@@ -80,7 +80,7 @@ final readonly class ChatRunStep
         [$tools, $choice] = match ($state->mode) {
             ChatRunState::MODE_FINISH => [[ChatLoopTools::finish()], 'required'],
             ChatRunState::MODE_FINISH_JSON => [[], null],
-            default => [[...$this->tools->declarations($scope), ChatLoopTools::updatePlan()], 'auto'],
+            default => [[...$this->tools->declarations($scope, $state->opened), ChatLoopTools::updatePlan()], 'auto'],
         };
         if (ChatRunState::MODE_FINISH_JSON === $state->mode) {
             $messages[] = ['role' => 'user', 'content' => ChatRunAnswer::JSON_REQUEST];

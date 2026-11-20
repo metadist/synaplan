@@ -13,6 +13,7 @@ use App\Service\Chat\Loop\ChatRunApprovals;
 use App\Service\Chat\Loop\ChatRunScope;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunStep;
+use App\Service\Chat\Loop\ConnectedToolCatalog;
 use App\Service\Chat\Loop\RegistryChatRunToolbox;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\Project\ProjectTurnContext;
@@ -35,7 +36,30 @@ final class RegistryChatRunToolboxTest extends TestCase
 
         $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope()));
 
-        self::assertSame(['web_search', 'custom_order'], $names);
+        self::assertSame(['web_search', ConnectedToolCatalog::NAME], $names, 'the own tools stay behind the catalog until opened');
+        self::assertSame(['web_search', 'custom_order', ConnectedToolCatalog::NAME], array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope(), ['custom_order'])));
+    }
+
+    public function testTheCatalogListsTheOwnToolsAndOpensOnlyThose(): void
+    {
+        $toolbox = $this->toolbox(registry: true);
+        $state = $this->state();
+
+        $listing = $toolbox->run($this->scope(), $state, ['id' => 'c1', 'name' => ConnectedToolCatalog::NAME, 'args' => []]);
+        $opened = $toolbox->run($this->scope(), $state, ['id' => 'c2', 'name' => ConnectedToolCatalog::NAME, 'args' => ['use' => ['custom_order', 'web_search', 'code_run']]]);
+
+        self::assertStringContainsString('- custom_order', $listing->text);
+        self::assertStringNotContainsString('web_search', $listing->text);
+        self::assertSame(['custom_order'], $state->opened);
+        self::assertStringContainsString('Not in the list: web_search, code_run.', $opened->text);
+        self::assertTrue($toolbox->isRead(ConnectedToolCatalog::NAME));
+    }
+
+    public function testNoCatalogWithoutOwnTools(): void
+    {
+        $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $this->toolbox(registry: true, own: false)->declarations($this->scope()));
+
+        self::assertSame(['web_search'], $names);
     }
 
     public function testNothingFromTheRegistryWhileItIsOff(): void
@@ -131,22 +155,22 @@ final class RegistryChatRunToolboxTest extends TestCase
     {
         $toolbox = $this->toolbox(registry: true, extra: [self::descriptor('finish', ToolSource::Custom), self::descriptor('update_plan', ToolSource::Mcp)]);
 
-        $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope()));
+        $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope(), ['finish', 'update_plan', 'custom_order']));
 
-        self::assertSame(['web_search', 'custom_order'], $names);
+        self::assertSame(['web_search', 'custom_order', ConnectedToolCatalog::NAME], $names);
     }
 
     /**
      * @param list<ToolDescriptor> $extra
      */
-    private function toolbox(bool $registry, ?KnowledgeSearchTool $knowledge = null, ?ToolInvoker $invoker = null, ?ApprovalRepository $approvals = null, array $extra = []): RegistryChatRunToolbox
+    private function toolbox(bool $registry, ?KnowledgeSearchTool $knowledge = null, ?ToolInvoker $invoker = null, ?ApprovalRepository $approvals = null, array $extra = [], bool $own = true): RegistryChatRunToolbox
     {
         $tools = $this->createStub(ToolRegistry::class);
         $tools->method('forUser')->willReturn([
             self::descriptor('web_search', ToolSource::Builtin),
             self::descriptor('code_run', ToolSource::Builtin),
             self::descriptor('document_edit', ToolSource::Document),
-            self::descriptor('custom:order', ToolSource::Custom),
+            ...($own ? [self::descriptor('custom:order', ToolSource::Custom)] : []),
             ...$extra,
         ]);
         $config = $this->createStub(ToolsConfig::class);

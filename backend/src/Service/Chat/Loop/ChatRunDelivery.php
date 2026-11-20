@@ -65,7 +65,8 @@ final readonly class ChatRunDelivery
     private function post(ChatRunState $state, Chat $chat): void
     {
         $now = $this->clock->now()->getTimestamp();
-        $reply = $this->metas->findMessageInChatByMeta((int) $chat->getId(), self::META, $state->runId)
+        $reply = $this->replyRow($state)
+            ?? $this->metas->findMessageInChatByMeta((int) $chat->getId(), self::META, $state->runId)
             ?? (new Message())
                 ->setUserId($state->userId)
                 ->setChat($chat)
@@ -88,5 +89,16 @@ final readonly class ChatRunDelivery
         }
         $chat->updateTimestamp();
         $this->em->flush();
+    }
+
+    /** The message the turn wrote for the answer, when it is an answer in this run's chat. */
+    private function replyRow(ChatRunState $state): ?Message
+    {
+        $row = null === $state->replyMessageId ? null : $this->messages->find($state->replyMessageId);
+        if (!$row instanceof Message || $row->getChatId() !== $state->chatId || $row->getUserId() !== $state->userId || 'OUT' !== $row->getDirection()) {
+            return null;
+        }
+
+        return $row;
     }
 }

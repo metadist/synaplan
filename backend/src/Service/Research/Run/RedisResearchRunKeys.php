@@ -114,6 +114,11 @@ LUA;
         return $this->guard(fn (): ?int => $this->kernel->appendEvent($seqKey, $listKey, $runKey, $body));
     }
 
+    public function awaitEvent(string $listKey, int $afterSeq, int $blockMs): void
+    {
+        $this->kernel->awaitEvent($listKey, $afterSeq, $blockMs);
+    }
+
     public function putSourceText(string $runId, string $sourceId, string $text): bool
     {
         $result = $this->redis->eval(

@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Repository\MessageRepository;
 use App\Repository\SearchResultRepository;
 use App\Service\Agent\AgentConfig;
+use App\Service\Chat\Loop\ChatLoopGate;
 use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\ConversationSummaryService;
 use App\Service\Message\Effort\AutoResearchGate;
@@ -74,6 +75,17 @@ final class AutoResearchTurnTest extends TestCase
         self::assertSame(['language' => 'en'], $classification);
         self::assertNull($notice);
         self::assertNull($limit);
+    }
+
+    public function testATurnOnTheLoopNeverAsksTheGate(): void
+    {
+        $gate = $this->createMock(AutoResearchGate::class);
+        $gate->expects(self::never())->method('decide');
+        $loop = $this->createStub(ChatLoopGate::class);
+        $loop->method('forTurn')->willReturn(true);
+        $turn = new AutoResearchTurn($gate, new AutoResearchText(self::translator()), $loop);
+
+        self::assertSame([['language' => 'en'], null, null], $turn->apply(new Message(), ['language' => 'en'], [], [], new TurnStatus(null, new NullLogger())));
     }
 
     public function testTheProcessorStreamsTheNoticeInsteadOfAnAnswer(): void

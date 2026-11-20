@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace App\Service\Message\Handler;
 
 use App\Entity\Message;
+use App\Service\Chat\Loop\ChatLoopTurn;
 use App\Service\Document\ChatDocumentOutput;
 use App\Service\Exception\VisionModelRequiredException;
 use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Message\Chat\ChatMessageAssembler;
+use App\Service\Message\Chat\ChatModelChoice;
 use App\Service\Message\Chat\ChatModelSelector;
+use App\Service\Message\Chat\ChatReply;
 use App\Service\Message\Chat\ChatReplyGenerator;
 use App\Service\Message\Chat\ChatRequestOptions;
 use App\Service\Message\Chat\ChatSystemPromptAssembler;
@@ -60,6 +63,7 @@ final readonly class ChatHandler implements MessageHandlerInterface
         private ChatDocumentOutput $documents,
         private RoutingHandoffResolver $routing,
         private PendingMemoryExtraction $pendingMemory,
+        private ?ChatLoopTurn $loop = null,
     ) {
     }
 
@@ -197,7 +201,15 @@ final readonly class ChatHandler implements MessageHandlerInterface
 
         [$messages, $options] = $this->messages->forStreamedTurn($turn, $model, $prompt, $options);
         $aiOptions = $this->requestOptions->forStreamedTurn($turn, $model, $options, $routingTools);
+        // On the loop the same call declares the tools; a tool call hands the turn to a run.
+        $loop = $this->loop?->prepare($turn, $model, $messages, $aiOptions, $options);
+        if (null !== $loop) {
+            [$messages, $aiOptions] = [$loop->messages, $loop->aiOptions];
+        }
         $reply = $this->replies->stream($turn, $model, $messages, $aiOptions, $streamCallback, !empty($options['incognito']), $progressCallback);
+        if (null !== $loop && [] !== $reply->toolCalls) {
+            return ['metadata' => self::streamedMetadata($reply, $model) + $turn->contextMetadata($prompt->docs) + $this->loop->handOver($loop, $turn, $model, $reply, $streamCallback, $progressCallback)];
+        }
 
         // Checked before the answer is: a hand-off turn legitimately streams
         // no visible token, and calling that an empty response would turn a
@@ -224,17 +236,25 @@ final readonly class ChatHandler implements MessageHandlerInterface
         $deferredExtraction = $this->pendingMemory->afterTurn($message, (string) $reply->content, $thread, $turn->personal->memories, $options);
 
         return [
-            'metadata' => FacadeMeteredChat::stamp([
-                'provider' => $reply->metadata['provider'] ?? 'unknown',
-                'model' => $reply->metadata['model'] ?? 'unknown',
-                'model_id' => $model->modelId,
-                'usage' => $reply->metadata['usage'] ?? [],
-                'response_id' => $reply->metadata['response_id'] ?? null,
-                'generated_file' => $reply->metadata['generated_file'] ?? null,
-                'documentChanges' => $reply->metadata['documentChanges'] ?? null,
-                'documentVersion' => $reply->metadata['documentVersion'] ?? null,
-                'documentFidelityLossy' => $reply->metadata['documentFidelityLossy'] ?? false,
-            ], $reply->metadata) + $turn->contextMetadata($prompt->docs) + ['extraction_payload' => $deferredExtraction],
+            'metadata' => self::streamedMetadata($reply, $model) + $turn->contextMetadata($prompt->docs) + ['extraction_payload' => $deferredExtraction],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function streamedMetadata(ChatReply $reply, ChatModelChoice $model): array
+    {
+        return FacadeMeteredChat::stamp([
+            'provider' => $reply->metadata['provider'] ?? 'unknown',
+            'model' => $reply->metadata['model'] ?? 'unknown',
+            'model_id' => $model->modelId,
+            'usage' => $reply->metadata['usage'] ?? [],
+            'response_id' => $reply->metadata['response_id'] ?? null,
+            'generated_file' => $reply->metadata['generated_file'] ?? null,
+            'documentChanges' => $reply->metadata['documentChanges'] ?? null,
+            'documentVersion' => $reply->metadata['documentVersion'] ?? null,
+            'documentFidelityLossy' => $reply->metadata['documentFidelityLossy'] ?? false,
+        ], $reply->metadata);
     }
 }

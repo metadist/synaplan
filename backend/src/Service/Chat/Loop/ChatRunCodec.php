@@ -26,6 +26,7 @@ final readonly class ChatRunCodec implements RunStateCodec
             'userId' => $state->userId,
             'chatId' => $state->chatId,
             'incomingMessageId' => $state->incomingMessageId,
+            'replyMessageId' => $state->replyMessageId,
             'provider' => $state->provider,
             'model' => $state->model,
             'locale' => $state->locale,
@@ -34,6 +35,7 @@ final readonly class ChatRunCodec implements RunStateCodec
             'pending' => $state->pending,
             'plan' => $state->plan,
             'reads' => (object) $state->reads,
+            'opened' => $state->opened,
             'status' => $state->status->value,
             'end' => $state->end?->value,
             'waitReason' => $state->waitReason,
@@ -95,6 +97,8 @@ final readonly class ChatRunCodec implements RunStateCodec
             (int) ($data['updated'] ?? 0),
         );
         $state->status = $status;
+        $reply = $data['replyMessageId'] ?? null;
+        $state->replyMessageId = self::positiveInt($reply) ? (int) $reply : null;
         $state->end = ChatRunEnd::tryFrom((string) ($data['end'] ?? ''));
         $state->waitReason = self::optionalString($data['waitReason'] ?? null);
         $state->answer = self::optionalString($data['answer'] ?? null);
@@ -107,6 +111,7 @@ final readonly class ChatRunCodec implements RunStateCodec
         $state->pending = self::pending($data['pending'] ?? []);
         $state->plan = self::plan($data['plan'] ?? []);
         $state->reads = self::reads($data['reads'] ?? []);
+        $state->opened = self::opened($data['opened'] ?? []);
         $expiresAt = $data['expiresAt'] ?? null;
         $state->restore(
             max(1, (int) ($data['expected'] ?? 1)),
@@ -171,6 +176,21 @@ final readonly class ChatRunCodec implements RunStateCodec
         }
 
         return $out;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function opened(mixed $raw): array
+    {
+        $out = [];
+        foreach (\is_array($raw) ? $raw : [] as $name) {
+            if (\is_string($name) && 1 === preg_match('/^[a-zA-Z0-9_-]{1,64}$/D', $name) && !\in_array($name, $out, true)) {
+                $out[] = $name;
+            }
+        }
+
+        return \array_slice($out, 0, ConnectedToolCatalog::MAX_OPEN);
     }
 
     private static function positiveInt(mixed $value): bool

@@ -9,6 +9,7 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\AI\ToolCalling\ToolCallingTranslator;
 use App\AI\ToolCalling\ToolCallParser;
+use App\Entity\Chat;
 use App\Entity\Message;
 use App\Entity\Model;
 use App\Entity\Prompt;
@@ -18,6 +19,9 @@ use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
+use App\Service\Chat\Loop\ChatLoopCall;
+use App\Service\Chat\Loop\ChatLoopTurn;
+use App\Service\Chat\Loop\ChatRunScope;
 use App\Service\Feedback\FeedbackConfigService;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\DocumentGeneratorService;
@@ -31,6 +35,8 @@ use App\Service\Memory\PendingMemoryExtraction;
 use App\Service\Memory\UserMemoryService;
 use App\Service\Message\Capability\SystemCapabilityRegistry;
 use App\Service\Message\Chat\ChatMessageAssembler;
+use App\Service\Message\Chat\ChatModelChoice;
+use App\Service\Message\Chat\ChatTurn;
 use App\Service\Message\Chat\ConversationHistoryRenderer;
 use App\Service\Message\Handler\ChatHandler;
 use App\Service\Message\PerfPipelineFlag;
@@ -97,7 +103,12 @@ class ChatHandlerTest extends TestCase
             ->method('resolveUsableModelId')
             ->willReturnCallback(static fn (?int $modelId): ?int => $modelId);
 
-        $this->handler = ChatHandlerFactory::create(
+        $this->handler = $this->buildHandler();
+    }
+
+    private function buildHandler(?ChatLoopTurn $loop = null): ChatHandler
+    {
+        return ChatHandlerFactory::create(
             $this->aiFacade,
             $this->promptRepository,
             $this->promptService,
@@ -127,6 +138,7 @@ class ChatHandlerTest extends TestCase
             new ToolCallingTranslator(new ToolCallingCapability()),
             new ToolCallParser(),
             new RoutingToolset(new SystemCapabilityRegistry()),
+            chatLoop: $loop,
         );
     }
 
@@ -2558,5 +2570,73 @@ class ChatHandlerTest extends TestCase
             new ConversationHistoryRenderer($catalog),
             $this->logger,
         );
+    }
+
+    public function testASimpleTurnOnTheLoopStaysOneCallWithoutARun(): void
+    {
+        $loop = $this->createMock(ChatLoopTurn::class);
+        $loop->method('prepare')->willReturnCallback(fn (ChatTurn $turn, ChatModelChoice $model, array $messages, array $aiOptions): ChatLoopCall => $this->loopCall($messages, $aiOptions));
+        $loop->expects($this->never())->method('handOver');
+        $this->aiFacade->expects($this->once())->method('chatStream')
+            ->with($this->anything(), $this->anything(), 1, $this->callback(static fn (array $options): bool => 'auto' === ($options['tool_choice'] ?? null)))
+            ->willReturnCallback(static function ($messages, $cb): array {
+                $cb('Hello there.');
+
+                return ['provider' => 'test', 'model' => 'test'];
+            });
+
+        $chunks = [];
+        $result = $this->buildHandler($loop)->handleStream($this->loopMessage(), [], ['topic' => 'CHAT', 'language' => 'en'], static function (string $chunk) use (&$chunks): void {
+            $chunks[] = $chunk;
+        });
+
+        self::assertSame(['Hello there.'], $chunks);
+        self::assertArrayNotHasKey(ChatLoopTurn::REPLY_ID, $result['metadata']);
+        self::assertArrayHasKey('extraction_payload', $result['metadata']);
+    }
+
+    public function testAToolCallOnTheLoopHandsTheTurnToARun(): void
+    {
+        $loop = $this->createMock(ChatLoopTurn::class);
+        $loop->method('prepare')->willReturnCallback(fn (ChatTurn $turn, ChatModelChoice $model, array $messages, array $aiOptions): ChatLoopCall => $this->loopCall($messages, $aiOptions));
+        $loop->expects($this->once())->method('handOver')->willReturn([ChatLoopTurn::REPLY_ID => 901, 'chat_run_id' => 'run_1']);
+        $this->aiFacade->expects($this->once())->method('chatStream')->willReturn([
+            'provider' => 'test',
+            'model' => 'test',
+            'tool_calls' => [['id' => 'call_1', 'type' => 'function', 'function' => ['name' => 'web_search', 'arguments' => '{"query":"release"}']]],
+        ]);
+
+        $result = $this->buildHandler($loop)->handleStream($this->loopMessage(), [], ['topic' => 'CHAT', 'language' => 'en'], static function (): void {
+        });
+
+        self::assertSame(901, $result['metadata'][ChatLoopTurn::REPLY_ID]);
+        self::assertSame('run_1', $result['metadata']['chat_run_id']);
+        self::assertSame('test', $result['metadata']['provider'], 'the first call is billed as today');
+        self::assertArrayNotHasKey('extraction_payload', $result['metadata'], 'memories wait for the answer');
+    }
+
+    private function loopMessage(): Message
+    {
+        $message = $this->createMock(Message::class);
+        $message->method('getUserId')->willReturn(1);
+        $message->method('getText')->willReturn('What changed?');
+        $message->method('getFileText')->willReturn('');
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(null);
+
+        return $message;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $messages
+     * @param array<string, mixed>       $aiOptions
+     */
+    private function loopCall(array $messages, array $aiOptions): ChatLoopCall
+    {
+        $user = $this->createStub(User::class);
+        $chat = $this->createStub(Chat::class);
+        $tools = ['tools' => [['type' => 'function', 'function' => ['name' => 'web_search', 'description' => 'Search', 'parameters' => ['type' => 'object']]]], 'tool_choice' => 'auto'];
+
+        return new ChatLoopCall($messages, $aiOptions + $tools, 'You help.', \array_slice($messages, 1), new ChatRunScope($user, $chat, null));
     }
 }

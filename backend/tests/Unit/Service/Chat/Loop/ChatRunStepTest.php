@@ -12,6 +12,7 @@ use App\Service\Chat\Loop\ChatRunReply;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunStatus;
 use App\Service\Chat\Loop\ChatRunStep;
+use App\Service\Chat\Loop\ConnectedToolCatalog;
 use App\Service\Project\ProjectTurnContext;
 
 final class ChatRunStepTest extends ChatLoopCase
@@ -34,6 +35,17 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertSame(1_000, $stored->costMicro);
         self::assertSame([ChatRunEvents::STEP, ChatRunEvents::ENDED], $this->eventNames($state->runId));
         self::assertSame(['completed'], $this->synced);
+    }
+
+    public function testAnOpenedConnectedToolIsDeclaredFromTheNextCallOn(): void
+    {
+        $this->model(new ScriptedChatRunModel(ScriptedChatRunModel::calls(ConnectedToolCatalog::NAME, ['use' => ['custom_order']]), ScriptedChatRunModel::says('Done.')));
+        $state = $this->open();
+
+        $this->drain();
+
+        self::assertSame([[], ['custom_order']], $this->tools->openedSeen);
+        self::assertSame(['custom_order'], $this->stored($state->runId)->opened);
     }
 
     public function testASearchRunsInTheNextUnitAndTheAnswerFollows(): void

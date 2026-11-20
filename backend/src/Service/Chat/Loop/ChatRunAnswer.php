@@ -108,7 +108,18 @@ final readonly class ChatRunAnswer
         return ChatRunStep::UNIT;
     }
 
-    private function toolCalls(ChatRunState $state, ChatRunReply $reply): string
+    /**
+     * The first answer, made in the request before the run existed: queue its
+     * calls. The run has no event log yet, so nothing is announced here.
+     */
+    public function seed(ChatRunState $state, ChatRunReply $reply): void
+    {
+        ++$state->steps;
+        $state->costMicro += max(0, $reply->costMicro);
+        $this->toolCalls($state, $reply, false);
+    }
+
+    private function toolCalls(ChatRunState $state, ChatRunReply $reply, bool $announce = true): string
     {
         $state->nudges = 0;
         $wire = [];
@@ -127,13 +138,15 @@ final readonly class ChatRunAnswer
         foreach ($reply->toolCalls as $i => $call) {
             $answer = match (true) {
                 $i >= $this->maxToolsPerStep => ToolLimits::SKIPPED_RESULT,
-                ChatLoopTools::UPDATE_PLAN === $call['name'] => $this->plan($state, $call['args']),
+                ChatLoopTools::UPDATE_PLAN === $call['name'] => $this->plan($state, $call['args'], $announce),
                 ChatLoopTools::FINISH === $call['name'] => 'finish is offered only when every plan item is done. Keep working.',
                 default => null,
             };
             if (null === $answer) {
                 $state->pending[] = ['id' => $call['id'], 'name' => $call['name'], 'args' => $call['args']];
-                $this->events->append($state->runId, ChatRunEvents::TOOL_CALL, ['tool' => $call['name']]);
+                if ($announce) {
+                    $this->events->append($state->runId, ChatRunEvents::TOOL_CALL, ['tool' => $call['name']]);
+                }
                 continue;
             }
             $state->messages[] = ['role' => 'tool', 'tool_call_id' => $call['id'], 'name' => $call['name'], 'content' => $answer];
@@ -145,10 +158,12 @@ final readonly class ChatRunAnswer
     /**
      * @param array<string, mixed> $args
      */
-    private function plan(ChatRunState $state, array $args): string
+    private function plan(ChatRunState $state, array $args, bool $announce): string
     {
         $text = ChatLoopTools::applyPlan($state, $args);
-        $this->events->append($state->runId, ChatRunEvents::PLAN, ['items' => $state->plan]);
+        if ($announce) {
+            $this->events->append($state->runId, ChatRunEvents::PLAN, ['items' => $state->plan]);
+        }
 
         return $text;
     }

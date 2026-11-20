@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Message\Processing;
 
 use App\Entity\Message;
+use App\Service\Chat\Loop\ChatLoopGate;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Message\Chat\FreshInfoRequest;
 use App\Service\Message\Handler\MessageHandlerInterface;
@@ -17,10 +18,8 @@ use App\Service\Multitask\TaskPlanStore;
 use Psr\Log\LoggerInterface;
 
 /**
- * Hands a classified turn to the handler that answers it: through the task
- * plan executor when multi-task routing is on for the user, otherwise through
- * the inference router. For single-node plans the executor delegates to the
- * same router with the same classification; it only also persists the plan.
+ * Hands a classified turn to its handler: the task plan executor when
+ * multi-task routing is on and the turn is not on the loop, else the router.
  */
 final readonly class TurnDispatcher
 {
@@ -32,6 +31,7 @@ final readonly class TurnDispatcher
         private MultitaskRoutingConfig $multitaskConfig,
         private ModelConfigService $modelConfigService,
         private LoggerInterface $logger,
+        private ?ChatLoopGate $loop = null,
     ) {
     }
 
@@ -70,7 +70,7 @@ final readonly class TurnDispatcher
      */
     public function dispatchStreamed(Message $message, array $history, array $classification, callable $streamCallback, ?callable $statusCallback, array $options): array
     {
-        return $this->isMultitaskRoutingEnabled($message)
+        return $this->isMultitaskRoutingEnabled($message) && true !== $this->loop?->forTurn($message, $options, $classification)
             ? $this->taskPlanExecutor->executeStream($message, $history, $classification, $streamCallback, $statusCallback, $options)
             : $this->router->routeStream($message, $history, $classification, $streamCallback, $statusCallback, $options);
     }

@@ -62,6 +62,12 @@ final readonly class RunEventLog
         ) ?? throw new RunNotFound($runId);
     }
 
+    /** Returns once an event after `$after` exists, or after `$blockMs`. */
+    public function await(string $runId, int $after, int $blockMs): void
+    {
+        $this->keys->awaitEvent($this->keyspace->events($runId), $after, $blockMs);
+    }
+
     /**
      * @return list<array{seq: int, event: string, data: array<string, mixed>}>
      */

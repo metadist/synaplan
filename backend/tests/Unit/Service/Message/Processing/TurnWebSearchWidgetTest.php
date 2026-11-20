@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Message\Processing;
 
 use App\Entity\Message;
 use App\Plug\WebSearch\WebSearchGateway;
+use App\Service\Chat\Loop\ChatLoopGate;
 use App\Service\Mcp\NotionLinkedPageRead;
 use App\Service\Mcp\NotionLinkedPageReader;
 use App\Service\Message\AttachmentSearchContextResolver;
@@ -99,6 +100,27 @@ final class TurnWebSearchWidgetTest extends TestCase
         );
 
         self::assertNull($result['searchResults']);
+    }
+
+    public function testATurnOnTheLoopDoesNotSearchBeforeTheModel(): void
+    {
+        $webSearch = $this->createMock(WebSearchGateway::class);
+        $webSearch->method('isEnabled')->willReturn(true);
+        $webSearch->expects(self::never())->method('search');
+        $loop = $this->createStub(ChatLoopGate::class);
+        $loop->method('forTurn')->willReturn(true);
+        $turn = new TurnWebSearch(
+            $webSearch,
+            $this->createStub(SearchQueryGenerator::class),
+            $this->createStub(AttachmentSearchContextResolver::class),
+            new LinkedContentReader($this->createStub(UrlContentService::class), new NullLogger()),
+            new NullLogger(),
+            loop: $loop,
+        );
+
+        $result = $turn->run($this->message(), ['topic' => 'general', 'web_search' => true], ['tool_internet' => true], [], [], new TurnStatus(null, new NullLogger()));
+
+        self::assertSame(['classification' => ['topic' => 'general', 'web_search' => true], 'searchResults' => null, 'searchOnRequest' => false], $result);
     }
 
     private function turn(

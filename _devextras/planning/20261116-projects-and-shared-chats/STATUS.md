@@ -11,9 +11,108 @@ to them.
 | PJ2 | merged | #3142 | spike; §0 #21 holds, also under load; G7 prototype passes with contract v3 after two failed runs, see 2026-11-16 below |
 | PJ3 | merged | #3152 | Projects with sources and instructions (API). Deviation from §10: a chat joins a project through `POST /projects/{uuid}/chats` and `PUT/DELETE /projects/{uuid}/chats/{chatId}`, so `POST /chats` and `PATCH /chats/{id}` are unchanged (no growth of the oversized `ChatController`). The flag is checked in the controller as well as by the module gate. Walked on the stack with a real model: a project chat answered from a text source with its marker, and the instructions shaped the answer. Create takes name and description; instructions go through PATCH. |
 | PJ4 | merged | #3186 | Project page `/projects/:id` (Chats, Sources, Instructions), a "Projects" section in the Chats panel, the Add-source dialog (file, link, text), the project name above the composer of a project chat, and move in/out of a project from the chat menu, pinned projects first (`BPROJECTS.BPINNEDAT`, migration `Version20261119120000`). A flag-off module answers 404 `feature_not_configured` and the UI shows nothing. `PROJECTS_ENABLED=1` is set in `backend/.env.test` so the E2E spec can run. |
-| PJ5a | PR open | branch `feat/chat-loop-run` | A chat run on the run kernel, flag off (`LOOP.ENABLED` = 0); nothing calls it yet. See 2026-11-20 below. The owner split PJ5 into PJ5a (the run) and PJ5b (the hand-over in the request). |
-| PJ5b | not started | — | The hand-over Request → run, skipping the classifier, auto-research and the task planner, the check before delivery, G1, E2E |
+| PJ5a | merged | #3216 | A chat run on the run kernel, flag off (`LOOP.ENABLED` = 0). See 2026-11-20 below. The owner split PJ5 into PJ5a (the run) and PJ5b (the hand-over in the request). |
+| PJ5b | PR open | branch `feat/chat-loop-handover` | The hand-over in the request, flag off. G1 at the border (+10.1 % cost, first token faster). See "2026-11-20 — PJ5b" below. |
+| PJ5c | not started | — | The check before delivery (03 §3.2), split out of PJ5b |
 | PJ6–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+
+---
+
+## 2026-11-20 — PJ5b: a streamed chat turn hands over to a run
+
+With `LOOP.ENABLED` on, a streamed web chat turn follows 03 §1.1. The flag
+stays 0 everywhere; nothing changes for anyone until PJ6 and PJ8.
+
+**What happens** (`backend/src/Service/Chat/Loop/`):
+
+- `ChatLoopGate` decides once per turn (a `WeakMap` on the message, so the
+  auto-research gate, the search, the dispatcher and the handler get the same
+  answer). Only a plain streamed web turn of a signed-in person in their own
+  chat, with no file, not incognito, guest, widget, agent, saved task,
+  "Again" or "Continue", not the document topic, not a deferred routing
+  decision, and with a chat model that calls tools while streaming.
+- On the loop `TurnWebSearch`, the auto-research gate and the task planner
+  are skipped. The sorter still runs (it picks the topic and the media
+  handlers). The shadow planner is not skipped (off by default, measurement
+  only).
+- `ChatLoopTurn::prepare`: the first model call stays in the request,
+  streaming, with the loop rules appended to the system prompt and the tools
+  declared; `previous_response_id` is dropped because the run sends the whole
+  transcript. No tool call → today's answer, no `BRUNS` row, one model call.
+- `ChatLoopTurn::handOver`: a tool call writes the answer's message first
+  (status `processing`), then starts the run seeded with that answer
+  (`ChatRunAnswer::seed`), so its tool calls run without a second model call.
+  The stream follows the run (`ChatRunTail`) as `chat_run` status events until
+  it ends, waits for the person, or 240 s passed (one lease); then the run
+  posts its answer into that same message itself (`replyMessageId`, checked
+  against chat, owner and direction). `StreamReplyPersister` reuses that row.
+  A failed start removes the row. Stop in the chat stops the run.
+- `ChatRunTail` waits on Redis, not with a sleep: every event also goes to a
+  one-entry stream `run:…:events:wake` (`XADD` with the event's sequence in
+  the append script), and the tail blocks on it with `XREAD` for at most 1 s
+  before it checks Stop and its deadline again. The long-wait gate stays
+  unchanged.
+- **Connected tools behind a catalog** (owner, 2026-11-20). The first G1 run
+  declared every tool of the account: the local admin has a Notion MCP
+  server with 77 tools, 237 KB of schemas, about 90,000 prompt tokens on
+  every turn (0.233 per simple turn instead of 0.031). Now a run declares
+  web search, web fetch, the project's sources and `connected_tools`; called
+  without arguments it lists the person's own tools by name (at most 60,
+  descriptions capped, as a tool result, never in the system prompt), called
+  with `use` it opens up to 8 of them, whose schemas every later call of the
+  run declares (`ChatRunState::$opened`). A tool called by name without
+  opening still runs through the same policy.
+
+**Tests:** `ChatLoopGateTest`, `ChatLoopHandOverTest`, `ChatRunDeliveryTest`,
+the persister, `TurnDispatcherLoopTest`, the skip in `TurnWebSearch` and
+`AutoResearchTurn`, `ChatHandlerTest` (a simple turn stays one call without a
+run; a tool call hands over), the toolbox catalog, the codec (`replyMessageId`,
+`opened`, forged values dropped), the Redis wake stream. Characterization
+snapshots unchanged.
+
+**G1 on the dev stack**, 2026-11-20, seeded admin account (Chat and Sort
+model Claude Sonnet 5.5, a Notion MCP server connected), `--group=simple
+--live`, same day, flag off and on:
+
+| Run | Cost total | Cost median | First token median / p95 (s) | Total median / p95 (s) | Chat call prompt tokens |
+| --- | ---------- | ----------- | ---------------------------- | ---------------------- | ----------------------- |
+| Loop off (today) | 0.3128 | 0.0308 | 3.29 / 4.02 | 4.24 / 5.68 | about 2,100 |
+| Loop on, every tool declared | 2.3314 | 0.2330 | 3.77 / 6.89 | 5.63 / 7.11 | about 93,700 |
+| Loop on, catalog | 0.3434 | 0.0339 | 2.93 / 6.95 | 4.53 / 8.16 | about 3,400 |
+
+No turn handed over and no `BRUNS` row of kind chat was written in any run.
+With the catalog the median cost is +10.1 % against the same day's run
+(+12.6 % against PJ1's 0.0301): the 1,300 extra prompt tokens are the four
+declarations (2.9 KB), the rules and the provider's own tool-use preamble.
+The first token is faster in the median, slower at p95 (two turns of ten).
+**G1 is at the border, not clearly met;** the owner decides whether it holds.
+Caching the tool list and the system prompt would take the rest; not done.
+
+```bash
+docker compose exec -T -e CHAT_LOOP_EVAL_PASSWORD backend php tests/Eval/ChatLoop/run.php \
+  --base-url=http://localhost --email=<account> --group=simple --live --report=var/chat-loop-eval/<name>.md
+```
+
+The flag was switched on in the dev database only for the runs and set back
+to 0 after each.
+
+**Gate:** `make ci-local` green (12,579 PHPUnit tests, 541 Vitest files,
+vue-tsc, PHPStan, deptrac 0 violations, size ratchet, long-wait gate).
+`TurnDispatcher` stays at 204 lines, `MessageProcessor` unchanged.
+
+**Limits, for PJ5c, PJ6 and PJ8:**
+
+- The check before delivery (03 §3.2) is PJ5c.
+- The stored answer is the run's answer; a preamble the first call streamed
+  is shown but not stored.
+- While a run waits or after the stream stopped following it, the message
+  shows the placeholder until the run delivers. The `chat_run` events are for
+  PJ8's card; the client shows them as statuses today.
+- Stop with "keep what was written" may store one more message; PJ8 owns Stop.
+
+**Not verified:** a turn that really hands over, walked in the browser with
+a real model (the flag stays 0 and the client has no run card before PJ8);
+a run longer than one lease followed by a second stream.
 
 ---
 

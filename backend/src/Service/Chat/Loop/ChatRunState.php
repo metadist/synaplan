@@ -42,6 +42,9 @@ final class ChatRunState implements RunState
     /** Model calls that failed in a row; a call that answers clears it. */
     public int $modelFailures = 0;
 
+    /** The chat message the answer goes into, written before the run started. */
+    public ?int $replyMessageId = null;
+
     /** @var list<array<string, mixed>> the transcript after the system prompt */
     public array $messages = [];
 
@@ -53,6 +56,9 @@ final class ChatRunState implements RunState
 
     /** @var array<string, int> a repeated read, by call hash, answered from the transcript */
     public array $reads = [];
+
+    /** @var list<string> connected tools the model opened, whose schemas every later call declares */
+    public array $opened = [];
 
     private int $expected = 1;
     private int $checkpoint = 0;
