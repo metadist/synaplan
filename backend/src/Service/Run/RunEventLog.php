@@ -77,8 +77,17 @@ final readonly class RunEventLog
             throw new \InvalidArgumentException('Replay starts at zero or a later update.');
         }
 
+        $key = $this->keyspace->events($runId);
+        // The append script numbers events from 1 in list order, so event `$after + 1`
+        // sits at index `$after`: a follower reads only what is new, not the whole log
+        // on every streamed piece. Should the numbering ever not match, read it all.
+        $lines = $this->keys->range($key, $after, -1);
+        if ($after > 0 && !self::startsAt($lines, $after + 1, fn (): array => $this->keys->range($key, -1, -1))) {
+            $lines = $this->keys->range($key, 0, -1);
+        }
+
         $out = [];
-        foreach ($this->keys->range($this->keyspace->events($runId), 0, -1) as $line) {
+        foreach ($lines as $line) {
             $row = RunEventRecord::parse($line);
             // Only names this kind records reach a stream; a foreign line cannot open an SSE frame.
             if (null === $row || $row['seq'] <= $after || !\in_array($row['event'], $this->names, true)) {
@@ -88,5 +97,23 @@ final readonly class RunEventLog
         }
 
         return $out;
+    }
+
+    /**
+     * Whether a read from the index of event `$seq` began at that event: its
+     * first line is that event, or nothing is new and the log's last event
+     * is older than it.
+     *
+     * @param list<string>             $lines
+     * @param callable(): list<string> $last  reads the log's last line
+     */
+    private static function startsAt(array $lines, int $seq, callable $last): bool
+    {
+        if ([] !== $lines) {
+            return (RunEventRecord::parse($lines[0])['seq'] ?? null) === $seq;
+        }
+        $last = $last();
+
+        return [] === $last || (RunEventRecord::parse($last[0])['seq'] ?? $seq) < $seq;
     }
 }

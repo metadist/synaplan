@@ -59,7 +59,10 @@ final readonly class ChatRunTail
                 $after = $event['seq'];
                 $spoke = $this->clock->now()->getTimestamp();
                 if (ChatRunEvents::TEXT === $event['event']) {
-                    $onText(\is_string($event['data']['text'] ?? null) ? $event['data']['text'] : '');
+                    $text = $event['data']['text'] ?? null;
+                    if (\is_string($text) && '' !== $text) {
+                        $onText($text);
+                    }
                     continue;
                 }
                 ProgressCallback::notify($progress, self::STATUS, $event['event'], [...$event['data'], 'run_id' => $runId, 'event' => $event['event']]);
