@@ -12,9 +12,75 @@ to them.
 | PJ3 | merged | #3152 | Projects with sources and instructions (API). Deviation from §10: a chat joins a project through `POST /projects/{uuid}/chats` and `PUT/DELETE /projects/{uuid}/chats/{chatId}`, so `POST /chats` and `PATCH /chats/{id}` are unchanged (no growth of the oversized `ChatController`). The flag is checked in the controller as well as by the module gate. Walked on the stack with a real model: a project chat answered from a text source with its marker, and the instructions shaped the answer. Create takes name and description; instructions go through PATCH. |
 | PJ4 | merged | #3186 | Project page `/projects/:id` (Chats, Sources, Instructions), a "Projects" section in the Chats panel, the Add-source dialog (file, link, text), the project name above the composer of a project chat, and move in/out of a project from the chat menu, pinned projects first (`BPROJECTS.BPINNEDAT`, migration `Version20261119120000`). A flag-off module answers 404 `feature_not_configured` and the UI shows nothing. `PROJECTS_ENABLED=1` is set in `backend/.env.test` so the E2E spec can run. |
 | PJ5a | merged | #3216 | A chat run on the run kernel, flag off (`LOOP.ENABLED` = 0). See 2026-11-20 below. The owner split PJ5 into PJ5a (the run) and PJ5b (the hand-over in the request). |
-| PJ5b | PR open | branch `feat/chat-loop-handover` | The hand-over in the request, flag off. G1 accepted by the owner (+10.1 % cost, first token faster). See "2026-11-20 — PJ5b" below. |
-| PJ5c | not started | — | The check before delivery (03 §3.2), split out of PJ5b |
+| PJ5b | merged | #3218 | The hand-over in the request, flag off. G1 accepted by the owner (+10.1 % cost, first token faster). See "2026-11-20 — PJ5b" below. |
+| PJ5c | PR open | branch `feat/chat-loop-check` | The check before delivery (03 §3.2), flag off. A note under the answer, nothing removed (owner). See "2026-11-20 — PJ5c" below. |
 | PJ6–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+
+---
+
+## 2026-11-20 — PJ5c: the check before delivery
+
+When a run's answer links to pages the run read, the research check runs on
+the statements that cite one, before the run's checkpoint. The flag stays 0.
+
+**Owner decision (2026-11-20):** the answer streamed already, so the check
+removes nothing. A note under the answer names the statements the sources do
+not back ("Nicht durch die gelesenen Quellen belegt …", five languages).
+
+**What happens** (`backend/src/Service/Chat/Loop/`):
+
+- `ChatRunUnitHandler::run` calls `ChatRunCheck::apply` once a unit ended the
+  run. It runs once (`ChatRunState::$note`: null until checked). A check that
+  throws leaves the answer without a note and logs a warning.
+- Only runs that ended with the model's answer (`answered`, `finished`,
+  `finish_fallback`, `no_progress`). A stopped or lost run is not checked.
+- `ChatRunSources` reads the run's sources from the transcript: each
+  `web_search` result (title and snippets) and each `web_fetch` page, by
+  canonical URL. A Markdown link, an autolink or a bare URL to such a page
+  becomes the research marker `[eN]`; a URL may hold balanced brackets
+  (`…/Langenfeld_(Rheinland)`). A link to a page the run did not read is not
+  checked. The link's text names the source and is not checked as a claim.
+- Free part: `DraftCheck` unchanged (numbers, dates and names of a statement
+  must be in the page it cites). A statement that cites nothing is not checked
+  (the chat may answer from what it knows); a line that only names a source
+  is no statement.
+- Model part: only when an admin set a checking model (`DEFAULTMODEL.VERIFY`
+  of owner 0, Admin → Research), the person may use it, it is healthy (a
+  retired one hands over to its successor), and it is not of the chat model's
+  family. Prompt `tools:research_check`, `ResearchCheckSchema`, `CheckBatches`
+  and the verdict rules, now shared with the research check stage
+  (`CheckVerdicts`, extracted from `CheckStage` unchanged). At most 3 calls;
+  the payer's budget is read and the lease renewed before each. `partial`,
+  `unsupported` and `contradicted` are noted; a statement without a verdict
+  is not. A checker that fails adds nothing. Its cost goes to the run.
+- The note is appended to the stored text and sent as the last piece of the
+  stream (`ChatRunDelivery::rest`), so a reload shows the same text. Event
+  `run.checked` `{statements, flagged, model}` for PJ8's card.
+
+**Walk (dev stack, admin, 2026-11-20, `LOOP.ENABLED` already 1 in the dev DB):**
+"Suche im Web: Wie viele Einwohner hat Langenfeld (Rheinland) und seit wann
+ist es eine Stadt? Verlinke die Quellen im Text."
+
+- Free check only: the run (2 steps) answered with links; `run.checked`
+  `{statements: 2, flagged: 2, model: false}`. It found two faults of the
+  first version, both fixed and tested: a Wikipedia URL with brackets was not
+  recognised, and link texts ("Rheinischen Post") were checked as names.
+- With `DEFAULTMODEL.VERIFY` set to `gemini-3.5-flash` for the walk, then
+  removed: chat run 9, 2 steps, `run.checked` `{statements: 4, flagged: 1,
+  model: true}`. Noted: "Das steht in Wikipedia, im Kreislexikon Mettmann und
+  im Stadtporträt der Rheinischen Post." (two of the three pages were only
+  search snippets). The note streamed in after the answer; the reload showed
+  the same text. Checker cost $0.0287 (`BUSELOG`), run $0.0733.
+
+**Limits:**
+
+- The checker reads the whole page a statement cites, up to the `web_fetch`
+  budget, once per statement: a long answer on long pages costs more. Three
+  calls at most.
+- Numbered citations ("[1]") are not mapped to sources: search results are
+  numbered per search.
+- The free check is strict on numbers: "über 59.000" is noted when the page
+  says "59.821".
 
 ---
 
@@ -117,7 +183,7 @@ vue-tsc, PHPStan, deptrac 0 violations, size ratchet, long-wait gate).
 
 **Limits, for PJ5c, PJ6 and PJ8:**
 
-- The check before delivery (03 §3.2) is PJ5c.
+- The check before delivery (03 §3.2) is PJ5c (done, see above).
 - A worker lost in the middle of a model call may stream that step's text a
   second time on retry; the stored text has it once.
 - While a run waits or after the stream stopped following it, the message

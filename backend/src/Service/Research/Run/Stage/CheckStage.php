@@ -30,9 +30,6 @@ use App\Service\Research\Run\ResearchStatus;
  */
 final readonly class CheckStage implements ResearchStage
 {
-    /** @var list<string> */
-    private const VERDICTS = ['supported', 'partial', 'unsupported', 'contradicted'];
-
     public function __construct(
         private StageCall $calls,
         private DraftCheck $draft,
@@ -80,13 +77,13 @@ final readonly class CheckStage implements ResearchStage
                 'checker',
                 $ctx->roles->checker,
                 ResearchPrompts::fill('tools:research_check', []),
-                $this->user($group),
+                CheckVerdicts::ask($group),
                 ResearchCheckSchema::build(),
             );
             if ($called->stop instanceof StageResult) {
                 return $called->stop;
             }
-            $parsed = $this->verdicts($called->reply?->data, $group);
+            $parsed = CheckVerdicts::parse($called->reply?->data, $group);
             if (null === $parsed) {
                 break;
             }
@@ -311,40 +308,6 @@ final readonly class CheckStage implements ResearchStage
     }
 
     /**
-     * Only the statements of this batch count, each with its first verdict.
-     * A row that is not usable is skipped, so that statement stays without
-     * a verdict and is treated as unsupported.
-     *
-     * @param list<array{id: string, sentence: string, bare: string, passages: string}> $group
-     *
-     * @return array<string, array{verdict: string, part: string, note?: string}>|null null when the answer has no verdict list at all
-     */
-    private function verdicts(mixed $data, array $group): ?array
-    {
-        if (!is_array($data) || !is_array($data['verdicts'] ?? null)) {
-            return null;
-        }
-        $asked = array_fill_keys(array_column($group, 'id'), true);
-        $out = [];
-        foreach ($data['verdicts'] as $row) {
-            if (!is_array($row) || !is_string($row['statement'] ?? null) || !is_string($row['verdict'] ?? null)) {
-                continue;
-            }
-            $id = $row['statement'];
-            if (!isset($asked[$id]) || isset($out[$id]) || !in_array($row['verdict'], self::VERDICTS, true)) {
-                continue;
-            }
-            $out[$id] = [
-                'verdict' => $row['verdict'],
-                'part' => is_string($row['unsupported_part'] ?? null) ? $row['unsupported_part'] : '',
-                'note' => is_string($row['note'] ?? null) ? $row['note'] : '',
-            ];
-        }
-
-        return $out;
-    }
-
-    /**
      * @param array<string, array{verdict: string, part: string}> $verdicts
      *
      * @return array<string, string>
@@ -471,24 +434,6 @@ final readonly class CheckStage implements ResearchStage
                 $line .= ' | unsupported part: '.$row['part'];
             }
             $lines[] = $line;
-        }
-
-        return implode("\n", $lines);
-    }
-
-    /**
-     * @param list<array{id: string, sentence: string, bare: string, passages: string}> $group
-     */
-    private function user(array $group): string
-    {
-        $lines = [];
-        foreach ($group as $item) {
-            $lines[] = '<statement id="'.$item['id'].'">';
-            $lines[] = '<text>'.ResearchPrompts::data($item['bare']).'</text>';
-            $lines[] = '<passages>';
-            $lines[] = ResearchPrompts::data($item['passages']);
-            $lines[] = '</passages>';
-            $lines[] = '</statement>';
         }
 
         return implode("\n", $lines);

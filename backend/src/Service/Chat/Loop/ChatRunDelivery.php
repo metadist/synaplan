@@ -19,7 +19,7 @@ use Psr\Clock\ClockInterface;
  * Posts a finished chat run into its chat, once, on the server. The text is
  * what the run already said while it worked, then its answer when that was
  * not said as it came; a run that ended without one gets the one true
- * sentence for why it ended.
+ * sentence for why it ended. The note of the check before delivery closes it.
  */
 final readonly class ChatRunDelivery
 {
@@ -55,6 +55,26 @@ final readonly class ChatRunDelivery
 
     public static function text(ChatRunState $state): string
     {
+        $text = self::answered($state);
+        $note = $state->note ?? '';
+        if ('' === trim($note)) {
+            return $text;
+        }
+
+        return $text.self::gap($text).$note;
+    }
+
+    /** The part of {@see text()} a stream that showed everything the run said has not shown yet. */
+    public static function rest(ChatRunState $state): string
+    {
+        $text = self::text($state);
+
+        return str_starts_with($text, $state->said) ? substr($text, \strlen($state->said)) : $text;
+    }
+
+    /** What the run said, then its answer when that was not said as it came. */
+    private static function answered(ChatRunState $state): string
+    {
         $said = $state->said;
         $last = self::last($state);
         if ('' === trim($said)) {
@@ -64,15 +84,12 @@ final readonly class ChatRunDelivery
             return $said;
         }
 
-        return $said.(str_ends_with($said, "\n\n") ? '' : "\n\n").$last;
+        return $said.self::gap($said).$last;
     }
 
-    /** The part of {@see text()} a stream that showed everything the run said has not shown yet. */
-    public static function rest(ChatRunState $state): string
+    private static function gap(string $text): string
     {
-        $text = self::text($state);
-
-        return str_starts_with($text, $state->said) ? substr($text, \strlen($state->said)) : $text;
+        return str_ends_with($text, "\n\n") ? '' : "\n\n";
     }
 
     /** The answer, or the sentence for why the run ended without one. */

@@ -1420,6 +1420,7 @@ services:
     App\Service\Chat\Loop\ChatRunModel: '@App\Service\Chat\Loop\FacadeChatRunModel'
     App\Service\Chat\Loop\ChatRunBudget: '@App\Service\Chat\Loop\MonthlyChatRunBudget'
     App\Service\Chat\Loop\ChatRunToolbox: '@App\Service\Chat\Loop\RegistryChatRunToolbox'
+    App\Service\Chat\Loop\ChatRunCheckModel: '@App\Service\Chat\Loop\ConfiguredChatRunCheckModel'
 
     # Research keys extend the kernel's; a plain RunKeys stays the kernel store.
     App\Service\Run\RunKeys: '@App\Service\Run\RedisRunKeys'

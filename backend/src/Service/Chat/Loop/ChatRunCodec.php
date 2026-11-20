@@ -41,6 +41,7 @@ final readonly class ChatRunCodec implements RunStateCodec
             'waitReason' => $state->waitReason,
             'answer' => $state->answer,
             'said' => $state->said,
+            'note' => $state->note,
             'mode' => $state->mode,
             'steps' => $state->steps,
             'costMicro' => $state->costMicro,
@@ -104,6 +105,7 @@ final readonly class ChatRunCodec implements RunStateCodec
         $state->waitReason = self::optionalString($data['waitReason'] ?? null);
         $state->answer = self::optionalString($data['answer'] ?? null);
         $state->said = \is_string($data['said'] ?? null) ? ChatRunSpeaker::cap($data['said']) : '';
+        $state->note = \is_string($data['note'] ?? null) ? ChatRunSpeaker::cap($data['note']) : null;
         $mode = $data['mode'] ?? ChatRunState::MODE_FREE;
         $state->mode = \in_array($mode, [ChatRunState::MODE_FREE, ChatRunState::MODE_FINISH, ChatRunState::MODE_FINISH_JSON], true) ? $mode : ChatRunState::MODE_FREE;
         $state->steps = max(0, (int) ($data['steps'] ?? 0));

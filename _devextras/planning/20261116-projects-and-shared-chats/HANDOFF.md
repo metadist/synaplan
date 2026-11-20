@@ -1,6 +1,6 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-20, `main` @ `23faeb218` (PJ5a gemergt), PJ5b auf `feat/chat-loop-handover`. Geschrieben für einen Agenten ohne Zugriff
+Stand: 2026-11-20, `main` @ `3ec559ea3` (PJ5b gemergt), PJ5c auf `feat/chat-loop-check`. Geschrieben für einen Agenten ohne Zugriff
 auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Planungsdateien
 geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
@@ -22,8 +22,8 @@ mit Blick auf Usability und vor allem Sicherheit.
 
 **Stand:** Phase 0 und A (PJ0–PJ4) sind fertig. Die Voraussetzungen für Phase B
 (AU26, AH8a, AH8b) sind gemergt. Der Owner hat PJ5 geteilt: **PJ5a** (der Lauf auf
-dem Kernel) ist gemergt, **PJ5b** (die Übergabe im Request) liegt als PR vor,
-**PJ5c** (der Check vor der Auslieferung) ist der nächste Schritt (Abschnitt 9).
+dem Kernel) und **PJ5b** (die Übergabe im Request) sind gemergt, **PJ5c** (der Check
+vor der Auslieferung) liegt als PR vor. Danach **PJ6** (Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
@@ -38,8 +38,9 @@ dem Kernel) ist gemergt, **PJ5b** (die Übergabe im Request) liegt als PR vor,
 | AH8a Run-Kernel und `BRUNS` (Zeile 25) | gemergt | #3198 |
 | AH8b Research läuft auf dem Kernel | gemergt | #3201 |
 | PJ5a Chat-Lauf auf dem Kernel (Flag aus) | gemergt | #3216 |
-| PJ5b Übergabe Request → Lauf, Tool-Katalog, G1 (Owner: reicht) | PR offen | `feat/chat-loop-handover` |
-| PJ5c Check vor der Auslieferung (03 §3.2) | **nächster Schritt** | — |
+| PJ5b Übergabe Request → Lauf, Tool-Katalog, G1 (Owner: reicht) | gemergt | #3218 |
+| PJ5c Check vor der Auslieferung (03 §3.2) | PR offen | `feat/chat-loop-check` |
+| PJ6 Kostenlimit und Kreiserkennung | **nächster Schritt**, braucht §0 #12, #14, #15 | — |
 | PJ6–PJ28 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
@@ -185,8 +186,10 @@ Composer, Chat ins Projekt und heraus über das Chat-Menü, angepinnte Projekte 
 - Vorhanden seit PJ5a: `backend/src/Service/Chat/Loop/*` (Profil `chat`, State, Codec,
   Einheit, Handler, Reap-Policy, Reaper, Starter, Reader, Auslieferung). Seit PJ5b:
   `ChatLoopGate` (wer auf den Loop darf), `ChatLoopTurn` (erster Aufruf, Übergabe),
-  `ChatRunTail` (Stream folgt dem Lauf), `ConnectedToolCatalog`. PJ5c ergänzt den
-  Check vor der Auslieferung in `ChatRunDelivery`.
+  `ChatRunTail` (Stream folgt dem Lauf), `ConnectedToolCatalog`. Seit PJ5c:
+  `ChatRunCheck` (Check vor der Auslieferung), `ChatRunSources`, `ChatRunCheckNote`,
+  `ConfiguredChatRunCheckModel`; die Urteilsregeln teilt Research über
+  `Service/Research/Run/Stage/CheckVerdicts`.
 - Lesen: `ChatStreamOrchestrator`, `MessageProcessor`, `TurnDispatcher`, `ChatHandler`,
   `ToolRegistry`, `PromptCatalog`, `Service/Chat/Run/*` (heutiger re-attachbarer
   Chat-Turn: `ChatRunService`, `RunStream`, `PumpChatRunner`),
@@ -232,6 +235,10 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
   schreibt den Text als `text.delta` in sein Log, der Stream reicht ihn als
   normale Chunks weiter. Gespeichert wird genau, was gezeigt wurde
   (`ChatRunState::$said`), danach die Antwort nur, wenn sie nicht gestreamt kam.
+- **PJ5c (Owner, 2026-11-20):** der Check entfernt nichts aus der schon gestreamten
+  Antwort; ein Hinweis darunter nennt die Aussagen, die die gelesenen Seiten nicht
+  belegen. Das Prüfmodell läuft nur, wenn ein Admin `DEFAULTMODEL.VERIFY` (Owner 0)
+  gesetzt hat und es nicht zur Familie des Chat-Modells gehört; höchstens 3 Aufrufe.
 - **PJ5b-Grenzen:** Wartet der Lauf oder endet das Folgen (240 s), zeigt
   die Nachricht den Platzhalter bis zur Auslieferung. Die SSE-Events `chat_run` sind
   für die Karte in PJ8. Stop mit "Text behalten" kann eine Nachricht mehr speichern
@@ -280,8 +287,7 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **PJ5b** PR abschließen (Copilot, CI), Owner mergt (G1 akzeptiert).
-   Danach **PJ5c** (Abschnitt 9).
+1. **PJ5c** PR abschließen (Copilot, CI), Owner mergt.
 2. **PJ6** Kostenlimit mit Ergebnis und Kreiserkennung (`RunCostGuard`,
    `StallDetector`); braucht §0 #12, #14, #15.
 3. **PJ7–PJ11** (Notizen, Chat-Suche, Dateien per ID, Rückfragekarte usw.); offene
@@ -289,23 +295,18 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 4. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt.
 5. **Phase D (PJ20–PJ22)**, **Phase E (PJ23–PJ27)**, **PJ28** Flags an.
 
-## 9. Exakt nächster Schritt: PJ5c
+## 9. Exakt nächster Schritt: PJ6
 
-Brief: `03_contracts.md` §3.2 (Check vor der Auslieferung) und der Rest von
-"PJ5" in `04_sprints.md`. PJ5b (`STATUS.md`, 2026-11-20) liefert die Übergabe;
-der Lauf schreibt seine Antwort über `ChatRunDelivery::deliver` in die Nachricht
-des Turns.
+Brief: "PJ6" in `04_sprints.md` (Kostenlimit mit Ergebnis, Kreiserkennung) und
+`03_contracts.md` §1.3 und §1.4. Erst wenn PJ5c gemergt ist und der Owner §0 #12
+(Kostenlimit 5.00 pro Lauf), #14 (Token-Cap 2.000.000 für unbepreiste Modelle) und
+#15 (Kreiserkennung 3/6/5) entschieden hat.
 
-1. Erst wenn PJ5b gemergt ist: `git checkout main && git pull --ff-only`, neuer Branch.
-2. **Tests zuerst:** eine Antwort, die den Check nicht besteht, wird nicht so
-   ausgeliefert, wie 03 §3.2 es festlegt; ein einfacher Turn (ohne Lauf) bleibt
-   unverändert; Flag aus Byte für Byte.
-3. **Umsetzen** in `ChatRunDelivery` bzw. einer eigenen Klasse daneben, nicht in
-   `ChatRunStep`. Keine neue §0-Entscheidung treffen; was 03 offen lässt, fragen.
-4. Gate wie immer (`make ci-local`, E2E). `LOOP.ENABLED` bleibt 0.
+1. `git checkout main && git pull --ff-only`, neuer Branch.
+2. **Tests zuerst**, dann `RunCostGuard` und `StallDetector` neben `ChatRunStep`
+   (`ChatRunStep` und `ChatRunAnswer` wachsen nicht über ihre Rolle hinaus).
+3. Gate wie immer (`make ci-local`, E2E). `LOOP.ENABLED` bleibt 0 bis PJ6 und PJ8.
    Danach `STATUS.md` und diese Datei nachziehen.
-
-Alternativ, falls der Owner es vorzieht: **PJ6** (braucht §0 #12, #14, #15).
 
 ## 10. Anforderungen und Entscheidungen des Owners
 
