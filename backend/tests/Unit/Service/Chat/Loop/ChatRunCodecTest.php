@@ -28,6 +28,7 @@ final class ChatRunCodecTest extends TestCase
         $state->modelFailures = 1;
         $state->replyMessageId = 31;
         $state->opened = ['notion-search', 'custom_order'];
+        $state->said = "Let me look.\n\nFound it.";
         $state->waitForApproval();
 
         $read = (new ChatRunCodec())->decode($state->stored(4, 3, 200, 9_999));
@@ -43,6 +44,7 @@ final class ChatRunCodecTest extends TestCase
         self::assertSame([ChatRunState::MODE_FINISH, 3, 4_200, 1, 1], [$read->mode, $read->steps, $read->costMicro, $read->nudges, $read->modelFailures]);
         self::assertSame(31, $read->replyMessageId);
         self::assertSame(['notion-search', 'custom_order'], $read->opened);
+        self::assertSame("Let me look.\n\nFound it.", $read->said);
         self::assertSame([4, 3, 200, 9_999], [$read->expectedSeq(), $read->checkpointSeq(), $read->updatedAt(), $read->expiresAt()]);
     }
 

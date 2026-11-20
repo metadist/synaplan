@@ -42,10 +42,25 @@ stays 0 everywhere; nothing changes for anyone until PJ6 and PJ8.
 - `ChatLoopTurn::handOver`: a tool call writes the answer's message first
   (status `processing`), then starts the run seeded with that answer
   (`ChatRunAnswer::seed`), so its tool calls run without a second model call.
-  The stream follows the run (`ChatRunTail`) as `chat_run` status events until
-  it ends, waits for the person, or 240 s passed (one lease); then the run
-  posts its answer into that same message itself (`replyMessageId`, checked
-  against chat, owner and direction). `StreamReplyPersister` reuses that row.
+  The stream follows the run (`ChatRunTail`) until it ends, waits for the
+  person, or 240 s passed (one lease): the run's text as ordinary chat chunks,
+  everything else as `chat_run` status events. Then the run posts its answer
+  into that same message itself (`replyMessageId`, checked against chat, owner
+  and direction).
+- **The run streams** (owner, 2026-11-20, after a walk took 17 s with the
+  answer appearing at once). Each free step calls the model streaming
+  (`FacadeChatRunModel`, when the model streams tool calls) and
+  `ChatRunSpeaker` appends the visible text in pieces of 32 characters or at
+  a line break as `text.delta` events; reasoning is never passed on. The run
+  keeps what it showed (`ChatRunState::$said`, the first call's text
+  included, at most 100,000 characters). The stored text starts with exactly
+  that, followed by the answer only when it was not shown as it came (a
+  `finish` result, the JSON fallback, a model that cannot stream, a reason).
+  The finish and JSON calls are never streamed. A reload shows what the
+  stream showed. Walk on the dev stack: the Langenfeld question handed over
+  (run of 2 steps, 3 s in the worker), the text grew in pieces, the whole
+  turn took 11 s, the reload showed the same text; a simple question started
+  no run. `StreamReplyPersister` reuses that row.
   A failed start removes the row. Stop in the chat stops the run.
 - `ChatRunTail` waits on Redis, not with a sleep: every event also goes to a
   one-entry stream `run:…:events:wake` (`XADD` with the event's sequence in
@@ -103,16 +118,15 @@ vue-tsc, PHPStan, deptrac 0 violations, size ratchet, long-wait gate).
 **Limits, for PJ5c, PJ6 and PJ8:**
 
 - The check before delivery (03 §3.2) is PJ5c.
-- The stored answer is the run's answer; a preamble the first call streamed
-  is shown but not stored.
+- A worker lost in the middle of a model call may stream that step's text a
+  second time on retry; the stored text has it once.
 - While a run waits or after the stream stopped following it, the message
   shows the placeholder until the run delivers. The `chat_run` events are for
   PJ8's card; the client shows them as statuses today.
 - Stop with "keep what was written" may store one more message; PJ8 owns Stop.
 
-**Not verified:** a turn that really hands over, walked in the browser with
-a real model (the flag stays 0 and the client has no run card before PJ8);
-a run longer than one lease followed by a second stream.
+**Not verified:** a run longer than one lease followed by a second stream;
+a run that waits for an approval, in the browser.
 
 ---
 

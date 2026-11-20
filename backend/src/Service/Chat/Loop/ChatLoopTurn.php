@@ -13,7 +13,6 @@ use App\Repository\UserRepository;
 use App\Service\Message\Chat\ChatModelChoice;
 use App\Service\Message\Chat\ChatReply;
 use App\Service\Message\Chat\ChatTurn;
-use App\Service\Message\ProgressCallback;
 use App\Service\Project\ProjectChatScope;
 use App\Service\Prompt\ChatPromptBlocks;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,7 +25,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * and no run exists. A tool call hands over: the answer's message is written
  * first, then the run opens with the call's answer, and the stream follows
  * the run until it ends, waits for the person, or has followed it long
- * enough. The run posts its answer into that message itself, so a closed
+ * enough, showing the run's text as it is written. The run posts its answer into that message itself, so a closed
  * tab loses nothing.
  */
 final readonly class ChatLoopTurn
@@ -106,12 +105,15 @@ final readonly class ChatLoopTurn
             throw $e;
         }
 
-        ProgressCallback::notify($progressCallback, ChatRunTail::STATUS, ChatRunEvents::STARTED, ['run_id' => $start->runId, 'event' => ChatRunEvents::STARTED]);
-        $state = $this->tail->follow($start->runId, (string) ($turn->options['track_id'] ?? ''), $progressCallback);
+        // The tail replays the run's log from the start, its `started` event included.
+        $state = $this->tail->follow($start->runId, (string) ($turn->options['track_id'] ?? ''), $streamCallback, $progressCallback);
         if (null !== $state && $state->isTerminal()) {
             // Whoever comes first posts it; the stream must not wait for the worker.
             $this->delivery->deliver($state);
-            $streamCallback(('' !== trim($preamble) ? "\n\n" : '').ChatRunDelivery::text($state));
+            $rest = ChatRunDelivery::rest($state);
+            if ('' !== $rest) {
+                $streamCallback($rest);
+            }
         }
 
         return [self::REPLY_ID => $row->getId(), ChatRunDelivery::META => $start->runId];

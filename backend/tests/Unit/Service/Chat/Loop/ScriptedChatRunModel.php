@@ -9,9 +9,20 @@ use App\Service\Chat\Loop\ChatRunModelFailed;
 use App\Service\Chat\Loop\ChatRunReply;
 use App\Service\Chat\Loop\ChatRunState;
 
-/** Answers model calls from a script, and records what each call was asked. */
+/**
+ * Answers model calls from a script, and records what each call was asked.
+ * A call with a listener streams its text in small deltas, as a provider does.
+ */
 final class ScriptedChatRunModel implements ChatRunModel
 {
+    private const DELTA = 7;
+
+    /** False plays a model that cannot stream: the listener hears nothing. */
+    public bool $streams = true;
+
+    /** @var list<bool> per call, whether it had a listener */
+    public array $listened = [];
+
     /** @var list<array{messages: list<array<string, mixed>>, tools: list<array<string, mixed>>, choice: ?string}> */
     public array $calls = [];
 
@@ -23,15 +34,21 @@ final class ScriptedChatRunModel implements ChatRunModel
         $this->script = array_values($script);
     }
 
-    public function call(ChatRunState $state, array $messages, array $tools, ?string $toolChoice): ChatRunReply
+    public function call(ChatRunState $state, array $messages, array $tools, ?string $toolChoice, ?callable $onText = null): ChatRunReply
     {
         $this->calls[] = ['messages' => $messages, 'tools' => $tools, 'choice' => $toolChoice];
+        $this->listened[] = null !== $onText;
         $next = array_shift($this->script);
         if (null === $next) {
             throw new \LogicException('The model was called more often than scripted.');
         }
         if ($next instanceof ChatRunModelFailed) {
             throw $next;
+        }
+        if (null !== $onText && $this->streams) {
+            foreach (mb_str_split($next->content, self::DELTA) as $delta) {
+                $onText($delta);
+            }
         }
 
         return $next;

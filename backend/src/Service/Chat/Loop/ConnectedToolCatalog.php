@@ -64,21 +64,26 @@ final class ConnectedToolCatalog
     public static function run(array $connected, ChatRunState $state, array $args): string
     {
         $use = $args['use'] ?? null;
+        // A model asking for one tool often sends the bare name.
+        if (\is_string($use) && '' !== trim($use)) {
+            $use = [trim($use)];
+        }
         if (!\is_array($use) || [] === $use) {
             return self::listing($connected);
         }
         $opened = [];
         $unknown = [];
-        foreach ($use as $name) {
-            if (!\is_string($name) || !isset($connected[$name])) {
-                $unknown[] = \is_string($name) ? mb_substr($name, 0, 64) : '?';
-                continue;
-            }
-            if (!\in_array($name, $state->opened, true) && \count($state->opened) < self::MAX_OPEN) {
-                $state->opened[] = $name;
-            }
-            if (\in_array($name, $state->opened, true)) {
+        $full = [];
+        foreach (array_unique(array_map(static fn (mixed $name): string => \is_string($name) ? $name : '', $use)) as $name) {
+            if (!isset($connected[$name])) {
+                $unknown[] = '' !== $name ? mb_substr($name, 0, 64) : '?';
+            } elseif (\in_array($name, $state->opened, true) || \count($state->opened) < self::MAX_OPEN) {
+                if (!\in_array($name, $state->opened, true)) {
+                    $state->opened[] = $name;
+                }
                 $opened[] = $name;
+            } else {
+                $full[] = $name;
             }
         }
         $lines = [];
@@ -88,8 +93,8 @@ final class ConnectedToolCatalog
         if ([] !== $unknown) {
             $lines[] = 'Not in the list: '.implode(', ', $unknown).'.';
         }
-        if (\count($state->opened) >= self::MAX_OPEN && \count($opened) < \count($use) - \count($unknown)) {
-            $lines[] = 'At most '.self::MAX_OPEN.' tools can be open in one run.';
+        if ([] !== $full) {
+            $lines[] = 'Not opened, at most '.self::MAX_OPEN.' tools can be open in one run: '.implode(', ', $full).'.';
         }
 
         return implode("\n", $lines);

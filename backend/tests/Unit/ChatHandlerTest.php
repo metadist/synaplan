@@ -2603,6 +2603,7 @@ class ChatHandlerTest extends TestCase
         $this->aiFacade->expects($this->once())->method('chatStream')->willReturn([
             'provider' => 'test',
             'model' => 'test',
+            'response_id' => 'resp_open_calls',
             'tool_calls' => [['id' => 'call_1', 'type' => 'function', 'function' => ['name' => 'web_search', 'arguments' => '{"query":"release"}']]],
         ]);
 
@@ -2613,6 +2614,7 @@ class ChatHandlerTest extends TestCase
         self::assertSame('run_1', $result['metadata']['chat_run_id']);
         self::assertSame('test', $result['metadata']['provider'], 'the first call is billed as today');
         self::assertArrayNotHasKey('extraction_payload', $result['metadata'], 'memories wait for the answer');
+        self::assertNull($result['metadata']['response_id'], 'a response with open tool calls is never continued');
     }
 
     private function loopMessage(): Message

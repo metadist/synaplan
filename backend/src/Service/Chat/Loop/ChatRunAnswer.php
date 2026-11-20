@@ -116,6 +116,8 @@ final readonly class ChatRunAnswer
     {
         ++$state->steps;
         $state->costMicro += max(0, $reply->costMicro);
+        // The request streamed it already; the stored answer starts with it.
+        $state->said = ChatRunSpeaker::cap($reply->content);
         $this->toolCalls($state, $reply, false);
     }
 

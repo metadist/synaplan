@@ -34,6 +34,9 @@ final class ChatRunState implements RunState
     public ?ChatRunEnd $end = null;
     public ?string $waitReason = null;
     public ?string $answer = null;
+
+    /** What the person already saw of this run, the first answer made in the request included. */
+    public string $said = '';
     public string $mode = self::MODE_FREE;
     public int $steps = 0;
     public int $costMicro = 0;

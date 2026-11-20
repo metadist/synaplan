@@ -122,7 +122,8 @@ final class ChatLoopHandOverTest extends ChatLoopCase
 
         self::assertCount(1, $model->calls, 'the first answer is not paid for again');
         self::assertSame(['web_search'], array_column($this->tools->runs, 'name'));
-        self::assertSame(["\n\nThe release fixed the login."], $this->streamed, 'the answer reaches the stream once');
+        self::assertSame("\n\nThe release fixed the login.", implode('', $this->streamed), 'the answer reaches the stream once, as it is written');
+        self::assertSame("Let me look.\n\nThe release fixed the login.", ChatRunDelivery::text($this->stored((string) $meta[ChatRunDelivery::META])), 'the stored text is what the person saw');
         self::assertCount(1, $this->persisted, 'one message for the answer');
         self::assertSame('processing', $this->persisted[0]->getStatus());
         self::assertSame('Let me look.', $this->persisted[0]->getText());
@@ -134,7 +135,9 @@ final class ChatLoopHandOverTest extends ChatLoopCase
         self::assertSame('The release fixed the login.', $state->answer);
         self::assertContains($runId, $this->delivered);
         self::assertSame(ChatRunEvents::STARTED, $this->statuses[0]['metadata']['event']);
+        self::assertCount(1, array_filter($this->statuses, static fn (array $s): bool => ChatRunEvents::STARTED === $s['metadata']['event']), 'the run is announced once');
         self::assertContains(ChatRunEvents::TOOL_CALL, array_map(static fn (array $s): string => (string) $s['metadata']['event'], $this->statuses));
+        self::assertNotContains(ChatRunEvents::TEXT, array_map(static fn (array $s): string => (string) $s['metadata']['event'], $this->statuses), 'text goes to the answer, not to the statuses');
         self::assertContains(ChatRunEvents::ENDED, $this->eventNames($runId));
         self::assertSame($runId, $this->row?->getUuid());
     }

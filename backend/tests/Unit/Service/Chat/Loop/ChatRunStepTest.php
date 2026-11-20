@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Chat\Loop;
 
 use App\Service\Chat\Loop\ChatLoopTools;
+use App\Service\Chat\Loop\ChatRunDelivery;
 use App\Service\Chat\Loop\ChatRunEnd;
 use App\Service\Chat\Loop\ChatRunEvents;
 use App\Service\Chat\Loop\ChatRunModelFailed;
@@ -33,8 +34,54 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertSame('auto', $model->calls[0]['choice']);
         self::assertSame(1, $stored->steps);
         self::assertSame(1_000, $stored->costMicro);
-        self::assertSame([ChatRunEvents::STEP, ChatRunEvents::ENDED], $this->eventNames($state->runId));
+        self::assertSame([ChatRunEvents::STEP, ChatRunEvents::ENDED], array_values(array_diff($this->eventNames($state->runId), [ChatRunEvents::TEXT])));
         self::assertSame(['completed'], $this->synced);
+    }
+
+    public function testTheAnswerIsStreamedIntoTheLogAsItIsWritten(): void
+    {
+        $this->model(new ScriptedChatRunModel(ScriptedChatRunModel::says('Version 5.8.9 adds the Coolify guide and fixes the login.')));
+        $state = $this->open();
+
+        $this->drain();
+
+        $pieces = $this->texts($state->runId);
+        self::assertGreaterThan(1, \count($pieces), 'the text arrives in pieces, not at the end');
+        self::assertSame('Version 5.8.9 adds the Coolify guide and fixes the login.', implode('', $pieces));
+        $stored = $this->stored($state->runId);
+        self::assertSame(implode('', $pieces), $stored->said);
+        self::assertSame($stored->answer, ChatRunDelivery::text($stored), 'what was shown is what is stored');
+        self::assertSame('', ChatRunDelivery::rest($stored));
+    }
+
+    public function testALaterStepContinuesBelowWhatTheRunAlreadySaid(): void
+    {
+        $this->model(new ScriptedChatRunModel(
+            new ChatRunReply('Let me look.', [['id' => 'call_1', 'name' => 'web_search', 'args' => ['query' => 'x']]], 1_000),
+            ScriptedChatRunModel::says('Found it.'),
+        ));
+        $state = $this->open();
+
+        $this->drain();
+
+        $stored = $this->stored($state->runId);
+        self::assertSame("Let me look.\n\nFound it.", implode('', $this->texts($state->runId)));
+        self::assertSame("Let me look.\n\nFound it.", ChatRunDelivery::text($stored));
+        self::assertSame('Found it.', $stored->answer);
+    }
+
+    public function testAModelThatCannotStreamStillEndsWithTheWholeAnswer(): void
+    {
+        $model = $this->model(new ScriptedChatRunModel(ScriptedChatRunModel::says('Plain answer.')));
+        $model->streams = false;
+        $state = $this->open();
+
+        $this->drain();
+
+        $stored = $this->stored($state->runId);
+        self::assertSame([], $this->texts($state->runId));
+        self::assertSame('Plain answer.', ChatRunDelivery::text($stored));
+        self::assertSame('Plain answer.', ChatRunDelivery::rest($stored), 'the stream shows it at the end');
     }
 
     public function testAnOpenedConnectedToolIsDeclaredFromTheNextCallOn(): void
@@ -220,6 +267,9 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertSame([ChatLoopTools::FINISH], $model->offered(4));
         self::assertSame('required', $model->calls[4]['choice']);
         self::assertContains(ChatRunEvents::PLAN, $this->eventNames($state->runId));
+        self::assertFalse($model->listened[4], 'a finish call is not streamed: its answer is a tool argument');
+        self::assertSame("Searching now.\n\nAll done.\n\nHere is the comparison.", ChatRunDelivery::text($stored));
+        self::assertSame("\n\nHere is the comparison.", ChatRunDelivery::rest($stored));
     }
 
     public function testARefusedFinishFallsBackToJson(): void
@@ -237,6 +287,8 @@ final class ChatRunStepTest extends ChatLoopCase
         $stored = $this->stored($state->runId);
         self::assertSame(ChatRunEnd::Finished, $stored->end);
         self::assertSame('The answer.', $stored->answer);
+        self::assertFalse($model->listened[3], 'the JSON is never shown as it comes');
+        self::assertStringNotContainsString('{', ChatRunDelivery::text($stored));
         self::assertSame([], $model->calls[3]['tools']);
         self::assertNull($model->calls[3]['choice']);
     }
@@ -305,7 +357,7 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertSame(ChatRunEnd::ModelFailed, $stored->end);
         self::assertNull($stored->answer);
         self::assertFalse($this->store->runs()->isClaimed($state->runId, $stored->expectedSeq()));
-        self::assertStringContainsString('KI-Modell', \App\Service\Chat\Loop\ChatRunDelivery::text($stored));
+        self::assertStringContainsString('KI-Modell', ChatRunDelivery::text($stored));
         self::assertSame('failed', end($this->synced));
     }
 
@@ -331,5 +383,18 @@ final class ChatRunStepTest extends ChatLoopCase
         self::assertNotNull($token);
 
         return new \App\Service\Run\RunClaim($this->store->runs(), $state->runId, $state->expectedSeq(), $token, 60_000);
+    }
+
+    /** @return list<string> the text pieces the run's log carries */
+    private function texts(string $runId): array
+    {
+        $texts = [];
+        foreach ($this->events->replay($runId, 0) as $record) {
+            if (ChatRunEvents::TEXT === $record['event']) {
+                $texts[] = (string) $record['data']['text'];
+            }
+        }
+
+        return $texts;
     }
 }

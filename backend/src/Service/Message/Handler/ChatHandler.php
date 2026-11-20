@@ -208,7 +208,12 @@ final readonly class ChatHandler implements MessageHandlerInterface
         }
         $reply = $this->replies->stream($turn, $model, $messages, $aiOptions, $streamCallback, !empty($options['incognito']), $progressCallback);
         if (null !== $loop && [] !== $reply->toolCalls) {
-            return ['metadata' => self::streamedMetadata($reply, $model) + $turn->contextMetadata($prompt->docs) + $this->loop->handOver($loop, $turn, $model, $reply, $streamCallback, $progressCallback)];
+            $metadata = self::streamedMetadata($reply, $model);
+            // That stored response ends in tool calls the run answers, not the
+            // provider: a later turn continuing it would fail on the open calls.
+            $metadata['response_id'] = null;
+
+            return ['metadata' => $metadata + $turn->contextMetadata($prompt->docs) + $this->loop->handOver($loop, $turn, $model, $reply, $streamCallback, $progressCallback)];
         }
 
         // Checked before the answer is: a hand-off turn legitimately streams

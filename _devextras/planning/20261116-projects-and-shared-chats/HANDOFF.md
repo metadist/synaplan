@@ -228,8 +228,11 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 - **Transport (gelöst in PJ5a):** `RunChatUnit` und `ResumeChatRunCommand` laufen
   auf `async_ai_high` im bestehenden Worker; nur `messenger.yaml`, kein Container.
   Eine Schemaänderung bleibt Ask-first.
-- **PJ5b-Grenzen:** gespeichert wird nur die Antwort des Laufs, eine im ersten Aufruf
-  gestreamte Einleitung nicht. Wartet der Lauf oder endet das Folgen (240 s), zeigt
+- **PJ5b streamt:** der Lauf ruft das Modell streamend auf, `ChatRunSpeaker`
+  schreibt den Text als `text.delta` in sein Log, der Stream reicht ihn als
+  normale Chunks weiter. Gespeichert wird genau, was gezeigt wurde
+  (`ChatRunState::$said`), danach die Antwort nur, wenn sie nicht gestreamt kam.
+- **PJ5b-Grenzen:** Wartet der Lauf oder endet das Folgen (240 s), zeigt
   die Nachricht den Platzhalter bis zur Auslieferung. Die SSE-Events `chat_run` sind
   für die Karte in PJ8. Stop mit "Text behalten" kann eine Nachricht mehr speichern
   (Stop gehört PJ8). Verbundene Tools (MCP, HTTP) nur über `connected_tools`

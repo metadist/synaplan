@@ -52,6 +52,27 @@ final class ChatRunDeliveryTest extends TestCase
         }
     }
 
+    public function testTheStoredTextStartsWithWhatThePersonAlreadySaw(): void
+    {
+        $row = $this->row(self::CHAT_ID, self::OWNER);
+        $state = $this->finished();
+        $state->said = "Let me look.\n\nThe answer.";
+
+        $this->delivery($row)->deliver($state);
+
+        self::assertSame("Let me look.\n\nThe answer.", $row->getText(), 'the streamed answer is not repeated');
+    }
+
+    public function testARunStoppedAfterItSpokeKeepsItsTextAndSaysWhy(): void
+    {
+        $state = new ChatRunState(self::RUN_ID, self::OWNER, self::CHAT_ID, null, 'anthropic', 'm', 'en', '', [], 1);
+        $state->said = 'Half an answer';
+        $state->finish(ChatRunEnd::StoppedByUser);
+
+        self::assertSame("Half an answer\n\n".ChatRunEnd::StoppedByUser->sentence('en'), ChatRunDelivery::text($state));
+        self::assertSame("\n\n".ChatRunEnd::StoppedByUser->sentence('en'), ChatRunDelivery::rest($state));
+    }
+
     public function testTheAnswerIsPostedOnce(): void
     {
         $row = $this->row(self::CHAT_ID, self::OWNER);
