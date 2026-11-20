@@ -70,18 +70,12 @@ final class FileGenerationEnvelope
     {
         $text = (string) preg_replace('#https?://\S+#i', ' ', $text);
 
-        $patterns = [
-            'xlsx' => '/\b\.?xlsx?\b|\bexcel\b|\bspreadsheet\b/i',
-            'docx' => '/\b\.?docx?\b|word-dokument|word-datei|microsoft word|\bals word\b|\bas word\b|\bword document\b/i',
-            // "Power Point" is two words in casual German and English. "Folien"
-            // is the everyday word for slides. /u so "Präsentation" matches.
-            'pptx' => '/\b\.?pptx?\b|power\s*points?|folien?\b|präsentation|praesentation|presentation/iu',
-            'csv' => '/\b\.?csv\b/i',
-            // Extension only. The phrase "text file" is a separate pattern
-            // below, so "text file … counter_weekday.txt" can still elect txt.
-            'txt' => '/\.txt\b/i',
-            'md' => '/\.md\b/i',
-        ];
+        // The word list lives in OfficeFormatVocabulary; the election policy
+        // (last match wins, source mentions lose) stays here.
+        $patterns = [];
+        foreach (OfficeFormatVocabulary::patterns() as $extension => $body) {
+            $patterns[$extension] = '/'.$body.'/iu';
+        }
 
         $winner = null;
         $winnerPos = -1;
@@ -143,21 +137,13 @@ final class FileGenerationEnvelope
         // "from this Excel spreadsheet": the second word continues the source
         // named immediately before it. "von CSV nach Excel" does not, because
         // "nach" is not itself a format word.
-        if (1 === preg_match('/\b(\w+)\s+$/u', $before, $previous) && self::isFormatWord($previous[1])) {
+        if (1 === preg_match('/\b(\w+)\s+$/u', $before, $previous) && OfficeFormatVocabulary::isFormatWord($previous[1])) {
             $previousPos = $pos - strlen($previous[0]);
 
             return self::isSourceMention($text, $previousPos);
         }
 
         return false;
-    }
-
-    private static function isFormatWord(string $word): bool
-    {
-        return 1 === preg_match(
-            '/^(xlsx?|excel|spreadsheet|csv|docx?|pptx?|powerpoint|presentation|präsentation|praesentation|folie|folien)$/iu',
-            $word,
-        );
     }
 
     /**

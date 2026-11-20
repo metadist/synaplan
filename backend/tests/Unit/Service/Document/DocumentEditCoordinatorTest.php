@@ -163,6 +163,9 @@ final class DocumentEditCoordinatorTest extends TestCase
             $method->invoke($coordinator, 'kannst du mir eine power point präsentation erstellen, nur ganz kurz'),
         );
         self::assertSame(DocumentKind::XLSX, $method->invoke($coordinator, 'Vergleich als Excel'));
+        self::assertSame(DocumentKind::DOCX, $method->invoke($coordinator, 'mach ein Dokument dazu'));
+        self::assertSame(DocumentKind::PPTX, $method->invoke($coordinator, 'mach ein paar Slides dazu'));
+        self::assertNull($method->invoke($coordinator, 'erzähl mir was über Synaplan'));
     }
 
     private function coordinator(DocumentToolsConfig $config): DocumentEditCoordinator

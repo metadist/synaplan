@@ -5,6 +5,7 @@ namespace App\Service\Message\Classification;
 use App\Entity\Message;
 use App\Repository\ConfigRepository;
 use App\Service\File\Office\OfficeConverterClient;
+use App\Service\File\OfficeFormatVocabulary;
 use App\Service\Message\Routing\RoutingDecision;
 use App\Service\Message\Routing\RoutingLayer;
 use Psr\Log\LoggerInterface;
@@ -292,7 +293,9 @@ final readonly class FastPathClassifier
         // supported office format/extension, defer to the AI sorter so it can
         // pick `officemaker`. PDF is included only when the LibreOffice
         // engine is on — without it we still cannot produce real PDFs.
-        $officeFormats = 'docx|xlsx|pptx|csv|word|excel|powerpoint|spreadsheet|tabellenkalkulation|praesentation|präsentation';
+        // The word list is shared with the envelope detector
+        // (OfficeFormatVocabulary); a hit here only costs a sorter call.
+        $officeFormats = OfficeFormatVocabulary::fastPathAlternation();
         if ($this->officePdfGenerationEnabled()) {
             $officeFormats .= '|pdf';
         }

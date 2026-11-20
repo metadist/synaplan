@@ -18,6 +18,7 @@ use App\Service\Document\Tool\DocumentToolResult;
 use App\Service\File\FileGenerationEnvelope;
 use App\Service\File\FileHelper;
 use App\Service\File\GeneratedDocumentStore;
+use App\Service\File\OfficeFormatVocabulary;
 use App\Service\File\UserUploadPathBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -168,6 +169,12 @@ final readonly class DocumentEditCoordinator
         }
 
         $kind = $this->inferKind((string) $message->getText());
+        if (null === $kind) {
+            // No format named and no attachment: do not silently birth a
+            // workbook.xlsx. Returning null falls back to the classic envelope
+            // path, where the model asks which format before generating.
+            return null;
+        }
 
         return [DocumentSession::empty($kind, $this->defaultFilename($kind)), false];
     }
@@ -193,11 +200,15 @@ final readonly class DocumentEditCoordinator
         return null;
     }
 
-    private function inferKind(string $text): string
+    /**
+     * The kind for a new tool session, or null when the request names none.
+     * The strict election runs first (same detector the envelope path uses,
+     * so a casual "Power Point Präsentation" is a deck); the weak hints only
+     * fill gaps ("mach ein Dokument" still seeds Word). Callers fall back to
+     * the classic envelope path on null instead of guessing workbook.xlsx.
+     */
+    private function inferKind(string $text): ?string
     {
-        // The same detector the envelope path uses. Without it a casual
-        // "Power Point Präsentation" missed every English keyword below and
-        // the empty session was born as workbook.xlsx.
         $requested = FileGenerationEnvelope::requestedFormat($text);
         if (null !== $requested) {
             $kind = DocumentKind::fromExtension($requested);
@@ -206,17 +217,16 @@ final readonly class DocumentEditCoordinator
             }
         }
 
-        if (preg_match('/\b(xlsx|excel|spreadsheet|csv|workbook)\b/i', $text)) {
-            return DocumentKind::XLSX;
-        }
-        if (preg_match('/\b(pptx|powerpoint|slides?|deck|presentation)\b/iu', $text)) {
-            return DocumentKind::PPTX;
-        }
-        if (preg_match('/\b(docx|word|document)\b/i', $text)) {
-            return DocumentKind::DOCX;
+        foreach (OfficeFormatVocabulary::kindHints() as $extension => $body) {
+            if (1 === preg_match('/\b(?:'.$body.')\b/iu', $text)) {
+                $kind = DocumentKind::fromExtension($extension);
+                if (null !== $kind) {
+                    return $kind;
+                }
+            }
         }
 
-        return DocumentKind::XLSX;
+        return null;
     }
 
     private function defaultFilename(string $kind): string
