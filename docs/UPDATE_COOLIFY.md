@@ -19,7 +19,7 @@ Synaplan shows its current version in the sidebar. When a newer release exists, 
 
 ## Update Procedure
 
-1. **Back up.** On the resource's **Backups** page, run the database backup and both storage backups (`Backend: synaplan-uploads`, `Qdrant: synaplan-qdrant`) and wait until all three show **Success**. [Backup](../deploy/coolify/README.md#backup) lists what each one holds.
+1. **Back up.** On the resource's **Backups** page, run the database backup and both storage backups (`Backend: synaplan-uploads`, `Qdrant: synaplan-qdrant`) and wait until all three show **Success**. If they are not set up yet, add them first as listed in [Backup](../deploy/coolify/README.md#backup), which also says what each one holds.
 2. **Set the new version.** Under **Environment Variables**, change `SYNAPLAN_VERSION` to the version shown in Synaplan, without a leading `v` (for example `5.9.0`, not `v5.9.0`).
 3. **Click Restart current version.** Coolify pulls the new image and recreates the containers.
 4. **Verify.** The web role applies the database migrations when it starts. Expect about half a minute in which the address does not answer. Then sign in: accounts, files and settings are as they were, and the sidebar shows the new version.
