@@ -23,6 +23,9 @@ final class SwitchedChatRunBudget implements ChatRunBudget
     public ?int $runCapMicro = null;
     public ?int $leftMicro = null;
 
+    /** What the payer spent since the test set leftMicro; the left amount shrinks by it. */
+    public ?\Closure $spent = null;
+
     public function __construct(public bool $left = true)
     {
     }
@@ -32,6 +35,8 @@ final class SwitchedChatRunBudget implements ChatRunBudget
         ++$this->checks;
         $allowed = $this->left && $this->checks <= $this->yes;
 
-        return new ChatRunAllowance($allowed, $allowed ? $this->leftMicro : 0, $this->runCapMicro);
+        $left = null === $this->leftMicro ? null : $this->leftMicro - (null === $this->spent ? 0 : (int) ($this->spent)());
+
+        return new ChatRunAllowance($allowed, $allowed ? $left : 0, $this->runCapMicro);
     }
 }

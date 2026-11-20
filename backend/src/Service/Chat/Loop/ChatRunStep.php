@@ -12,7 +12,8 @@ use App\Service\Tool\Execution\ToolLimits;
  * tool calls of the last model answer, then make one model call.
  *
  * Before the paid call it reads the stop flag, the cost limit and circle
- * detection; a limit or a second circle turns the call into the wrap-up. A
+ * detection; a limit or a second circle turns the call into the wrap-up.
+ * While a limit applies, each working call is told the budget left. A
  * write that needs approval parks the run; nothing here approves it.
  */
 final readonly class ChatRunStep
@@ -21,6 +22,9 @@ final readonly class ChatRunStep
 
     /** Said for a declined and for an expired approval alike, so it claims neither. */
     public const DECLINED = 'The person did not approve this action. Do not try it again in this run.';
+
+    /** Text of a reply that counts as a written answer at the cost limit. */
+    private const MIN_ANSWER_CHARS = 500;
 
     private ChatRunAnswer $answers;
     private ChatRunCostGuard $cost;
@@ -58,12 +62,17 @@ final readonly class ChatRunStep
 
             return null;
         }
-        if (ChatRunState::MODE_WRAP_UP !== $state->mode && !$this->guard($state, $scope)) {
-            return null;
+        $limit = null;
+        if (ChatRunState::MODE_WRAP_UP !== $state->mode) {
+            $check = $this->guard($state, $scope);
+            if (null === $check) {
+                return null;
+            }
+            $limit = $check->limitMicro;
         }
         $claim->renew();
 
-        return $this->call($state, $scope);
+        return $this->call($state, $scope, $limit);
     }
 
     /** The run was asked to stop before this unit began. */
@@ -81,29 +90,46 @@ final readonly class ChatRunStep
     /**
      * The cost limit first, then circle detection, which only watches working steps.
      *
-     * @return bool false when the run ended here without another call
+     * @return ChatRunCostCheck|null null when the run ended here without another call
      */
-    private function guard(ChatRunState $state, ChatRunScope $scope): bool
+    private function guard(ChatRunState $state, ChatRunScope $scope): ?ChatRunCostCheck
     {
-        $reason = $this->cost->check($state, $scope->user);
+        $check = $this->cost->check($state, $scope->user);
+        $reason = $check->end;
         if (ChatRunEnd::BudgetUsed === $reason) {
             $this->answers->end($state, ChatRunEnd::BudgetUsed);
 
-            return false;
+            return null;
+        }
+        if (null === $reason && $check->nearlyUsed && !$state->budgetNudged) {
+            $state->budgetNudged = true;
+            $state->messages[] = ['role' => 'user', 'content' => ChatRunCostGuard::NEARLY_USED];
         }
         if (null === $reason && ChatRunState::MODE_FREE === $state->mode && $this->stall->check($state, $this->events)) {
             $reason = ChatRunEnd::Circling;
         }
         if (null !== $reason) {
             ChatRunWrapUp::begin($state, $reason, $this->events);
+            // The last reply was already a written answer: deliver it, not a wrap-up call that repeats it.
+            $written = ChatRunEnd::Circling !== $reason ? self::writtenAnswer($state) : null;
+            $answer = null === $written ? null : ChatRunWrapUp::answer($state, $reason, $written);
+            if (null !== $answer) {
+                $this->answers->end($state, $reason, $answer);
+
+                return null;
+            }
         }
 
-        return true;
+        return $check;
     }
 
-    private function call(ChatRunState $state, ChatRunScope $scope): ?string
+    private function call(ChatRunState $state, ChatRunScope $scope, ?int $limit): ?string
     {
         $messages = [['role' => 'system', 'content' => ChatLoopPrompt::system($state, $scope)], ...$state->messages];
+        if (null !== $limit && ChatRunState::MODE_WRAP_UP !== $state->mode && $state->costMicro > 0) {
+            // Said with each working call and never stored: the transcript keeps no stale amounts.
+            $messages[] = ['role' => 'user', 'content' => ChatRunCostGuard::line($state->costMicro, $limit)];
+        }
         [$tools, $choice] = match ($state->mode) {
             ChatRunState::MODE_FINISH => [[ChatLoopTools::finish()], 'required'],
             ChatRunState::MODE_FINISH_JSON, ChatRunState::MODE_WRAP_UP => [[], null],
@@ -202,6 +228,31 @@ final readonly class ChatRunStep
             $state->reads[self::hash($call)] = \count($state->messages) - 1;
         }
         $this->events->append($state->runId, ChatRunEvents::TOOL_RESULT, ['tool' => $call['name'], 'chars' => mb_strlen($text)]);
+    }
+
+    /**
+     * The answer the model already wrote in its last reply: text of some
+     * length with no tool call but a plan update. A short note before a
+     * tool call is not one.
+     */
+    private static function writtenAnswer(ChatRunState $state): ?string
+    {
+        for ($i = \count($state->messages) - 1; $i >= 0; --$i) {
+            $message = $state->messages[$i];
+            if ('assistant' !== ($message['role'] ?? null)) {
+                continue;
+            }
+            $text = \is_string($message['content'] ?? null) ? trim($message['content']) : '';
+            foreach (\is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [] as $call) {
+                if (!\is_array($call) || ChatLoopTools::UPDATE_PLAN !== ($call['function']['name'] ?? null)) {
+                    return null;
+                }
+            }
+
+            return mb_strlen($text) >= self::MIN_ANSWER_CHARS ? $text : null;
+        }
+
+        return null;
     }
 
     /**

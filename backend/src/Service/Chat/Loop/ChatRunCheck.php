@@ -209,12 +209,13 @@ final readonly class ChatRunCheck
         return $answered;
     }
 
-    /** The payer's budget allows it, and the run is still under the share it may spend. */
+    /** The payer's budget allows it, and what the run may still spend covers its dearest call. */
     private function mayPay(ChatRunState $state, ChatRunScope $scope): bool
     {
         $allowance = $this->budget->allowance($scope->user);
+        $room = ChatRunCostGuard::room($state->costMicro, $allowance);
 
-        return $allowance->allowed && (null === $allowance->runCapMicro || $state->costMicro + $state->dearestMicro < $allowance->runCapMicro);
+        return $allowance->allowed && (null === $room || $state->dearestMicro < $room);
     }
 
     /**

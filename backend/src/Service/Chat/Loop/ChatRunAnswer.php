@@ -99,11 +99,20 @@ final readonly class ChatRunAnswer
         $cost = max(0, $reply->costMicro);
         $state->costMicro += $cost;
         $state->dearestMicro = max($state->dearestMicro, $cost);
+        // Before the reply joins the transcript: the size of what the call sent.
+        $state->lastCallMicro = $cost;
+        $state->lastCallChars = ChatRunCostEstimate::size($state);
     }
 
     private function noTool(ChatRunState $state, ChatRunReply $reply): ?string
     {
         if ([] === $state->plan) {
+            $this->end($state, ChatRunEnd::Answered, $reply->content);
+
+            return null;
+        }
+        if ($state->budgetNudged && '' !== trim($reply->content)) {
+            // Told to finish up: text without a tool call is the answer, not another step.
             $this->end($state, ChatRunEnd::Answered, $reply->content);
 
             return null;

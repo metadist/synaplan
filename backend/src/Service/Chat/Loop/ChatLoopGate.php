@@ -6,6 +6,8 @@ namespace App\Service\Chat\Loop;
 
 use App\AI\ToolCalling\ToolCallingCapability;
 use App\Entity\Message;
+use App\Entity\Model;
+use App\Entity\User;
 use App\Service\Message\Routing\RoutingHandoffResolver;
 use App\Service\ModelConfigService;
 
@@ -37,6 +39,7 @@ final readonly class ChatLoopGate
         private ChatLoopConfig $config,
         private ModelConfigService $models,
         private ToolCallingCapability $capability,
+        private ChatRunStartBudget $budget,
     ) {
         $this->decided = new \WeakMap();
     }
@@ -48,6 +51,23 @@ final readonly class ChatLoopGate
     public function forTurn(Message $message, array $options, array $classification): bool
     {
         return $this->decided[$message] ??= $this->decide($message, $options, $classification);
+    }
+
+    /**
+     * Whether the payer can pay for a long answer: its first call and the
+     * wrap-up reserve. Asked once the turn is on the loop.
+     *
+     * @param list<array<string, mixed>> $messages
+     */
+    public function affords(User $payer, ?Model $model, array $messages): bool
+    {
+        return $this->budget->affords($payer, $model, $messages);
+    }
+
+    /** The price a run of this model estimates its calls with. */
+    public function rates(?Model $model): ?ChatRunRates
+    {
+        return $this->budget->rates($model);
     }
 
     /**

@@ -36,11 +36,34 @@ as planned. §0 #12, #14, #15 are updated.
   default. Cap = monthly budget with top-ups × share / 100, in billed money
   (with markup), the same figure as the budget. A plan without a monthly
   budget has no cap per run. No schema change.
-- `ChatRunCostGuard`, read fresh before every model call: reserve = max(10 %
-  of the cap, the dearest call so far). Budget already used up → ends at once
-  with `budget_used`, no further paid call; left ≤ reserve → wrap-up
-  `payer_empty`; spent + reserve ≥ cap → wrap-up `cost_limit`. A model
-  without a price costs 0 and never reaches it.
+- `ChatRunCostGuard`, read fresh before every model call (owner review of
+  the budget rules, 2026-11-20, points 1–6):
+  - limit = spent + min(share − spent, what the payer has left now). A
+    larger share never stops a run earlier than a smaller one.
+  - reserve = max(estimated wrap-up call, 10 % of the limit). The estimate
+    (`ChatRunCostEstimate`, `ChatRunRates`) is the transcript now as input
+    plus an answer of 2,000 tokens at the model's price with markup, fixed
+    when the run starts; at least the dearest call so far. Without a price,
+    the last call scaled to the transcript.
+  - Each working call ends with a message that is never stored: "Budget for
+    this answer: $L, used $S ($R left)."
+  - spent + reserve ≥ 80 % of the limit → once "nearly used, finish up".
+    A reply with text and no tool call after that is the answer, even with
+    plan steps open.
+  - spent + reserve ≥ limit → wrap-up, `payer_empty` when what is left binds,
+    else `cost_limit`. When the last reply already holds a written answer
+    (500+ characters, no tool call but plan updates), it is delivered under
+    the fixed opening without another call. Budget already used up → ends
+    at once with `budget_used`, no further paid call.
+  - Before the long answer starts (`ChatRunStartBudget`, asked by the gate in
+    `ChatLoopTurn::prepare`): if the first call (price estimate) plus the
+    reserve does not fit, the turn answers without tools and says in its
+    language that the monthly budget is nearly used. No half run.
+  - A model without a price costs 0 and is never held back.
+  - Tested: $10 a month, 50 %, $0.20 left → the run works with the $0.20
+    and wraps up near the end, the same as at 10 %; every share against
+    three amounts left, a larger share never stops earlier.
+  - Point 7 (parallel runs) is documented in 03 §1.3, not built.
 - `ChatRunStallDetector`, deterministic: the same call with the same
   normalised input 3 times, 6 steps in a row without a new result, 5 failed
   tool calls in a row. The first signal adds one user message that names the

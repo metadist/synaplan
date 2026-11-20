@@ -48,6 +48,10 @@ final readonly class ChatRunCodec implements RunStateCodec
             'nudges' => $state->nudges,
             'modelFailures' => $state->modelFailures,
             'dearestMicro' => $state->dearestMicro,
+            'lastCallMicro' => $state->lastCallMicro,
+            'lastCallChars' => $state->lastCallChars,
+            'budgetNudged' => $state->budgetNudged,
+            'rates' => $state->rates?->encode(),
             'wrapUp' => $state->wrapUp?->value,
             'stall' => ChatRunStallDetector::encode($state->stall),
             'expected' => $expectedSeq,
@@ -116,6 +120,10 @@ final readonly class ChatRunCodec implements RunStateCodec
         $state->nudges = max(0, (int) ($data['nudges'] ?? 0));
         $state->modelFailures = max(0, (int) ($data['modelFailures'] ?? 0));
         $state->dearestMicro = max(0, (int) ($data['dearestMicro'] ?? 0));
+        $state->lastCallMicro = max(0, (int) ($data['lastCallMicro'] ?? 0));
+        $state->lastCallChars = max(0, (int) ($data['lastCallChars'] ?? 0));
+        $state->budgetNudged = true === ($data['budgetNudged'] ?? false);
+        $state->rates = ChatRunRates::decode($data['rates'] ?? null);
         $state->wrapUp = ChatRunWrapUp::reason($data['wrapUp'] ?? null);
         $state->stall = ChatRunStallDetector::decode($data['stall'] ?? null);
         $state->pending = self::pending($data['pending'] ?? []);

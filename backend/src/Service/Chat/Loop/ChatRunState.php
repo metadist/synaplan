@@ -55,6 +55,16 @@ final class ChatRunState implements RunState
     /** The dearest single model call of this run, in what the person is billed. */
     public int $dearestMicro = 0;
 
+    /** The last model call: what it cost and how many characters it sent, for the cost estimate. */
+    public int $lastCallMicro = 0;
+    public int $lastCallChars = 0;
+
+    /** The model's price, fixed at the start; null for a model without one. */
+    public ?ChatRunRates $rates = null;
+
+    /** Whether the model was told once that the budget of this answer is nearly used. */
+    public bool $budgetNudged = false;
+
     /** Why the run wraps up; set once, when the wrap-up call is asked for. */
     public ?ChatRunEnd $wrapUp = null;
 

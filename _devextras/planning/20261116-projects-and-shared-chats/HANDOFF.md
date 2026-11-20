@@ -180,7 +180,11 @@ Composer, Chat ins Projekt und heraus über das Chat-Menü, angepinnte Projekte 
   ein Kostenlimit und Kreiserkennung (PJ6), beide enden mit einem Ergebnis.
 - **Seit PJ6** prüft ein `chat`-Lauf vor jedem Modellaufruf das Kostenlimit (Anteil
   des Monatsbudgets, den die Person in Einstellungen → Chat wählt: 5–100 %, Standard
-  10 %) und das Restbudget, und endet mit einer Wrap-up-Antwort. Ohne Monatsbudget
+  10 %) und das Restbudget, und endet mit einer Wrap-up-Antwort. Limit = das Kleinere
+  aus Anteil und Restbudget; Reserve = geschätzter Wrap-up-Call (Transkript plus
+  2.000 Token Antwort zum Modellpreis), mindestens 10 % des Limits; Budgetzeile bei
+  jedem Arbeitsschritt; einmal "fast verbraucht" bei 80 %; reicht das Budget nicht
+  für den Start, antwortet der Turn ohne Tools mit Hinweis (03 §1.3). Ohne Monatsbudget
   kein Limit pro Lauf; kein Token-Limit für unbepreiste Modelle (§0 #12, #14).
   Kreiserkennung 3/6/5: erst ein Hinweis, dann Wrap-up (§0 #15).
 - **Ende eines Laufs** (§0 #68): ohne `update_plan` endet ein Turn mit einer normalen

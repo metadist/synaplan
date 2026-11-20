@@ -16,6 +16,11 @@ final class ChatLoopPrompt
 {
     public const TOPIC = 'tools:chat_loop';
 
+    /** Added instead of the loop rules when the budget cannot pay for a long answer. */
+    public const LOW_BUDGET = 'The monthly budget of this person is nearly used up, so this answer cannot use tools or search. '
+        .'Answer from what you already know. Say in one short sentence, in the language of your answer, '
+        .'that a deeper answer was not possible because the monthly budget is nearly used up.';
+
     public static function system(ChatRunState $state, ChatRunScope $scope): string
     {
         $text = rtrim($state->basePrompt)."\n\n".self::rules();

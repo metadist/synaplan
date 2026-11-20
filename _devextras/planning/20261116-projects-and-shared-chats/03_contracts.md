@@ -62,15 +62,40 @@ plan §4.
 ### 1.3 Cost limit and wrap-up
 
 ```
-cap     = monthly budget × the person's share / 100           re-read before every call
+share   = monthly budget × the person's share / 100
           (BCONFIG owner = person, LOOP.RUN_COST_PERCENT; 5, 10, 20, 25, 50 or 100; default 10)
-reserve = max(cap × LOOP.WRAPUP_RESERVE_PERCENT / 100,
-              the dearest model call of this run so far)
-before every model call:
+limit   = spent + min(share − spent, what the payer has left now)    re-read before every call
+reserve = max(estimated wrap-up call, limit × LOOP.WRAPUP_RESERVE_PERCENT / 100)
+          estimated wrap-up = transcript now as input + an answer of 2,000 tokens,
+          at the model's price with markup (fixed at the start), at least the
+          dearest call so far; without a price, the last call scaled to the transcript
+before the long answer starts (the first call, in the request):
+    first call (price estimate) + reserve ≥ limit
+                                               ──► no tools, no run: the answer says
+                                                   the monthly budget is nearly used
+before every model call of the run:
     payer's budget already used up             ──► end at once, no call (budget_used)
-    payer's left ≤ reserve                     ──► wrap-up call (payer_empty)
-    spent + reserve ≥ cap                      ──► wrap-up call (cost_limit)
+    spent + reserve ≥ limit                    ──► wrap-up call: payer_empty when what
+                                                   is left binds, else cost_limit;
+                                                   a written answer in the last reply
+                                                   (500+ chars, only plan updates)
+                                                   is delivered without that call
+    spent + reserve ≥ 80 % of limit            ──► once: "nearly used, finish up";
+                                                   text without tools after it is
+                                                   the answer
+each working call while a limit applies:
+    a last message, never stored: "Budget for this answer: $L, used $S ($R left)."
 ```
+
+A larger share never stops a run earlier than a smaller one: the limit only
+grows with the share, and the reserve grows by a tenth of it at most. With
+$10 a month, 50 % and $0.20 left, the run works with the $0.20 and wraps up
+near its end, the same as at 10 %.
+
+Parallel runs (point 7 of the owner's 2026-11-20 review, not built): one run
+per chat and `RUNS.MAX_ACTIVE_PER_PERSON` bound the overshoot to one call per
+active run. Holds per call (reserve, then settle) come with the payer
+ledger, §3.
 
 Money is what the person is billed (with markup), the same figure as the
 monthly budget. A plan with no monthly budget (budget 0) has no cap per run.
@@ -91,7 +116,7 @@ share means in money.
 | Wrap-up reason | Trigger | Terminal status |
 | -------------- | ------- | --------------- |
 | `cost_limit` | rule above | `budget_used` |
-| `payer_empty` | what the payer has left is within the reserve (a budget already used up ends the run without a call, `budget_used`) | `budget_used` |
+| `payer_empty` | the rule above, with what the payer has left as the smaller amount (a budget already used up ends the run without a call, `budget_used`) | `budget_used` |
 | `circling` | §1.4, second trigger | `completed` |
 | `answer_now` | the person pressed "Answer now" | `completed` |
 
@@ -660,7 +685,7 @@ existing installs ships as a migration `UPDATE`.
 | ----- | --- | ------- | ------- |
 | `LOOP` | `ENABLED` | 0 | the chat turn runs on the loop |
 | `LOOP` | `RUN_COST_PERCENT` | 10 | owner = the person, share of their monthly budget per run, §1.3 |
-| `LOOP` | `WRAPUP_RESERVE_PERCENT` | 10 | |
+| `LOOP` | `WRAPUP_RESERVE_PERCENT` | 10 | the least reserve, as a share of the run's limit, §1.3 |
 | `LOOP` | `STALL_REPEAT` / `STALL_NO_NEW` / `STALL_ERRORS` | 3 / 6 / 5 | §1.4 |
 | `LOOP` | `COMPACT_AT_PERCENT` / `COMPACT_KEEP_STEPS` | 70 / 4 | §1.5 |
 | `LOOP` | `QUESTION_WAIT_HOURS` | 24 | |

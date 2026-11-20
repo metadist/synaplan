@@ -72,6 +72,9 @@ final class ChatRunCodecTest extends TestCase
         $state->mode = ChatRunState::MODE_WRAP_UP;
         $state->wrapUp = ChatRunEnd::Circling;
         $state->dearestMicro = 20_000;
+        $state->lastCallMicro = 12_000;
+        $state->lastCallChars = 4_321;
+        $state->budgetNudged = true;
         $state->stall = ['calls' => ['c:x' => ['tool' => 'web_search', 'n' => 2]], 'seen' => ['o:y' => true], 'stale' => 4, 'errors' => 1, 'nudged' => true, 'found' => false, 'ran' => false];
 
         $read = (new ChatRunCodec())->decode($state->stored(2, 1, 5, null));
@@ -79,6 +82,7 @@ final class ChatRunCodecTest extends TestCase
         self::assertInstanceOf(ChatRunState::class, $read);
         self::assertSame([ChatRunState::MODE_WRAP_UP, ChatRunEnd::Circling, 20_000], [$read->mode, $read->wrapUp, $read->dearestMicro]);
         self::assertSame($state->stall, $read->stall);
+        self::assertSame([12_000, 4_321, true], [$read->lastCallMicro, $read->lastCallChars, $read->budgetNudged]);
     }
 
     public function testAStoredWrapUpThatIsNoWrapUpReasonIsDropped(): void
