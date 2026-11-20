@@ -58,7 +58,10 @@ as planned. §0 #12, #14, #15 are updated.
   - Before the long answer starts (`ChatRunStartBudget`, asked by the gate in
     `ChatLoopTurn::prepare`): if the first call (price estimate) plus the
     reserve does not fit, the turn answers without tools and says in its
-    language that the monthly budget is nearly used. No half run.
+    language which limit binds: the monthly budget is nearly used, or the
+    share per answer is too low for this model (Settings → Chat & AI). No
+    half run. The price units are read like billing
+    (`CostCalculationService::normaliseToPerUnit`).
   - A model without a price costs 0 and is never held back.
   - Tested: $10 a month, 50 %, $0.20 left → the run works with the $0.20
     and wraps up near the end, the same as at 10 %; every share against

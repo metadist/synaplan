@@ -21,6 +21,11 @@ final class ChatLoopPrompt
         .'Answer from what you already know. Say in one short sentence, in the language of your answer, '
         .'that a deeper answer was not possible because the monthly budget is nearly used up.';
 
+    /** Added instead of the loop rules when the share per answer cannot pay for a long answer with this model. */
+    public const LOW_LIMIT = 'The cost limit per answer this person chose is too low for a long answer with this model, so this answer cannot use tools or search. '
+        .'Answer from what you already know. Say in one short sentence, in the language of your answer, '
+        .'that a deeper answer needs a higher cost limit per answer (Settings, Chat & AI) or a cheaper model.';
+
     public static function system(ChatRunState $state, ChatRunScope $scope): string
     {
         $text = rtrim($state->basePrompt)."\n\n".self::rules();

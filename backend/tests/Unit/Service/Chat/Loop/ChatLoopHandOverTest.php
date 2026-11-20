@@ -112,6 +112,19 @@ final class ChatLoopHandOverTest extends ChatLoopCase
         self::assertStringNotContainsString(ChatLoopPrompt::rules(), $call->messages[0]['content']);
     }
 
+    public function testAShareTooSmallForTheModelSaysSoNotThatTheBudgetIsUsedUp(): void
+    {
+        // Plenty left this month, but the chosen share cannot pay for the first call and the reserve.
+        $this->budget->runCapMicro = 50_000;
+        $this->budget->leftMicro = 9_000_000;
+
+        $call = $this->turn()->prepare($this->chatTurn(), $this->choice($this->priced()), $this->messages(), [], $this->options());
+
+        self::assertNotNull($call);
+        self::assertArrayNotHasKey('tools', $call->aiOptions);
+        self::assertStringEndsWith(ChatLoopPrompt::LOW_LIMIT, $call->messages[0]['content']);
+    }
+
     public function testABudgetThatPaysForTheFirstCallAndTheReserveStartsTheLoop(): void
     {
         $this->budget->runCapMicro = 1_000_000;

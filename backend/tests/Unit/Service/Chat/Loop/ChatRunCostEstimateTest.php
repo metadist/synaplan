@@ -66,6 +66,17 @@ final class ChatRunCostEstimateTest extends TestCase
         self::assertNull(ChatRunRates::decode(['in' => 'x', 'answer' => 1]));
     }
 
+    public function testTheRatesReadThePriceUnitLikeBilling(): void
+    {
+        $perMillion = ChatRunRates::of((new Model())->setPriceIn(3.0)->setInUnit('per1M')->setPriceOut(15.0)->setOutUnit('per1M'), 0.0);
+        $perThousand = ChatRunRates::of((new Model())->setPriceIn(0.003)->setInUnit('per1000')->setPriceOut(0.015)->setOutUnit('per1k'), 0.0);
+
+        self::assertNotNull($perMillion);
+        self::assertNotNull($perThousand);
+        self::assertSame($perMillion->answerMicro, $perThousand->answerMicro);
+        self::assertEqualsWithDelta($perMillion->inMicroPerChar, $perThousand->inMicroPerChar, 1e-9);
+    }
+
     public function testTheRunMaySpendTheSmallerOfItsShareAndWhatIsLeft(): void
     {
         self::assertSame(200_000, ChatRunCostGuard::room(0, new ChatRunAllowance(true, 200_000, 5_000_000)));

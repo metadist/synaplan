@@ -54,14 +54,14 @@ final readonly class ChatLoopGate
     }
 
     /**
-     * Whether the payer can pay for a long answer: its first call and the
-     * wrap-up reserve. Asked once the turn is on the loop.
+     * The limit that keeps the payer from paying for a long answer (its first
+     * call and the wrap-up reserve), or null. Asked once the turn is on the loop.
      *
      * @param list<array<string, mixed>> $messages
      */
-    public function affords(User $payer, ?Model $model, array $messages): bool
+    public function holdsBack(User $payer, ?Model $model, array $messages): ?ChatRunEnd
     {
-        return $this->budget->affords($payer, $model, $messages);
+        return $this->budget->holdsBack($payer, $model, $messages);
     }
 
     /** The price a run of this model estimates its calls with. */

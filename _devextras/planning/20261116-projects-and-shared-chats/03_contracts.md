@@ -72,7 +72,9 @@ reserve = max(estimated wrap-up call, limit × LOOP.WRAPUP_RESERVE_PERCENT / 100
 before the long answer starts (the first call, in the request):
     first call (price estimate) + reserve ≥ limit
                                                ──► no tools, no run: the answer says
-                                                   the monthly budget is nearly used
+                                                   which limit binds: the monthly budget
+                                                   is nearly used, or the share per answer
+                                                   is too low for this model
 before every model call of the run:
     payer's budget already used up             ──► end at once, no call (budget_used)
     spent + reserve ≥ limit                    ──► wrap-up call: payer_empty when what

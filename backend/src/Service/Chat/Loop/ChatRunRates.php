@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Chat\Loop;
 
 use App\Entity\Model;
+use App\Service\Usage\CostCalculationService;
 
 /**
  * The price of the run's model in what the person is billed, markup
@@ -33,8 +34,8 @@ final readonly class ChatRunRates
             return null;
         }
         $markup = 1 + max(0.0, $markupPercent) / 100;
-        $in = self::perToken($model->getPriceIn(), $model->getInUnit()) * $markup * self::MICRO / self::CHARS_PER_TOKEN;
-        $answer = self::perToken($model->getPriceOut(), $model->getOutUnit()) * $markup * self::MICRO * self::ANSWER_TOKENS;
+        $in = CostCalculationService::normaliseToPerUnit($model->getPriceIn(), $model->getInUnit()) * $markup * self::MICRO / self::CHARS_PER_TOKEN;
+        $answer = CostCalculationService::normaliseToPerUnit($model->getPriceOut(), $model->getOutUnit()) * $markup * self::MICRO * self::ANSWER_TOKENS;
 
         return new self(max(0.0, $in), (int) ceil(round(max(0.0, $answer), 3)));
     }
@@ -58,14 +59,5 @@ final readonly class ChatRunRates
         }
 
         return new self(max(0.0, (float) $raw['in']), max(0, $raw['answer']));
-    }
-
-    private static function perToken(float $price, string $unit): float
-    {
-        return match ($unit) {
-            'per1K' => $price / 1_000,
-            'per1' => $price,
-            default => $price / 1_000_000,
-        };
     }
 }

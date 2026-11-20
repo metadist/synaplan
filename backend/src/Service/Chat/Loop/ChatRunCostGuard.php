@@ -85,7 +85,8 @@ final readonly class ChatRunCostGuard
             .' ('.self::dollars(max(0, $limitMicro - $spentMicro)).' left). Plan your remaining steps to finish within it.';
     }
 
-    private static function payerBinds(int $spentMicro, ChatRunAllowance $allowance): bool
+    /** Whether what the payer has left, not the share per answer, is the tighter limit. */
+    public static function payerBinds(int $spentMicro, ChatRunAllowance $allowance): bool
     {
         return null !== $allowance->leftMicro
             && (null === $allowance->runCapMicro || $allowance->leftMicro < $allowance->runCapMicro - $spentMicro);

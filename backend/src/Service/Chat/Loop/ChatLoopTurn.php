@@ -67,9 +67,10 @@ final readonly class ChatLoopTurn
             return null;
         }
         $basePrompt = $this->basePrompt($system['content'], $turn, $options);
-        if (!$this->gate->affords($scope->user, $model->model, $messages)) {
-            // No run that could only stop at once: an answer without tools that says why.
-            $messages[0]['content'] = rtrim($system['content'])."\n\n".ChatLoopPrompt::LOW_BUDGET;
+        $held = $this->gate->holdsBack($scope->user, $model->model, $messages);
+        if (null !== $held) {
+            // No run that could only stop at once: an answer without tools that says which limit and why.
+            $messages[0]['content'] = rtrim($system['content'])."\n\n".(ChatRunEnd::CostLimit === $held ? ChatLoopPrompt::LOW_LIMIT : ChatLoopPrompt::LOW_BUDGET);
 
             return new ChatLoopCall($messages, $aiOptions, $basePrompt, \array_slice($messages, 1), $scope);
         }
