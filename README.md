@@ -2,6 +2,8 @@
 
 <a href="https://www.synaplan.com"><img src="docs/images/hero.svg" alt="Synaplan. Own the flow. Your knowledge, your models, your channels." width="100%"></a>
 
+**Own the flow.**
+
 Build agents on your own documents and put them wherever work happens: web, WhatsApp, email, Outlook, Nextcloud and ownCloud. Mix local models with the best cloud AI, see what every answer costs, and decide what the AI is allowed to do – open source, on your server or ours.
 
 [**Run it in up to five minutes**](#quickstart) &nbsp;·&nbsp; [**Try it hosted**](https://web.synaplan.com/) &nbsp;·&nbsp; [**Docs**](https://docs.synaplan.com/) &nbsp;·&nbsp; [**Discord**](https://discord.com/invite/kQB3eDjWfF)
@@ -20,15 +22,18 @@ Build agents on your own documents and put them wherever work happens: web, What
 
 <p align="center"><sub>Chat, the cost of every answer, your files, generated media and connected apps – in about 30 seconds.</sub></p>
 
+<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a></p>
+
+<!-- The GIF above is docs/images/synaplan-admin-tour.gif. scripts/build-readme-tour.sh rebuilds the tour film and stills. -->
+
 ---
 
-## Why Synaplan
+## Own the flow
 
 - **Own your channels.** The AI answers on your website, in WhatsApp, by email, in Outlook and inside Nextcloud and ownCloud – with the same knowledge and the same rules everywhere.
 - **Own your models.** Hundreds of models from OpenAI, Anthropic, Google, Mistral, sovereign EU providers or locally via Ollama. Mix them per task: sensitive work stays local, everything else gets the best model for the job.
 - **Own your costs.** Every answer shows its model and price. A planner splits bigger requests into steps and spends the expensive model only where it matters.
 - **Own the decisions.** Actions like sending mail or creating tickets wait for your approval, and every step is logged.
-- **Own the stack.** On-prem, EU cloud or fully air-gapped. No training on your data, no forced telemetry, no feature paywall: self-hosted Synaplan is the same software as our cloud, under Apache-2.0.
 
 **Running in production at** Megaherz Yoga · SANI Pflegedienst · National Secure Cloud · PlateArt
 
@@ -57,13 +62,13 @@ The first start downloads everything and takes 5–15 minutes. After that, Synap
 
 | Where | How | Guide |
 | --- | --- | --- |
-| **Your machine** | `make up` – the quickstart above | [Quickstart](#quickstart) |
 | **Published image, no git** | One `compose.yaml`, then `docker compose up -d` | [Published image](docs/PLATFORM_REFERENCE.md#published-image-no-git-checkout) |
 | **Docker GUI** | Portainer, Dockge, Synology: paste the compose file as a stack | [Docker GUI](docs/PLATFORM_REFERENCE.md#published-image-no-git-checkout) |
 | **Closed network** | No route to the internet, HTTPS on your LAN address | [Closed network](docs/PLATFORM_REFERENCE.md#closed-network) |
 | **Linux server** | The installer pins a release, generates secrets and runs a smoke test | [On a server](docs/PLATFORM_REFERENCE.md#on-a-server) |
 | **Kubernetes** | Helm charts for clusters | [synaplan-charts](https://github.com/metadist/synaplan-charts) |
 | **One click** | [RepoCloud](https://repocloud.io/details/Synaplan/) · [Elestio](https://elest.io/open-source/synaplan) | – |
+| **Public sector (EU/CH)** | openDesk, Nextcloud and OpenCloud, on-premises or in an EU cloud | [synaplan.eu](https://www.synaplan.eu/) |
 
 A Linux server in one line:
 
@@ -72,7 +77,7 @@ curl -fsSL https://raw.githubusercontent.com/metadist/synaplan/main/install.sh |
   bash -s -- --mode server --domain https://ai.example.com
 ```
 
-**Public sector & sovereign cloud (EU/CH):** [synaplan.eu](https://www.synaplan.eu/) covers openDesk, Nextcloud and OpenCloud deployments, on-premises or in an EU cloud.
+**Own the stack.** On-prem, EU cloud or fully air-gapped. No training on your data, no forced telemetry, no feature paywall: self-hosted Synaplan is the same software as our cloud, under Apache-2.0.
 
 ---
 
@@ -83,7 +88,7 @@ People usually arrive comparing Synaplan with a chat window or an app builder. T
 | | Synaplan | Open WebUI | LibreChat | Dify |
 | --- | --- | --- | --- | --- |
 | What it is | A team platform: chat, your files as knowledge, a site widget, and the same AI on WhatsApp and email | A chat interface for local and cloud models | A chat app for many providers | A builder for AI apps and workflows |
-| First run | Several containers, about 4 GB | One container | A Compose stack | A Compose stack, and a hosted cloud |
+| First run | Several containers, 8 GB of RAM | One container | A Compose stack | A Compose stack, and a hosted cloud |
 | Cost of an answer | Shown on the answer | Not on the answer | Not on the answer | In the builder's usage logs, not on the chat answer |
 | Same AI on your site, WhatsApp and email | Yes | No | No | Site widget yes. WhatsApp and email are not built in |
 
@@ -91,73 +96,7 @@ If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
 ---
 
-## Take the tour
-
-![A tour through Synaplan: chat with live cost tracking, one-key provider setup, per-task model choice, document search, media generation, the embeddable chat widget and white-label branding](docs/images/synaplan-tour.webp)
-
-<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a> &nbsp;·&nbsp; Click any screenshot to see it full size.</p>
-
-<table>
-  <tr>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/chat.webp"><img src="docs/images/tour/thumbs/chat.webp" alt="Chat with per-model cost tracking" width="100%"></a><br>
-      <sub><b>Chat</b><br>Every answer shows what it cost</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/provider-setup.webp"><img src="docs/images/tour/thumbs/provider-setup.webp" alt="AI provider setup with live key validation" width="100%"></a><br>
-      <sub><b>Provider setup</b><br>One key, tested and encrypted</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/model-selection.webp"><img src="docs/images/tour/thumbs/model-selection.webp" alt="Per-task model selection with cost badges" width="100%"></a><br>
-      <sub><b>Model choice</b><br>A different model per task</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/rag-search.webp"><img src="docs/images/tour/thumbs/rag-search.webp" alt="Semantic search across uploaded documents" width="100%"></a><br>
-      <sub><b>Document search</b><br>Answers from your own files</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/media-generation.webp"><img src="docs/images/tour/thumbs/media-generation.webp" alt="Gallery of AI-generated images and video" width="100%"></a><br>
-      <sub><b>Media generation</b><br>Images, video and audio in chat</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/chat-widget.webp"><img src="docs/images/tour/thumbs/chat-widget.webp" alt="Embed code for the chat widget" width="100%"></a><br>
-      <sub><b>Chat widget</b><br>One snippet, any website</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/system-prompts.webp"><img src="docs/images/tour/thumbs/system-prompts.webp" alt="System prompt editor" width="100%"></a><br>
-      <sub><b>AI instructions</b><br>Your own system prompts</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/file-manager.webp"><img src="docs/images/tour/thumbs/file-manager.webp" alt="File manager with folders and storage quota" width="100%"></a><br>
-      <sub><b>Files</b><br>Uploads become knowledge</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/plugins.webp"><img src="docs/images/tour/thumbs/plugins.webp" alt="Plugin view showing Synaform collections" width="100%"></a><br>
-      <sub><b>Plugins</b><br>Extend without forking</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/admin-panel.webp"><img src="docs/images/tour/thumbs/admin-panel.webp" alt="Admin panel with system info and user counts" width="100%"></a><br>
-      <sub><b>Admin</b><br>Users, usage and health</sub>
-    </td>
-    <td width="25%" align="center">
-      <a href="docs/images/tour/branding.webp"><img src="docs/images/tour/thumbs/branding.webp" alt="White-label branding settings" width="100%"></a><br>
-      <sub><b>Branding</b><br>White-label the whole app</sub>
-    </td>
-    <td width="25%"></td>
-  </tr>
-</table>
-
-<!-- Regenerate these assets after a UI change with scripts/build-readme-tour.sh -->
-
----
-
-## One AI, everywhere you work
-
-The same AI, the same knowledge, the same model policy – on every channel your team and your customers already use.
+## Where the AI shows up
 
 | Surface | What it does | Get it |
 | --- | --- | --- |
@@ -174,16 +113,6 @@ The same AI, the same knowledge, the same model policy – on every channel your
 
 ---
 
-## Under the hood
-
-- **Stack:** Symfony (PHP) backend, Vue frontend, MariaDB VECTOR or Qdrant for document search, Redis, Docker.
-- **Lean core:** app, database and Redis. Local AI, office files, web search, voice and more are building blocks you switch on when you need them.
-- **Open by design:** OpenAPI REST API, MCP server and client, an Anthropic-compatible `/v1/messages` endpoint and a plugin system – extend Synaplan without forking it.
-
-Full feature list, every AI provider, all building blocks and developer commands: **[Platform reference](docs/PLATFORM_REFERENCE.md)**.
-
----
-
 ## Troubleshooting
 
 | Problem | What to do |
@@ -196,23 +125,15 @@ Full feature list, every AI provider, all building blocks and developer commands
 
 ---
 
-## Learn more
+## Under the hood
 
-- **[docs.synaplan.com](https://docs.synaplan.com/)** – guides for users and admins
-- **[docs/README.md](docs/README.md)** – the technical manual, in five learning tracks
-- **[Platform reference](docs/PLATFORM_REFERENCE.md)** – install variants, features, providers and building blocks
-- Changing the code? Start with [adding an AI provider](docs/PROVIDERS.md) or [following a tool call](docs/ARCHITECTURE.md#tool-path).
+- **Stack:** Symfony (PHP) backend, Vue frontend, MariaDB VECTOR or Qdrant for document search, Redis, Docker.
+- **Lean core:** app, database and Redis. Local AI, office files, web search, voice and more are building blocks you switch on when you need them.
+- **Open by design:** OpenAPI REST API, MCP server and client, an Anthropic-compatible `/v1/messages` endpoint and a plugin system – extend Synaplan without forking it.
 
----
+[Docs](https://docs.synaplan.com/) · [Technical manual](docs/README.md) · [Platform reference](docs/PLATFORM_REFERENCE.md) · [Discussions](https://github.com/metadist/synaplan/discussions) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Discord](https://discord.com/invite/kQB3eDjWfF)
 
-## Help shape what's next
-
-We build Synaplan in the open. Tell us what you'd use it for, vote on ideas or show what you built in [Discussions](https://github.com/metadist/synaplan/discussions) – we read everything.
-
-- 💬 **[Discord](https://discord.com/invite/kQB3eDjWfF)** – the fastest place for self-hosting and configuration questions
-- 🐛 **[Issues](https://github.com/metadist/synaplan/issues)** – bugs and feature requests
-- 🙌 **[Contributing](CONTRIBUTING.md)** – how to get your first pull request merged ([AGENTS.md](AGENTS.md) is the guide for coding agents)
-- 🔒 **[Security policy](SECURITY.md)** – report a vulnerability privately
+Changing the code? Start with [adding an AI provider](docs/PROVIDERS.md) or [following a tool call](docs/ARCHITECTURE.md#tool-path). [AGENTS.md](AGENTS.md) is the guide for coding agents.
 
 ---
 
@@ -224,14 +145,4 @@ We build Synaplan in the open. Tell us what you'd use it for, vote on ideas or s
   <a href="https://osb-alliance.de/" target="_blank" rel="noopener noreferrer"><img src="docs/images/osba-member.png" alt="OSBA member" width="180" height="90"></a>
 </p>
 
-<p align="center"><b>If Synaplan helps you own your flow, a ⭐ helps the next team find it.</b></p>
-
-<p align="center">
-  <a href="https://star-history.com/#metadist/synaplan&Date">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date&theme=dark" />
-      <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" />
-      <img alt="Star history of metadist/synaplan" src="https://api.star-history.com/svg?repos=metadist/synaplan&type=Date" width="720">
-    </picture>
-  </a>
-</p>
+<p align="center"><b>If Synaplan helps you Own the flow, a ⭐ helps the next team find it.</b></p>
