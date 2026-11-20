@@ -284,9 +284,13 @@
     "publishedOnly": "Nur veröffentlichte KI-Agenten sind enthalten. Entwürfe bleiben auf diesem Konto."
   },
   "templates": {
-    "pickTitle": "Neuer Agent",
-    "pickSubtitle": "Starten Sie mit einem fertigen Agenten oder mit einem leeren.",
-    "searchPlaceholder": "Vorlagen suchen",
+    "pickTitle": "Was soll dein Agent tun?",
+    "pickSubtitle": "Such dir einen fertigen aus und pass ihn an — oder fang mit einem leeren an.",
+    "groups": {
+      "schedule": "Läuft von selbst",
+      "chat": "Antwortet im Chat"
+    },
+    "searchPlaceholder": "Beispiele suchen",
     "all": "Alle",
     "startEmpty": "Leer starten",
     "startEmptyHint": "Ein leerer Agent. Die Anweisungen schreiben Sie selbst.",
@@ -370,68 +374,68 @@
       "plugin": "Plugins"
     },
     "offerWriter": {
-      "title": "Angebots-Schreiber",
+      "title": "Ein Angebot aus deiner Preisliste schreiben",
       "summary": "Schreibt ein Angebot aus Ihrer Preisliste und nennt zu jedem Preis die Quelle.",
       "needsPriceList": "Braucht den Ordner mit Ihrer Preisliste.",
       "try1": "Schreib ein Angebot für die Müller GmbH über 10 Lizenzen.",
       "try2": "Welche Preise gelten für einen Supportvertrag über ein Jahr?"
     },
     "hrHandbook": {
-      "title": "HR-Handbuch",
+      "title": "Handbuch-Fragen mit Fundstelle beantworten",
       "summary": "Beantwortet Fragen zum geschriebenen Handbuch und nennt die Stelle. Es trifft keine Personalentscheidung.",
       "needsHandbook": "Braucht den Ordner mit Ihrem Handbuch.",
       "try1": "Wie viele Urlaubstage erlaubt das Handbuch?",
       "try2": "Was steht im Handbuch zum Arbeiten von zu Hause?"
     },
     "tenderResponse": {
-      "title": "Antwort auf Ausschreibung",
+      "title": "Ausschreibungs-Antworten aus deinen Dateien entwerfen",
       "summary": "Entwirft Antworten auf Ausschreibungsfragen und nennt die Quelldatei.",
       "needsFolder": "Braucht den Ordner mit Ihren Ausschreibungsunterlagen.",
       "try1": "Beantworte die Frage zu unseren Supportzeiten und nenne die Datei.",
       "try2": "Welche Unterlagen fehlen uns für diese Ausschreibung noch?"
     },
     "contractSummary": {
-      "title": "Vertragszusammenfassung",
+      "title": "Einen Vertrag in einfachen Worten zusammenfassen",
       "summary": "Fasst einen Vertrag in einfacher Sprache zusammen. Das ist keine Rechtsberatung.",
       "needsFile": "Braucht die Vertragsdatei.",
       "try1": "Fasse die Parteien, die Laufzeit und die Zahlung zusammen.",
       "try2": "Was passiert, wenn wir den Vertrag vorzeitig beenden?"
     },
     "meetingMinutes": {
-      "title": "Besprechungsprotokoll",
+      "title": "Aus Notizen Entscheidungen und Aufgaben machen",
       "summary": "Macht aus Notizen oder einem Transkript Beschlüsse und Aufgaben.",
       "try1": "Mach aus diesen Notizen ein Protokoll mit Beschlüssen und Aufgaben.",
       "try2": "Liste nur die Aufgaben, mit der Person, wenn eine genannt wurde."
     },
     "socialPosts": {
-      "title": "Beiträge für soziale Medien",
+      "title": "Drei Beiträge aus einer Pressemeldung entwerfen",
       "summary": "Entwirft drei Beiträge aus einer Pressemitteilung, ohne Fakten zu ergänzen.",
       "try1": "Schreib drei Beiträge aus dieser Pressemitteilung.",
       "try2": "Mach eine kürzere Fassung des zweiten Beitrags."
     },
     "itHelpdesk": {
-      "title": "IT-Helpdesk",
+      "title": "IT-Fragen aus deinen Hilfe-Artikeln beantworten",
       "summary": "Schreibt eine erste Antwort aus Ihren Hilfeartikeln und nennt den Artikel. Es öffnet kein Ticket.",
       "needsArticles": "Braucht den Ordner mit Ihren Hilfeartikeln.",
       "try1": "Eine Kollegin kommt nicht ins VPN. Was soll sie zuerst versuchen?",
       "try2": "Wie setzen wir ein vergessenes Passwort zurück?"
     },
     "dailyBriefing": {
-      "title": "Tägliches Briefing",
+      "title": "Dein Morgen-Briefing, jeden Werktag",
       "summary": "Ein Briefing an Werktagen morgens aus Ihrem Postfach.",
       "needsMail": "Verbinden Sie Ihr Postfach, damit das Briefing es lesen kann.",
       "try1": "Was in meinem Postfach braucht heute eine Entscheidung?",
       "try2": "Lass Newsletter weg und liste nur die Nachrichten, die ich beantworten sollte."
     },
     "regulationWatch": {
-      "title": "Vorschriften im Blick",
+      "title": "Bescheid sagen, wenn sich eine beobachtete Seite ändert",
       "summary": "Meldet eine Änderung auf einer Seite, die Sie beobachten, und nennt die Seite. Es erfindet keine Änderung.",
       "needsPage": "Fügen Sie die Seiten hinzu, die beobachtet werden sollen. Das geht unter Gespeicherte Aufgaben.",
       "try1": "Was hat sich auf den Seiten geändert, die ich beobachte?",
       "try2": "Hat sich die Gebührenordnung geändert, oder ist sie unverändert?"
     },
     "expertResearch": {
-      "title": "Eigene Recherche",
+      "title": "Aus deinen eigenen Dokumenten antworten",
       "summary": "Antwortet aus Ihren eigenen Dokumenten und nennt die Stelle. Es sagt, wenn die Dokumente die Antwort nicht enthalten.",
       "needsFolder": "Braucht den Ordner mit Ihren Dokumenten.",
       "needsResearch": "Die Recherche ist auf diesem Server ausgeschaltet. Dieser Agent antwortet trotzdem aus dem Ordner, den Sie wählen.",
@@ -439,7 +443,7 @@
       "try2": "Was sagt unsere Notiz zur Kündigungsfrist?"
     },
     "serviceDesk": {
-      "title": "Bürgerservice",
+      "title": "Besucherfragen von deiner Website beantworten",
       "summary": "Beantwortet Fragen von Besuchern Ihrer Website aus Ihren freigegebenen Dokumenten, in ihrer Sprache, und nennt die Stelle. Es schickt keinen Antrag und entscheidet den Fall nicht.",
       "needsFolder": "Braucht den Ordner mit den freigegebenen Dokumenten.",
       "needsWidget": "Veröffentlichen Sie diesen Agenten und legen Sie ihn dann auf ein Chat-Widget. Besucher hören ihn erst nach der Veröffentlichung.",
