@@ -6,11 +6,13 @@ namespace App\MessageHandler;
 
 use App\Entity\Approval;
 use App\Message\ResumeApprovalCommand;
+use App\Message\ResumeChatRunCommand;
 use App\Message\ResumeSavedTaskRunCommand;
 use App\Repository\ApprovalRepository;
 use App\Repository\CustomToolRepository;
 use App\Repository\McpServerConfigRepository;
 use App\Repository\UserRepository;
+use App\Service\Chat\Loop\ChatRunApprovals;
 use App\Service\Mcp\McpClient;
 use App\Service\Tool\ApprovalRealtimeNotifier;
 use App\Service\Tool\ApprovalReference;
@@ -82,6 +84,12 @@ final readonly class ResumeApprovalCommandHandler
     public function __invoke(ResumeApprovalCommand $command): void
     {
         $approval = $this->approvals->find($command->approvalId);
+        if ($approval instanceof Approval && null !== ChatRunApprovals::runOf($approval->getRequestedBy())) {
+            // A chat run runs its own approved call, under its own claim.
+            $this->bus->dispatch(new ResumeChatRunCommand((int) $approval->getId()));
+
+            return;
+        }
         if (!$approval instanceof Approval || Approval::STATUS_APPROVED !== $approval->getStatus()) {
             return;
         }

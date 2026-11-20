@@ -7,8 +7,10 @@ namespace App\Controller;
 use App\DTO\Tool\ApprovalResponse;
 use App\Entity\User;
 use App\Message\ResumeApprovalCommand;
+use App\Message\ResumeChatRunCommand;
 use App\Service\AgentTemplate\AgentPublishReview;
 use App\Service\AgentTemplate\Exception\AgentPublishReviewException;
+use App\Service\Chat\Loop\ChatRunApprovals;
 use App\Service\Email\MailerConfig;
 use App\Service\Mcp\Permissions\McpApprovalAllowance;
 use App\Service\Mcp\Permissions\McpApprovalConnection;
@@ -184,6 +186,9 @@ final class ApprovalController extends AbstractController
             $approval = $this->approvals->reject($id, $user, $reason);
         } catch (ApprovalNotFoundException) {
             return $this->json(['success' => false, 'error' => 'Not found'], Response::HTTP_NOT_FOUND);
+        }
+        if (null !== ChatRunApprovals::runOf($approval->getRequestedBy())) {
+            $this->bus->dispatch(new ResumeChatRunCommand((int) $approval->getId()));
         }
 
         return $this->json(['success' => true, 'approval' => $this->connections->decorate($this->approvals->toArray($approval), (int) $user->getId())]);

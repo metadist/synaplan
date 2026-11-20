@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Service\Chat\Loop\ChatRunReaper;
 use App\Service\Chat\Run\StreamRedis;
+use App\Service\Research\Run\ResearchReaper;
 use App\Service\Run\RunReaper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -24,7 +26,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 final class ReapRunsCommand extends Command
 {
     /**
-     * @param iterable<RunReaper> $kernelReapers one per kind of kernel run, tagged `app.run_reaper`
+     * @param iterable<RunReaper|ChatRunReaper|ResearchReaper> $kernelReapers one per kind of kernel run, tagged `app.run_reaper`
      */
     public function __construct(
         private readonly StreamRedis $redis,
