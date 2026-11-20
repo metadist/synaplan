@@ -8,7 +8,7 @@ to them.
 | ---- | ----- | -- | ----- |
 | CF0 | decided 2026-11-19 | — | §0 #5 setup wizard, #6 `coolify` platform, #9 publish a TTS tag; #7, #8 open |
 | CF1 | done 2026-11-19 | — | Coolify development stack, `next` @ `ed1e184` (reports 4.7.5), on the owner's M4 (Colima, arm64), ports moved off the Synaplan dev stack. `traefik/whoami:v1.11.0` from the API's Docker Compose path answered 200 through `coolify-proxy` (`traefik:v3.7`) |
-| CF2 | in progress | — | `deploy/coolify/synaplan.yaml` deployed, all nine containers healthy, setup wizard walked, live chat connected, redeploy survived. Chat, upload and a spoken answer not walked yet (see below) |
+| CF2 | done 2026-11-20 | — | `deploy/coolify/synaplan.yaml` deployed, all nine containers healthy, setup wizard walked, live chat connected, redeploy survived; chat stream, document question and spoken answer walked with an Anthropic key (see below) |
 | CF3 | done 2026-11-19 | — | tag `v2.1.1` on `metadist/synaplan-tts` `c208a5f42`; its `ci.yml` published `ghcr.io/metadist/synaplan-tts:2.1.1` for `amd64` and `arm64` (`docker manifest inspect`). The file pins `2.1.1` |
 | CF4 | done 2026-11-19 | #3195 | file, guide, test, release pins |
 | CF5 | done 2026-11-19 | — | update 5.8.0 → 5.8.8 and backup and restore measured on CF1, guide rewritten from the result (see below) |
@@ -37,7 +37,10 @@ was the file as committed.
 | Synaplan Demo | `POST https://web.synaplan.com/v1/free/keys` answered 403 from this install; not a Coolify issue, not investigated further |
 | Live chat | WebSocket to `/connection/websocket` opened; Centrifugo `api/info` reported `num_clients: 1` |
 | Redeploy | compose updated to `synaplan-tts:2.1.1` through the API, service restarted: all nine containers healthy again within a minute, the four volumes kept their creation time, `BUSER` still 1 row, the administrator signed in (`POST /api/v1/auth/login` 200, level `ADMIN`) |
-| Not walked | chat stream, document upload and question, spoken answer (need a provider key typed by the owner) |
+| Chat stream (2026-11-20) | Anthropic key typed by the owner under AI infrastructure, chat default Claude Sonnet 5. `POST /api/v1/messages/stream` 200 through `coolify-proxy`; the answer grew in 250 ms samples over 3.5 s (500 → 1683 characters), so Traefik does not buffer the stream |
+| Document question (2026-11-20) | a 166-byte text file attached in the chat; `BFILES` row `processed`, 165 characters extracted by Tika; the answer named the keeper and the cat from the file |
+| Spoken answer (2026-11-20) | asked for an audio file in the chat: `tts_….mp3` (17.5 KB, 2.0 s) played from `/api/v1/files/uploads/…`; the `tts` sidecar logged `POST /api/tts` 200, the worker logged provider `piper`. No provider key needed |
+| Not covered | no embedding model (Anthropic has none, the Ollama default is not in the file), so the worker logs `Smart Search index embedding failed, rows keep keyword search only` and Qdrant stays empty |
 
 ## CF5 walk, 2026-11-19
 
