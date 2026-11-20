@@ -38,7 +38,7 @@ dem Kernel) ist gemergt, **PJ5b** (die Übergabe im Request) liegt als PR vor,
 | AH8a Run-Kernel und `BRUNS` (Zeile 25) | gemergt | #3198 |
 | AH8b Research läuft auf dem Kernel | gemergt | #3201 |
 | PJ5a Chat-Lauf auf dem Kernel (Flag aus) | gemergt | #3216 |
-| PJ5b Übergabe Request → Lauf, Tool-Katalog, G1 (Grenzfall) | PR offen | `feat/chat-loop-handover` |
+| PJ5b Übergabe Request → Lauf, Tool-Katalog, G1 (Owner: reicht) | PR offen | `feat/chat-loop-handover` |
 | PJ5c Check vor der Auslieferung (03 §3.2) | **nächster Schritt** | — |
 | PJ6–PJ28 | nicht begonnen | — |
 
@@ -234,9 +234,9 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
   für die Karte in PJ8. Stop mit "Text behalten" kann eine Nachricht mehr speichern
   (Stop gehört PJ8). Verbundene Tools (MCP, HTTP) nur über `connected_tools`
   (höchstens 8 offen, 60 gelistet).
-- **G1 ist Grenzfall:** Median +10,1 % Kosten gegenüber dem Lauf ohne Loop am selben
-  Tag (Tool-Deklarationen und Tool-Use-Preamble des Providers, etwa 1.300 Token).
-  Der Owner entscheidet, ob das hält; Prompt-Caching wäre der nächste Hebel.
+- **G1 knapp, vom Owner akzeptiert (2026-11-20):** Median +10,1 % Kosten gegenüber
+  dem Lauf ohne Loop am selben Tag (Tool-Deklarationen und Tool-Use-Preamble des
+  Providers, etwa 1.300 Token). Prompt-Caching wäre der nächste Hebel.
 - **Warten ohne `sleep`:** der `LongWaitGateTest` verbietet neue Sleeps. Ein Leser
   wartet blockierend auf den Stream `run:…:events:wake` (`RunKeys::awaitEvent`).
 - **PJ5a-Grenzen:** der Lauf bietet keine Dokument-Tools, keine Skills und keinen
@@ -277,7 +277,7 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **PJ5b** PR abschließen (Copilot, CI), Owner mergt und entscheidet G1.
+1. **PJ5b** PR abschließen (Copilot, CI), Owner mergt (G1 akzeptiert).
    Danach **PJ5c** (Abschnitt 9).
 2. **PJ6** Kostenlimit mit Ergebnis und Kreiserkennung (`RunCostGuard`,
    `StallDetector`); braucht §0 #12, #14, #15.
