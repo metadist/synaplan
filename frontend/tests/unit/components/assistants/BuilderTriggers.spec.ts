@@ -51,9 +51,13 @@ vi.mock('@/services/api/inboundEmailHandlersApi', () => ({
   inboundEmailHandlersApi: { list: vi.fn().mockResolvedValue([]) },
 }))
 
-function mountTriggers() {
+function mountTriggers(
+  triggers: ReturnType<typeof emptyAgentDraft>['triggers'] = { events: [], schedules: [] }
+) {
   setActivePinia(createPinia())
   const store = useAgentsStore()
+  const draft = emptyAgentDraft()
+  draft.triggers = triggers
   store.current = {
     id: 3,
     slug: 'contract-review',
@@ -66,7 +70,7 @@ function mountTriggers() {
     source: 'manual',
     routable: false,
     publishedVersionId: null,
-    draft: emptyAgentDraft(),
+    draft,
     createdAt: 1,
     updatedAt: 1,
   }
@@ -91,6 +95,38 @@ describe('BuilderTriggers', () => {
       'only answers when someone starts a chat'
     )
     expect(wrapper.text().toLowerCase()).not.toContain('cron')
+  })
+
+  it('says once that the agent runs as you and keeps identity words off personal rows', () => {
+    const { wrapper } = mountTriggers({
+      events: [{ id: 'wdg-1', kind: 'widget', widget: '4:main', enabled: true }],
+      schedules: [{ id: 'sch-1', name: 'Morning news', enabled: true }],
+    })
+
+    expect(wrapper.get('[data-testid="text-runs-as-line"]').text()).toBe('Runs as you.')
+    const text = wrapper.text()
+    expect(text).not.toContain('Runs as the person talking')
+    expect(text).not.toContain('Runs as the person using the app')
+    expect(text).not.toContain('Runs on its own (as you)')
+  })
+
+  it('names the shared mailbox on a department mail event', () => {
+    const { wrapper } = mountTriggers({
+      events: [
+        {
+          id: 'mail-1',
+          kind: 'mail',
+          mailbox: '4:inbox',
+          department: 'support@example.org',
+          enabled: true,
+        },
+      ],
+      schedules: [],
+    })
+
+    expect(wrapper.get('[data-testid="row-event-mail-1"]').text()).toContain(
+      'Sends mail from the shared mailbox.'
+    )
   })
 
   it('adds a weekly schedule from the form', async () => {

@@ -59,7 +59,7 @@
         class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
         :disabled="!store.current || store.current.status === 'archived'"
         data-testid="btn-share-assistant"
-        @click="shareOpen = true"
+        @click="onShare"
       >
         {{ $t('assistants.share') }}
       </button>
@@ -89,6 +89,35 @@
       >
         {{ $t('assistants.delete') }}
       </button>
+    </div>
+
+    <div v-if="descriptionAskOpen" class="space-y-3" data-testid="section-share-description">
+      <p class="txt-primary text-sm font-medium">{{ $t('assistants.shareDescriptionTitle') }}</p>
+      <p class="txt-secondary text-sm">{{ $t('assistants.shareDescriptionHint') }}</p>
+      <textarea
+        v-model="descriptionDraft"
+        rows="3"
+        class="w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+        data-testid="input-share-description"
+      />
+      <div class="flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium"
+          :disabled="!descriptionDraft.trim() || descriptionSaving"
+          data-testid="btn-share-description-save"
+          @click="onConfirmDescription"
+        >
+          {{ $t('assistants.shareDescriptionSave') }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary px-4 py-2.5 rounded-xl text-sm font-medium"
+          @click="descriptionAskOpen = false"
+        >
+          {{ $t('common.cancel') }}
+        </button>
+      </div>
     </div>
 
     <ul v-if="versions.length > 0" class="space-y-2" data-testid="list-assistant-versions">
@@ -124,6 +153,8 @@ import {
   type AgentVersionCard,
 } from '@/services/api/agentsApi'
 import { ApiError } from '@/services/api/httpClient'
+import { promptsApi } from '@/services/api/promptsApi'
+import { deriveAgentDescription } from '@/utils/agentDescribe'
 import { useAgentsStore } from '@/stores/agents'
 import ShareDialog from '@/components/iam/ShareDialog.vue'
 import AssistantUsagePanel from './AssistantUsagePanel.vue'
@@ -140,6 +171,10 @@ const { success, error, warning } = useNotification()
 const changelog = ref('')
 const publishing = ref(false)
 const shareOpen = ref(false)
+const descriptionAskOpen = ref(false)
+const descriptionDraft = ref('')
+const descriptionSaving = ref(false)
+const afterDescription = ref<'share' | 'publish' | null>(null)
 const versions = ref<AgentVersionCard[]>([])
 const usage = ref<AgentUsage>({ byVersion: [], byDay: [] })
 
@@ -193,9 +228,73 @@ async function reload(): Promise<void> {
   }
 }
 
+/**
+ * Sharing and publishing show the description to other people. If there is
+ * none yet, offer the sentence derived from the instructions — once,
+ * prefilled — instead of sending the user back to a form field.
+ * Returns false when the ask is open and the caller must wait for it.
+ */
+async function ensureDescription(next: 'share' | 'publish'): Promise<boolean> {
+  const agent = store.current
+  if (!agent || agent.id == null) {
+    return false
+  }
+  if ((agent.description ?? '').trim()) {
+    return true
+  }
+  let derived = ''
+  if (agent.promptId) {
+    try {
+      const prompt = await promptsApi.getPrompt(agent.promptId)
+      derived = deriveAgentDescription(prompt.prompt)
+    } catch {
+      derived = ''
+    }
+  }
+  if (!derived) {
+    return true
+  }
+  descriptionDraft.value = derived
+  afterDescription.value = next
+  descriptionAskOpen.value = true
+  return false
+}
+
+async function onConfirmDescription(): Promise<void> {
+  const agent = store.current
+  const value = descriptionDraft.value.trim()
+  if (!agent || agent.id == null || !value) {
+    return
+  }
+  descriptionSaving.value = true
+  try {
+    await agentsApi.update(agent.id, { description: value })
+    agent.description = value
+    descriptionAskOpen.value = false
+    const next = afterDescription.value
+    afterDescription.value = null
+    if (next === 'share') {
+      shareOpen.value = true
+    } else if (next === 'publish') {
+      await onPublish()
+    }
+  } catch {
+    error(t('assistants.shareDescriptionFailed'))
+  } finally {
+    descriptionSaving.value = false
+  }
+}
+
+async function onShare(): Promise<void> {
+  if (await ensureDescription('share')) {
+    shareOpen.value = true
+  }
+}
+
 async function onPublish(): Promise<void> {
   const id = store.current?.id
   if (id == null) return
+  if (!(await ensureDescription('publish'))) return
   const names = triggerNames()
   const ok = await confirm({
     title: t('assistants.publish'),
