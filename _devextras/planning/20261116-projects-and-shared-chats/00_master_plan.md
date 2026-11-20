@@ -101,10 +101,10 @@ proposal and wait for a tick. **Ask** rows are ask-first by `AGENTS.md`.
 | 9 | No fixed time, no maximum number of steps or rounds. | None | Yes — owner |
 | 10 | Two guard rails: a cost limit per run and going-in-circles detection. Stop is always there. | As written | Yes — owner |
 | 11 | At the cost limit the run does not abort. It writes the result from what it has and says what is still open. | Wrap-up | Yes — owner |
-| 12 | Value of the cost limit: `LOOP.RUN_COST_CAP` = 5.00 per run (the value "thorough" research has today), set by the admin, never above what the payer has left this month. | 5.00 | ☐ business |
+| 12 | Value of the cost limit: the person chooses it, as a share of their own monthly budget (5, 10, 20, 25, 50 or 100 %, default 10 %), in Settings → Chat. Never above what the payer has left this month. A plan without a monthly budget has no cost limit per run. | Person chooses a share, default 10 % | Yes — owner, 2026-11-20 |
 | 13 | After a wrap-up the person can press "Keep going". That is a new run with a new limit that starts from the notes of the old one. | Offered | ☐ |
-| 14 | Models without a price (local Ollama) never reach a cost limit. For them the limit counts tokens: `LOOP.RUN_TOKEN_CAP` = 2,000,000. | Token cap | ☐ |
-| 15 | Circle detection is deterministic and counts repetition, not work: the same call with the same input three times, six steps in a row that bring nothing new, five tool errors in a row. First a nudge, then the wrap-up. | 3 / 6 / 5 | ☐ |
+| 14 | Models without a price (local Ollama) never reach a cost limit. There is no token limit for them; circle detection and Stop end a stuck run. | No token cap | Yes — owner, 2026-11-20 |
+| 15 | Circle detection is deterministic and counts repetition, not work: the same call with the same input three times, six steps in a row that bring nothing new, five tool errors in a row. First a nudge, then the wrap-up. | 3 / 6 / 5 | Yes — owner, 2026-11-20 |
 | 16 | Scope: web chat and projects. Not the widget. | As written | Yes — owner |
 | 17 | Also not in this track: WhatsApp, Telegram, e-mail, the two gateway APIs, Saved Tasks, Desktop. They keep today's paths. | Later (§9) | ☐ |
 | 18 | The Chat model runs every step. No list of "verified" models. A weak model gives a weak result. | Chat model | Yes — owner |
@@ -499,7 +499,7 @@ refused.
 | Risk | Why it matters | Answer |
 | ---- | -------------- | ------ |
 | Phase B rests on two unmerged steps of other rows | Nothing in B can start | §0 #22. A and C deliver first. PJ2 is a spike that needs neither. |
-| No step limit and a free local model | A run could go on for days | §0 #14 token cap, circle detection, Stop, one run per chat. |
+| No step limit and a free local model | A run could go on for days | Circle detection, Stop, one run per chat (§0 #14: no token cap). |
 | The loop makes simple turns slower or dearer | Everyone pays for the few long turns | §0 #21, gate G1. |
 | A weak Chat model with tool calling does poor long work | "Bad model, bad output" is accepted, a stuck run is not | Circle detection and wrap-up are model-independent; G5 runs on the cheapest seeded model. |
 | Compaction drops the one fact that mattered | A two-hour run answers the wrong question | Notes keep source references, `conversation_search` reads originals, G7. |

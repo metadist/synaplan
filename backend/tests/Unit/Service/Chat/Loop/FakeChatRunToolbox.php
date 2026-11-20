@@ -24,6 +24,12 @@ final class FakeChatRunToolbox implements ChatRunToolbox
     /** @var array<string, string> what a read tool returns, by name, instead of the default */
     public array $results = [];
 
+    /** @var list<string> tools that fail every time they run */
+    public array $fails = [];
+
+    /** A read answers with its arguments, so every new query finds something new. */
+    public bool $echo = false;
+
     /** @var list<list<string>> the opened tools each declaration was asked with */
     public array $openedSeen = [];
 
@@ -51,6 +57,13 @@ final class FakeChatRunToolbox implements ChatRunToolbox
         }
         if ('knowledge_search' === $call['name'] && null === $scope->project) {
             return ChatToolResult::text('This tool is not available in this chat.');
+        }
+
+        if (\in_array($call['name'], $this->fails, true)) {
+            return ChatToolResult::failed('The tool failed.');
+        }
+        if ($this->echo) {
+            return ChatToolResult::text('result of '.$call['name'].' for '.json_encode($call['args']));
         }
 
         return ChatToolResult::text($this->results[$call['name']] ?? 'result of '.$call['name']);

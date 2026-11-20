@@ -50,8 +50,8 @@ With the loop on, the web chat does not call `TurnWebSearch`,
 | Minutes | none |
 | Tools per step | `ToolLimits::MAX_TOOLS_PER_TURN` (16), per step, not per run |
 | Result size per tool | `ToolLimits::RESULT_CHARS` (12,000) |
-| Cost | `LOOP.RUN_COST_CAP`, §1.3. Until PJ6: the payer's monthly budget (`RateLimitService::checkCostBudget`) before every model call, not only before the turn (§0 #70) |
-| Tokens (unpriced models) | `LOOP.RUN_TOKEN_CAP`, §1.3 |
+| Cost | the share of the monthly budget the person chose, §1.3, and what the payer has left, both before every model call (§0 #70) |
+| Tokens (unpriced models) | none (§0 #14); circle detection, §1.4 |
 | Provider timeout per call | as today; a call that times out is a tool or model error, not a run limit |
 | Active runs | `RUNS.MAX_ACTIVE_PER_PERSON`, `RUNS.MAX_ACTIVE`; above them a promoted turn is `queued` and the card says so |
 
@@ -62,12 +62,49 @@ plan §4.
 ### 1.3 Cost limit and wrap-up
 
 ```
-cap     = min(LOOP.RUN_COST_CAP, what the payer has left)      re-read before every call
-reserve = max(cap × LOOP.WRAPUP_RESERVE_PERCENT / 100,
-              the dearest model call of this run so far)
-before every model call:
-    spent + reserve ≥ cap  ──► wrap-up call
+share   = monthly budget × the person's share / 100
+          (BCONFIG owner = person, LOOP.RUN_COST_PERCENT; 5, 10, 20, 25, 50 or 100; default 10)
+limit   = spent + min(share − spent, what the payer has left now)    re-read before every call
+reserve = max(estimated wrap-up call, limit × LOOP.WRAPUP_RESERVE_PERCENT / 100)
+          estimated wrap-up = transcript now as input + an answer of 2,000 tokens,
+          at the model's price with markup (fixed at the start), at least the
+          dearest call so far; without a price, the last call scaled to the transcript
+before the long answer starts (the first call, in the request):
+    first call (price estimate) + reserve ≥ limit
+                                               ──► no tools, no run: the answer says
+                                                   which limit binds: the monthly budget
+                                                   is nearly used, or the share per answer
+                                                   is too low for this model
+before every model call of the run:
+    payer's budget already used up             ──► end at once, no call (budget_used)
+    spent + reserve ≥ limit                    ──► wrap-up call: payer_empty when what
+                                                   is left binds, else cost_limit;
+                                                   a written answer in the last reply
+                                                   (500+ chars, only plan updates)
+                                                   is delivered without that call
+    spent + reserve ≥ 80 % of limit            ──► once: "nearly used, finish up";
+                                                   text without tools after it is
+                                                   the answer
+each working call while a limit applies:
+    a last message, never stored: "Budget for this answer: $L, used $S ($R left)."
 ```
+
+A larger share never stops a run earlier than a smaller one: the limit only
+grows with the share, and the reserve grows by a tenth of it at most. With
+$10 a month, 50 % and $0.20 left, the run works with the $0.20 and wraps up
+near its end, the same as at 10 %.
+
+Parallel runs (point 7 of the owner's 2026-11-20 review, not built): one run
+per chat and `RUNS.MAX_ACTIVE_PER_PERSON` bound the overshoot to one call per
+active run. Holds per call (reserve, then settle) come with the payer
+ledger, §3.
+
+Money is what the person is billed (with markup), the same figure as the
+monthly budget. A plan with no monthly budget (budget 0) has no cap per run.
+The person reads and sets the share with `GET` / `PUT
+/api/v1/config/chat-run-limit` (`{percent: int|null}`, null goes back to the
+default; a share that is not offered is 422). The setting shows what each
+share means in money.
 
 - The wrap-up call has no tools. Its instruction: write the result from the
   notes and the transcript, start with the fixed opening line for the
@@ -75,12 +112,13 @@ before every model call:
 - A tool call that is running when the limit is reached finishes. No new
   one starts.
 - Overshoot is bounded by one model call.
-- Models with no price: the same rule on tokens with `LOOP.RUN_TOKEN_CAP`.
+- Models with no price cost nothing here and never reach the cap (§0 #14);
+  circle detection ends a stuck run.
 
 | Wrap-up reason | Trigger | Terminal status |
 | -------------- | ------- | --------------- |
 | `cost_limit` | rule above | `budget_used` |
-| `payer_empty` | the payer's monthly budget is empty | `budget_used` |
+| `payer_empty` | the rule above, with what the payer has left as the smaller amount (a budget already used up ends the run without a call, `budget_used`) | `budget_used` |
 | `circling` | §1.4, second trigger | `completed` |
 | `answer_now` | the person pressed "Answer now" | `completed` |
 
@@ -386,7 +424,7 @@ PayerResolver::resolve(chat, sender)
 - First call that falls back to the sender: set `BEXHAUSTEDAT`, post the
   notice line once, send `payer.changed`.
 - A sender with no budget and no allowance: the turn is refused as today
-  (`COST_BUDGET_EXCEEDED`); inside a run it is the wrap-up `payer_empty`.
+  (`COST_BUDGET_EXCEEDED`); inside a run it is the wrap-up `payer_empty`, or `budget_used` without a call once nothing is left.
 - The Chat model is the sender's, also when the owner pays (§0 #67).
 
 ## 6. Shared chats
@@ -648,9 +686,8 @@ existing installs ships as a migration `UPDATE`.
 | Group | Key | Default | Meaning |
 | ----- | --- | ------- | ------- |
 | `LOOP` | `ENABLED` | 0 | the chat turn runs on the loop |
-| `LOOP` | `RUN_COST_CAP` | 5.00 | per run, §1.3 |
-| `LOOP` | `RUN_TOKEN_CAP` | 2000000 | per run, unpriced models |
-| `LOOP` | `WRAPUP_RESERVE_PERCENT` | 10 | |
+| `LOOP` | `RUN_COST_PERCENT` | 10 | owner = the person, share of their monthly budget per run, §1.3 |
+| `LOOP` | `WRAPUP_RESERVE_PERCENT` | 10 | the least reserve, as a share of the run's limit, §1.3 |
 | `LOOP` | `STALL_REPEAT` / `STALL_NO_NEW` / `STALL_ERRORS` | 3 / 6 / 5 | §1.4 |
 | `LOOP` | `COMPACT_AT_PERCENT` / `COMPACT_KEEP_STEPS` | 70 / 4 | §1.5 |
 | `LOOP` | `QUESTION_WAIT_HOURS` | 24 | |

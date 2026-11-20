@@ -753,6 +753,17 @@
       "saved": "Arama sağlayıcınız kaydedildi.",
       "saveFailed": "Arama sağlayıcınız kaydedilemedi"
     },
+    "chatRunLimit": {
+      "title": "Uzun yanıt başına maliyet sınırı",
+      "description": "Sohbet bir yanıt için birkaç adım çalıştığında, aylık bütçenizin en fazla bu kadarını harcayabilir. Sınıra ulaşınca aramayı bırakır ve bulduklarıyla yanıt verir.",
+      "share": "Aylık bütçenizden pay",
+      "option": "{'%'}{percent} – yanıt başına en fazla {amount}",
+      "default": "varsayılan",
+      "monthly": "Aylık bütçeniz: {amount}",
+      "noBudget": "Planınızda aylık bütçe yok, bu yüzden yanıt başına maliyet sınırı yok. Uzun bir yanıt yine de kendini tekrar ettiğinde sona erer.",
+      "saved": "Maliyet sınırınız kaydedildi.",
+      "saveFailed": "Maliyet sınırınız kaydedilemedi"
+    },
     "account": {
       "title": "Hesap",
       "email": "E-posta",

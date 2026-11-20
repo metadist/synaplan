@@ -12,6 +12,8 @@ use App\Service\Chat\Loop\ChatRunCheck;
 use App\Service\Chat\Loop\ChatRunCheckModel;
 use App\Service\Chat\Loop\ChatRunDelivery;
 use App\Service\Chat\Loop\ChatRunEvents;
+use App\Service\Chat\Loop\ChatRunLoopLimits;
+use App\Service\Chat\Loop\ChatRunRates;
 use App\Service\Chat\Loop\ChatRunRecords;
 use App\Service\Chat\Loop\ChatRunScope;
 use App\Service\Chat\Loop\ChatRunState;
@@ -50,6 +52,9 @@ abstract class ChatLoopCase extends TestCase
     protected ChatRunStep $step;
     protected ChatRunUnitHandler $handler;
     protected ChatRunDelivery $delivery;
+
+    /** The model's price a new run carries; null is a model without one. */
+    protected ?ChatRunRates $rates = null;
     protected User $user;
 
     /** The checking model's answers; it is asked only while {@see $checkModel} is set. */
@@ -87,7 +92,7 @@ abstract class ChatLoopCase extends TestCase
 
     protected function model(ScriptedChatRunModel $model): ScriptedChatRunModel
     {
-        $this->step = new ChatRunStep($this->world, $model, $this->budget, $this->tools, $this->events);
+        $this->step = new ChatRunStep($this->world, $model, $this->budget, $this->tools, $this->events, new ChatRunLoopLimits());
         $records = $this->createStub(ChatRunRecords::class);
         $records->method('sync')->willReturnCallback(function (ChatRunState $state): void {
             $this->synced[] = $state->status->value;
@@ -134,6 +139,7 @@ abstract class ChatLoopCase extends TestCase
             [['role' => 'user', 'content' => $question]],
             $this->clock->now()->getTimestamp(),
         );
+        $state->rates = $this->rates;
         $this->store->runs()->open($state);
         $this->bus->dispatch($state->runId, ChatRunStep::UNIT, 1, 0);
 

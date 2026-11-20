@@ -25,8 +25,10 @@ final readonly class ChatRunEvents
     public const RESUMED = 'run.resumed';
     public const ENDED = 'run.ended';
     public const CHECKED = 'run.checked';
+    public const CIRCLING = 'run.circling';
+    public const WRAP_UP = 'run.wrap_up';
 
-    public const NAMES = [self::STARTED, self::STEP, self::TEXT, self::TOOL_CALL, self::TOOL_RESULT, self::PLAN, self::WAITING, self::RESUMED, self::ENDED, self::CHECKED];
+    public const NAMES = [self::STARTED, self::STEP, self::TEXT, self::TOOL_CALL, self::TOOL_RESULT, self::PLAN, self::WAITING, self::RESUMED, self::ENDED, self::CHECKED, self::CIRCLING, self::WRAP_UP];
 
     private RunEventLog $log;
 

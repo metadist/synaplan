@@ -66,6 +66,14 @@ final readonly class ChatLoopTurn
         if (null === $scope) {
             return null;
         }
+        $basePrompt = $this->basePrompt($system['content'], $turn, $options);
+        $held = $this->gate->holdsBack($scope->user, $model->model, $messages);
+        if (null !== $held) {
+            // No run that could only stop at once: an answer without tools that says which limit and why.
+            $messages[0]['content'] = rtrim($system['content'])."\n\n".(ChatRunEnd::CostLimit === $held ? ChatLoopPrompt::LOW_LIMIT : ChatLoopPrompt::LOW_BUDGET);
+
+            return new ChatLoopCall($messages, $aiOptions, $basePrompt, \array_slice($messages, 1), $scope);
+        }
 
         $messages[0]['content'] = rtrim($system['content'])."\n\n".ChatLoopPrompt::rules();
         $aiOptions['tools'] = [...$this->tools->declarations($scope), ChatLoopTools::updatePlan()];
@@ -73,7 +81,7 @@ final readonly class ChatLoopTurn
         // The run sends the whole transcript; a stored provider response would skip it.
         unset($aiOptions['previous_response_id']);
 
-        return new ChatLoopCall($messages, $aiOptions, $this->basePrompt($system['content'], $turn, $options), \array_slice($messages, 1), $scope);
+        return new ChatLoopCall($messages, $aiOptions, $basePrompt, \array_slice($messages, 1), $scope);
     }
 
     /**
@@ -92,7 +100,7 @@ final readonly class ChatLoopTurn
                 (int) $call->scope->user->getId(),
                 (int) $call->scope->chat->getId(),
                 $message->getId(),
-                new ChatRunPrompt($model->provider, $model->modelName, $turn->language(), $call->basePrompt, $call->transcript),
+                new ChatRunPrompt($model->provider, $model->modelName, $turn->language(), $call->basePrompt, $call->transcript, $this->gate->rates($model->model)),
                 mb_substr($message->getText(), 0, 500),
                 'chat-turn-'.$message->getId(),
                 new ChatRunReply($preamble, ChatRunCalls::read($this->parser, $reply->toolCalls), FacadeChatRunModel::micro($reply->metadata['facade_charged_cost'] ?? null)),
