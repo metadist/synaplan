@@ -8,7 +8,7 @@ to them.
 | ---- | ----- | -- | ----- |
 | AH0 | draft | — | plan written 2026-10-23; §0 ticked the same day |
 | AH8a | merged | #3198 | run kernel `App\Service\Run\*` and `BRUNS` (migration `Version20261119150000`, `BNOTES`, `BKIND` `assistant` · `research` · `chat`), `RunEraser`, kernel reapers in `app:runs:reap`; no consumer yet. See 2026-11-19 below |
-| AH8b | in review | — | research runs on the kernel, no behaviour change; same Redis keys and stored format. See 2026-11-19 AH8b below |
+| AH8b | merged | #3201 | research runs on the kernel, no behaviour change; same Redis keys and stored format. See 2026-11-19 AH8b below |
 | AH1–AH7, AH9–AH23, AHX1–AHX2 | not started | — | plan only until the owner orders them |
 
 ---

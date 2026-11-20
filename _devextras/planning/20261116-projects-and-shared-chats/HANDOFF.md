@@ -1,12 +1,15 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-19, `main` @ `89694c4b2`. Geschrieben für einen Agenten ohne Zugriff
-auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Dateien in diesem
-Ordner geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
+Stand: 2026-11-20, `main` @ `e52bbb189`. Geschrieben für einen Agenten ohne Zugriff
+auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Planungsdateien
+geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
 Lies zuerst: `/AGENTS.md` (die Schleife und das Gate), danach in diesem Ordner
 `STATUS.md` (Schrittprotokoll), `04_sprints.md` (die Briefs PJ0–PJ28),
-`00_master_plan.md` §0 (Entscheidungstabelle, ☐ = offen) und `03_contracts.md`.
+`00_master_plan.md` §0 (Entscheidungstabelle, ☐ = offen) und `03_contracts.md`
+(§1.1 ist der Vertrag für PJ5). Für den Kernel:
+`../20261023-agent-handling/STATUS.md` (AH8a, AH8b). Für den Loop:
+`../20261021-architecture-update/STATUS.md` (AU26).
 
 ## 1. Ziel und aktuelle Aufgabe
 
@@ -17,43 +20,42 @@ beliebig lange arbeiten darf. 28 Schritte PJ0–PJ28 in Phasen 0, A–F.
 **Auftrag des Owners:** die Schritte der Reihe nach umsetzen, nach `AGENTS.md`,
 mit Blick auf Usability und vor allem Sicherheit.
 
-**Stand:** PJ0–PJ4, AU26 und AH8a sind auf `main`. Phase B (PJ5) wartet auf AH8b
-(im Review). Der Owner hat am 2026-11-19 entschieden: als Nächstes **AU26**,
-dann **AH8a**, **AH8b**, dann PJ5 (siehe Abschnitt 9).
+**Stand:** Phase 0 und A (PJ0–PJ4) sind fertig. Die Voraussetzungen für Phase B
+(AU26, AH8a, AH8b) sind gemergt. **Nächster Schritt ist PJ5**, aber erst nach einem
+ausdrücklichen "Ja" des Owners (Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
-| PJ0 Plan | fertig, gemergt | #3133 |
-| PJ1 Corpus und Runner | fertig, gemergt | #3141 |
-| PJ2 Spike "ein Chat-Turn als Run-Einheiten" | fertig, gemergt | #3142 |
-| Loop-Vertrag (Ledger, Guard, Ende eines Laufs) | fertig, gemergt (Doku) | #3151 |
-| PJ3 Projekte mit Quellen und Instruktionen (API) | fertig, gemergt | #3152 |
-| PJ4 Projektseite, Projekte im Chats-Panel | fertig, gemergt | #3186 |
-| AU26 ein Agent-Loop (Zeile 22) | fertig, gemergt | #3193 |
-| AH8a Run-Kernel und `BRUNS` | fertig, gemergt | #3198 |
-| AH8b Research auf dem Kernel | im Review, Branch `refactor/research-on-run-kernel` | — |
-| PJ5–PJ28 | nicht begonnen; zuerst AH8b (im Review) | — |
+| PJ0 Plan | gemergt | #3133 |
+| PJ1 Corpus und Runner | gemergt | #3141 |
+| PJ2 Spike "ein Chat-Turn als Run-Einheiten" | gemergt | #3142 |
+| Loop-Vertrag (Ledger, Guard, Ende eines Laufs) | gemergt (Doku) | #3151 |
+| PJ3 Projekte mit Quellen und Instruktionen (API) | gemergt | #3152 |
+| PJ4 Projektseite, Projekte im Chats-Panel | gemergt | #3186 |
+| Plan nach PJ4, Reihenfolge AU26 → AH8 | gemergt (Doku) | #3191 |
+| AU26 ein Agent-Loop (Zeile 22, S4) | gemergt | #3193 |
+| AH8a Run-Kernel und `BRUNS` (Zeile 25) | gemergt | #3198 |
+| AH8b Research läuft auf dem Kernel | gemergt | #3201 |
+| PJ5 Chat-Turn als Lauf auf dem einen Loop | **nächster Schritt, nicht begonnen** | — |
+| PJ6–PJ28 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
 
-### Fertig implementiert und gemergt
+### PJ0–PJ2 (Plan, Messung)
 
 - **PJ0:** Plan in diesem Ordner (`00`–`04`, `STATUS.md`).
 - **PJ1:** `backend/tests/Eval/ChatLoop/` mit `corpus.json` (40 Turns: 10 simple,
   8 search, 8 files, 8 multi_step, 6 research), vier synthetischen Dokumenten, drei
   geskripteten Chats und `run.php`. `StackClient.php` meldet sich wie der Web-Client
-  an, sendet Turns an `POST /api/v1/messages/stream` und liest Run-Daten. Heutige
-  Zahlen stehen in `STATUS.md` (z. B. `simple`: 0.0301 Kosten, erstes Token 2,56 s,
-  Total 3,64 s; Vergleichsbasis für G1).
-- **PJ2:** Messung, dass "jeder Turn über die Pump-Queue" unter Last G1 verletzt
-  (16 gleichzeitige Turns: Faktor 30 beim ersten Text). **§0 #21 bleibt:** ein
-  einfacher Turn läuft im Request, nur Turns mit Tool-Aufruf gehen in die Queue. Der
-  Zwei-Stunden-Prototyp (G7) hat G7 **nicht** erfüllt (falsche Summe, Ziel verloren,
-  32 doppelte Reads); die Folgerungen für Contract §1.5 stehen in `STATUS.md`.
-  Skripte: `spike/turn-latency.php`, `spike/long-run.php` (kein Produktcode).
-- **PJ3 (Projekte-API, Backend):** siehe unten.
+  an, sendet Turns an `POST /api/v1/messages/stream` und liest Run-Daten. Die
+  Vergleichszahlen stehen in `STATUS.md` (z. B. `simple`: 0.0301 Kosten, erstes
+  Token 2,56 s, Total 3,64 s; Basis für G1, den Exit von PJ5).
+- **PJ2:** "Jeder Turn über die Pump-Queue" verletzt G1 unter Last (16 gleichzeitige
+  Turns: Faktor 30 beim ersten Text). **§0 #21 gilt:** ein einfacher Turn läuft im
+  Request, erst ein Turn mit Tool-Aufruf geht in die Queue (die Übergabe von PJ5).
+  Skripte unter `spike/` (kein Produktcode).
 
-### PJ3 im Detail (alles in `main`)
+### PJ3 (Projekte-API, Backend)
 
 Migration `backend/migrations/Version20261117120000.php` (rohes idempotentes SQL, keine
 Fremdschlüssel):
@@ -64,251 +66,273 @@ Fremdschlüssel):
 - `BCHATS` neu: `BPROJECTID` (BIGINT null), `BPROJECTSHARED` (TINYINT, default 0),
   `BMEMORYMODE` (VARCHAR 20 null), Index `idx_chat_project`.
 - `BCONFIG` (`BOWNERID=0`, Gruppe `PROJECTS`, Setting `ENABLED`) = `'0'`.
-  `down()` entfernt alles wieder.
 
-Backend (neue Dateien, Pfade unter `backend/src/`):
+Neue Dateien unter `backend/src/`:
 
 | Datei | Aufgabe |
 | ----- | ------- |
-| `Entity/Project.php`, `Repository/ProjectRepository.php` | Entity (Datumsspalten `datetime_immutable`) und Queries |
-| `Controller/ProjectController.php` | 13 Routen unter `/api/v1/projects`, Namen `api_projects_*`; nur HTTP, `respond()` übersetzt `ProjectException` in JSON |
-| `Module/Chat/ProjectsModule.php` | FeatureModule; Env-Schlüssel `PROJECTS_ENABLED`, BCONFIG `PROJECTS.ENABLED` |
-| `Service/Project/ProjectsConfig.php` | Schalter und Grenzen (siehe Abschnitt 5) |
-| `Service/Project/ProjectService.php` | Anlegen, Ändern, Löschen (`chats=keep|delete`) |
-| `Service/Project/ProjectSourceService.php` | Quellen: Datei, Link, Text; Refresh, Entfernen |
-| `Service/Project/ProjectSourceIndexer.php` | speichert Link- und Textquellen, indexiert unter dem Projektordner, prüft Rate-Limit und Speicherquote **vor** dem Abruf |
-| `Service/Project/ProjectSource.php` | Quell-DTO; Zustände `reading`, `ready`, `failed` |
+| `Entity/Project.php`, `Repository/ProjectRepository.php` | Entity (`datetime_immutable`) und Queries |
+| `Controller/ProjectController.php` | 13 Routen unter `/api/v1/projects`; nur HTTP |
+| `Module/Chat/ProjectsModule.php` | FeatureModule; Env `PROJECTS_ENABLED`, BCONFIG `PROJECTS.ENABLED` |
+| `Service/Project/ProjectsConfig.php` | Schalter und Grenzen |
+| `Service/Project/ProjectService.php` | Anlegen, Ändern, Löschen (`chats=keep\|delete`) |
+| `Service/Project/ProjectSourceService.php`, `ProjectSourceIndexer.php` | Quellen Datei/Link/Text; Rate-Limit und Quote **vor** dem Abruf |
 | `Service/Project/ProjectChatScope.php` | liefert für einen Chat den Pin (`ProjectTurnContext`) oder null |
-| `Service/Project/ProjectChatMembership.php` | Chat in ein Projekt aufnehmen oder entfernen |
-| `Service/Project/ProjectPresenter.php`, `ProjectException.php`, `ProjectTurnContext.php` | Darstellung, Fehlercodes, Turn-Kontext |
+| `Service/Project/ProjectChatMembership.php` | Chat aufnehmen oder entfernen |
 | `Service/Iam/Erasure/ProjectEraser.php` | Account-Löschung entfernt die Projekte |
 
-Geänderte bestehende Dateien: `Entity/Chat.php` (Projektfelder), `Entity/File.php`
-(`SOURCES` += `project_file`, `project_link`, `project_text`),
-`Service/Chat/Stream/StreamTurnPreparer.php` (neuer Konstruktorparameter
-`ProjectChatScope`, `withProject`), `Service/Message/Chat/ChatSystemPromptAssembler.php`
-und `Service/Prompt/ChatPromptBlocks.php` (`projectInstructions`),
-`Service/File/FileGroupDeletionService.php` (`deleteFile` ist jetzt public),
-`Seed/ModuleGateSeeder.php` (`projects` in `DEFAULT_ON`), `config/services.yaml`,
-`config/packages/nelmio_api_doc.yaml` (Schemas `Project`, `ProjectSource`,
-`ProjectChat`), `docker-compose.minimal.yml` und `backend/.env.minimal`,
-fünf `frontend/src/i18n/locales/*/admin.json` (`modules.projects.label`), mehrere
-Snapshots und Architekturtests (Liste: `git show --stat d3aeb80d6 e72654298`).
+Wichtige Eingriffe in Bestehendes: `StreamTurnPreparer::withProject` (Pin vom Server),
+`ChatSystemPromptAssembler` / `ChatPromptBlocks::projectInstructions`,
+`File::SOURCES` += `project_file`, `project_link`, `project_text`,
+`ModuleGateSeeder` (`projects` in `DEFAULT_ON`), `nelmio_api_doc.yaml` (Schemas
+`Project`, `ProjectSource`, `ProjectChat`).
 
-Tests: `tests/Unit/Service/Project/{ProjectChatScopeTest,ProjectChatMembershipTest,ProjectSourceServiceTest}.php`,
-`tests/Unit/Service/Chat/Stream/StreamRagGroupKeyTest.php` (Pin-Tests),
-`frontend/tests/e2e/tests/minimal-stack.spec.ts` (Modulzahl).
+`BPROJECTSHARED` und `BMEMORYMODE` existieren, werden aber nirgends gelesen oder
+gesetzt (reserviert für PJ20–PJ22).
 
-### Teilweise umgesetzt
+### PJ4 (Frontend)
 
-- Die Spalten `BPROJECTSHARED` und `BMEMORYMODE` existieren und haben Getter in
-  `Chat.php`, werden aber nirgends gesetzt oder gelesen. Reserviert für PJ20–PJ22.
+`views/ProjectView.vue` (`/projects/:id`, Tabs Chats, Quellen, Instruktionen),
+`components/projects/*`, `stores/projects.ts`, `services/api/projectsApi.ts`;
+Abschnitt "Projekte" im Chats-Panel, Dialog "Quelle hinzufügen", Projektname über dem
+Composer, Chat ins Projekt und heraus über das Chat-Menü, angepinnte Projekte zuerst
+(`BPROJECTS.BPINNEDAT`, Migration `Version20261119120000`). Flag aus → 404
+`feature_not_configured`, die UI zeigt nichts. `PROJECTS_ENABLED=1` steht in
+`backend/.env.test` für die E2E-Spec.
 
-### Noch offen
+### AU26 (#3193): ein Agent-Loop
 
-PJ5–PJ28. PJ4 (#3186) hat das Frontend gebracht (`views/ProjectView.vue`,
-`components/projects/*`, `stores/projects.ts`, `services/api/projectsApi.ts`) und die
-Spalte `BPROJECTS.BPINNEDAT` (Migration `Version20261119120000`).
+- `App\Service\Tool\Loop\AgentToolLoop` besitzt Iterationsgrenze, Deadline und Tools
+  pro Turn und liest sie aus `ToolLoopLimits`, die der Aufrufer übergibt.
+  `ToolLoopLimits::defaults($cap)` = heutige Zahlen aus `ToolLimits`;
+  **`ToolLoopLimits::unbounded()`** = keine Grenze, keine Deadline → **Eingabe des
+  Profils `chat` in PJ5**.
+- Ein Turn endet als `stop`, `again` (ein weiterer Aufruf ohne Tool, Web-Search-Wrap-up)
+  oder `run`. `ToolCallPartition` trennt eigene von Client-Tools. Ergebnis:
+  `ToolLoopRun` mit `ToolLoopStop` und Iterationszahl.
+- Adapter (`ToolLoopAdapter`): `DocumentToolLoopAdapter`, `MessagesCompleteAdapter`,
+  `MessagesStreamAdapter`, `OpenAiToolLoopAdapter`. `GatewayToolLoop` 1 274 → 223
+  Zeilen, aus dem Size-Ledger. Snapshot `tool_loops.json` unverändert.
+- Fehler als Ergebnis bleiben in `ToolInvoker` und den Executoren (AU24): der Loop
+  sieht nie eine Tool-Exception.
+
+### AH8a (#3198): Run-Kernel und `BRUNS`
+
+- `App\Service\Run\*`: `RunService` (Start mit 24-h-`Idempotency-Key`, Stop als Flag),
+  `RunUnit` (claim, reload, Stop prüfen, ausführen, gefencter Checkpoint, nächste
+  Einheit), `RunClaim`, `RunCheckpointStore`, `RunEventLog`, `RunEventStream`,
+  `RunReaper`, `RunDelivery` (einmal in den Chat, auf dem Server), `RunKeyRemoval`,
+  `RunUnitBus`.
+- Pro Art verschieden: `RunState` / `RunStateCodec`, `RunUnitHandler`,
+  `RunReapPolicy`. Budgets sind nicht im Kernel; der Handler bekommt sie als
+  Profil-Eingabe.
+- Migration `Version20261119150000`: `BRUNS` nach `../20261023-agent-handling/03_contracts.md`
+  §2.1 plus `BNOTES` (mediumtext null); `BKIND` ∈ `assistant`, `research`, `chat`.
+  Kein Unique-Index auf `(BUSERID, BIDEMPOTENCY)` (Redis hält das 24-h-Fenster).
+- `RunEraser` (Account-Löschung), `app:runs:reap` führt alle Services mit Tag
+  `app.run_reaper` aus.
+- **Für PJ5 noch nicht vorhanden:** Messenger-Transport für `RunUnitBus` und
+  `app:runs:prune` ("kommen mit dem ersten Konsumenten", AH8a). Research nutzt seinen
+  eigenen Worker. Siehe Abschnitt 6 (ask-first prüfen).
+
+### AH8b (#3201): Research auf dem Kernel
+
+- `ResearchRunState` implementiert `RunState`, `ResearchRunCodec` liest ihn.
+  `ResearchStateStore` ist eine Fassade über einem `RunCheckpointStore` mit dem
+  Research-Keyspace (`RunKeyspace('research', …, ['state' => 'run', 'cancel' =>
+  'stop'])`); alle Redis-Schlüssel behalten ihren Namen.
+- `ResearchUnitWorker` → `RunUnit` mit `ResearchUnitHandler`; `ResearchReaper` →
+  `RunReaper` mit `ResearchReapPolicy`. `ResearchLease` ist weg (Stufen halten
+  `RunClaim`). Doppeltes Lua entfernt.
+- Der Kernel lernte: umbenannte Key-Segmente, gleitender Ablauf während ein Lauf aktiv
+  ist (`activeTtlHours`), einen Hook nach jedem Schreiben (`written`), einen Codec, der
+  "kein Lauf" (null) antworten darf.
+- `services.yaml`: `App\Service\Run\RunKeys: '@App\Service\Run\RedisRunKeys'` (zwei
+  Implementierungen; ohne Alias bricht das Autowiring).
+- **Akzeptierte Kante beim Deploy:** die Reap-Marke wandert von
+  `research:reap:{id}:{seq}` nach `research:reap:{id}`; eine Einheit, die in den
+  Minuten um den Deploy verloren geht, kann einmal öfter neu dispatcht werden.
+- Gate: `make ci-local` (PHPUnit 12 462, Vitest 539 Dateien, PHPStan und Deptrac 0),
+  Research-E2E grün. Volle E2E lokal: 50 Fehler auf dem Branch, 53 auf `main`
+  (Umgebung, siehe Abschnitt 6). Copilot konnte #3201 wegen erschöpfter Quote nicht
+  reviewen; der Owner hat trotzdem gemergt.
 
 ## 3. Wichtige Architektur- und Designentscheidungen
 
 - **Quellen sind normale Dateien** (`BFILES`) unter dem Wissensordner des Projekts
-  (`BPROJECTS.BGROUPKEY`, Form `project:<uuid>`). Es gibt keine Quelltabelle.
-  Dadurch gelten Indexierung, Speicherquote und Löschlogik der Dateien weiter.
-- **Der Ordner-Pin kommt vom Server.** `StreamTurnPreparer::withProject` setzt
-  `rag_group_key` aus `ProjectChatScope::forChat($state->chat)` und überschreibt
-  damit jeden `ragGroupKey` des Requests. Zusätzlich gehen die Optionen
-  `project_instructions` und `project_name` in den Turn.
-- **Instruktionen** stehen im System-Prompt (`ChatSystemPromptAssembler::opening()` ruft
-  `ChatPromptBlocks::projectInstructions`). Gekürzt auf
-  `PROJECTS.INSTRUCTIONS_MAX_CHARS`.
-- **Flag aus = 404 und Plain-Chat.** `ModuleGateListener` antwortet nur dann mit 404,
-  wenn die Gate-Zeile `MODULES.GATE_<ID>` an ist; deshalb prüft der Controller das
-  Flag zusätzlich selbst (`deny()`: erst Flag → 404 `feature_not_configured`, dann
-  Login → 401). Ist das Flag aus, behandelt `ProjectChatScope` einen Chat als normalen
-  Chat (kein Pin, keine Instruktionen).
-- **Abweichung vom Brief (§10):** Ein Chat tritt über `POST /projects/{uuid}/chats`
-  (neuer Chat), `PUT /projects/{uuid}/chats/{chatId}` (aufnehmen) und
-  `DELETE /projects/{uuid}/chats/{chatId}` (entfernen) bei. `POST /chats` und
-  `PATCH /chats/{id}` blieben unverändert, weil `ChatController` über dem
-  Größen-Ledger liegt. In `STATUS.md` vermerkt.
-- **Löschen mit `chats=keep`** (Standard): Chats werden zu normalen Chats
-  (`BPROJECTID` null) und sehen die Quellen nicht mehr; `chats=delete` löscht sie.
-  Ungültiger Wert → 422.
-- **Create nimmt nur `name` und `description`.** `instructions` werden per `PATCH`
-  gesetzt. So steht es in der OpenAPI-Beschreibung; kein Fehler.
-- **Gemeinsame OpenAPI-Schemas** müssen in `config/packages/nelmio_api_doc.yaml` unter
-  `components.schemas` stehen. Eine DTO-Klasse mit `#[OA\Schema]` wurde nicht
-  gescannt (`$ref not found`, HTTP 500 auf `/api/doc.json`).
-- **Sicherheit der Link-Quellen:** Abruf über `UrlContentService::fetchForReading`
-  (maximal 200 000 Zeichen); Rate-Limit und Quote werden vor dem Abruf geprüft;
-  ein 403 endet als `failed` mit Grund (z. B. "HTTP 403"). Der Grund ist auf 500
-  Zeichen gekürzt.
+  (`BPROJECTS.BGROUPKEY`, Form `project:<uuid>`). Keine Quelltabelle.
+- **Der Ordner-Pin kommt vom Server** (`StreamTurnPreparer::withProject`), jeder
+  `ragGroupKey` des Requests wird überschrieben. PJ5 muss den Pin **pro Einheit neu
+  prüfen** (Chat kann zwischen zwei Einheiten aus dem Projekt verschoben werden).
+- **Flag aus = 404 und Plain-Chat**; der Controller prüft das Flag zusätzlich zum
+  `ModuleGateListener`.
+- **Ein Chat tritt über die Projekt-Routen bei** (`POST/PUT/DELETE
+  /projects/{uuid}/chats…`), nicht über `/chats` (Größe von `ChatController`).
+- **Einfacher Turn im Request, Tool-Turn als Lauf** (§0 #21, PJ2-Messung).
+- **Grenzen als Profil-Eingabe** (§0 #69): kein Limit im Kernel oder Loop selbst.
+- **Kein festes Zeit- oder Schrittlimit** für den Chat-Lauf; einzige Leitplanken sind
+  ein Kostenlimit und Kreiserkennung (PJ6), beide enden mit einem Ergebnis.
+- **Bis PJ6** prüft ein `chat`-Lauf vor jedem Modellaufruf das Monatsbudget des
+  Zahlenden und endet sauber, wenn es leer ist (§0 #70).
+- **Ende eines Laufs** (§0 #68): ohne `update_plan` endet ein Turn mit einer normalen
+  Antwort; mit offenen Plan-Punkten beendet das Pflicht-Tool `finish` den Lauf.
 
-## 4. Betroffene Dateien (Orientierung für AU26 und AH8)
+## 4. Betroffene Dateien für PJ5 (Orientierung)
 
-- AU26: `backend/src/AI/Messages/Tools/GatewayToolLoop.php` (im Size-Ledger),
-  `backend/src/AI/OpenAI/OpenAiGatewayToolLoop.php`,
-  `backend/src/Service/Document/ChatToolLoop.php`,
-  `backend/src/Service/Tool/Execution/ToolLimits.php`, der Snapshot `tool_loops.json`.
-- AH8a: `backend/src/Service/Research/Run/*` (`ResearchLease`, `ResearchReaper`,
-  `ResearchUnitWorker`, `ResearchStateStore`), `Service/Chat/Run/ChatRunService.php`
-  (heute re-attachbarer Chat-Turn), Contract `../20261023-agent-handling/03_contracts.md`.
+- Neu: `backend/src/Service/Chat/Loop/*` (Profil `chat`, Handler, Codec, Reap-Policy,
+  Übergabe, Check vor der Auslieferung).
+- Lesen: `ChatStreamOrchestrator`, `MessageProcessor`, `TurnDispatcher`, `ChatHandler`,
+  `ToolRegistry`, `PromptCatalog`, `Service/Chat/Run/*` (heutiger re-attachbarer
+  Chat-Turn: `ChatRunService`, `RunStream`, `PumpChatRunner`),
+  `Service/Tool/Loop/*`, `Service/Run/*`, `Service/Research/Run/*` als Vorbild.
+- **Nicht wachsen lassen:** `MessageProcessor`, `TurnDispatcher` (Size-Ledger).
+- Prompt `tools:chat_loop` (interne Topics beginnen mit `tools:`; Katalogdaten als
+  idempotenter Seeder).
+- Characterization-Snapshots (`backend/tests/Characterization/`) müssen mit Flag aus
+  unverändert bleiben.
 
 ## 5. Technische Details, APIs, Datenbank
 
-**Routen** (alle `/api/v1/projects`, Cookie-Login, Flag muss an sein):
+**Projekt-Routen** (alle `/api/v1/projects`, Cookie-Login, Flag an):
 
 | Methode und Pfad | Zweck |
 | ---------------- | ----- |
-| `GET /` | Liste, zuletzt geändert zuerst |
-| `POST /` | anlegen `{name, description?}` (201) |
-| `GET /{uuid}` | lesen |
-| `PATCH /{uuid}` | `name`, `description`, `instructions` ändern |
-| `DELETE /{uuid}?chats=keep\|delete` | löschen |
-| `GET /{uuid}/sources` | Quellen |
-| `POST /{uuid}/sources` | Datei (multipart `files[]`), oder JSON `{type:"link",url}` oder `{type:"text",title,text}`; Antwort 201 mit `sources` und `errors` |
-| `POST /{uuid}/sources/{fileId}/refresh` | Link neu lesen |
-| `DELETE /{uuid}/sources/{fileId}` | Quelle entfernen |
-| `GET /{uuid}/chats` | Chats des Projekts |
-| `POST /{uuid}/chats` | neuen Chat im Projekt anlegen `{title}` |
-| `PUT /{uuid}/chats/{chatId}` | Chat aufnehmen |
-| `DELETE /{uuid}/chats/{chatId}` | Chat herauslösen |
+| `GET /`, `POST /` | Liste; anlegen `{name, description?}` (201) |
+| `GET/PATCH/DELETE /{uuid}` | lesen; `name`, `description`, `instructions`; löschen `?chats=keep\|delete` |
+| `GET/POST /{uuid}/sources` | Quellen; Datei (multipart `files[]`), `{type:"link",url}`, `{type:"text",title,text}` |
+| `POST /{uuid}/sources/{fileId}/refresh`, `DELETE /{uuid}/sources/{fileId}` | Link neu lesen; entfernen |
+| `GET/POST /{uuid}/chats`, `PUT/DELETE /{uuid}/chats/{chatId}` | Chats; neu anlegen; aufnehmen; herauslösen |
 
-Die `{uuid}` ist die Projekt-UUID, in den JSON-Antworten das Feld `id`
-(`{"success":true,"project":{"id":...,"name":...,"description":...,"instructions":...,"createdAt":...,"updatedAt":...}}`).
-Fehlercodes: 401, 404 (kein Projekt oder Flag aus, Code `feature_not_configured`), 409
-(Limit oder Speicher), 422 (ungültige Eingabe), 429 (zu viele Quellen kurz hintereinander).
+Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429.
 
-**Grenzen** (`ProjectsConfig`, BCONFIG-Gruppe `PROJECTS`, Owner 0; Default greift,
-wenn nichts gesetzt ist): `MAX_SOURCES` = 50, `INSTRUCTIONS_MAX_CHARS` = 4000. Fest im
-Code: Titel 200, Text 500 000 Zeichen, Link-Abruf 200 000 Zeichen.
+**Grenzen** (`PROJECTS`, Owner 0): `MAX_SOURCES` 50, `INSTRUCTIONS_MAX_CHARS` 4000.
 
-**Schalter:** `PROJECTS.ENABLED` (DB, Default `0` durch die Migration) und
-`PROJECTS_ENABLED` (Env, optional, Default leer; gesetzt gewinnt vor der DB).
-`FEATURE_MODULES_GATE_PROJECTS=true` steht nur in der Minimal-Konfiguration. **Keine
-neue Pflicht-Env-Variable für Production.** Die Gate-Seeder-Zeile für `projects` ist
-an (`DEFAULT_ON`).
+**Schalter:**
 
-**Zod und TypeScript:** `make -C frontend generate-schemas` erzeugt
-`frontend/src/generated/api-schemas.ts` (gitignored). Jeder Schritt mit neuer API muss das ausführen und die
-Typen daraus über `httpClient` und `services/api/` verwenden; keine handgeschriebenen
-Payload-Interfaces.
+- `PROJECTS.ENABLED` = 0 (bis PJ28, §0 #73); Env `PROJECTS_ENABLED` gewinnt, wenn gesetzt.
+- `LOOP.ENABLED` existiert noch nicht; PJ5 führt ihn ein, Default 0, und er bleibt 0
+  in jeder Umgebung, bis PJ6 und PJ8 gemergt sind (§0 #70). Ein neuer BCONFIG-Default
+  geht als Migration (`AGENTS.md`, "Flags").
 
-## 6. Bekannte Probleme und Einschränkungen
+**Zod:** nach jeder OpenAPI-Änderung `make -C frontend generate-schemas`, dann
+`vue-tsc`. Keine handgeschriebenen Payload-Interfaces.
 
-- **Flag aus.** `PROJECTS.ENABLED` bleibt 0 bis PJ28 (§0 #73).
-- **Chats ohne eigene Projekt-Zuordnung über `/chats`:** `POST /chats` und
-  `PATCH /chats/{id}` kennen kein Projekt (bewusst, siehe Abschnitt 3). PJ4 nutzt die
-  `PUT`/`DELETE`-Routen unter `/projects/{uuid}/chats/{chatId}`; PJ20/PJ22 ebenso.
-- **Nicht geprüft:** ein E2E-Lauf für PJ3 (`make test-e2e`), weil keine UI und keine
-  von der UI genutzte Route geändert wurde; CI lief auf #3152 grün (`All Checks Passed`).
-- **Nicht geprüft:** PDF-Quelle über multipart-Upload im echten Chat (nur Textquelle
-  wurde im echten Chat getestet; Datei-Pfad ist durch Unit-Tests und denselben
-  Indexierer abgedeckt, aber nicht per Hand durchgespielt).
-- **Merge-Hinweis:** #3151 und #3152 wurden auf ausdrückliche Anweisung des Owners per
-  Admin-Override ohne Review-Freigabe gemergt (Checks grün, Copilot ohne Kommentar).
-  Das gilt nur für diese beiden PRs; für weitere PRs gilt wieder: der Owner mergt.
-- **PJ2-Prototyp:** G7 nicht erfüllt, echter Lauf im Worker mit Lease und Neustart und
-  ein zweites Dokument und Modell stehen aus (siehe `STATUS.md`).
+## 6. Bekannte Probleme, Einschränkungen, worauf zu achten ist
+
+- **Ask-first vor PJ5 prüfen:** der Messenger-Transport für `RunUnitBus` fehlt. Wenn
+  dafür ein neuer Worker-Container, eine Compose-Zeile oder CI-Konfiguration nötig
+  ist, ist das Docker/Build-Konfiguration → vorher den Owner fragen. Ebenso eine
+  Schemaänderung (z. B. neue Spalte); `BRUNS` mit `BKIND = chat` und `BNOTES` ist
+  bereits freigegeben und gemergt.
+- **Offene §0-Zeilen** (nicht selbst entscheiden): vor PJ6 #12 (Kostenlimit 5.00),
+  #14 (Token-Cap für unbepreiste Modelle), #15 (Kreiserkennung 3/6/5); vor PJ7 #27;
+  vor PJ9 #31; vor PJ10 #20; vor PJ11 #65. PJ5 selbst hat keine offene Zeile.
+- **Lokale E2E:** etwa 50–53 Tests schlagen auf diesem Stack auch auf `main` fehl
+  (Umgebung). Vergleich immer gegen `main`; bekannte Fälle in `docs/E2E_TESTING.md`.
+- **Veralteter Stack nach Codeänderung:** `backend worker scheduler pump` neu starten
+  und auf `/api/health` = 200 warten, bevor E2E läuft.
+- **php-cs-fixer im Container hält auf dem Mac nicht** (einseitiger Datei-Sync);
+  Fixes lokal anwenden, Import-Reihenfolge notfalls von Hand.
+- **Snapshots** neu schreiben mit `UPDATE_ROUTING_SNAPSHOTS=1`,
+  `UPDATE_CLEANUP_V2_SNAPSHOTS=1` oder `UPDATE_FEATURE_STATUS_SNAPSHOTS=1`. Im Container
+  geschriebene Dateien gehören `root`; mit `docker compose exec -T -u root backend cat …`
+  lesen und lokal anlegen. Nie mit leerer `cat >`-Ausgabe überschreiben.
+- **Copilot-Quote:** bei #3201 erschöpft. Wenn Copilot nicht reviewen kann, dem Owner
+  sagen und nicht selbst mergen.
+- **Nicht verifiziert:** PDF-Quelle per multipart im echten Chat (nur Textquelle per
+  Hand); PJ2-Prototyp hat G7 nicht erfüllt (Lauf im Worker mit Lease und Neustart steht
+  aus, siehe `STATUS.md`).
 
 ## 7. Getestete und verworfene Ansätze
 
-- **`ProjectSchemas`-DTO mit `#[OA\Schema]`:** nicht gescannt → Schemas wanderten in
-  `nelmio_api_doc.yaml`, DTO gelöscht.
-- **Flag nur über `ModuleGateListener`:** reichte nicht (antwortet nur bei gesetzter
-  Gate-Zeile) → Prüfung zusätzlich im Controller.
-- **`File::setSource` fiel für unbekannte Quellen auf `web_upload` zurück** → die drei
-  Projektquellen in `File::SOURCES` aufgenommen.
-- **Datumsspalten als `datetime`** erzeugten Schema-Drift → `datetime_immutable`.
-- **Verbindungs-Beitritt über `POST /chats` und `PATCH /chats/{id}`:** verworfen wegen
-  der Größe von `ChatController`.
-- **PJ2:** "Jeder Turn über die Pump-Queue" verworfen (Last, G1).
-- **Demo-Account** (`demo@synaplan.com`) hat kein Default-Modell → Antworten sind
-  Demo-Texte des `TestProvider`. Für echte Antworten den Admin-Account nehmen.
-
-**Durchgespielt auf dem Dev-Stack (Stand 2026-11-17, über die API, Flag danach wieder 0,
-Testdaten gelöscht):** Flag aus → 404. Als `admin@synaplan.com`: Projekt angelegt,
-Instruktion per PATCH ("one short sentence, end with BANANA"), Textquelle "Zorblax
-warranty lasts 17 months …" → `ready`, Chat im Projekt, Frage → Antwort "The Zorblax
-warranty lasts 17 months and covers only the flux capacitor housing [1], BANANA.",
-Anbieter `anthropic claude-sonnet-5-5`, `ragSources` mit `groupKey: project:<uuid>`.
-Link mit 403 → `failed` mit Grund. Löschen mit ungültigem `chats` → 422; mit
-`chats=keep` bleibt ein Plain-Chat (`BPROJECTID` null), Quellen weg.
+- `ProjectSchemas`-DTO mit `#[OA\Schema]` wurde nicht gescannt → Schemas in
+  `nelmio_api_doc.yaml`.
+- Flag nur über `ModuleGateListener` reichte nicht → zusätzlich im Controller.
+- `File::setSource` fiel auf `web_upload` zurück → Projektquellen in `File::SOURCES`.
+- Datumsspalten `datetime` → Schema-Drift → `datetime_immutable`.
+- Beitritt über `POST /chats` / `PATCH /chats/{id}` verworfen (Größe `ChatController`).
+- "Jeder Turn über die Pump-Queue" verworfen (G1 unter Last).
+- AH8b: zwei `RunKeys`-Implementierungen ohne Alias → Autowiring-Fehler → Alias in
+  `services.yaml`.
+- Demo-Account (`demo@synaplan.com`) hat kein Default-Modell → nur Demo-Texte; für echte
+  Antworten den Admin-Account aus `docs/DEVELOPMENT.md` nehmen.
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **AU26** (Zeile 22, gemergt #3193): ein Tool-Loop für Dokument-Chat und beide Gateways, Grenzen als
-   Profil-Eingabe (§0 #69).
-2. **AH8a** (Zeile 25, gemergt #3198): Run-Kernel und `BRUNS` aus `Service/Research/Run/*` extrahiert,
-   ohne Nutzer; Migration mit `BNOTES` und `chat` als `BKIND`-Wert (§0 #63).
-3. **AH8b** (im Review): Research läuft auf dem Kernel, ohne Verhaltensänderung.
-4. **Phase B (PJ5–PJ11).** Vor PJ6: #12, #14, #15; vor PJ7: #27; vor PJ9: #31;
-   vor PJ10: #20; vor PJ11: #65. `LOOP.ENABLED` bleibt 0, bis PJ6 und PJ8 gemergt sind (§0 #70).
-5. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt. Offen: #34–#37, #40,
-   #45, #46, #67, Schema `BMESSAGES.BAUTHORID` u. a. (#63); Notion-Spike #49 (PJ18).
-6. **Phase D (PJ20–PJ22)**: #54–#56. **Phase E (PJ23–PJ27)**: #58–#62. **PJ28**: Flags an.
+1. **PJ5** (Abschnitt 9), nach "Ja" des Owners.
+2. **PJ6** Kostenlimit mit Ergebnis und Kreiserkennung (`RunCostGuard`,
+   `StallDetector`); braucht §0 #12, #14, #15.
+3. **PJ7–PJ11** (Notizen, Chat-Suche, Dateien per ID, Rückfragekarte usw.); offene
+   Zeilen siehe Abschnitt 6. `LOOP.ENABLED` bleibt 0 bis PJ6 und PJ8.
+4. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt.
+5. **Phase D (PJ20–PJ22)**, **Phase E (PJ23–PJ27)**, **PJ28** Flags an.
 
-Ask-first laut `AGENTS.md`: Schemaänderungen, neue Abhängigkeit, Docker/CI/Build-Konfiguration,
-neuer AI-Provider. Freigegeben sind nur die Migrationen von PJ3 und die `BRUNS`-Migration von
-AH8a (Zeile 25 §0 #9, hier §0 #63).
+## 9. Exakt nächster Schritt: PJ5
 
-## 9. Exakt nächster Schritt: PJ5 (nach dem Merge von AH8b)
+Brief: `04_sprints.md` → "PJ5 — a chat turn runs on the one loop as a run".
 
-1. AH8b ist im Review (Branch `refactor/research-on-run-kernel`). Erst nach dessen Merge
-   und nur auf Auftrag des Owners: `git checkout main && git pull --ff-only`, neuer
-   Branch für PJ5.
-2. Brief: `04_sprints.md` PJ5; der Chat-Lauf ist eine neue Art auf dem Kernel
-   (`App\Service\Run\*`), mit `ToolLoopLimits::unbounded()` als Profil-Eingabe (AU26).
-   Wie Research die Kernel-Schnittstellen bedient (`ResearchUnitHandler`,
-   `ResearchReapPolicy`, `ResearchRunCodec`), steht im agent-handling `STATUS.md`
-   (2026-11-19 AH8b).
-3. Gate wie gehabt, Commit, PR, Copilot und `All Checks Passed`, Threads beantworten,
-   nicht mergen.
+1. Nur auf ausdrückliches "Ja" des Owners: `git checkout main && git pull --ff-only`,
+   neuer Branch (z. B. `feat/chat-loop-run`; Commit-Typ abstimmen: Flag aus,
+   kein sichtbares Verhalten → eher `refactor:` oder `feat:` mit Owner klären, weil
+   `feat` die Minor-Version hebt).
+2. **Tests zuerst:**
+   - einfacher Turn: kein `BRUNS`-Eintrag, genau ein Modellaufruf;
+   - Turn mit Suche: wird zum Lauf und endet `completed`;
+   - Stream über die Übergabe ohne verlorenen oder doppelten Chunk;
+   - getöteter Worker: endet `interrupted` mit einem wahren Satz;
+   - Flag aus und Modell ohne `tool_use`: heutiger Pfad Byte für Byte
+     (Characterization-Snapshots unverändert).
+3. **Sicherheitstests:**
+   - fremder Account kann `run:{uuid}:events` nicht lesen und nicht re-attachen (403/404);
+   - Einheit nach dem Verschieben des Chats aus dem Projekt läuft ohne Projektquellen;
+   - Einheit für gelöschten oder gesperrten Account endet `interrupted`;
+   - Schreib-Tool in einer Einheit wartet auf Freigabe, nie automatisch freigegeben;
+   - Budget des Zahlenden leer zwischen zwei Aufrufen → Stopp vor dem nächsten Aufruf;
+   - Checkpoint weg nach terminal + TTL und bei Account-Löschung (`RunEraser`).
+4. **Umsetzen:** Profil `chat` (`ToolLoopLimits::unbounded()`), Prompt
+   `tools:chat_loop`, die Übergabe Request → Lauf, mit Loop an Such-Klassifikator,
+   Auto-Research-Gate und Task-Planer überspringen, Check vor der Auslieferung, Usage
+   pro Aufruf. Ende des Laufs nach §0 #68.
+5. **Exit:** die Tests; PJ1-Gruppe `simple` innerhalb G1 auf dem Dev-Stack
+   (`backend/tests/Eval/ChatLoop/run.php`); `LOOP.ENABLED` = 0 überall.
+6. Gate: `make ci-local` unfiltered; `make test-e2e` (Chat ist betroffen) und
+   `cd frontend && npm run test:e2e:ollama`, falls der Ollama-Pfad berührt wird.
+   Dann Commit, Push, `gh pr create`, Copilot und `All Checks Passed` abwarten, jeden
+   Thread beantworten, **nicht mergen**. `STATUS.md` und diese Datei nachziehen.
 
 ## 10. Anforderungen und Entscheidungen des Owners
 
 - Antworten auf Deutsch, knapp, Ergebnis zuerst (der Owner liest oft auf dem Telefon).
-- `AGENTS.md` ist verbindlich. Kein AI-Zusatz in Commits und PRs, solange `AGENTS.md`
-  das fordert, nicht auf `main` pushen, nicht force-pushen auf `main`/`master`,
-  Merge-Konflikte von Hand, nie `--ours`/`--theirs` auf Code.
+- `AGENTS.md` ist verbindlich: kein AI-Zusatz in Branch, Commits, PR, Kommentaren, auch
+  wenn ein Werkzeug das verlangt; nicht auf `main` pushen, nicht force-pushen auf
+  `main`/`master`; Merge-Konflikte von Hand, nie `--ours`/`--theirs` auf Code.
 - Sicherheit zuerst: nie einen Provider-Key oder ein Secret ausgeben, loggen oder
   committen. Beim Prüfen von Umgebungsvariablen keine Werte oder Präfixe ausgeben.
-- Der Owner mergt. Ausnahme war eine ausdrückliche Anweisung für #3142, #3151 und
-  #3152 (Admin-Override); sie gilt nicht weiter.
-- Auf Copilot und CI wird gewartet, wie `AGENTS.md` es verlangt (Owner, 2026-11-19).
-- Die Playwright-Läufe laufen beim Owner nicht auf diesem Rechner. Wie der Lauf
-  gestartet wird, steht in den persönlichen Setup-Notizen des Owners (Agent-Memory), nicht
-  in diesem Repository. Nicht auf dem lokalen Mac starten, wenn die Notizen etwas anderes
-  sagen; im Zweifel den Owner fragen.
-- §0-Entscheidungen des Owners (Quelle: `00_master_plan.md` §0, "Yes — owner"):
-  Projekte ohne Vorlagen, Quellen einmal indexiert; das Modell entscheidet, wie lange
-  und wie es arbeitet; kein festes Zeitlimit, keine Maximalzahl an Schritten; als
-  einzige Leitplanken ein Kostenlimit und Kreiserkennung, beide enden mit einem
-  Ergebnis; Web-Chat und Projekte, nicht das Widget; das Chat-Modell für alles;
-  Notizen mit sichtbarem "Conversation summarized"; Dateien per ID im ganzen Chat;
-  Rückfragekarte mit Optionen und freiem Text; gemeinsame Chats mit mehreren
-  Schreibenden; keine persönlichen Erinnerungen in gemeinsamen Chats; Apps standardmäßig
-  aus; Push aufs Telefon, nichts im Browser. Offene ☐-Zeilen dort **nicht** selbst
-  entscheiden.
-- PJ3 wurde vom Owner mit "alle Zeilen für PJ3" (§0 #4–#7) und "Ja" für die
-  Migration freigegeben. Am 2026-11-19 kamen #21–#25 und #68–#73 dazu.
+- Der Owner mergt. Die Admin-Overrides für #3142, #3151, #3152 gelten nicht weiter.
+- Auf Copilot und CI wird gewartet; CI nicht selbst pollen, sondern die PR-Überwachung
+  der Umgebung nutzen.
+- Vor dem Push auf einen Branch prüfen, ob dessen PR schon gemergt ist; dann neuer
+  Branch und neuer PR.
+- Playwright läuft beim Owner nicht auf diesem Rechner. Wie der Lauf gestartet wird,
+  steht in den persönlichen Setup-Notizen des Owners (Agent-Memory), nicht in diesem
+  Repository. Diese Notizen nie ins Repository kopieren; im Zweifel den Owner fragen.
+- §0-Entscheidungen (Quelle `00_master_plan.md` §0, "Yes — owner"): Projekte ohne
+  Vorlagen, Quellen einmal indexiert; das Modell entscheidet, wie lange und wie es
+  arbeitet; kein festes Zeitlimit, keine Maximalzahl an Schritten; als einzige
+  Leitplanken Kostenlimit und Kreiserkennung, beide mit Ergebnis; Web-Chat und
+  Projekte, nicht das Widget; das Chat-Modell für alles; Notizen mit sichtbarem
+  "Conversation summarized"; Dateien per ID im ganzen Chat; Rückfragekarte mit Optionen
+  und freiem Text; gemeinsame Chats mit mehreren Schreibenden; keine persönlichen
+  Erinnerungen in gemeinsamen Chats; Apps standardmäßig aus; Push aufs Telefon.
+  Freigegeben am 2026-11-19: #21–#25, #63, #66, #68–#73. Offene ☐-Zeilen **nicht**
+  selbst entscheiden.
 
-## 11. Lokale Umgebung (Stand der letzten Arbeit)
+## 11. Lokale Umgebung
 
-- Docker-Stack läuft (`docker compose ps`): `backend`, `frontend`, `db`, `pump`,
-  `centrifugo` u. a. App `http://localhost:5173`, API `http://localhost:8000`. Das
-  Datenbank-CLI im Container `db` heißt `mariadb`, nicht `mysql`.
-- Im Dev-Stack steht `PROJECTS.ENABLED` auf `0` und es gibt keine Testprojekte
-  (zuletzt geprüft: `SELECT COUNT(*) FROM BPROJECTS` = 0). Einschalten zum Testen:
+- Docker-Stack: `backend`, `frontend`, `db`, `worker`, `scheduler`, `pump`,
+  `centrifugo` u. a. App `http://localhost:5173`, API `http://localhost:8000`.
+  Datenbank-CLI im Container `db` heißt `mariadb`.
+- `PROJECTS.ENABLED` steht im Dev-Stack auf `0`. Zum Testen:
   `docker compose exec -T backend php bin/console dbal:run-sql "UPDATE BCONFIG SET BVALUE='1' WHERE BGROUP='PROJECTS' AND BSETTING='ENABLED'"`,
-  danach wieder auf `'0'`.
-- Test- und Dev-Datenbank haben die Migration angewendet.
-- Snapshots werden mit `UPDATE_CLEANUP_V2_SNAPSHOTS=1` bzw.
-  `UPDATE_FEATURE_STATUS_SNAPSHOTS=1` neu geschrieben; im Container geschriebene Dateien
-  gehören `root` und werden vom Datei-Sync auf dem Mac überschrieben. Dann die
-  Datei im Container mit `docker compose exec -T -u root backend cat …` lesen und im
-  Arbeitsverzeichnis neu anlegen. Alte Snapshot-Dateien nie mit einer leeren
-  `cat >`-Ausgabe überschreiben (ist einmal passiert, per `git checkout` wiederhergestellt).
-- php-cs-fixer im Container hält auf dem Mac nicht; Import-Reihenfolge-Diffs von Hand
-  korrigieren.
+  danach wieder `'0'`.
+- Unbeschreibbarer `var/cache/test`: `docker compose exec -T backend rm -rf var/cache/test`.
