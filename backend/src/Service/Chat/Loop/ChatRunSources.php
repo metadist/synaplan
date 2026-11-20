@@ -16,20 +16,23 @@ use App\Service\Research\Run\Ledger\CanonicalUrl;
  * read, with the text the model saw of it: the result's title and
  * snippets, or the page. A link in the answer to such a page becomes the
  * marker `[eN]` the check knows, after its text; a link to a page the run
- * did not read stays as it is and is not checked. The link's text is
- * fenced by {@see LABEL}: it names the source and is not a claim to check.
+ * did not read stays as it is and is not checked. The link's text names the
+ * source and is not a claim to check: the report holds only its number,
+ * fenced by {@see LABEL}, so a period in it ("Example Inc. blog") cannot
+ * split the sentence it stands in.
  */
 final class ChatRunSources
 {
-    /** An invisible separator around a link's text, removed before anything is shown. */
+    /** An invisible separator around a link text's number, removed before anything is shown. */
     public const LABEL = "\u{2063}";
 
     /** A URL may hold balanced brackets, as in `wiki/Langenfeld_(Rheinland)`. */
     private const URL = 'https?:\/\/(?:[^\s()<>\[\]"]|\([^\s()<>]*\))+';
-    private const LINK = '/\[([^\]\n]*)\]\(\s*<?('.self::URL.')>?(?:\s+"[^"\n]*")?\s*\)/u';
+    private const LINK = '/(?<!!)\[([^\]\n]*)\]\(\s*<?('.self::URL.')>?(?:\s+"[^"\n]*")?\s*\)/u';
     private const AUTOLINK = '/<(https?:\/\/[^\s>]+)>/u';
     private const BARE = '/(?<![\w\/(\[<"=])'.self::URL.'/u';
     private const RESULT_START = '/\n(?=\[\d+\] )/';
+    private const LABELLED = '/'.self::LABEL.'(\d+)'.self::LABEL.' ?/u';
 
     /**
      * @param list<array<string, mixed>> $messages the run's transcript
@@ -62,29 +65,37 @@ final class ChatRunSources
      *
      * @param array<string, string> $sources from {@see read()}
      *
-     * @return array{report: string, passages: array<string, string>}
+     * @return array{report: string, passages: array<string, string>, urls: array<string, string>, labels: list<string>}
      */
     public static function cite(string $answer, array $sources): array
     {
         $answer = str_replace(self::LABEL, '', $answer);
         $ids = [];
-        $marker = static function (string $url) use ($sources, &$ids): ?string {
-            $key = CanonicalUrl::key(rtrim($url, '.,;:!?'));
+        $urls = [];
+        $labels = [];
+        $marker = static function (string $url) use ($sources, &$ids, &$urls): ?string {
+            $url = rtrim($url, '.,;:!?');
+            $key = CanonicalUrl::key($url);
             if (null === $key || !isset($sources[$key])) {
                 return null;
             }
             $ids[$key] ??= 'e'.(\count($ids) + 1);
+            $urls[$ids[$key]] ??= $url;
 
             return '['.$ids[$key].']';
         };
-        $report = (string) preg_replace_callback(self::LINK, static function (array $m) use ($marker): string {
+        $report = (string) preg_replace_callback(self::LINK, static function (array $m) use ($marker, &$labels): string {
             $mark = $marker($m[2]);
             if (null === $mark) {
                 return $m[0];
             }
             $label = trim($m[1]);
+            if ('' === $label) {
+                return $mark;
+            }
+            $labels[] = $label;
 
-            return ('' !== $label ? self::LABEL.$label.self::LABEL.' ' : '').$mark;
+            return self::LABEL.(\count($labels) - 1).self::LABEL.' '.$mark;
         }, $answer);
         $report = (string) preg_replace_callback(self::AUTOLINK, static fn (array $m): string => $marker($m[1]) ?? $m[0], $report);
         $report = (string) preg_replace_callback(self::BARE, static function (array $m) use ($marker): string {
@@ -98,19 +109,27 @@ final class ChatRunSources
             $passages[$id] = $sources[$key];
         }
 
-        return ['report' => $report, 'passages' => $passages];
+        return ['report' => $report, 'passages' => $passages, 'urls' => $urls, 'labels' => $labels];
     }
 
     /** The text the check judges: a link's text is left out, its marker stays. */
     public static function withoutLabels(string $text): string
     {
-        return (string) preg_replace('/'.self::LABEL.'[^'.self::LABEL.']*'.self::LABEL.' ?/u', '', $text);
+        return (string) preg_replace(self::LABELLED, '', $text);
     }
 
-    /** The text as the person read it, the link's text included. */
-    public static function shown(string $text): string
+    /**
+     * The text as the person read it, the link's text included.
+     *
+     * @param list<string> $labels from {@see cite()}
+     */
+    public static function shown(string $text, array $labels): string
     {
-        return str_replace(self::LABEL, '', $text);
+        return (string) preg_replace_callback(
+            self::LABELLED,
+            static fn (array $m): string => ($labels[(int) $m[1]] ?? '').' ',
+            $text,
+        );
     }
 
     /**

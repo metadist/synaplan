@@ -68,7 +68,7 @@ final readonly class ChatRunCheck
             return;
         }
         $cited = ChatRunSources::cite($answer, ChatRunSources::read($state->messages));
-        $statements = $this->statements($cited['report'], $cited['passages']);
+        $statements = $this->statements($cited);
         if ([] === $statements) {
             return;
         }
@@ -79,7 +79,7 @@ final readonly class ChatRunCheck
         $listed = [];
         foreach ($statements as $item) {
             if (isset($failed[$item['id']])) {
-                $listed[] = $item['shown'];
+                $listed[] = ['statement' => $item['shown'], 'sources' => $item['sources']];
             }
         }
         $state->note = ChatRunCheckNote::text($listed, $state->locale);
@@ -93,16 +93,17 @@ final readonly class ChatRunCheck
     /**
      * The statements that cite a page of this run, in the shape the checker
      * reads. A link's text names the source, like a marker, so it is not
-     * checked; the note shows the statement with it, as the person read it.
+     * checked; the note shows the statement with it, as the person read it,
+     * and links the pages it cites so the person can look for themselves.
      *
-     * @param array<string, string> $passages
+     * @param array{report: string, passages: array<string, string>, urls: array<string, string>, labels: list<string>} $cited
      *
-     * @return list<array{id: string, sentence: string, bare: string, passages: string, shown: string}>
+     * @return list<array{id: string, sentence: string, bare: string, passages: string, shown: string, sources: list<string>}>
      */
-    private function statements(string $report, array $passages): array
+    private function statements(array $cited): array
     {
         $out = [];
-        foreach (DraftSentences::split($report) as $written) {
+        foreach (DraftSentences::split($cited['report']) as $written) {
             $sentence = ChatRunSources::withoutLabels($written);
             $ids = self::ids($sentence);
             if ([] === $ids) {
@@ -112,16 +113,21 @@ final readonly class ChatRunCheck
             if (!self::saysSomething($bare)) {
                 continue;
             }
-            $cited = [];
+            $read = [];
+            $sources = [];
             foreach ($ids as $id) {
-                $cited[] = $id.': '.($passages[$id] ?? '');
+                $read[] = $id.': '.($cited['passages'][$id] ?? '');
+                if (isset($cited['urls'][$id])) {
+                    $sources[] = $cited['urls'][$id];
+                }
             }
             $out[] = [
                 'id' => 'c'.(\count($out) + 1),
                 'sentence' => $sentence,
                 'bare' => $bare,
-                'passages' => implode("\n", $cited),
-                'shown' => DraftSentences::bare(ChatRunSources::shown($written)),
+                'passages' => implode("\n", $read),
+                'shown' => DraftSentences::bare(ChatRunSources::shown($written, $cited['labels'])),
+                'sources' => $sources,
             ];
         }
 
@@ -133,7 +139,7 @@ final readonly class ChatRunCheck
      * is not this check's business: the chat may answer from what it knows.
      *
      * @param array<string, string>                                                                    $passages
-     * @param list<array{id: string, sentence: string, bare: string, passages: string, shown: string}> $statements
+     * @param list<array{id: string, sentence: string, bare: string, passages: string, shown: string, sources: list<string>}> $statements
      *
      * @return array<string, true> failed statements by id
      */
@@ -158,7 +164,7 @@ final readonly class ChatRunCheck
     /**
      * Asks the checking model, batch by batch, while the payer's budget allows.
      *
-     * @param list<array{id: string, sentence: string, bare: string, passages: string, shown: string}> $ask
+     * @param list<array{id: string, sentence: string, bare: string, passages: string, shown: string, sources: list<string>}> $ask
      * @param array<string, true>                                                                      $failed by id
      *
      * @return bool whether the model answered at least once

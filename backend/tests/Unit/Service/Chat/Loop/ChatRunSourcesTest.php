@@ -32,9 +32,26 @@ final class ChatRunSourcesTest extends TestCase
             $sources,
         );
 
-        self::assertSame('One First [e1]. Two [e2]. Three [e1]. Four [Other](https://other.example.net/).', ChatRunSources::shown($cited['report']));
+        self::assertSame('One First [e1]. Two [e2]. Three [e1]. Four [Other](https://other.example.net/).', ChatRunSources::shown($cited['report'], $cited['labels']));
         self::assertSame('One [e1]. Two [e2]. Three [e1]. Four [Other](https://other.example.net/).', ChatRunSources::withoutLabels($cited['report']));
         self::assertSame(['e1' => 'page a', 'e2' => 'page b'], $cited['passages']);
+        self::assertSame(['e1' => 'https://example.com/a/', 'e2' => 'https://example.org/b'], $cited['urls']);
+    }
+
+    public function testAPeriodInALinksTextDoesNotSplitTheSentence(): void
+    {
+        $cited = ChatRunSources::cite('It has 59,821 people, says the [Stadt Langenfeld Inc. z. B. page](https://example.com/a).', ['https://example.com/a' => 'page']);
+
+        self::assertStringNotContainsString('Inc.', $cited['report']);
+        self::assertSame('It has 59,821 people, says the [e1].', ChatRunSources::withoutLabels($cited['report']));
+        self::assertSame('It has 59,821 people, says the Stadt Langenfeld Inc. z. B. page [e1].', ChatRunSources::shown($cited['report'], $cited['labels']));
+    }
+
+    public function testAnImageIsNotACitation(): void
+    {
+        $cited = ChatRunSources::cite('A chart ![Chart](https://example.com/a).', ['https://example.com/a' => 'page']);
+
+        self::assertSame([], $cited['passages']);
     }
 
     public function testAUrlWithBracketsIsOneLink(): void
@@ -45,7 +62,7 @@ final class ChatRunSourcesTest extends TestCase
             $sources,
         );
 
-        self::assertSame('It has 59,821 people (Wikipedia [e1]). Also [e1].', ChatRunSources::shown($cited['report']));
+        self::assertSame('It has 59,821 people (Wikipedia [e1]). Also [e1].', ChatRunSources::shown($cited['report'], $cited['labels']));
     }
 
     public function testAnAnswerWithoutLinksCitesNothing(): void

@@ -44,9 +44,9 @@ final class ChatRunCheckTest extends ChatLoopCase
         $stored = $this->stored($state->runId);
         $text = ChatRunDelivery::text($stored);
         self::assertStringStartsWith($answer."\n\n---\n\n**Nicht durch die gelesenen Quellen belegt.**", $text);
-        self::assertStringEndsWith("\n\n- The sync is now 7 times faster, says the blog.", $text);
+        self::assertStringEndsWith("\n\n- The sync is now 7 times faster, says the blog. — [blog.example.org](<https://blog.example.org/sync>)", $text);
         self::assertStringNotContainsString('Release 4.2 fixed', substr($text, \strlen($answer)));
-        self::assertStringNotContainsString('blog.example.org', substr($text, \strlen($answer)));
+        self::assertStringNotContainsString('example.com', substr($text, \strlen($answer)), 'only the page of the flagged statement is linked');
         // What streamed stays as it was; only the note is still to come.
         self::assertSame($answer, $stored->said);
         self::assertSame(substr($text, \strlen($answer)), ChatRunDelivery::rest($stored));
@@ -98,7 +98,7 @@ final class ChatRunCheckTest extends ChatLoopCase
         self::assertStringContainsString('<statement id="c1">', $this->checker->users[0]);
         self::assertStringContainsString('e1: Changelog 4.2', $this->checker->users[0]);
         $stored = $this->stored($state->runId);
-        self::assertSame("---\n\n".$this->head()."\n\n- The login fix is in release 4.2 Changelog.", $stored->note);
+        self::assertSame("---\n\n".$this->head()."\n\n- The login fix is in release 4.2 Changelog. — [example.com](<https://example.com/changelog>)", $stored->note);
         self::assertSame(['statements' => 2, 'flagged' => 1, 'model' => true], $this->checked($state->runId));
         self::assertSame(2_000 + 2_500, $stored->costMicro);
     }
@@ -179,21 +179,40 @@ final class ChatRunCheckTest extends ChatLoopCase
 
     public function testTheNoteListsTenStatementsAndCountsTheRest(): void
     {
-        $statements = array_map(static fn (int $i): string => 'Statement number '.$i.' is wrong.', range(1, 12));
+        $statements = array_map(static fn (int $i): array => ['statement' => 'Statement number '.$i.' is wrong.', 'sources' => []], range(1, 12));
         $note = ChatRunCheckNote::text($statements, 'en-US');
 
         self::assertSame(10, substr_count($note, "\n- "));
         self::assertStringEndsWith("\n\n… and 2 more.", $note);
-        self::assertSame('', ChatRunCheckNote::text([' '], 'de'));
+        self::assertSame('', ChatRunCheckNote::text([['statement' => ' ', 'sources' => []]], 'de'));
     }
 
     public function testANoteLineStartsNoNewMarkdownBlock(): void
     {
-        $note = ChatRunCheckNote::text(['# Heading '.str_repeat('x', 400)], 'fr');
+        $note = ChatRunCheckNote::text([['statement' => '# Heading '.str_repeat('x', 400), 'sources' => []]], 'fr');
 
         self::assertStringContainsString("\n- Heading ", $note);
         self::assertStringEndsWith('…', $note);
         self::assertStringContainsString('Non étayé', $note);
+    }
+
+    public function testANoteLinksOnlyWebPages(): void
+    {
+        $note = ChatRunCheckNote::text([[
+            'statement' => 'It has 12 options.',
+            'sources' => ['https://www.example.com/a_(b)', 'javascript:alert(1)', 'https://example.com/x>y', 'https://www.example.com/a_(b)'],
+        ]], 'tr');
+
+        self::assertStringEndsWith("\n- It has 12 options. — [example.com](<https://www.example.com/a_(b)>)", $note);
+        self::assertStringContainsString('kontrol edin:', $note);
+    }
+
+    public function testAStatementWhoseLinkTextHasAPeriodIsChecked(): void
+    {
+        $state = $this->runAnswering('The sync is now 7 times faster, says [Example Inc. Engineering Blog](https://blog.example.org/sync).');
+
+        self::assertStringContainsString('- The sync is now 7 times faster, says Example Inc. Engineering Blog.', (string) $this->stored($state->runId)->note);
+        self::assertSame(['statements' => 1, 'flagged' => 1, 'model' => false], $this->checked($state->runId));
     }
 
     private function runAnswering(string $answer, bool $search = true): ChatRunState
