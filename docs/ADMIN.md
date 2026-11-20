@@ -1,5 +1,5 @@
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (1/9)**  
-> **← Previous:** [1.8 Updating on AWS Marketplace](UPDATE_AWS.md) · **Next:** [2.2 Health Probes & Uptime Monitoring →](HEALTH_MONITORING.md)
+> **← Previous:** [1.9 Updating on Coolify](UPDATE_COOLIFY.md) · **Next:** [2.2 Health Probes & Uptime Monitoring →](HEALTH_MONITORING.md)
 
 # Administration & Governance Guide
 
@@ -311,6 +311,7 @@ Follow the step-by-step guide for your platform:
 - [Update a Self-Hosted Deployment](UPDATE_SELFHOST.md)
 - [Update on Elestio](UPDATE_ELESTIO.md)
 - [Update on AWS (Marketplace AMI)](UPDATE_AWS.md)
+- [Update on Coolify](UPDATE_COOLIFY.md)
 
 Production images must use a released, pinned `SYNAPLAN_VERSION`; never update
 a production deployment by following `latest`. Read the release notes and the
@@ -1070,4 +1071,4 @@ make up
 ---
 
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 2: Administration, Security & Billing (1/9)**  
-> **← Previous:** [1.8 Updating on AWS Marketplace](UPDATE_AWS.md) · **Next:** [2.2 Health Probes & Uptime Monitoring →](HEALTH_MONITORING.md)
+> **← Previous:** [1.9 Updating on Coolify](UPDATE_COOLIFY.md) · **Next:** [2.2 Health Probes & Uptime Monitoring →](HEALTH_MONITORING.md)

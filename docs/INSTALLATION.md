@@ -1,4 +1,4 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (2/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (2/9)**  
 > **← Previous:** [1.1 Platform Capabilities & Mental Model](FEATURES.md) · **Next:** [1.3 Configuration & AI Providers →](CONFIGURATION.md)
 
 # Installation & Deployment Guide
@@ -633,5 +633,5 @@ docker compose exec redis redis-cli ping   # expects PONG
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (2/8)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 1: Getting Started & Deployment (2/9)**  
 > **← Previous:** [1.1 Platform Capabilities & Mental Model](FEATURES.md) · **Next:** [1.3 Configuration & AI Providers →](CONFIGURATION.md)

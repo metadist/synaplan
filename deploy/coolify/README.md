@@ -146,6 +146,9 @@ address does not answer. Accounts, files and settings stay as they were.
 Migrations are not reversed. To go back, restore the backup from step 2 and
 set the old version again.
 
+The update notice in the admin area links to
+[Update on Coolify](../../docs/UPDATE_COOLIFY.md), which has the same steps.
+
 ## Backup
 
 Synaplan keeps its data in the database and in three volumes. Coolify backs

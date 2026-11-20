@@ -12,7 +12,7 @@ to them.
 | CF3 | done 2026-11-19 | — | tag `v2.1.1` on `metadist/synaplan-tts` `c208a5f42`; its `ci.yml` published `ghcr.io/metadist/synaplan-tts:2.1.1` for `amd64` and `arm64` (`docker manifest inspect`). The file pins `2.1.1` |
 | CF4 | done 2026-11-19 | #3195 | file, guide, test, release pins |
 | CF5 | done 2026-11-19 | — | update 5.8.0 → 5.8.8 and backup and restore measured on CF1, guide rewritten from the result (see below) |
-| CF6 | not started | — | `SYNAPLAN_PLATFORM: coolify` already set in the file; unknown platforms fall back to `selfhost` until CF6 |
+| CF6 | done 2026-11-20 | — | `coolify` in `UpdatePlatformGuide` → `docs/UPDATE_COOLIFY.md` (Track 1.9); the file already sets `SYNAPLAN_PLATFORM: coolify` |
 | CF7 | not started | — | opened by a person (§0 #7) |
 | CF8 | blocked | — | Coolify docs still show the pause on 2026-11-19 |
 | CF9 | blocked | — | after CF8 is merged upstream |

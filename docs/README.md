@@ -80,6 +80,7 @@ Start here to understand what Synaplan ships with, choose the right deployment t
 | **1.6** | **[Updating a Self-Hosted Instance](UPDATE_SELFHOST.md)** | The four-step backup, version pin, upgrade, and rollback workflow for `deploy/` and Docker GUI Quickstart volumes. |
 | **1.7** | **[Updating on Elestio](UPDATE_ELESTIO.md)** | Taking a manual recovery snapshot, updating `SYNAPLAN_VERSION`, and redeploying an Elestio CI/CD pipeline. |
 | **1.8** | **[Updating on AWS Marketplace](UPDATE_AWS.md)** | Connecting via AWS Session Manager, snapshotting the EBS data volume, and running `sudo synaplan-update`. |
+| **1.9** | **[Updating on Coolify](UPDATE_COOLIFY.md)** | Backing up a Coolify resource, setting `SYNAPLAN_VERSION`, restarting, and rolling back from the backup. |
 
 ---
 
