@@ -13,7 +13,7 @@ to them.
 | CF4 | done 2026-11-19 | #3195 | file, guide, test, release pins |
 | CF5 | done 2026-11-19 | — | update 5.8.0 → 5.8.8 and backup and restore measured on CF1, guide rewritten from the result (see below) |
 | CF6 | done 2026-11-20 | — | `coolify` in `UpdatePlatformGuide` → `docs/UPDATE_COOLIFY.md` (Track 1.9); the file already sets `SYNAPLAN_PLATFORM: coolify` |
-| CF7 | not started | — | opened by a person (§0 #7) |
+| CF7 | waiting 2026-11-20 | — | Instead of a discussion, the owner replied by email to Coolify's answer of 2026-08-05 (no exceptions to the 1,000-star rule at the time). Asked: an exception, or how long the pause lasts, and which branch a service pull request targets. 972 stars on 2026-11-20 (`gh api repos/metadist/synaplan`) |
 | CF8 | blocked | — | Coolify docs still show the pause on 2026-11-19 |
 | CF9 | blocked | — | after CF8 is merged upstream |
 
@@ -69,7 +69,8 @@ uploaded (`process_level=store`) before every step and fetched after it.
 | U6 | open. Traefik v3 default `readTimeout` is 60 s for the whole request, and Coolify's proxy command sets none; a slow large upload may be cut | 2026-11-19 | `bootstrap/helpers/proxy.php`, Traefik docs |
 | U7 | open | | |
 | U8 | yes, all five third-party images publish `arm64`; the stack ran on arm64 | 2026-11-19 | Docker Hub tags API, CF1 host |
-| U9 | open | | |
-| U10 | open: pause still shown 2026-11-19 | 2026-11-19 | coolify.io/docs contribute page |
-| U11 | open | | |
-| U12 | open | | |
+| U9 | open: not asked; the maintainers pin moving tags themselves (`chore(service): pin moving tags…`, 2026-11-16 and 2026-11-17) | 2026-11-20 | `gh api repos/coollabsio/coolify/commits` |
+| U10 | open: pause still shown, "no ETA"; asked by email | 2026-11-20 | coolify.io/docs/contribute/service |
+| U11 | `public/svgs/synaplan.svg`, referenced as `# logo: svgs/synaplan.svg`. `public/svgs/` holds 351 logos, the root `svgs/` 11 and was last changed in August; recent template pull requests (OpenCode, Hi.Events) add to `public/svgs/` | 2026-11-20 | `gh api repos/coollabsio/coolify/contents`, merged pull requests |
+| U12 | no: maintainers write the `.changes/` entries themselves; external service pull requests merged on 2026-11-19 (11796, 11751) have none, and neither `CONTRIBUTING.md` nor the pull request template asks for one | 2026-11-20 | merged pull requests, `.changes/` commit authors |
+| U13 | open: the service docs say "current release/v4.x branch", but no such branch exists (only `main`, `next`; release v4.7.6). `CONTRIBUTING.md` sends features to `next`; service pull requests merged on 2026-11-18/19 went to `main` (netbird, n8n, WordPress) and `next` (OpenCode). Asked by email | 2026-11-20 | coolify.io/docs/contribute/service, `gh api repos/coollabsio/coolify/branches` |
