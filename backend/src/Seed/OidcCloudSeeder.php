@@ -17,6 +17,11 @@ use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
  * fixed row `oidc-cloud` on every container start, after the platform-links
  * defaults. Nothing happens when PLATFORM_LINKS_OIDC_CLOUD_TYPE is empty; a row
  * from an earlier configuration then stays as it is.
+ *
+ * Type, host, client id and delivery address follow the configuration.
+ * What the app takes does not: that is the app's own report, and a restart
+ * leaves it. A different cloud type is a different app, so its report starts
+ * again. Until an app has reported, the row offers nothing that waits.
  */
 #[AsTaggedItem(priority: -10)]
 final readonly class OidcCloudSeeder implements SeederInterface
@@ -48,6 +53,7 @@ final readonly class OidcCloudSeeder implements SeederInterface
         $host = $this->redirects->normalizeOperatorHost($this->cloud->url);
         $instance = $this->instances->findByInstanceId(PlatformInstance::OIDC_CLOUD_ID);
         $created = !$instance instanceof PlatformInstance;
+        $previousClient = $instance instanceof PlatformInstance ? $instance->getClient() : '';
         if (!$instance instanceof PlatformInstance) {
             $instance = new PlatformInstance($this->cloud->client, PlatformInstance::OIDC_CLOUD_ID, $host, [], PlatformInstance::STATUS_ACTIVE);
         }
@@ -55,8 +61,11 @@ final readonly class OidcCloudSeeder implements SeederInterface
         $instance->setHost($host);
         $instance->setStatus(PlatformInstance::STATUS_ACTIVE);
         $instance->setOidcClientId($this->cloud->clientId);
-        $instance->setAppCapabilities($this->cloud->capabilities);
         $instance->setDeliveryUrl($this->cloud->deliveryUrl);
+        if (!$created && $previousClient !== $this->cloud->client) {
+            $instance->setAppCapabilities([]);
+            $instance->setAppVersion(null);
+        }
         $this->instances->save($instance);
         $this->supersession->takeOverOlderTwins($instance);
         if ($created) {

@@ -950,9 +950,13 @@ person's link and every token it holds.
 **A cloud that shares Synaplan's identity provider (OpenCloud with the same
 Keycloak)** needs no registration: `PLATFORM_LINKS_OIDC_CLOUD*` configure it
 (see `backend/.env.example`). People's tokens are exchanged in Keycloak; a
-person's link is created on their first call through the cloud. Synaplan
-offers the OpenCloud app copies and pickups, which the app takes from 1.2.0
-on. An older app leaves them waiting: update the app with Synaplan.
+person's link is created on their first call through the cloud. The app
+reports what it takes with `PUT /api/v1/platform-links/oidc-cloud`, using one
+of those people's tokens (`azp` is `PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID`).
+Names this Synaplan does not know are ignored, so a newer app and an older
+core still work together. Until that report has arrived, Synaplan offers no
+copy and no pickup: an older app is never left waiting for an answer. A
+restart keeps the report. Changing the cloud type starts it again.
 
 **What a user sees.** **Channels & integrations → Linked platforms** lists the
 user's own links (platform, host, external id) with *Disconnect*, which ends

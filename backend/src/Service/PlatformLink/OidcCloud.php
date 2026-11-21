@@ -24,24 +24,13 @@ use App\Entity\PlatformInstance;
  *
  * Synaplan notifies the cloud at the app's inbound path, which belongs to
  * the cloud type and changes with the app, not with the configuration.
+ *
+ * What that app takes is not known here. The app reports it
+ * ({@see OidcCloudReport}) with a person's token whose azp is this client.
+ * Until that report arrives, the core offers nothing that waits for an answer.
  */
 final readonly class OidcCloud
 {
-    public const ALL_CAPABILITIES = ['deliveries', 'pickups', 'read_scope', 'source_events', 'watches'];
-
-    /**
-     * What each cloud app takes besides lifecycle notices. The configured
-     * cloud cannot report this itself, so the list follows the current app
-     * of each type: the OpenCloud app takes copies and pickups from 1.2.0
-     * on. An older app leaves an offered copy or pickup waiting for an
-     * answer; the app reporting what it takes is
-     * https://github.com/metadist/synaplan/issues/3161.
-     */
-    public const CAPABILITIES = [
-        PlatformInstance::CLIENT_OPENCLOUD => self::ALL_CAPABILITIES,
-        PlatformInstance::CLIENT_NEXTCLOUD => self::ALL_CAPABILITIES,
-    ];
-
     /** Where each cloud app takes Synaplan's notifications. */
     public const INBOUND_PATHS = [
         PlatformInstance::CLIENT_OPENCLOUD => '/api/synaplan/inbound',
@@ -52,8 +41,6 @@ final readonly class OidcCloud
     public string $url;
     public string $clientId;
     public string $deliveryUrl;
-    /** @var list<string> */
-    public array $capabilities;
 
     public function __construct(string $type, string $url, string $clientId, string $internalUrl = '')
     {
@@ -63,7 +50,6 @@ final readonly class OidcCloud
         $base = '' !== trim($internalUrl) ? rtrim(trim($internalUrl), '/') : $this->url;
         $path = self::INBOUND_PATHS[$this->client] ?? null;
         $this->deliveryUrl = null !== $path && '' !== $base ? $base.$path : '';
-        $this->capabilities = self::CAPABILITIES[$this->client] ?? [];
     }
 
     public function isEnabled(): bool
