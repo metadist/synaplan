@@ -50,6 +50,7 @@ final class AdminPlugsWebSearchControllerTest extends WebTestCase
         self::assertContains('tavily', $keys);
         self::assertContains('exa', $keys);
         self::assertContains('firecrawl', $keys);
+        self::assertContains('specstream', $keys);
         self::assertContains('perplexity', $keys);
     }
 

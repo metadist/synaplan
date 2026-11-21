@@ -35,6 +35,45 @@ final class WebSearchOptionMapper
     /**
      * @param array<string, mixed> $options
      */
+    public static function country(array $options): ?string
+    {
+        $raw = $options['country'] ?? null;
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return null;
+        }
+
+        $code = strtoupper(substr(trim($raw), 0, 2));
+        if (1 !== preg_match('/^[A-Z]{2}$/', $code)) {
+            return null;
+        }
+
+        // Chat / multitask callers forward the UI language code as `country`
+        // (for example `en`). Map pure language codes to their primary country so
+        // APIs that validate ISO 3166-1 alpha-2 do not receive `EN`.
+        $langToCountry = [
+            'EN' => 'US',
+            'JA' => 'JP',
+            'ZH' => 'CN',
+            'KO' => 'KR',
+            'AR' => 'SA',
+            'HI' => 'IN',
+            'SV' => 'SE',
+            'DA' => 'DK',
+            'CS' => 'CZ',
+            'EL' => 'GR',
+            'HE' => 'IL',
+            'VI' => 'VN',
+            'UK' => 'UA',
+            'MS' => 'MY',
+            'BN' => 'BD',
+        ];
+
+        return $langToCountry[$code] ?? $code;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
     public static function site(array $options): ?string
     {
         $site = $options['site'] ?? $options['include_domains'] ?? null;

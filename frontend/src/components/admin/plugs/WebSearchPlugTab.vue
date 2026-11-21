@@ -208,7 +208,7 @@ import {
 type ProviderCard = WebSearchStatus['providers'][number]
 type CapabilityKey = 'freshness' | 'country' | 'language' | 'siteFilter' | 'fullContent' | 'answer'
 
-const KEY_PROVIDERS = new Set(['tavily', 'exa', 'firecrawl', 'perplexity'])
+const KEY_PROVIDERS = new Set(['tavily', 'exa', 'firecrawl', 'specstream', 'perplexity'])
 
 const { t } = useI18n()
 const { success, warning, error: showError } = useNotification()

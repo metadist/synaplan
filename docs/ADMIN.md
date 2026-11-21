@@ -985,7 +985,7 @@ vision → STT). Extra adapters whose keys are not built-in (today:
 through if they fail, so a down sidecar never blocks an upload.
 
 Web search defaults to Brave (`WEB_SEARCH.PROVIDER=brave`). An admin
-picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
+picks Brave, SearXNG, Tavily, Exa, Firecrawl, SpecStream or Perplexity on
 **Admin → System configuration → Web search**, plus an optional
 fallback. The Brave API key and result count sit on the same tab. The next chat search uses the new provider with no restart.
 **Test query** shows up to five titles. Per-user override is

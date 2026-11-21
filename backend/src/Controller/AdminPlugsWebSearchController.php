@@ -218,7 +218,7 @@ final class AdminPlugsWebSearchController extends AbstractController
     #[Route('/keys/{provider}', name: 'admin_plugs_keys_save', methods: ['PUT'])]
     #[OA\Put(
         path: '/api/v1/admin/plugs/keys/{provider}',
-        summary: 'Store an encrypted plug API key (tavily, exa, firecrawl, perplexity)',
+        summary: 'Store an encrypted plug API key (tavily, exa, firecrawl, specstream, perplexity)',
         security: [['Bearer' => []]],
         tags: ['Admin Plugs Web Search']
     )]

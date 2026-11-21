@@ -91,6 +91,18 @@ final readonly class WebSearchCapabilities
         );
     }
 
+    public static function specstream(): self
+    {
+        return new self(
+            freshness: true,
+            country: true,
+            language: true,
+            siteFilter: true,
+            fullContent: true,
+            answer: true,
+        );
+    }
+
     /**
      * @return array{freshness: bool, country: bool, language: bool, siteFilter: bool, fullContent: bool, answer: bool}
      */
