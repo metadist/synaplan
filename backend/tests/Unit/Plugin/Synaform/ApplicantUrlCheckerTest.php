@@ -9,6 +9,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Plugin\Synaform\Service\ApplicantUrlChecker;
 use Plugin\Synaform\Service\ApplicantUrlFetch;
+use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -135,6 +136,54 @@ final class ApplicantUrlCheckerTest extends TestCase
         self::assertFalse($fetch->refused);
         self::assertSame('Public CV', $fetch->text);
         self::assertNull($fetch->warning);
+    }
+
+    public function testKeepsThePathForAQueryOrFragmentRedirect(): void
+    {
+        $urls = [];
+        $checker = $this->checker(function (string $method, string $url) use (&$urls): MockResponse {
+            $urls[] = $url;
+            if (1 === count($urls)) {
+                return new MockResponse('', [
+                    'http_code' => 302,
+                    'response_headers' => ['location' => '?view=print'],
+                ]);
+            }
+            if (2 === count($urls)) {
+                return new MockResponse('', [
+                    'http_code' => 302,
+                    'response_headers' => ['location' => '#cv'],
+                ]);
+            }
+
+            return new MockResponse('<p>Printable CV</p>', ['http_code' => 200]);
+        });
+
+        $fetch = $checker->check('http://93.184.216.34/profiles/jane?lang=en');
+
+        self::assertSame([
+            'http://93.184.216.34/profiles/jane?lang=en',
+            'http://93.184.216.34/profiles/jane?view=print',
+            'http://93.184.216.34/profiles/jane?view=print#cv',
+        ], $urls);
+        self::assertSame('Printable CV', $fetch->text);
+        self::assertFalse($fetch->refused);
+    }
+
+    public function testABodyThatFailsToDownloadIsAWarningWithNoText(): void
+    {
+        $checker = $this->checker(fn (): MockResponse => new MockResponse((static function (): \Generator {
+            yield '<p>partial';
+            throw new TransportException('idle timeout');
+        })(), ['http_code' => 200]));
+
+        $fetch = $checker->check('http://93.184.216.34/cv');
+
+        self::assertFalse($fetch->refused);
+        self::assertNull($fetch->text);
+        self::assertNotNull($fetch->warning);
+        self::assertStringNotContainsString('partial', (string) $fetch->warning);
+        self::assertStringContainsString('Could not reach the URL', $fetch->warning);
     }
 
     public function testStoredErrorBodyIsNotUsableText(): void

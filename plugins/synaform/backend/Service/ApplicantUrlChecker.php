@@ -131,7 +131,13 @@ final readonly class ApplicantUrlChecker
             return new ApplicantUrlFetch(null, $this->describe($host, $status, null), false);
         }
 
-        return $this->readablePage($host, $response->getContent(false));
+        try {
+            $raw = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            return $this->transportResult($url, $e);
+        }
+
+        return $this->readablePage($host, $raw);
     }
 
     private function transportResult(string $url, TransportExceptionInterface $exception): ApplicantUrlFetch
@@ -198,11 +204,19 @@ final readonly class ApplicantUrlChecker
         if (isset($base['port'])) {
             $origin .= ':'.$base['port'];
         }
+        $path = $base['path'] ?? '/';
+        if (str_starts_with($location, '?')) {
+            return $origin.$path.$location;
+        }
+        if (str_starts_with($location, '#')) {
+            $query = isset($base['query']) ? '?'.$base['query'] : '';
+
+            return $origin.$path.$query.$location;
+        }
         if (str_starts_with($location, '/')) {
             return $origin.$location;
         }
 
-        $path = $base['path'] ?? '/';
         $slash = strrpos($path, '/');
         $dir = false === $slash ? '/' : substr($path, 0, $slash + 1);
 
