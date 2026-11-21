@@ -47,6 +47,13 @@ final readonly class ChatRunCodec implements RunStateCodec
             'costMicro' => $state->costMicro,
             'nudges' => $state->nudges,
             'modelFailures' => $state->modelFailures,
+            'dearestMicro' => $state->dearestMicro,
+            'lastCallMicro' => $state->lastCallMicro,
+            'lastCallChars' => $state->lastCallChars,
+            'budgetNudged' => $state->budgetNudged,
+            'rates' => $state->rates?->encode(),
+            'wrapUp' => $state->wrapUp?->value,
+            'stall' => ChatRunStallDetector::encode($state->stall),
             'expected' => $expectedSeq,
             'checkpoint' => $checkpointSeq,
             'updated' => $now,
@@ -107,11 +114,18 @@ final readonly class ChatRunCodec implements RunStateCodec
         $state->said = \is_string($data['said'] ?? null) ? ChatRunSpeaker::cap($data['said']) : '';
         $state->note = \is_string($data['note'] ?? null) ? ChatRunSpeaker::cap($data['note']) : null;
         $mode = $data['mode'] ?? ChatRunState::MODE_FREE;
-        $state->mode = \in_array($mode, [ChatRunState::MODE_FREE, ChatRunState::MODE_FINISH, ChatRunState::MODE_FINISH_JSON], true) ? $mode : ChatRunState::MODE_FREE;
+        $state->mode = \in_array($mode, ChatRunState::MODES, true) ? $mode : ChatRunState::MODE_FREE;
         $state->steps = max(0, (int) ($data['steps'] ?? 0));
         $state->costMicro = max(0, (int) ($data['costMicro'] ?? 0));
         $state->nudges = max(0, (int) ($data['nudges'] ?? 0));
         $state->modelFailures = max(0, (int) ($data['modelFailures'] ?? 0));
+        $state->dearestMicro = max(0, (int) ($data['dearestMicro'] ?? 0));
+        $state->lastCallMicro = max(0, (int) ($data['lastCallMicro'] ?? 0));
+        $state->lastCallChars = max(0, (int) ($data['lastCallChars'] ?? 0));
+        $state->budgetNudged = true === ($data['budgetNudged'] ?? false);
+        $state->rates = ChatRunRates::decode($data['rates'] ?? null);
+        $state->wrapUp = ChatRunWrapUp::reason($data['wrapUp'] ?? null);
+        $state->stall = ChatRunStallDetector::decode($data['stall'] ?? null);
         $state->pending = self::pending($data['pending'] ?? []);
         $state->plan = self::plan($data['plan'] ?? []);
         $state->reads = self::reads($data['reads'] ?? []);

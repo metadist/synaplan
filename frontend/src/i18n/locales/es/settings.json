@@ -752,6 +752,17 @@
       "saved": "Se guardó su proveedor de búsqueda.",
       "saveFailed": "No se pudo guardar su proveedor de búsqueda"
     },
+    "chatRunLimit": {
+      "title": "Límite de coste por respuesta larga",
+      "description": "Cuando el chat recorre varios pasos para una respuesta, puede gastar como máximo esta parte de tu presupuesto mensual. Al llegar al límite deja de buscar y responde con lo que ha encontrado.",
+      "share": "Parte de tu presupuesto mensual",
+      "option": "{percent} % – hasta {amount} por respuesta",
+      "default": "predeterminado",
+      "monthly": "Tu presupuesto mensual: {amount}",
+      "noBudget": "Tu plan no tiene presupuesto mensual, así que no hay límite de coste por respuesta. Una respuesta larga termina igualmente si da vueltas en círculo.",
+      "saved": "Tu límite de coste se ha guardado.",
+      "saveFailed": "No se pudo guardar tu límite de coste"
+    },
     "account": {
       "title": "Cuenta",
       "email": "Correo",

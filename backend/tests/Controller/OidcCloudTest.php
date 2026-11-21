@@ -117,18 +117,39 @@ final class OidcCloudTest extends WebTestCase
         self::assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
     }
 
-    public function testTheCloudIsOfferedWhatItsAppTakes(): void
+    public function testANewCloudIsOfferedNothingUntilItsAppReports(): void
     {
         $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
-        self::assertSame(OidcCloud::ALL_CAPABILITIES, $this->row()->getAppCapabilities(), 'the OpenCloud app takes copies and pickups from 1.2.0 on');
-        self::assertTrue($this->row()->canReceiveCopies());
-        self::assertTrue($this->row()->reports('pickups'));
 
-        $this->seed('https://cloud.example.com', 'http://nextcloud', 'nextcloud');
-        self::assertSame(OidcCloud::ALL_CAPABILITIES, $this->row()->getAppCapabilities());
+        self::assertSame([], $this->row()->getAppCapabilities());
+        self::assertFalse($this->row()->canReceiveCopies());
+        self::assertFalse($this->row()->reports('pickups'));
+        self::assertSame('http://synaplan-opencloud:9106/api/synaplan/inbound', $this->row()->getDeliveryUrl());
+    }
+
+    public function testTheSeederKeepsAReportAndDropsItWhenTheCloudTypeChanges(): void
+    {
+        $this->seed('https://cloud.example.com', 'http://synaplan-opencloud:9106');
+        $row = $this->row();
+        $row->setAppCapabilities(['deliveries', 'pickups']);
+        $row->setAppVersion('1.2.0');
+        $this->em->flush();
+
+        $this->seed('https://files.example.com', 'http://opencloud-synaplan.cloud.svc:9106');
+        self::assertSame(['deliveries', 'pickups'], $this->row()->getAppCapabilities());
+        self::assertSame('1.2.0', $this->row()->getAppVersion());
         self::assertTrue($this->row()->canReceiveCopies());
 
-        self::assertSame([], (new OidcCloud('owncloud', 'https://cloud.example.com', 'zero-setup-people'))->capabilities, 'a type without a configured app is offered nothing');
+        $this->seed('https://files.example.com', 'http://nextcloud', 'nextcloud');
+        self::assertSame([], $this->row()->getAppCapabilities());
+        self::assertNull($this->row()->getAppVersion());
+        self::assertFalse($this->row()->canReceiveCopies());
+        self::assertSame('http://nextcloud/index.php/apps/synaplan_integration/api/v1/inbound', $this->row()->getDeliveryUrl());
+    }
+
+    public function testACloudTypeWithoutAnInboundPathIsNotConfigured(): void
+    {
+        self::assertFalse((new OidcCloud('owncloud', 'https://cloud.example.com', 'zero-setup-people'))->isEnabled());
     }
 
     private function seed(string $url, string $internalUrl, string $type = 'opencloud'): OidcCloud

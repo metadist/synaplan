@@ -8,6 +8,7 @@ use App\AI\ToolCalling\ToolCallingCapability;
 use App\AI\ToolCalling\ToolCallParser;
 use App\Entity\Chat;
 use App\Entity\Message;
+use App\Entity\Model;
 use App\Entity\Run;
 use App\Repository\ConfigRepository;
 use App\Repository\RunRepository;
@@ -18,7 +19,9 @@ use App\Service\Chat\Loop\ChatLoopPrompt;
 use App\Service\Chat\Loop\ChatLoopTurn;
 use App\Service\Chat\Loop\ChatRunDelivery;
 use App\Service\Chat\Loop\ChatRunEvents;
+use App\Service\Chat\Loop\ChatRunLoopLimits;
 use App\Service\Chat\Loop\ChatRunRecords;
+use App\Service\Chat\Loop\ChatRunStartBudget;
 use App\Service\Chat\Loop\ChatRunStarter;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunStatus;
@@ -36,6 +39,7 @@ use App\Service\ModelConfigService;
 use App\Service\Project\ProjectChatScope;
 use App\Service\Project\ProjectTurnContext;
 use App\Service\Prompt\ChatPromptBlocks;
+use App\Service\RateLimitService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -91,6 +95,56 @@ final class ChatLoopHandOverTest extends ChatLoopCase
         self::assertArrayNotHasKey('previous_response_id', $call->aiOptions, 'the run sends the whole transcript');
         self::assertSame([['role' => 'user', 'content' => 'What changed?']], $call->transcript);
         self::assertSame('You help.', $call->basePrompt);
+    }
+
+    public function testABudgetThatCannotPayForALongAnswerAnswersWithoutToolsAndSaysWhy(): void
+    {
+        // One call of this model costs about $0.033; what is left covers that, not the reserve too.
+        $this->budget->runCapMicro = 1_000_000;
+        $this->budget->leftMicro = 50_000;
+
+        $call = $this->turn()->prepare($this->chatTurn(), $this->choice($this->priced()), $this->messages(), ['previous_response_id' => 'resp_1'], $this->options());
+
+        self::assertNotNull($call);
+        self::assertArrayNotHasKey('tools', $call->aiOptions);
+        self::assertSame('resp_1', $call->aiOptions['previous_response_id']);
+        self::assertStringEndsWith(ChatLoopPrompt::LOW_BUDGET, $call->messages[0]['content']);
+        self::assertStringNotContainsString(ChatLoopPrompt::rules(), $call->messages[0]['content']);
+    }
+
+    public function testAShareTooSmallForTheModelSaysSoNotThatTheBudgetIsUsedUp(): void
+    {
+        // Plenty left this month, but the chosen share cannot pay for the first call and the reserve.
+        $this->budget->runCapMicro = 50_000;
+        $this->budget->leftMicro = 9_000_000;
+
+        $call = $this->turn()->prepare($this->chatTurn(), $this->choice($this->priced()), $this->messages(), [], $this->options());
+
+        self::assertNotNull($call);
+        self::assertArrayNotHasKey('tools', $call->aiOptions);
+        self::assertStringEndsWith(ChatLoopPrompt::LOW_LIMIT, $call->messages[0]['content']);
+    }
+
+    public function testABudgetThatPaysForTheFirstCallAndTheReserveStartsTheLoop(): void
+    {
+        $this->budget->runCapMicro = 1_000_000;
+        $this->budget->leftMicro = 80_000;
+
+        $call = $this->turn()->prepare($this->chatTurn(), $this->choice($this->priced()), $this->messages(), [], $this->options());
+
+        self::assertNotNull($call);
+        self::assertArrayHasKey('tools', $call->aiOptions);
+    }
+
+    public function testAModelWithoutAPriceIsNeverHeldBackAtTheStart(): void
+    {
+        $this->budget->runCapMicro = 1_000;
+        $this->budget->leftMicro = 1_000;
+
+        $call = $this->turn()->prepare($this->chatTurn(), $this->choice(), $this->messages(), [], $this->options());
+
+        self::assertNotNull($call);
+        self::assertArrayHasKey('tools', $call->aiOptions);
     }
 
     public function testTheRunPromptLeavesOutWhatOnlyTheProjectGives(): void
@@ -237,7 +291,7 @@ final class ChatLoopHandOverTest extends ChatLoopCase
         });
 
         return new ChatLoopTurn(
-            new ChatLoopGate($config, $models, $capability),
+            new ChatLoopGate($config, $models, $capability, new ChatRunStartBudget($this->budget, $this->rates(), new ChatRunLoopLimits())),
             $capability,
             new ToolCallParser(),
             $this->createStub(UserRepository::class),
@@ -285,9 +339,23 @@ final class ChatLoopHandOverTest extends ChatLoopCase
         return new ChatTurn($message, [], ['topic' => 'general', 'language' => 'de'], ['track_id' => self::TRACK_ID], null, null, new PerfTimer(), $knowledge, new ChatPersonalContext($this->user));
     }
 
-    private function choice(): ChatModelChoice
+    private function choice(?Model $model = null): ChatModelChoice
     {
-        return new ChatModelChoice(3, 'test', 'test-model', self::USER_ID, false, false, false);
+        return new ChatModelChoice(3, 'test', 'test-model', self::USER_ID, false, false, false, $model);
+    }
+
+    private function rates(): RateLimitService
+    {
+        $rates = $this->createStub(RateLimitService::class);
+        $rates->method('getMarkupPercent')->willReturn(10.0);
+
+        return $rates;
+    }
+
+    /** A priced model: $3 in and $15 out per million tokens. */
+    private function priced(): Model
+    {
+        return (new Model())->setPriceIn(3.0)->setInUnit('per1M')->setPriceOut(15.0)->setOutUnit('per1M');
     }
 
     /** @return list<array<string, mixed>> */

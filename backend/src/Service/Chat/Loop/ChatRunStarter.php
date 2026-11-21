@@ -86,6 +86,7 @@ final readonly class ChatRunStarter
                 $this->clock->now()->getTimestamp(),
             );
             $state->replyMessageId = $request->replyMessageId;
+            $state->rates = $request->prompt->rates;
             if (null !== $request->first) {
                 $this->answers->seed($state, $request->first);
                 $seeded = $state;

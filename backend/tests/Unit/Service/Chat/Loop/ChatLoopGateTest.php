@@ -10,7 +10,10 @@ use App\Entity\Message;
 use App\Repository\ConfigRepository;
 use App\Service\Chat\Loop\ChatLoopConfig;
 use App\Service\Chat\Loop\ChatLoopGate;
+use App\Service\Chat\Loop\ChatRunLoopLimits;
+use App\Service\Chat\Loop\ChatRunStartBudget;
 use App\Service\ModelConfigService;
+use App\Service\RateLimitService;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -103,7 +106,9 @@ final class ChatLoopGateTest extends TestCase
             $models->method('getProviderForModel')->willReturn($provider);
         }
 
-        return new ChatLoopGate(new ChatLoopConfig($this->createStub(ConfigRepository::class), $env), $models, new ToolCallingCapability());
+        $start = new ChatRunStartBudget(new SwitchedChatRunBudget(), $this->createStub(RateLimitService::class), new ChatRunLoopLimits());
+
+        return new ChatLoopGate(new ChatLoopConfig($this->createStub(ConfigRepository::class), $env), $models, new ToolCallingCapability(), $start);
     }
 
     private function message(): Message
