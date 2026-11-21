@@ -71,6 +71,15 @@ final readonly class WebSearchAdminService
         return $this->plugConfig->isWebSearchEnabled();
     }
 
+    /**
+     * @return array{
+     *     providers: list<array<string, mixed>>,
+     *     active: string,
+     *     fallback: string,
+     *     userOverrideAllowed: bool,
+     *     enabled: bool
+     * }
+     */
     public function save(string $active, string $fallback, bool $enabled): array
     {
         $this->plugConfig->setWebSearchEnabled($enabled);
