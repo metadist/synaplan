@@ -38,10 +38,16 @@ parameters:
             reportUnmatched: false
         # synaform's controller is one pre-gate class. Its level-5 findings are
         # phpdoc narrowing inside that monolith; they wait for a split, not a
-        # drive-by edit of a ten-thousand-line file.
+        # drive-by edit of a ten-thousand-line file. The HTML preview service
+        # was covered by the same plugin-wide ignore. New plugin classes stay
+        # on the normal level.
         -
             message: '#.*#'
-            path: /plugins/synaform/*
+            path: /plugins/synaform/backend/Controller/SynaformController.php
+            reportUnmatched: false
+        -
+            message: '#.*#'
+            path: /plugins/synaform/backend/Service/TemplateHtmlPreviewService.php
             reportUnmatched: false
         -
             identifiers:

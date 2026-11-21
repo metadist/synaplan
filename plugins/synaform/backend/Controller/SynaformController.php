@@ -17,6 +17,8 @@ use App\Service\RateLimitService;
 use OpenApi\Attributes as OA;
 use PhpOffice\PhpWord\IOFactory as PhpWordIOFactory;
 use PhpOffice\PhpWord\TemplateProcessor;
+use Plugin\Synaform\Service\ApplicantUrlChecker;
+use Plugin\Synaform\Service\ApplicantUrlFetch;
 use Plugin\Synaform\Service\TemplateHtmlPreviewService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -140,6 +142,7 @@ class SynaformController extends AbstractController
         private AiFacade $aiFacade,
         private FileProcessor $fileProcessor,
         private TemplateHtmlPreviewService $htmlPreviewService,
+        private ApplicantUrlChecker $applicantUrls,
         private HttpClientInterface $http,
         #[Autowire('%app.upload_dir%')] private string $uploadDir,
     ) {
@@ -2246,7 +2249,8 @@ class SynaformController extends AbstractController
         security: [['ApiKey' => []]],
         tags: ['Synaform Plugin']
     )]
-    #[OA\Response(response: 200, description: 'URL attached')]
+    #[OA\Response(response: 200, description: 'URL attached. fetch_error is a warning when the page text was not kept.')]
+    #[OA\Response(response: 400, description: 'The address is not a public http(s) page')]
     public function candidatesUrlsAdd(int $userId, string $candidateId, Request $request, #[CurrentUser] ?User $user): JsonResponse
     {
         if (!$this->canAccessPlugin($user, $userId)) {
@@ -2266,14 +2270,12 @@ class SynaformController extends AbstractController
             return $this->json(['success' => false, 'error' => 'URL is required'], Response::HTTP_BAD_REQUEST);
         }
 
-        $parsed = parse_url($url);
-        if (!$parsed || empty($parsed['scheme']) || !in_array(strtolower($parsed['scheme']), ['http', 'https'], true) || empty($parsed['host'])) {
-            return $this->json(['success' => false, 'error' => 'Only http:// and https:// URLs are supported'], Response::HTTP_BAD_REQUEST);
+        $fetch = $this->applicantUrls->check($url);
+        if ($fetch->refused) {
+            return $this->json(['success' => false, 'error' => $fetch->warning ?? ApplicantUrlChecker::PUBLIC_ONLY], Response::HTTP_BAD_REQUEST);
         }
 
-        [$snippet, $fetchError] = $this->fetchUrlText($url);
-
-        $host = $parsed['host'] ?? '';
+        $host = (string) (parse_url($url, \PHP_URL_HOST) ?? '');
         $kind = 'web';
         if (str_contains($host, 'linkedin.com')) {
             $kind = 'linkedin';
@@ -2289,9 +2291,9 @@ class SynaformController extends AbstractController
             'label' => '' !== $label ? $label : $host,
             'host' => $host,
             'kind' => $kind,
-            'text_snippet' => $snippet,
-            'fetch_error' => $fetchError,
-            'fetched_at' => null !== $snippet ? date('c') : null,
+            'text_snippet' => $fetch->text,
+            'fetch_error' => $fetch->warning,
+            'fetched_at' => null !== $fetch->text ? date('c') : null,
             'added_at' => date('c'),
         ];
 
@@ -2367,10 +2369,10 @@ class SynaformController extends AbstractController
         }
 
         $existing = $urls[$urlIndex];
-        [$snippet, $fetchError] = $this->fetchUrlText($existing['url']);
-        $existing['text_snippet'] = $snippet;
-        $existing['fetch_error'] = $fetchError;
-        $existing['fetched_at'] = null !== $snippet ? date('c') : null;
+        $fetch = $this->applicantUrls->check((string) ($existing['url'] ?? ''));
+        $existing['text_snippet'] = $fetch->text;
+        $existing['fetch_error'] = $fetch->warning;
+        $existing['fetched_at'] = null !== $fetch->text ? date('c') : null;
         $entry['files']['urls'][$urlIndex] = $existing;
         $entry['updated_at'] = date('c');
         $this->pluginData->set($userId, self::PLUGIN_NAME, self::DATA_TYPE_CANDIDATE, $candidateId, $entry);
@@ -2420,8 +2422,8 @@ class SynaformController extends AbstractController
                 }
             }
             foreach ($entry['files']['urls'] ?? [] as $urlEntry) {
-                $snippet = $urlEntry['text_snippet'] ?? null;
-                if (is_string($snippet) && '' !== trim($snippet)) {
+                $snippet = ApplicantUrlFetch::storedText($urlEntry['text_snippet'] ?? null, $urlEntry['fetch_error'] ?? null);
+                if (null !== $snippet) {
                     $host = $urlEntry['host'] ?? 'url';
                     $kind = $urlEntry['kind'] ?? 'web';
                     $rawText .= "=== URL Source ({$kind} · {$host} · ".($urlEntry['url'] ?? '').") ===\n".$snippet."\n\n";
@@ -2707,8 +2709,8 @@ class SynaformController extends AbstractController
         }
 
         foreach ($entry['files']['urls'] ?? [] as $urlEntry) {
-            $snippet = $urlEntry['text_snippet'] ?? null;
-            if (is_string($snippet) && '' !== trim($snippet)) {
+            $snippet = ApplicantUrlFetch::storedText($urlEntry['text_snippet'] ?? null, $urlEntry['fetch_error'] ?? null);
+            if (null !== $snippet) {
                 $host = $urlEntry['host'] ?? 'url';
                 $kind = $urlEntry['kind'] ?? 'web';
                 $allTexts[] = "=== URL Source ({$kind} · {$host} · ".($urlEntry['url'] ?? '').") ===\n".$snippet;
@@ -6459,154 +6461,6 @@ class SynaformController extends AbstractController
         {$text}
         ---
         PROMPT;
-    }
-
-    /**
-     * Fetch a URL and return plain-text content for AI consumption.
-     *
-     * Best-effort, defensive: many public profile pages (LinkedIn,
-     * Instagram, Facebook, X) **always** block unauthenticated
-     * server-side fetches — this is structural, not transient. We
-     * detect those hosts up front and return an actionable error
-     * instead of misleading the user with "rate-limited" language
-     * (which implies "wait and retry"; for these hosts retry never
-     * helps without a logged-in session). Open pages (GitHub,
-     * corporate sites, XING public profiles, Wikipedia, etc.) do
-     * work — the AI prompt tolerates partial / noisy input, so
-     * even a thin snippet is useful.
-     *
-     * @return array{0: ?string, 1: ?string} [plainText|null, errorMessage|null]
-     */
-    private function fetchUrlText(string $url): array
-    {
-        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?? ''));
-
-        try {
-            $response = $this->http->request('GET', $url, [
-                'timeout' => 15,
-                'max_duration' => 15,
-                'max_redirects' => 5,
-                'headers' => [
-                    'User-Agent' => 'Mozilla/5.0 (compatible; Synaform-Bot/1.0; +https://synaplan.com)',
-                    'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language' => 'en-US,en;q=0.9,de;q=0.8',
-                ],
-            ]);
-            $status = $response->getStatusCode();
-            $raw = $response->getContent(false);
-            $err = null;
-        } catch (TransportExceptionInterface $e) {
-            $status = 0;
-            $raw = '';
-            $err = $e->getMessage();
-        }
-
-        if ('' === $raw) {
-            return [null, $this->describeUrlFetchError($host, $status, $err ?: 'Failed to fetch URL')];
-        }
-
-        // Strip script/style/noscript blocks, then all tags. Collapse whitespace.
-        $cleaned = preg_replace('#<(script|style|noscript)\b[^>]*>.*?</\1>#is', ' ', (string) $raw) ?? '';
-        $cleaned = preg_replace('#<!--.*?-->#s', ' ', $cleaned) ?? '';
-        $cleaned = html_entity_decode(strip_tags($cleaned), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $cleaned = preg_replace('/[ \t]+/', ' ', $cleaned) ?? '';
-        $cleaned = preg_replace("/\n{3,}/", "\n\n", $cleaned) ?? '';
-        $cleaned = trim($cleaned);
-
-        // Cap the stored snippet to keep plugin_data rows reasonable.
-        $cap = 60000;
-        if (function_exists('mb_strlen') && mb_strlen($cleaned) > $cap) {
-            $cleaned = mb_substr($cleaned, 0, $cap)."\n…[truncated]…";
-        } elseif (strlen($cleaned) > $cap) {
-            $cleaned = substr($cleaned, 0, $cap)."\n…[truncated]…";
-        }
-
-        // Detect login-wall responses that come back HTTP 200 with
-        // essentially a sign-in shell (LinkedIn does this on certain
-        // CDNs even when 999 is not returned). Heuristic: very short
-        // content that looks like a login prompt.
-        $isWalledHost = $this->isLoginWalledHost($host);
-        $cleanedLen = function_exists('mb_strlen') ? mb_strlen($cleaned) : strlen($cleaned);
-        $looksLikeLoginShell = $isWalledHost && $cleanedLen < 600
-            && 1 === preg_match('/\b(sign in|log in|join now|anmelden|einloggen|connectez-vous)\b/i', $cleaned);
-
-        if ($status >= 400 || $looksLikeLoginShell) {
-            return [
-                '' !== $cleaned && !$looksLikeLoginShell ? $cleaned : null,
-                $this->describeUrlFetchError($host, $status, null),
-            ];
-        }
-
-        if ('' === $cleaned) {
-            return [null, $this->describeUrlFetchError($host, $status, 'No extractable text')];
-        }
-
-        return [$cleaned, null];
-    }
-
-    /**
-     * Translate a (host, http_code, transport_error) tuple into a
-     * user-facing message that tells the user what to do next instead
-     * of just dumping a raw HTTP code. Honesty matters: calling a
-     * structural block "rate-limited" sends users into a retry loop
-     * that can never succeed.
-     */
-    private function describeUrlFetchError(string $host, int $status, ?string $transportError): string
-    {
-        $isLinkedIn = str_contains($host, 'linkedin.com');
-        $isInstagram = str_contains($host, 'instagram.com');
-        $isFacebook = str_contains($host, 'facebook.com') || str_contains($host, 'fb.com');
-        $isTwitter = 'x.com' === $host || str_ends_with($host, '.x.com')
-            || str_contains($host, 'twitter.com');
-
-        // 429 is the only HTTP code that genuinely means "wait and retry".
-        if (429 === $status) {
-            return 'The site rate-limited the fetch (HTTP 429). Try again in a minute.';
-        }
-
-        // LinkedIn 999, login walls, or any 4xx from these hosts are
-        // structural — retry never works without a logged-in session.
-        if ($isLinkedIn) {
-            return 'LinkedIn blocks server-side fetches of profile pages. Open the profile in your browser, choose “More → Save to PDF”, and upload the PDF as a CV instead. The URL stays attached as a reference.';
-        }
-        if ($isInstagram) {
-            return 'Instagram blocks server-side fetches. Take a screenshot of the profile and upload it as an additional document instead. The URL stays attached as a reference.';
-        }
-        if ($isFacebook) {
-            return 'Facebook blocks server-side fetches of profile pages. Save the page as PDF from your browser and upload it as an additional document instead. The URL stays attached as a reference.';
-        }
-        if ($isTwitter) {
-            return 'X (Twitter) blocks server-side fetches without authentication. Copy the relevant content into the description field, or take a screenshot. The URL stays attached as a reference.';
-        }
-
-        if (0 === $status && $transportError) {
-            return 'Could not reach the URL: '.$transportError;
-        }
-        if ($status >= 400) {
-            return 'The site returned HTTP '.$status.' — the page is not publicly readable by a server.';
-        }
-        if ($transportError) {
-            return $transportError;
-        }
-
-        return 'No extractable text on the page.';
-    }
-
-    /**
-     * Hosts that are known to redirect or anti-bot to a login wall.
-     * Used to flag short HTTP-200 responses that are really sign-in
-     * shells (no real profile content reached us).
-     */
-    private function isLoginWalledHost(string $host): bool
-    {
-        $needles = ['linkedin.com', 'instagram.com', 'facebook.com', 'x.com', 'twitter.com'];
-        foreach ($needles as $n) {
-            if (str_contains($host, $n)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private function extractTextFromDocx(string $path): ?string
