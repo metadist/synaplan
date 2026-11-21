@@ -66,6 +66,11 @@ final readonly class WebSearchAdminService
         ];
     }
 
+    public function isEnabled(): bool
+    {
+        return $this->plugConfig->isWebSearchEnabled();
+    }
+
     /**
      * @return array{
      *     providers: list<array<string, mixed>>,
@@ -75,11 +80,6 @@ final readonly class WebSearchAdminService
      *     enabled: bool
      * }
      */
-    public function isEnabled(): bool
-    {
-        return $this->plugConfig->isWebSearchEnabled();
-    }
-
     public function save(string $active, string $fallback, bool $enabled): array
     {
         $this->plugConfig->setWebSearchEnabled($enabled);
