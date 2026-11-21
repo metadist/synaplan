@@ -120,6 +120,12 @@ describe('Provider Flag Utility', () => {
     expect(getProviderFlag('cerebras')).toBe('circle-flags:us')
   })
 
+  it('should return the Turkish flag for LLMTR', () => {
+    expect(getProviderFlag('LLMTR')).toBe('circle-flags:tr')
+    expect(getProviderFlag('llmtr')).toBe('circle-flags:tr')
+    expect(getProviderIcon('LLMTR')).toBe('mdi:robot-outline')
+  })
+
   it('should return the French flag for Scaleway', () => {
     expect(getProviderFlag('Scaleway')).toBe('circle-flags:fr')
     expect(getProviderFlag('scaleway')).toBe('circle-flags:fr')

@@ -1092,6 +1092,10 @@
       "title": "Scaleway API anahtarı",
       "message": "Scaleway konsolunda (IAM → API anahtarları) bir gizli anahtar oluşturun ve buraya yapıştırın. Bu, Paris'te barındırılan üretken API'leri açar. İstemleri Fransa'da Scaleway işler."
     },
+    "llmtr": {
+      "title": "LLMTR API anahtarı",
+      "message": "LLMTR'de bir API anahtarı oluşturun ve buraya yapıştırın. Bu, Türkiye'de barındırılan modelleri açar (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Bu modellerin istemleri Türkiye'de işlenir."
+    },
     "huggingface": {
       "title": "HuggingFace API jetonu",
       "message": "HuggingFace ayarlarında bir erişim jetonu oluşturun ve HuggingFace Inference modellerini kullanmak için buraya yapıştırın."

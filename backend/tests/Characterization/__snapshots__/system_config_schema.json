@@ -1336,6 +1336,16 @@
                 "tab": "vectordb",
                 "type": "number"
             },
+            "LLMTR_API_KEY": {
+                "default": "",
+                "description": "LLMTR API key — models hosted in Turkey (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Create it at https://llmtr.com/",
+                "managedBy": "ai-infrastructure",
+                "section": "cloud",
+                "sensitive": true,
+                "source": "database",
+                "tab": "ai",
+                "type": "password"
+            },
             "M365_CLIENT_ID": {
                 "dbGroup": "M365",
                 "dbKey": "CLIENT_ID",
@@ -2161,6 +2171,7 @@
                             "A2AGENT_API_KEY",
                             "HUGGINGFACE_API_KEY",
                             "SCALEWAY_API_KEY",
+                            "LLMTR_API_KEY",
                             "GOOGLE_VERTEX_ACCESS_TOKEN"
                         ],
                         "id": "cloud",
@@ -3509,6 +3520,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "5"
+            },
+            "LLMTR_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "M365_CLIENT_ID": {
                 "isMasked": false,
@@ -4860,6 +4877,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "5"
+            },
+            "LLMTR_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "M365_CLIENT_ID": {
                 "isMasked": false,
@@ -6935,6 +6958,16 @@
                 "tab": "vectordb",
                 "type": "number"
             },
+            "LLMTR_API_KEY": {
+                "default": "",
+                "description": "LLMTR API key — models hosted in Turkey (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Create it at https://llmtr.com/",
+                "managedBy": "ai-infrastructure",
+                "section": "cloud",
+                "sensitive": true,
+                "source": "database",
+                "tab": "ai",
+                "type": "password"
+            },
             "M365_CLIENT_ID": {
                 "dbGroup": "M365",
                 "dbKey": "CLIENT_ID",
@@ -7760,6 +7793,7 @@
                             "A2AGENT_API_KEY",
                             "HUGGINGFACE_API_KEY",
                             "SCALEWAY_API_KEY",
+                            "LLMTR_API_KEY",
                             "GOOGLE_VERTEX_ACCESS_TOKEN"
                         ],
                         "id": "cloud",
@@ -9290,6 +9324,12 @@
                 "locked": false,
                 "value": "5"
             },
+            "LLMTR_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
+            },
             "M365_CLIENT_ID": {
                 "isMasked": false,
                 "isSet": false,
@@ -10482,6 +10522,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "5"
+            },
+            "LLMTR_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "M365_CLIENT_ID": {
                 "isMasked": false,
@@ -11693,6 +11739,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "5"
+            },
+            "LLMTR_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "M365_CLIENT_ID": {
                 "isMasked": false,
@@ -13037,6 +13089,12 @@
                 "locked": false,
                 "value": "5"
             },
+            "LLMTR_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
+            },
             "M365_CLIENT_ID": {
                 "isMasked": false,
                 "isSet": false,
@@ -14379,6 +14437,12 @@
                 "isSet": false,
                 "locked": false,
                 "value": "5"
+            },
+            "LLMTR_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "keySource": "none",
+                "value": ""
             },
             "M365_CLIENT_ID": {
                 "isMasked": false,

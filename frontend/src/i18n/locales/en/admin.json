@@ -1096,6 +1096,10 @@
       "title": "Scaleway API key",
       "message": "Create a secret key in the Scaleway console (IAM → API keys), then paste it here. This unlocks Generative APIs hosted in Paris. Prompts are processed by Scaleway in France."
     },
+    "llmtr": {
+      "title": "LLMTR API key",
+      "message": "Create an API key at LLMTR, then paste it here. This unlocks models hosted in Turkey (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Prompts for those models are processed in Turkey."
+    },
     "huggingface": {
       "title": "HuggingFace API token",
       "message": "Create an access token in your HuggingFace settings, then paste it here to use HuggingFace Inference models."

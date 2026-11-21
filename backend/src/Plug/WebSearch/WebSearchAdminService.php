@@ -66,15 +66,6 @@ final readonly class WebSearchAdminService
         ];
     }
 
-    /**
-     * @return array{
-     *     providers: list<array<string, mixed>>,
-     *     active: string,
-     *     fallback: string,
-     *     userOverrideAllowed: bool,
-     *     enabled: bool
-     * }
-     */
     public function isEnabled(): bool
     {
         return $this->plugConfig->isWebSearchEnabled();

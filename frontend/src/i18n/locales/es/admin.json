@@ -1092,6 +1092,10 @@
       "title": "Clave API de Scaleway",
       "message": "Crea una clave secreta en la consola de Scaleway (IAM → claves API) y pégala aquí. Así se activan las API generativas alojadas en París. Los prompts los procesa Scaleway en Francia."
     },
+    "llmtr": {
+      "title": "Clave API de LLMTR",
+      "message": "Crea una clave API en LLMTR y pégala aquí. Así se activan modelos alojados en Turquía (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Los prompts de esos modelos se procesan en Turquía."
+    },
     "huggingface": {
       "title": "Token API de HuggingFace",
       "message": "Crea un token de acceso en la configuración de HuggingFace y pégalo aquí para usar los modelos de HuggingFace Inference."
