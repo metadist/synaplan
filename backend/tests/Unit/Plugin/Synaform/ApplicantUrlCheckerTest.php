@@ -188,6 +188,79 @@ final class ApplicantUrlCheckerTest extends TestCase
         self::assertStringContainsString('Could not reach the URL', $fetch->warning);
     }
 
+    public function testPinsTheAcceptedAddressForAHostname(): void
+    {
+        $guard = $this->createMock(SsrfGuard::class);
+        $guard->expects(self::atLeastOnce())->method('pinnedIps')->with('cv.example')->willReturn(['93.184.216.34']);
+
+        $resolve = null;
+        $checker = new ApplicantUrlChecker(new MockHttpClient(
+            function (string $method, string $url, array $options) use (&$resolve): MockResponse {
+                $resolve = array_values($options['resolve'] ?? []);
+
+                return new MockResponse('<p>Jane Doe</p>', ['http_code' => 200]);
+            },
+        ), $guard);
+
+        $fetch = $checker->check('https://cv.example/jane');
+
+        self::assertSame(['93.184.216.34'], $resolve);
+        self::assertSame('Jane Doe', $fetch->text);
+        self::assertFalse($fetch->refused);
+    }
+
+    public function testAnEmptySecondLookupMakesNoRequest(): void
+    {
+        $guard = $this->createStub(SsrfGuard::class);
+        $guard->method('pinnedIps')->willReturnOnConsecutiveCalls(['93.184.216.34'], []);
+
+        $calls = 0;
+        $checker = new ApplicantUrlChecker(new MockHttpClient(function () use (&$calls): MockResponse {
+            ++$calls;
+
+            return new MockResponse(self::MARKER, ['http_code' => 200]);
+        }), $guard);
+
+        $fetch = $checker->check('https://cv.example/jane');
+
+        self::assertTrue($fetch->refused);
+        self::assertNull($fetch->text);
+        self::assertSame(0, $calls);
+    }
+
+    public function testAnEmptySecondLookupAfterARedirectMakesNoRequestToThatHost(): void
+    {
+        $lookups = [];
+        $guard = $this->createStub(SsrfGuard::class);
+        $guard->method('pinnedIps')->willReturnCallback(function (string $host) use (&$lookups): array {
+            $lookups[$host] = ($lookups[$host] ?? 0) + 1;
+            if ('cv.example' === $host) {
+                return ['93.184.216.34'];
+            }
+
+            return 1 === $lookups[$host] ? ['8.8.8.8'] : [];
+        });
+
+        $urls = [];
+        $checker = new ApplicantUrlChecker(new MockHttpClient(
+            function (string $method, string $url) use (&$urls): MockResponse {
+                $urls[] = $url;
+
+                return new MockResponse('', [
+                    'http_code' => 302,
+                    'response_headers' => ['location' => 'https://next.example/page'],
+                ]);
+            },
+        ), $guard);
+
+        $fetch = $checker->check('https://cv.example/jane');
+
+        self::assertSame(['https://cv.example/jane'], $urls);
+        self::assertTrue($fetch->refused);
+        self::assertNull($fetch->text);
+        self::assertStringNotContainsString(self::MARKER, (string) $fetch->warning);
+    }
+
     public function testStoredErrorBodyIsNotUsableText(): void
     {
         self::assertNull(ApplicantUrlFetch::storedText(self::MARKER, 'The site returned HTTP 404 — the page is not publicly readable by a server.'));
