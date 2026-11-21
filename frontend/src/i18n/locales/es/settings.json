@@ -747,8 +747,8 @@
     },
     "webSearch": {
       "title": "Búsqueda web",
-      "description": "Usa un proveedor de búsqueda distinto del que su administrador definió para todos.",
-      "useMyOwn": "Usar mi propia búsqueda",
+      "description": "Elija qué buscador responde a sus preguntas. Se usa la elección del administrador hasta que usted elija.",
+      "useMyOwn": "Buscador",
       "saved": "Se guardó su proveedor de búsqueda.",
       "saveFailed": "No se pudo guardar su proveedor de búsqueda"
     },

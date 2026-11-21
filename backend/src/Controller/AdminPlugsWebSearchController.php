@@ -34,7 +34,7 @@ final class AdminPlugsWebSearchController extends AbstractController
         response: 200,
         description: 'Web search providers and current selection',
         content: new OA\JsonContent(
-            required: ['providers', 'active', 'fallback', 'userOverrideAllowed'],
+            required: ['providers', 'active', 'fallback', 'userOverrideAllowed', 'enabled'],
             properties: [
                 new OA\Property(
                     property: 'providers',
@@ -87,6 +87,7 @@ final class AdminPlugsWebSearchController extends AbstractController
                 new OA\Property(property: 'active', type: 'string', example: 'brave'),
                 new OA\Property(property: 'fallback', type: 'string', example: ''),
                 new OA\Property(property: 'userOverrideAllowed', type: 'boolean', example: false),
+                new OA\Property(property: 'enabled', type: 'boolean', example: true),
             ],
             type: 'object'
         )
@@ -104,18 +105,18 @@ final class AdminPlugsWebSearchController extends AbstractController
     #[Route('/web-search', name: 'admin_plugs_web_search_save', methods: ['PUT'])]
     #[OA\Put(
         path: '/api/v1/admin/plugs/web-search',
-        summary: 'Set the active web search provider, fallback and user-override flag',
+        summary: 'Set whether web search is on, the preferred provider and the fallback',
         security: [['Bearer' => []]],
         tags: ['Admin Plugs Web Search']
     )]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            required: ['active', 'fallback', 'userOverrideAllowed'],
+            required: ['active'],
             properties: [
                 new OA\Property(property: 'active', type: 'string', example: 'searxng'),
                 new OA\Property(property: 'fallback', type: 'string', example: 'brave'),
-                new OA\Property(property: 'userOverrideAllowed', type: 'boolean', example: false),
+                new OA\Property(property: 'enabled', type: 'boolean', example: true, description: 'When false, chat does not search the web. When two or more engines are ready, each person chooses in Preferences and the preferred engine is the default.'),
             ],
             type: 'object'
         )
@@ -135,10 +136,14 @@ final class AdminPlugsWebSearchController extends AbstractController
         }
 
         try {
+            $enabled = \array_key_exists('enabled', $data)
+                ? (bool) $data['enabled']
+                : $this->webSearchAdmin->isEnabled();
+
             return $this->json($this->webSearchAdmin->save(
                 $data['active'],
                 \is_string($data['fallback'] ?? null) ? $data['fallback'] : '',
-                (bool) ($data['userOverrideAllowed'] ?? false),
+                $enabled,
             ));
         } catch (\InvalidArgumentException $e) {
             return $this->json(['error' => $e->getMessage()], Response::HTTP_UNPROCESSABLE_ENTITY);
@@ -218,7 +223,7 @@ final class AdminPlugsWebSearchController extends AbstractController
     #[Route('/keys/{provider}', name: 'admin_plugs_keys_save', methods: ['PUT'])]
     #[OA\Put(
         path: '/api/v1/admin/plugs/keys/{provider}',
-        summary: 'Store an encrypted plug API key (tavily, exa, firecrawl, perplexity)',
+        summary: 'Store an encrypted plug API key (tavily, exa, firecrawl, specstream, perplexity)',
         security: [['Bearer' => []]],
         tags: ['Admin Plugs Web Search']
     )]

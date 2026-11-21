@@ -6,8 +6,8 @@ namespace App\Plug\WebSearch;
 
 /**
  * Where a web-search provider runs. Only SearXNG stays on the installation.
- * The others are US-hosted, so a local or EU world has to say so or refuse
- * them when strict mode is on.
+ * The others are hosted in the US or the EU, so a local or EU world has to say
+ * so or refuse them when strict mode is on.
  */
 final class WebSearchHosting
 {
@@ -24,6 +24,7 @@ final class WebSearchHosting
         'exa' => 'US',
         'firecrawl' => 'US',
         'perplexity' => 'US',
+        'specstream' => 'ES',
     ];
 
     public static function selfHosted(string $provider): bool

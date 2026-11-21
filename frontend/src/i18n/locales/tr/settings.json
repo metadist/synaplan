@@ -748,8 +748,8 @@
     },
     "webSearch": {
       "title": "Web araması",
-      "description": "Yöneticinizin herkes için ayarladığı arama sağlayıcısından farklı birini kullanın.",
-      "useMyOwn": "Kendi aramamı kullan",
+      "description": "Sorularınızı hangi arama motorunun yanıtlayacağını seçin. Siz seçene kadar yöneticinizin seçimi kullanılır.",
+      "useMyOwn": "Arama motoru",
       "saved": "Arama sağlayıcınız kaydedildi.",
       "saveFailed": "Arama sağlayıcınız kaydedilemedi"
     },

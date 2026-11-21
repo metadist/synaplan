@@ -29,6 +29,7 @@ final class PlugConfigServiceTest extends TestCase
         $this->assertSame('brave', $service->webSearchProvider(null));
         $this->assertSame('', $service->webSearchFallback());
         $this->assertFalse($service->isWebSearchUserOverrideAllowed());
+        $this->assertTrue($service->isWebSearchEnabled());
         $this->assertSame(8000, $service->webSearchTimeoutMs());
         $this->assertSame(4000, $service->webSearchMaxContentChars());
         $this->assertFalse($service->isRerankEnabled());
@@ -74,6 +75,7 @@ final class PlugConfigServiceTest extends TestCase
         ]));
 
         $this->assertSame('brave', $service->webSearchProvider(null));
+        $this->assertSame('specstream', $service->requireKnownProvider('specstream'));
     }
 
     public function testExtraExtractorKeysAreKeysNotInTheBuiltinList(): void

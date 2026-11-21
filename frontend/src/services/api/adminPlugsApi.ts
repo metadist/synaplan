@@ -54,7 +54,7 @@ export async function getWebSearchStatus(): Promise<WebSearchStatus> {
 export async function saveWebSearch(payload: {
   active: string
   fallback: string
-  userOverrideAllowed: boolean
+  enabled: boolean
 }): Promise<WebSearchStatus> {
   return httpClient('/api/v1/admin/plugs/web-search', {
     method: 'PUT',

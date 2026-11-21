@@ -752,8 +752,8 @@
     },
     "webSearch": {
       "title": "Web search",
-      "description": "Use a different search provider than the one your administrator set for everyone.",
-      "useMyOwn": "Use my own search",
+      "description": "Choose which search engine answers your questions. Your administrator's choice is used until you pick.",
+      "useMyOwn": "Search engine",
       "saved": "Your search provider was saved.",
       "saveFailed": "Your search provider could not be saved"
     },

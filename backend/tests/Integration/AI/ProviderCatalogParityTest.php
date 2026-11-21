@@ -606,7 +606,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
             'api.meta.ai', 'api.cerebras.ai', 'api.perplexity.ai',
         ];
         $au15Integrations = [
-            'api.stripe.com', 'api.telegram.org', 'graph.facebook.com', 'api.search.brave.com',
+            'api.stripe.com', 'api.telegram.org', 'graph.facebook.com', 'api.search.brave.com', 'api.specstream.ai',
             'accounts.google.com', 'androidpublisher.googleapis.com', 'oauth2.googleapis.com', 'www.googleapis.com',
             'github.com', 'api.github.com', 'appleid.apple.com', 'www.google.com', 'www.recaptcha.net', 'challenges.cloudflare.com',
         ];

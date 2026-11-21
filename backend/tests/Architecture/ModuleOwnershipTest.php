@@ -125,6 +125,7 @@ final class ModuleOwnershipTest extends TestCase
             'TAVILY_API_KEY',
             'EXA_API_KEY',
             'FIRECRAWL_API_KEY',
+            'SPECSTREAM_API_KEY',
             'JINA_API_KEY',
             'COHERE_API_KEY',
             'VOYAGE_API_KEY',

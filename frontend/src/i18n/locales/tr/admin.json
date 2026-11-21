@@ -905,6 +905,13 @@
     },
     "webSearch": {
       "lead": "Sohbet için webde kimin arayacağını seçin. Sonraki arama yeni sağlayıcıyı kullanır, yeniden başlatma gerekmez. Test sorgusu başlıkları gösterir, böylece çalıştığını görürsünüz.",
+      "enabled": "Web araması",
+      "enabledHint": "Bu kapalıyken sohbet webde arama yapmaz.",
+      "apiKeyKept": "Bir anahtar kayıtlı. Değiştirmek için yenisini yapıştırın.",
+      "braveCount": "Arama başına sonuç",
+      "braveRestart": "Yeni bir Brave anahtarı veya sonuç sayısı, sunucu yeniden başladıktan sonra kullanılır.",
+      "peopleChoose": "Birden fazla arama motoru hazır. Herkes kendisininkini Tercihler'den seçer. Seçene kadar bu varsayılandır.",
+      "oneEngine": "Yalnızca bir arama motoru hazır. Herkes onu kullanır.",
       "docs": "Belgeler",
       "healthAvailable": "kullanılabilir",
       "healthUnavailable": "kullanılamıyor",

@@ -18,7 +18,22 @@
     </div>
 
     <template v-else>
-      <div class="space-y-4 mb-6">
+      <label
+        class="surface-card rounded-lg p-4 mb-4 flex items-start gap-3"
+        data-testid="web-search-enabled"
+      >
+        <input v-model="enabled" type="checkbox" class="mt-1" />
+        <span>
+          <span class="block text-sm font-medium txt-primary">{{
+            $t('aiInfra.webSearch.enabled')
+          }}</span>
+          <span class="block text-xs txt-secondary mt-0.5">{{
+            $t('aiInfra.webSearch.enabledHint')
+          }}</span>
+        </span>
+      </label>
+
+      <div v-if="enabled" class="space-y-4 mb-6">
         <article
           v-for="provider in providers"
           :key="provider.key"
@@ -73,7 +88,43 @@
             </li>
           </ul>
 
-          <div v-if="hasKeyField(provider.key)" class="mt-4">
+          <div v-if="provider.key === 'brave'" class="mt-4 space-y-3">
+            <div>
+              <label class="block text-sm font-medium txt-primary" for="plug-key-brave">
+                {{ $t('aiInfra.webSearch.apiKey') }}
+              </label>
+              <input
+                id="plug-key-brave"
+                v-model="braveKey"
+                type="password"
+                autocomplete="off"
+                class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                :placeholder="
+                  braveKeySet
+                    ? $t('aiInfra.webSearch.apiKeyKept')
+                    : $t('aiInfra.webSearch.apiKeyPlaceholder')
+                "
+                data-testid="web-search-key-brave"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium txt-primary" for="web-search-brave-count">
+                {{ $t('aiInfra.webSearch.braveCount') }}
+              </label>
+              <input
+                id="web-search-brave-count"
+                v-model="braveCount"
+                type="number"
+                min="1"
+                max="20"
+                class="mt-1 w-28 px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+                data-testid="web-search-brave-count"
+              />
+            </div>
+            <p class="text-xs txt-secondary">{{ $t('aiInfra.webSearch.braveRestart') }}</p>
+          </div>
+
+          <div v-else-if="hasKeyField(provider.key)" class="mt-4">
             <label class="block text-sm font-medium txt-primary" :for="`plug-key-${provider.key}`">
               {{ $t('aiInfra.webSearch.apiKey') }}
             </label>
@@ -103,7 +154,7 @@
         </article>
       </div>
 
-      <div class="surface-card rounded-lg p-4 mb-4">
+      <div v-if="enabled" class="surface-card rounded-lg p-4 mb-4">
         <label class="block text-sm font-medium txt-primary" for="web-search-fallback">
           {{ $t('aiInfra.webSearch.fallback') }}
         </label>
@@ -119,33 +170,16 @@
           </option>
         </select>
 
-        <label class="mt-4 flex items-start gap-2 text-sm txt-primary">
-          <input
-            v-model="userOverrideAllowed"
-            type="checkbox"
-            class="mt-1"
-            data-testid="web-search-user-override"
-          />
-          <span>
-            <span class="block">{{ $t('aiInfra.webSearch.allowUsers') }}</span>
-            <span class="block text-xs txt-secondary mt-0.5">{{
-              $t('aiInfra.webSearch.allowUsersHint')
-            }}</span>
-          </span>
-        </label>
-
-        <button
-          type="button"
-          class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
-          :disabled="saving"
-          data-testid="web-search-save"
-          @click="save"
-        >
-          {{ saving ? $t('common.saving') : $t('aiInfra.webSearch.save') }}
-        </button>
+        <p class="mt-4 text-sm txt-secondary" data-testid="web-search-who-chooses">
+          {{
+            readyCount >= 2
+              ? $t('aiInfra.webSearch.peopleChoose')
+              : $t('aiInfra.webSearch.oneEngine')
+          }}
+        </p>
       </div>
 
-      <div class="surface-card rounded-lg p-4">
+      <div v-if="enabled" class="surface-card rounded-lg p-4">
         <h3 class="text-sm font-semibold txt-primary">{{ $t('aiInfra.webSearch.testTitle') }}</h3>
         <p class="text-sm txt-secondary mt-1 mb-3">{{ $t('aiInfra.webSearch.testHint') }}</p>
         <div class="flex flex-col sm:flex-row gap-2">
@@ -186,6 +220,16 @@
           </li>
         </ul>
       </div>
+
+      <button
+        type="button"
+        class="btn-primary px-4 py-2.5 rounded-xl text-sm font-medium mt-4"
+        :disabled="saving"
+        data-testid="web-search-save"
+        @click="save"
+      >
+        {{ saving ? $t('common.saving') : $t('aiInfra.webSearch.save') }}
+      </button>
     </template>
   </div>
 </template>
@@ -196,6 +240,7 @@ import { useI18n } from 'vue-i18n'
 import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
 import { webSearchSaveFeedback } from '@/components/admin/plugs/webSearchSaveFeedback'
+import { getConfigValues, updateConfigValue } from '@/services/api/adminConfigApi'
 import {
   getWebSearchStatus,
   savePlugKey,
@@ -208,7 +253,7 @@ import {
 type ProviderCard = WebSearchStatus['providers'][number]
 type CapabilityKey = 'freshness' | 'country' | 'language' | 'siteFilter' | 'fullContent' | 'answer'
 
-const KEY_PROVIDERS = new Set(['tavily', 'exa', 'firecrawl', 'perplexity'])
+const KEY_PROVIDERS = new Set(['tavily', 'exa', 'firecrawl', 'specstream', 'perplexity'])
 
 const { t } = useI18n()
 const { success, warning, error: showError } = useNotification()
@@ -221,12 +266,23 @@ const savingKey = ref('')
 const providers = ref<ProviderCard[]>([])
 const active = ref('brave')
 const fallback = ref('')
-const userOverrideAllowed = ref(false)
+const enabled = ref(true)
+const braveKey = ref('')
+const braveKeySet = ref(false)
+const braveCount = ref('10')
+const loadedBraveCount = ref('10')
 const testQuery = ref('')
 const testResult = ref<WebSearchTestResult | null>(null)
 const keyDraft = reactive<Record<string, string>>({})
 
 const fallbackOptions = computed(() => providers.value.filter((p) => p.key !== active.value))
+const readyCount = computed(
+  () =>
+    providers.value.filter(
+      (provider) =>
+        provider.keyStatus.configured || (provider.key === 'searxng' && provider.health.available)
+    ).length
+)
 
 onMounted(() => {
   void load()
@@ -238,6 +294,7 @@ async function load(): Promise<void> {
   try {
     const status = await getWebSearchStatus()
     applyStatus(status)
+    await loadBraveFields()
   } catch (err) {
     loadFailed.value = true
     showError(err instanceof Error ? err.message : t('aiInfra.webSearch.loadFailed'))
@@ -250,7 +307,20 @@ function applyStatus(status: WebSearchStatus): void {
   providers.value = status.providers
   active.value = status.active
   fallback.value = status.fallback
-  userOverrideAllowed.value = status.userOverrideAllowed
+  enabled.value = status.enabled !== false
+}
+
+async function loadBraveFields(): Promise<void> {
+  try {
+    const values = await getConfigValues()
+    const count = values.BRAVE_SEARCH_COUNT?.value
+    braveCount.value = count && count !== '' ? count : '10'
+    loadedBraveCount.value = braveCount.value
+    braveKeySet.value = values.BRAVE_SEARCH_API_KEY?.isSet === true
+    braveKey.value = ''
+  } catch {
+    // The provider list still works when the Brave fields cannot be read.
+  }
 }
 
 async function save(): Promise<void> {
@@ -259,13 +329,16 @@ async function save(): Promise<void> {
     const status = await saveWebSearch({
       active: active.value,
       fallback: fallback.value,
-      userOverrideAllowed: userOverrideAllowed.value,
+      enabled: enabled.value,
     })
     applyStatus(status)
+    const restart = await saveBraveFields()
     const feedback = webSearchSaveFeedback(status)
     const message = t(`aiInfra.webSearch.${feedback.key}`, feedback.params)
     if (feedback.level === 'warning') {
       warning(message)
+    } else if (restart) {
+      warning(t('aiInfra.webSearch.braveRestart'))
     } else {
       success(message)
     }
@@ -274,6 +347,24 @@ async function save(): Promise<void> {
   } finally {
     saving.value = false
   }
+}
+
+async function saveBraveFields(): Promise<boolean> {
+  let restart = false
+  const key = braveKey.value.trim()
+  if (key !== '') {
+    const result = await updateConfigValue('BRAVE_SEARCH_API_KEY', key)
+    braveKey.value = ''
+    braveKeySet.value = true
+    restart = result.requiresRestart === true
+  }
+  if (braveCount.value !== loadedBraveCount.value) {
+    const result = await updateConfigValue('BRAVE_SEARCH_COUNT', braveCount.value)
+    loadedBraveCount.value = braveCount.value
+    restart = restart || result.requiresRestart === true
+  }
+
+  return restart
 }
 
 async function saveKey(provider: string): Promise<void> {

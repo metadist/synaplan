@@ -10,6 +10,20 @@ namespace App\Plug\WebSearch;
 final class WebSearchOptionMapper
 {
     /**
+     * ISO 3166-1 alpha-2 codes this installation forwards. Anything else is
+     * omitted so a search is not rejected for a code the provider will not take.
+     *
+     * @var list<string>
+     */
+    private const COUNTRY_CODES = [
+        'US', 'GB', 'CA', 'AU', 'DE', 'FR', 'ES', 'IT', 'PT', 'NL',
+        'PL', 'RU', 'JP', 'CN', 'KR', 'IN', 'BR', 'MX', 'AR', 'CL',
+        'SE', 'DK', 'FI', 'NO', 'CZ', 'HU', 'RO', 'UA', 'GR', 'TR',
+        'IL', 'SA', 'AE', 'ID', 'TH', 'VN', 'MY', 'SG', 'PH', 'BD',
+        'BE', 'AT', 'CH', 'IE', 'NZ', 'ZA', 'EG', 'NG', 'KE', 'CO',
+    ];
+
+    /**
      * @param array<string, mixed> $options
      */
     public static function count(array $options, int $default = 10): int
@@ -30,6 +44,47 @@ final class WebSearchOptionMapper
         }
 
         return strtolower(substr(trim($lang), 0, 2));
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public static function country(array $options): ?string
+    {
+        $raw = $options['country'] ?? null;
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return null;
+        }
+
+        $code = strtoupper(substr(trim($raw), 0, 2));
+        if (1 !== preg_match('/^[A-Z]{2}$/', $code)) {
+            return null;
+        }
+
+        // Chat / multitask callers forward the UI language code as `country`
+        // (for example `en`). Map pure language codes to their primary country so
+        // APIs that validate ISO 3166-1 alpha-2 do not receive `EN`.
+        $langToCountry = [
+            'EN' => 'US',
+            'JA' => 'JP',
+            'ZH' => 'CN',
+            'KO' => 'KR',
+            'AR' => 'SA',
+            'HI' => 'IN',
+            'SV' => 'SE',
+            'DA' => 'DK',
+            'CS' => 'CZ',
+            'EL' => 'GR',
+            'HE' => 'IL',
+            'VI' => 'VN',
+            'UK' => 'UA',
+            'MS' => 'MY',
+            'BN' => 'BD',
+        ];
+
+        $mapped = $langToCountry[$code] ?? $code;
+
+        return \in_array($mapped, self::COUNTRY_CODES, true) ? $mapped : null;
     }
 
     /**

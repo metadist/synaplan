@@ -12,6 +12,7 @@ export interface WebSearchSaveFeedback {
 export interface WebSearchSaveStatus {
   active: string
   fallback: string
+  enabled?: boolean
   providers: Array<{
     key: string
     label: string
@@ -24,6 +25,10 @@ export interface WebSearchSaveStatus {
  * A stored selection is not the same as a working search.
  */
 export function webSearchSaveFeedback(status: WebSearchSaveStatus): WebSearchSaveFeedback {
+  if (status.enabled === false) {
+    return { level: 'success', key: 'saved', params: { provider: '', reason: '' } }
+  }
+
   const active = status.providers.find((provider) => provider.key === status.active)
   const provider = active?.label ?? status.active
   const reason = active?.health.reason ?? ''

@@ -33,6 +33,18 @@ final class WebSearchRegistryTest extends TestCase
         $this->assertFalse($gateway->isEnabled(42));
     }
 
+    public function testSwitchOffSkipsEveryProvider(): void
+    {
+        $brave = $this->provider('brave', available: true);
+        $registry = $this->registry([
+            [0, PlugConfigService::KEY_WEB_SEARCH_ENABLED, '0'],
+            [0, PlugConfigService::KEY_WEB_SEARCH_PROVIDER, 'brave'],
+        ], [$brave]);
+
+        $this->assertFalse((new WebSearchGateway($registry))->isEnabled());
+        $this->assertSame([], $registry->search(new WebSearchQuery('synaplan'))->results);
+    }
+
     /**
      * @param list<array{0: int, 1: string, 2: string}> $rows
      * @param list<WebSearchProviderInterface>          $providers
