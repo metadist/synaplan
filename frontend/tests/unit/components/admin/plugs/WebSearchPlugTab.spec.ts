@@ -24,6 +24,14 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: showError, success, warning }),
 }))
 
+vi.mock('@/services/api/adminConfigApi', () => ({
+  getConfigValues: vi.fn().mockResolvedValue({
+    BRAVE_SEARCH_COUNT: { value: '10', isSet: true, isMasked: false },
+    BRAVE_SEARCH_API_KEY: { value: '', isSet: false, isMasked: false },
+  }),
+  updateConfigValue: vi.fn().mockResolvedValue({ success: true, requiresRestart: false }),
+}))
+
 const noneCapabilities = {
   freshness: false,
   country: false,

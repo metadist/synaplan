@@ -10,6 +10,20 @@ namespace App\Plug\WebSearch;
 final class WebSearchOptionMapper
 {
     /**
+     * ISO 3166-1 alpha-2 codes this installation forwards. Anything else is
+     * omitted so a search is not rejected for a code the provider will not take.
+     *
+     * @var list<string>
+     */
+    private const COUNTRY_CODES = [
+        'US', 'GB', 'CA', 'AU', 'DE', 'FR', 'ES', 'IT', 'PT', 'NL',
+        'PL', 'RU', 'JP', 'CN', 'KR', 'IN', 'BR', 'MX', 'AR', 'CL',
+        'SE', 'DK', 'FI', 'NO', 'CZ', 'HU', 'RO', 'UA', 'GR', 'TR',
+        'IL', 'SA', 'AE', 'ID', 'TH', 'VN', 'MY', 'SG', 'PH', 'BD',
+        'BE', 'AT', 'CH', 'IE', 'NZ', 'ZA', 'EG', 'NG', 'KE', 'CO',
+    ];
+
+    /**
      * @param array<string, mixed> $options
      */
     public static function count(array $options, int $default = 10): int
@@ -68,7 +82,9 @@ final class WebSearchOptionMapper
             'BN' => 'BD',
         ];
 
-        return $langToCountry[$code] ?? $code;
+        $mapped = $langToCountry[$code] ?? $code;
+
+        return \in_array($mapped, self::COUNTRY_CODES, true) ? $mapped : null;
     }
 
     /**

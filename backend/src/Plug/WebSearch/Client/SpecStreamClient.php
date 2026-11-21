@@ -41,8 +41,11 @@ final readonly class SpecStreamClient
             throw new \RuntimeException('SpecStream API key is not configured');
         }
 
+        // The bearer key must not be replayed onto another host. Egress mode
+        // off follows redirects itself, so this call does not.
         $response = $this->httpClient->request('GET', self::ENDPOINT, [
             'timeout' => $this->plugConfig->webSearchTimeoutMs() / 1000,
+            'max_redirects' => 0,
             'headers' => [
                 'Accept' => 'application/json',
                 'Authorization' => 'Bearer '.$key,
@@ -51,7 +54,7 @@ final readonly class SpecStreamClient
         ]);
 
         $status = $response->getStatusCode();
-        if ($status >= 400) {
+        if ($status < 200 || $status >= 300) {
             throw new \RuntimeException('SpecStream search returned HTTP '.$status);
         }
 

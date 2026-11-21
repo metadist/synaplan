@@ -752,8 +752,8 @@
     },
     "webSearch": {
       "title": "Websuche",
-      "description": "Nutzen Sie einen anderen Suchanbieter als den, den Ihre Administration für alle festgelegt hat.",
-      "useMyOwn": "Meine eigene Suche verwenden",
+      "description": "Wählen Sie, welche Suchmaschine Ihre Fragen beantwortet. Die Wahl der Administration gilt, bis Sie eine treffen.",
+      "useMyOwn": "Suchmaschine",
       "saved": "Ihr Suchanbieter wurde gespeichert.",
       "saveFailed": "Ihr Suchanbieter konnte nicht gespeichert werden"
     },

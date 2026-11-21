@@ -752,8 +752,8 @@
     },
     "webSearch": {
       "title": "Recherche web",
-      "description": "Utilisez un autre fournisseur de recherche que celui défini par votre administrateur pour tout le monde.",
-      "useMyOwn": "Utiliser ma propre recherche",
+      "description": "Choisissez le moteur qui répond à vos questions. Le choix de l'administrateur s'applique tant que vous n'en choisissez pas un.",
+      "useMyOwn": "Moteur de recherche",
       "saved": "Votre fournisseur de recherche a été enregistré.",
       "saveFailed": "Votre fournisseur de recherche n’a pas pu être enregistré"
     },

@@ -30,7 +30,7 @@ You do not maintain a static list of AI provider domains by hand. `EgressPolicy`
 
 1. **Internal installation services (`EgressBuiltinDestinations::INTERNAL`)** — The Docker Compose and Kubernetes service names of this installation (`db`, `redis`, `qdrant`, `tika`, `docling`, `searxng`, `collabora`, `tts`, `compute`, `centrifugo`, `voice`, `transcriber`).
 2. **AI provider endpoints (`ProviderCatalog::endpoints()`)** — Every inference host and key-validation host declared in each provider's `ProviderDescriptor`. Adding a provider as one PHP class ([PROVIDERS.md](PROVIDERS.md)) automatically adds its hosts to the allowlist in `enforce` mode.
-3. **Non-AI integrations (`EgressBuiltinDestinations::INTEGRATIONS`)** — Fixed upstream hosts for Stripe, Telegram, Meta Graph (WhatsApp), Brave Search, Google OAuth & Play Billing, GitHub OAuth, Apple Sign-In, reCAPTCHA, and Cloudflare Turnstile.
+3. **Non-AI integrations (`EgressBuiltinDestinations::INTEGRATIONS`)** — Fixed upstream hosts for Stripe, Telegram, Meta Graph (WhatsApp), Brave Search, SpecStream, Google OAuth & Play Billing, GitHub OAuth, Apple Sign-In, reCAPTCHA, and Cloudflare Turnstile.
 4. **Operator additions (`EGRESS.ALLOW` and `EGRESS_NO_PROXY`)** — Custom OpenAI-compatible base URLs entered by an administrator are not auto-added; in `report` mode they appear as `egress.would_block` until listed in `EGRESS.ALLOW`.
 
 ---

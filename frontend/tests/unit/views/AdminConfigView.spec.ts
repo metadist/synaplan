@@ -192,7 +192,7 @@ describe('AdminConfigView — topics', () => {
     expect(wrapper.text()).toContain('Who may register and sign in')
   })
 
-  it('pairs the web search picker with the Brave settings', async () => {
+  it('shows web search once, without a second Brave settings form', async () => {
     const { wrapper, router } = await mountView()
 
     await wrapper.get('[data-testid="btn-config-tab-web_search"]').trigger('click')
@@ -200,8 +200,8 @@ describe('AdminConfigView — topics', () => {
 
     expect(router.currentRoute.value.query.tab).toBe('web_search')
     expect(wrapper.find('[data-testid="web-search-plug-tab-stub"]').exists()).toBe(true)
-    expect(wrapper.text()).toContain('Brave Search settings')
-    expect(wrapper.find('#config-section-brave').exists()).toBe(true)
+    expect(wrapper.find('#config-section-brave').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Brave Search settings')
   })
 
   it('collects tool rules and file work under Tools & automation', async () => {

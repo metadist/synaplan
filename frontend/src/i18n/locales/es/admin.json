@@ -905,6 +905,13 @@
     },
     "webSearch": {
       "lead": "Elija quién busca en la web para el chat. La siguiente búsqueda usa el nuevo proveedor, sin reiniciar. La consulta de prueba muestra títulos para que vea que funciona.",
+      "enabled": "Búsqueda web",
+      "enabledHint": "Si esto está desactivado, el chat no busca en la web.",
+      "apiKeyKept": "Hay una clave guardada. Pegue una nueva para sustituirla.",
+      "braveCount": "Resultados por búsqueda",
+      "braveRestart": "Una clave de Brave nueva o un número de resultados nuevo se usa tras reiniciar el servidor.",
+      "peopleChoose": "Hay más de un buscador listo, así que cada persona elige el suyo en Preferencias. Este es el predeterminado hasta que lo haga.",
+      "oneEngine": "Solo un buscador está listo, así que todos lo usan.",
       "docs": "Documentación",
       "healthAvailable": "disponible",
       "healthUnavailable": "no disponible",

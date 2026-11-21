@@ -28,6 +28,7 @@ final readonly class PlugConfigService
     public const KEY_QUALITY_MIN_LENGTH = 'EXTRACTION.QUALITY.min_length';
     public const KEY_QUALITY_MIN_ENTROPY = 'EXTRACTION.QUALITY.min_entropy';
     public const KEY_QUALITY_APPLY_TO = 'EXTRACTION.QUALITY.apply_to';
+    public const KEY_WEB_SEARCH_ENABLED = 'WEB_SEARCH.ENABLED';
     public const KEY_WEB_SEARCH_PROVIDER = 'WEB_SEARCH.PROVIDER';
     public const KEY_WEB_SEARCH_FALLBACK = 'WEB_SEARCH.FALLBACK';
     public const KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED = 'WEB_SEARCH.USER_OVERRIDE_ALLOWED';
@@ -335,6 +336,26 @@ final readonly class PlugConfigService
         $raw = $this->readGlobal(self::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED, '0');
 
         return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? self::DEFAULT_WEB_SEARCH_USER_OVERRIDE_ALLOWED;
+    }
+
+    /**
+     * Master switch for every provider. A missing row stays on, so an
+     * installation that already searches keeps searching until an admin
+     * turns it off on the Web search page.
+     */
+    public function isWebSearchEnabled(): bool
+    {
+        $raw = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_WEB_SEARCH_ENABLED);
+        if (null === $raw || '' === trim($raw)) {
+            return true;
+        }
+
+        return filter_var($raw, \FILTER_VALIDATE_BOOL, \FILTER_NULL_ON_FAILURE) ?? true;
+    }
+
+    public function setWebSearchEnabled(bool $enabled): void
+    {
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::KEY_WEB_SEARCH_ENABLED, $enabled ? '1' : '0');
     }
 
     public function webSearchTimeoutMs(): int

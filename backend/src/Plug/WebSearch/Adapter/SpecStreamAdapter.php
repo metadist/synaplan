@@ -53,75 +53,21 @@ final readonly class SpecStreamAdapter implements WebSearchProviderInterface, We
     public function search(WebSearchQuery $query): SearchResultSet
     {
         $maxChars = $this->plugConfig->webSearchMaxContentChars();
-        $q = WebSearchOptionMapper::applySiteFilter($query->query, WebSearchOptionMapper::site($query->options));
-        $start = WebSearchOptionMapper::startPublishedDate(WebSearchOptionMapper::freshness($query->options));
-        if (null !== $start && !str_contains(strtolower($q), 'after:')) {
-            $q .= ' after:'.$start;
-        }
-
-        $params = [
-            'q' => $q,
-            'num' => WebSearchOptionMapper::count($query->options),
-            'passages' => 'true',
-        ];
-        if (!$query->wantAnswer) {
-            $params['speed'] = 'fast';
-        }
-
-        $language = WebSearchOptionMapper::language($query->options);
-        if (null !== $language && 1 === preg_match('/^[a-z]{2}$/', $language)) {
-            $params['language'] = $language;
-        }
-
-        $country = WebSearchOptionMapper::country($query->options);
-        if (null !== $country) {
-            $params['country'] = $country;
-        }
-
-        $payload = $this->client->search($params);
+        $payload = $this->client->search($this->params($query));
         $data = \is_array($payload['data'] ?? null) ? $payload['data'] : [];
-
-        $passagesByUrl = [];
-        foreach ($data['passages'] ?? [] as $passage) {
-            if (!\is_array($passage)) {
-                continue;
-            }
-            $passageUrl = \is_string($passage['url'] ?? null) ? $passage['url'] : '';
-            $passageText = \is_string($passage['text'] ?? null) ? $passage['text'] : '';
-            if ('' !== $passageUrl && '' !== trim($passageText)) {
-                $passagesByUrl[$passageUrl] = isset($passagesByUrl[$passageUrl])
-                    ? $passagesByUrl[$passageUrl]."\n\n".$passageText
-                    : $passageText;
-            }
-        }
+        $passages = $this->passagesByUrl($data['passages'] ?? null, $maxChars);
 
         $results = [];
         foreach ($data['sources'] ?? [] as $row) {
-            if (!\is_array($row)) {
-                continue;
+            $result = $this->result($row, $passages, $maxChars);
+            if (null !== $result) {
+                $results[] = $result;
             }
-            $url = \is_string($row['url'] ?? null) ? $row['url'] : '';
-            if ('' === $url) {
-                continue;
-            }
-            $snippet = \is_string($row['snippet'] ?? null) ? $row['snippet'] : '';
-            $excerpt = \is_string($row['excerpt'] ?? null) && '' !== trim($row['excerpt'])
-                ? $row['excerpt']
-                : ($passagesByUrl[$url] ?? null);
-            $published = $row['published'] ?? null;
-
-            $results[] = new SearchResult(
-                title: \is_string($row['title'] ?? null) ? $row['title'] : '',
-                url: $url,
-                description: '' !== $snippet ? $snippet : ($excerpt ?? ''),
-                content: WebSearchOptionMapper::truncate($excerpt, $maxChars),
-                publishedAt: \is_string($published) ? $published : null,
-            );
         }
 
         $answer = null;
         if ($query->wantAnswer) {
-            $answerValue = $this->extractAnswerText($data['answer'] ?? null);
+            $answerValue = self::bounded($this->extractAnswerText($data['answer'] ?? null), $maxChars);
             if (null !== $answerValue) {
                 $answer = new ProviderAnswer($answerValue);
             }
@@ -149,6 +95,96 @@ final readonly class SpecStreamAdapter implements WebSearchProviderInterface, We
         );
     }
 
+    /**
+     * @return array<string, int|string>
+     */
+    private function params(WebSearchQuery $query): array
+    {
+        $q = WebSearchOptionMapper::applySiteFilter(
+            $query->query,
+            self::siteHost(WebSearchOptionMapper::site($query->options)),
+        );
+        $start = WebSearchOptionMapper::startPublishedDate(WebSearchOptionMapper::freshness($query->options));
+        if (null !== $start && !str_contains(strtolower($q), 'after:')) {
+            $q .= ' after:'.$start;
+        }
+
+        $params = [
+            'q' => $q,
+            'num' => WebSearchOptionMapper::count($query->options),
+            'passages' => 'true',
+        ];
+        if (!$query->wantAnswer) {
+            $params['speed'] = 'fast';
+        }
+
+        $language = WebSearchOptionMapper::language($query->options);
+        if (null !== $language && 1 === preg_match('/^[a-z]{2}$/', $language)) {
+            $params['language'] = $language;
+        }
+
+        $country = WebSearchOptionMapper::country($query->options);
+        if (null !== $country) {
+            $params['country'] = $country;
+        }
+
+        return $params;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function passagesByUrl(mixed $passages, int $maxChars): array
+    {
+        if (!\is_array($passages)) {
+            return [];
+        }
+
+        $byUrl = [];
+        foreach ($passages as $passage) {
+            if (!\is_array($passage)) {
+                continue;
+            }
+            $url = self::publicHttpUrl(\is_string($passage['url'] ?? null) ? $passage['url'] : '');
+            $text = \is_string($passage['text'] ?? null) ? trim($passage['text']) : '';
+            if (null === $url || '' === $text) {
+                continue;
+            }
+            $joined = isset($byUrl[$url]) ? $byUrl[$url]."\n\n".$text : $text;
+            $byUrl[$url] = self::bounded($joined, $maxChars) ?? '';
+        }
+
+        return $byUrl;
+    }
+
+    /**
+     * @param array<string, string> $passages
+     */
+    private function result(mixed $row, array $passages, int $maxChars): ?SearchResult
+    {
+        if (!\is_array($row)) {
+            return null;
+        }
+        $url = self::publicHttpUrl(\is_string($row['url'] ?? null) ? $row['url'] : '');
+        if (null === $url) {
+            return null;
+        }
+        $snippet = \is_string($row['snippet'] ?? null) ? $row['snippet'] : '';
+        $excerpt = \is_string($row['excerpt'] ?? null) && '' !== trim($row['excerpt'])
+            ? $row['excerpt']
+            : ($passages[$url] ?? null);
+        $published = $row['published'] ?? null;
+        $description = '' !== trim($snippet) ? $snippet : ($excerpt ?? '');
+
+        return new SearchResult(
+            title: \is_string($row['title'] ?? null) ? $row['title'] : '',
+            url: $url,
+            description: self::bounded($description, $maxChars) ?? '',
+            content: self::bounded(\is_string($excerpt) ? $excerpt : null, $maxChars),
+            publishedAt: \is_string($published) ? $published : null,
+        );
+    }
+
     private function extractAnswerText(mixed $raw): ?string
     {
         if (\is_string($raw) && '' !== trim($raw)) {
@@ -159,5 +195,57 @@ final readonly class SpecStreamAdapter implements WebSearchProviderInterface, We
         }
 
         return null;
+    }
+
+    private static function bounded(?string $text, int $maxChars): ?string
+    {
+        return WebSearchOptionMapper::truncate($text, $maxChars);
+    }
+
+    /**
+     * A site filter is one hostname. Anything else would be appended as a
+     * search operator and could widen the query.
+     */
+    private static function siteHost(?string $site): ?string
+    {
+        if (null === $site) {
+            return null;
+        }
+        $site = strtolower(trim($site));
+        if (1 !== preg_match('/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/', $site)) {
+            return null;
+        }
+
+        return $site;
+    }
+
+    /**
+     * Search hits are shown and may be fetched later. Only a public http(s)
+     * URL is kept; credentials, private addresses and other schemes are not.
+     */
+    private static function publicHttpUrl(string $url): ?string
+    {
+        $url = trim($url);
+        if ('' === $url || str_contains($url, '\\') || str_contains($url, "\n") || str_contains($url, "\r")) {
+            return null;
+        }
+        $parts = parse_url($url);
+        if (!\is_array($parts)) {
+            return null;
+        }
+        $scheme = strtolower(\is_string($parts['scheme'] ?? null) ? $parts['scheme'] : '');
+        $host = strtolower(\is_string($parts['host'] ?? null) ? $parts['host'] : '');
+        if (!\in_array($scheme, ['http', 'https'], true) || '' === $host || isset($parts['user']) || isset($parts['pass'])) {
+            return null;
+        }
+        if ('localhost' === $host || str_ends_with($host, '.localhost') || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
+            return null;
+        }
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)
+            && false === filter_var($host, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE)) {
+            return null;
+        }
+
+        return $url;
     }
 }

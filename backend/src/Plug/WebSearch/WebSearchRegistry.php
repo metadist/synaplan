@@ -62,6 +62,10 @@ final class WebSearchRegistry
 
     public function active(?int $userId = null): ?WebSearchProviderInterface
     {
+        if (!$this->config->isWebSearchEnabled()) {
+            return null;
+        }
+
         $key = $this->config->webSearchProvider($userId);
         $provider = $this->byKey[$key] ?? null;
         if (null !== $provider && $provider->health()->available) {
@@ -91,6 +95,10 @@ final class WebSearchRegistry
      */
     public function search(WebSearchQuery $query, ?int $userId = null): SearchResultSet
     {
+        if (!$this->config->isWebSearchEnabled()) {
+            return SearchResultSet::empty($query->query, ['provider' => '']);
+        }
+
         $activeKey = $this->config->webSearchProvider($userId);
         $primary = $this->byKey[$activeKey] ?? null;
         $primarySet = $this->trySearch($primary, $query, $activeKey);

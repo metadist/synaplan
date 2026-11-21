@@ -948,7 +948,8 @@ migration to roll out a new default.
 | `EXTRACTION.QUALITY.min_length` | `10` | PDF quality gate (bootstrap from `TIKA_MIN_LENGTH`) |
 | `EXTRACTION.QUALITY.min_entropy` | `3.0` | PDF quality gate (bootstrap from `TIKA_MIN_ENTROPY`) |
 | `EXTRACTION.QUALITY.apply_to` | `pdf` | Families / extensions the quality gate runs on |
-| `WEB_SEARCH.PROVIDER` | `brave` | Active search adapter (`brave`, `searxng`, `tavily`, `exa`, `firecrawl`, `specstream`, `perplexity`) |
+| `WEB_SEARCH.ENABLED` | `1` when missing | Master switch. Off means chat does not search. On means the preferred provider is used, and each person chooses when two or more engines are ready |
+| `WEB_SEARCH.PROVIDER` | `brave` | Preferred search adapter (`brave`, `searxng`, `tavily`, `exa`, `firecrawl`, `specstream`, `perplexity`) |
 | `WEB_SEARCH.FALLBACK` | _(empty)_ | One-shot fallback when the active provider is down or errors |
 | `WEB_SEARCH.USER_OVERRIDE_ALLOWED` | `0` | When `1`, Settings shows **Use my own search** |
 | `WEB_SEARCH.TIMEOUT_MS` | `8000` | Per-provider HTTP timeout |

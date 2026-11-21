@@ -30,7 +30,8 @@ final readonly class WebSearchAdminService
      *     providers: list<array<string, mixed>>,
      *     active: string,
      *     fallback: string,
-     *     userOverrideAllowed: bool
+     *     userOverrideAllowed: bool,
+     *     enabled: bool
      * }
      */
     public function status(): array
@@ -61,6 +62,7 @@ final readonly class WebSearchAdminService
             'active' => $active,
             'fallback' => $fallback,
             'userOverrideAllowed' => $this->plugConfig->isWebSearchUserOverrideAllowed(),
+            'enabled' => $this->plugConfig->isWebSearchEnabled(),
         ];
     }
 
@@ -69,12 +71,29 @@ final readonly class WebSearchAdminService
      *     providers: list<array<string, mixed>>,
      *     active: string,
      *     fallback: string,
-     *     userOverrideAllowed: bool
+     *     userOverrideAllowed: bool,
+     *     enabled: bool
      * }
      */
-    public function save(string $active, string $fallback, bool $userOverrideAllowed): array
+    public function isEnabled(): bool
     {
-        $this->plugConfig->setWebSearch($active, $fallback, $userOverrideAllowed);
+        return $this->plugConfig->isWebSearchEnabled();
+    }
+
+    public function save(string $active, string $fallback, bool $enabled): array
+    {
+        $this->plugConfig->setWebSearchEnabled($enabled);
+        $ready = 0;
+        foreach ($this->registry->all() as $adapter) {
+            if ($this->keyStatus($adapter->key())['configured']) {
+                ++$ready;
+            }
+        }
+        // One ready engine is the server default. Two or more means each
+        // person chooses; the admin's pick stays the default until they do.
+        $peopleChoose = $enabled && $ready >= 2;
+
+        $this->plugConfig->setWebSearch($active, $fallback, $peopleChoose);
 
         return $this->status();
     }

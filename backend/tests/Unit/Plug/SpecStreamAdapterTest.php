@@ -59,6 +59,7 @@ final class SpecStreamAdapterTest extends TestCase
 
         $headers = array_map('strtolower', $capturedOptions['headers'] ?? []);
         self::assertContains('authorization: bearer ss-test-key', $headers);
+        self::assertSame(0, $capturedOptions['max_redirects'] ?? null);
 
         $queryString = (string) parse_url($capturedUrl, PHP_URL_QUERY);
         parse_str($queryString, $params);
@@ -173,6 +174,7 @@ final class SpecStreamAdapterTest extends TestCase
      */
     public static function httpFailureStatusProvider(): iterable
     {
+        yield 'redirect 302' => [302];
         yield 'unauthorized 401' => [401];
         yield 'payment required 402' => [402];
     }
@@ -196,6 +198,88 @@ final class SpecStreamAdapterTest extends TestCase
         self::assertSame('FR', WebSearchOptionMapper::country(['country' => 'fr']));
         self::assertSame('GB', WebSearchOptionMapper::country(['country' => 'gb']));
         self::assertNull(WebSearchOptionMapper::country(['country' => '']));
+        self::assertNull(WebSearchOptionMapper::country(['country' => 'ZZ']));
+    }
+
+    public function testUnsafeResultUrlsAreDropped(): void
+    {
+        $payload = json_encode([
+            'data' => [
+                'sources' => [
+                    ['title' => 'Script', 'url' => 'javascript:alert(1)', 'snippet' => 'no'],
+                    ['title' => 'Metadata', 'url' => 'http://169.254.169.254/latest', 'snippet' => 'no'],
+                    ['title' => 'Creds', 'url' => 'https://user:secret@example.com/a', 'snippet' => 'no'],
+                    ['title' => 'Synaplan', 'url' => 'https://www.synaplan.com/', 'snippet' => 'yes'],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $http = new MockHttpClient([
+            new MockResponse($payload, ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']]),
+        ]);
+        $adapter = new SpecStreamAdapter(
+            new SpecStreamClient($http, $this->plugKeys('specstream', 'ss-test-key'), $this->plugConfig()),
+            $this->plugConfig(),
+        );
+
+        $set = $adapter->search(new WebSearchQuery('synaplan'));
+
+        self::assertCount(1, $set->results);
+        self::assertSame('https://www.synaplan.com/', $set->results[0]['url']);
+    }
+
+    public function testSiteFilterMustBeAHostname(): void
+    {
+        $capturedUrl = null;
+        $http = new MockHttpClient(function (string $method, string $url) use (&$capturedUrl): MockResponse {
+            $capturedUrl = $url;
+
+            return new MockResponse('{"data":{"sources":[]}}', [
+                'http_code' => 200,
+                'response_headers' => ['content-type' => 'application/json'],
+            ]);
+        });
+        $adapter = new SpecStreamAdapter(
+            new SpecStreamClient($http, $this->plugKeys('specstream', 'ss-test-key'), $this->plugConfig()),
+            $this->plugConfig(),
+        );
+
+        $adapter->search(new WebSearchQuery('synaplan', ['site' => 'synaplan.com OR secret']));
+
+        $queryString = (string) parse_url((string) $capturedUrl, PHP_URL_QUERY);
+        parse_str($queryString, $params);
+        self::assertSame('synaplan', $params['q'] ?? null);
+    }
+
+    public function testLongSnippetExcerptAndAnswerAreCapped(): void
+    {
+        $long = str_repeat('a', 5000);
+        $payload = json_encode([
+            'data' => [
+                'answer' => ['value' => $long],
+                'sources' => [
+                    [
+                        'title' => 'Long',
+                        'url' => 'https://www.synaplan.com/',
+                        'snippet' => $long,
+                        'excerpt' => $long,
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+        $http = new MockHttpClient([
+            new MockResponse($payload, ['http_code' => 200, 'response_headers' => ['content-type' => 'application/json']]),
+        ]);
+        $adapter = new SpecStreamAdapter(
+            new SpecStreamClient($http, $this->plugKeys('specstream', 'ss-test-key'), $this->plugConfig()),
+            $this->plugConfig(),
+        );
+
+        $set = $adapter->search(new WebSearchQuery('synaplan', [], true));
+
+        self::assertSame(4000, strlen((string) $set->results[0]['description']));
+        self::assertSame(4000, strlen((string) $set->results[0]['content']));
+        self::assertSame(4000, strlen((string) $set->answer?->text));
     }
 
     private function plugKeys(string $provider, ?string $value): PlugKeyStore
