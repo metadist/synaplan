@@ -7,6 +7,14 @@
   ],
   enabled: true,
   timezone: 'Europe/Berlin',
+  // npm 12 refuses registry tarballs of packages that declare
+  // bundleDependencies during --package-lock-only (npm/cli#9800), and
+  // @tailwindcss/oxide-wasm32-wasi in the frontend tree is one of them.
+  // allow-remote=all is npm 11's default; allow-git stays at npm 12's "none".
+  // Renovate writes this npmrc only for its own npm runs, so CI and local
+  // installs keep npm's defaults. npmrcMerge keeps a future repo .npmrc.
+  npmrc: 'allow-remote=all',
+  npmrcMerge: true,
   constraints: {
     npm: '<13',
   },
