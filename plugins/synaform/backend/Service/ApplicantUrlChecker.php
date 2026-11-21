@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Plugin\Synaform\Service;
 
+use App\Service\Egress\EgressCall;
 use App\Service\Security\SsrfGuard;
 use Symfony\Component\HttpClient\NoPrivateNetworkHttpClient;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -47,8 +48,14 @@ final readonly class ApplicantUrlChecker
         }
 
         $current = $url;
+        $deadline = microtime(true) + 15.0;
         for ($hop = 0; $hop <= self::MAX_REDIRECTS; ++$hop) {
-            $fetch = $this->fetchOnce($current);
+            $remaining = $deadline - microtime(true);
+            if ($remaining <= 0.0) {
+                return new ApplicantUrlFetch(null, $this->describe($this->hostOf($current), 0, 'Could not reach the page'), false);
+            }
+
+            $fetch = $this->fetchOnce($current, $remaining);
             if ($fetch instanceof ApplicantUrlFetch) {
                 return $fetch;
             }
@@ -105,10 +112,15 @@ final readonly class ApplicantUrlChecker
     /**
      * @return ApplicantUrlFetch|string the next absolute URL when the response is a redirect
      */
-    private function fetchOnce(string $url): ApplicantUrlFetch|string
+    private function fetchOnce(string $url, float $remaining): ApplicantUrlFetch|string
     {
+        $options = $this->requestOptions($url, $remaining);
+        if ($options instanceof ApplicantUrlFetch) {
+            return $options;
+        }
+
         try {
-            $response = $this->http->request('GET', $url, $this->requestOptions($url));
+            $response = $this->http->request('GET', $url, $options);
             $status = $response->getStatusCode();
         } catch (TransportExceptionInterface $e) {
             return $this->transportResult($url, $e);
@@ -146,26 +158,43 @@ final readonly class ApplicantUrlChecker
             return new ApplicantUrlFetch(null, self::PUBLIC_ONLY, true);
         }
 
-        $host = strtolower(trim((string) parse_url($url, \PHP_URL_HOST), '[]'));
-
-        return new ApplicantUrlFetch(null, $this->describe($host, 0, 'Could not reach the page'), false);
+        return new ApplicantUrlFetch(null, $this->describe($this->hostOf($url), 0, 'Could not reach the page'), false);
     }
 
     /**
-     * @return array<string, mixed>
+     * Options for one hop, or a refusal when a hostname no longer has a
+     * public address to pin. The pin is the address this call just accepted,
+     * so a later lookup cannot move the connection.
+     *
+     * @return array<string, mixed>|ApplicantUrlFetch
      */
-    private function requestOptions(string $url): array
+    private function requestOptions(string $url, float $remaining): array|ApplicantUrlFetch
     {
-        return [
-            'timeout' => 15,
-            'max_duration' => 15,
+        $options = [
+            'timeout' => $remaining,
+            'max_duration' => $remaining,
             'max_redirects' => 0,
             'headers' => [
                 'User-Agent' => 'Mozilla/5.0 (compatible; Synaform-Bot/1.0; +https://synaplan.com)',
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Accept-Language' => 'en-US,en;q=0.9,de;q=0.8',
             ],
-        ] + $this->ssrfGuard->pinnedResolveOption($url);
+        ];
+        $host = $this->hostOf($url);
+        if (false === filter_var($host, \FILTER_VALIDATE_IP)) {
+            $pinned = $this->ssrfGuard->pinnedIps($host);
+            if ([] === $pinned) {
+                return new ApplicantUrlFetch(null, self::PUBLIC_ONLY, true);
+            }
+            $options['resolve'] = [$host => $pinned[0]];
+        }
+
+        return EgressCall::typed($options);
+    }
+
+    private function hostOf(string $url): string
+    {
+        return strtolower(trim((string) parse_url($url, \PHP_URL_HOST), '[]'));
     }
 
     private function redirectTarget(ResponseInterface $response): ?string

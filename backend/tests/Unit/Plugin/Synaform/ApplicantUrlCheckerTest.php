@@ -60,6 +60,8 @@ final class ApplicantUrlCheckerTest extends TestCase
             self::assertSame('GET', $method);
             self::assertSame('http://93.184.216.34/cv', $url);
             self::assertSame(0, $options['max_redirects']);
+            self::assertLessThanOrEqual(15, $options['max_duration']);
+            self::assertTrue($options['extra']['egress_typed'] ?? false);
 
             return new MockResponse(
                 '<html><script>secret()</script><body><p>Jane Doe, engineer</p></body></html>',
