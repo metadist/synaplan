@@ -30,6 +30,7 @@ test.describe('@ci Agents builder name autosave', () => {
       const name = page.locator(SEL.name)
       const greetingField = page.locator(SEL.greeting)
       await expect(name).toHaveValue(originalName, { timeout: TIMEOUTS.STANDARD })
+      await page.locator('[data-testid="details-basics-advanced"] summary').click()
 
       const patch = page.waitForResponse(
         (response) =>
@@ -49,6 +50,7 @@ test.describe('@ci Agents builder name autosave', () => {
       await expect(page.locator(SEL.name)).toHaveValue(originalName, {
         timeout: TIMEOUTS.STANDARD,
       })
+      await page.locator('[data-testid="details-basics-advanced"] summary').click()
       await expect(page.locator(SEL.greeting)).toHaveValue(greeting)
     } finally {
       await request.delete(`${getApiUrl()}/api/v1/agents/${agentId}`, { headers })
