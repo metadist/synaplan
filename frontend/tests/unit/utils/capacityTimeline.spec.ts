@@ -3,6 +3,7 @@ import {
   formatCost,
   formatDuration,
   largestPart,
+  partsOverlap,
   perMinute,
   requestParts,
   share,
@@ -101,6 +102,33 @@ describe('requestParts', () => {
   it('ignores negative timings', () => {
     const parts = requestParts(request({ db_ms: -20, ai: [{ duration_ms: -5 }] }))
     expect(parts.find((p) => p.key === 'php')?.ms).toBe(1000)
+  })
+})
+
+describe('measured parts', () => {
+  it('keeps each raw duration even when the split has no room for it', () => {
+    const r = request({
+      total_ms: 1000,
+      ai: [{ duration_ms: 600 }],
+      tools: [{ duration_ms: 800 }],
+    })
+    const parts = requestParts(r)
+    expect(parts.find((p) => p.key === 'ai')?.measured).toBe(600)
+    expect(parts.find((p) => p.key === 'tools')?.measured).toBe(800)
+    expect(parts.find((p) => p.key === 'tools')?.ms).toBe(400)
+    expect(partsOverlap(parts, r.total_ms)).toBe(true)
+  })
+
+  it('keeps outbound calls that AI and tools do not explain in the legend', () => {
+    const parts = requestParts(
+      request({ ai: [{ duration_ms: 900 }], egress: [{ duration_ms: 300 }] })
+    )
+    expect(parts.find((p) => p.key === 'outbound')).toMatchObject({ ms: 0, measured: 300 })
+  })
+
+  it('does not report an overlap when the parts fit', () => {
+    const r = request({ db_ms: 50, ai: [{ duration_ms: 600 }] })
+    expect(partsOverlap(requestParts(r), r.total_ms)).toBe(false)
   })
 })
 

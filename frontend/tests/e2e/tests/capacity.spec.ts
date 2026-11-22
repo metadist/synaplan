@@ -285,12 +285,16 @@ test.describe('@ci Capacity timeline', () => {
     }
   })
 
-  test('tool calls waiting for approval link to Approvals', async ({ page }) => {
+  test('tool calls that asked for approval link to what still waits', async ({ page }) => {
     await page.route('**/api/v1/config/runtime', async (route) => {
       const response = await route.fetch()
       const body = (await response.json()) as { features?: Record<string, unknown> }
       body.features = { ...body.features, toolsApprovalsEnabled: true }
       await route.fulfill({ response, json: body })
+    })
+    // The table counts the window's history; the link counts this viewer's open approvals.
+    await page.route('**/api/v1/approvals?*', async (route) => {
+      await route.fulfill({ json: { success: true, pendingCount: 1, approvals: [] } })
     })
     await mockReport(page, 'tools', {
       ...meta(),
@@ -311,6 +315,7 @@ test.describe('@ci Capacity timeline', () => {
     const row = page.locator(selectors.capacity.toolRow).first()
     await expect(row).toContainText('MCP servers', { timeout: TIMEOUTS.STANDARD })
     await expect(row.locator(selectors.capacity.toolWaiting)).toHaveText('2')
+    await expect(page.locator(selectors.capacity.approvalsLink)).toContainText('1 waiting')
     await page.locator(selectors.capacity.approvalsLink).click()
     await expect(page).toHaveURL(/\/approvals/)
   })

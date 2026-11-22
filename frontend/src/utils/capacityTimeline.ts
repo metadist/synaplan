@@ -8,7 +8,10 @@ export type PartKey = 'wait' | 'php' | 'ai' | 'tools' | 'outbound' | 'db'
 
 export interface RequestPart {
   key: PartKey
+  /** This part's slice of the bar; the slices add up to the total. */
   ms: number
+  /** What was measured for this part; measurements can overlap. */
+  measured?: number
 }
 
 export interface TimedRequest {
@@ -52,11 +55,13 @@ const sum = (items: readonly { duration_ms: number }[]): number =>
   items.reduce((acc, item) => acc + Math.max(0, item.duration_ms), 0)
 
 /**
- * Splits one request's total time into parts that add up to the total.
- * The timings overlap: PHP time contains the AI, tool and database time,
- * and AI and tool calls make outbound calls of their own. So waiting comes
- * first, then AI, tools and database; outbound is only what AI and tools do
- * not already explain; PHP is the rest.
+ * Splits one request's total time into slices that add up to the total, for
+ * the bar. The record keeps durations, not when each call ran, and they can
+ * overlap: PHP time contains the AI, tool and database time, a tool can call
+ * an AI model, and AI and tool calls make outbound calls of their own. So the
+ * split is an estimate: waiting first, then AI, tools and database; outbound
+ * only beyond what AI and tools took; PHP is the rest. `measured` keeps each
+ * raw duration so the legend never hides one.
  */
 export function requestParts(request: TimedRequest): RequestPart[] {
   const total = Math.max(0, request.total_ms)
@@ -66,17 +71,25 @@ export function requestParts(request: TimedRequest): RequestPart[] {
     left -= taken
     return taken
   }
+  const wait = Math.max(0, request.wait_ms ?? 0)
   const ai = sum(request.ai)
   const tools = sum(request.tools)
+  const db = Math.max(0, request.db_ms)
+  const outbound = sum(request.egress)
   const parts: RequestPart[] = [
-    { key: 'wait', ms: take(request.wait_ms ?? 0) },
-    { key: 'ai', ms: take(ai) },
-    { key: 'tools', ms: take(tools) },
-    { key: 'db', ms: take(request.db_ms) },
-    { key: 'outbound', ms: take(sum(request.egress) - ai - tools) },
+    { key: 'wait', ms: take(wait), measured: wait },
+    { key: 'ai', ms: take(ai), measured: ai },
+    { key: 'tools', ms: take(tools), measured: tools },
+    { key: 'db', ms: take(db), measured: db },
+    { key: 'outbound', ms: take(outbound - ai - tools), measured: outbound },
   ]
   parts.push({ key: 'php', ms: left })
   return parts
+}
+
+/** True when the measured parts add up to more than the request took. */
+export function partsOverlap(parts: readonly RequestPart[], total: number): boolean {
+  return parts.reduce((acc, part) => acc + (part.measured ?? part.ms), 0) > total
 }
 
 /** The part that took longest, for the one-line summary of a request. */

@@ -1831,7 +1831,8 @@
       "ai": "IA",
       "tools": "Outils",
       "outbound": "Sortant",
-      "db": "Base de données"
+      "db": "Base de données",
+      "overlap": "Ces durées se chevauchent (un outil peut appeler un modèle d’IA, et l’IA et les outils passent par le réseau), elles dépassent donc la durée de la requête. La barre est une estimation."
     },
     "status": {
       "2xx": "Répondue",
@@ -1982,7 +1983,8 @@
       "col": {
         "source": "Source",
         "kind": "Type",
-        "calls": "Appels"
+        "calls": "Appels",
+        "askedApproval": "Approbation demandée"
       }
     },
     "outbound": {
@@ -2021,6 +2023,7 @@
       "removed": "{rule} n’est plus sur la liste d’autorisation.",
       "removeTitle": "Retirer de la liste d’autorisation ?",
       "removeEnforce": "Le filtre refusera les appels vers {rule} dès la prochaine requête.",
+      "removeReport": "Les appels vers {rule} continuent de sortir tant que le filtre ne fait que signaler ou est désactivé. Ils réapparaissent comme non listés et seront refusés dès que le filtre refusera.",
       "invalidRule": "Cette destination ne peut pas aller sur la liste d’autorisation.",
       "saveFailed": "La liste d’autorisation n’a pas pu être enregistrée. Réessayez dans un instant."
     }

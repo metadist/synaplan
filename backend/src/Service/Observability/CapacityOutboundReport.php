@@ -61,6 +61,7 @@ final readonly class CapacityOutboundReport
             }
         }
 
+        $standings = $this->standing->ofAll(array_map('strval', array_keys($rows)));
         $destinations = [];
         foreach ($rows as $destination => $row) {
             $destinations[] = [
@@ -69,7 +70,7 @@ final readonly class CapacityOutboundReport
                 'failures' => $row['failures'],
                 'refused' => $row['refused'],
                 'p95_ms' => TimelineHistogram::percentile($row['buckets'], 0.95),
-            ] + $this->standing->of((string) $destination);
+            ] + $standings[(string) $destination];
         }
 
         usort($destinations, static fn (array $a, array $b): int => [

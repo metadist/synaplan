@@ -12,7 +12,7 @@ import { formatDuration } from '@/utils/capacityTimeline'
 /**
  * Admin › Capacity › Outbound (AU33, journey J-AU-3): where Synaplan called
  * out to, and which of those the outbound filter does not know. Allow adds
- * the destination to the allow list; Remove takes it off again at once.
+ * the destination to the allow list; Remove takes it off again after asking.
  */
 const { t } = useI18n()
 const { success, error } = useNotification()
@@ -64,16 +64,17 @@ async function allow(row: OutboundRow): Promise<void> {
 async function remove(row: OutboundRow): Promise<void> {
   const rule = row.rule
   if (!rule || saving.value) return
-  if (mode.value === 'enforce') {
-    const confirmed = await dialog.confirm({
-      title: t('capacity.outbound.removeTitle'),
-      message: t('capacity.outbound.removeEnforce', { rule }),
-      confirmText: t('capacity.outbound.remove'),
-      cancelText: t('common.cancel'),
-      danger: true,
-    })
-    if (!confirmed) return
-  }
+  const enforcing = mode.value === 'enforce'
+  const confirmed = await dialog.confirm({
+    title: t('capacity.outbound.removeTitle'),
+    message: t(enforcing ? 'capacity.outbound.removeEnforce' : 'capacity.outbound.removeReport', {
+      rule,
+    }),
+    confirmText: t('capacity.outbound.remove'),
+    cancelText: t('common.cancel'),
+    danger: enforcing,
+  })
+  if (!confirmed) return
   saving.value = row.destination
   try {
     await capacityApi.removeAllow(rule)

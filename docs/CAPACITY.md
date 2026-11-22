@@ -17,23 +17,27 @@ for its whole duration (16 by default, 24 on large nodes), while it uses
 about 4 % of a processor. A server with 24 stream workers answers 24 chats
 at once. The 25th waits up to 15 seconds and then gets "busy, try again".
 Everything else (sign-in, files, settings) keeps its own `api` pool and
-stays fast. With the stream pump on, the long wait for the provider moves
-out of the web request: one pump process holds a turn, and adding pump
-processes is cheap (about 160 MB idle each on the dev stack). A mid-sized installation with 1,000 people
-needs two web servers for availability and enough pump processes for its
-peak, worked out in [Sizing](#sizing).
+stays fast. With the stream pump on, the call to the provider moves to a
+pump process, and adding pump processes is cheap (about 160 MB idle each
+on the dev stack). The web request still copies the answer to the browser,
+and it holds a `streams` worker while it does, unless the watchdog relay
+(`SYNAPLAN_RELAY=1`) holds the connection instead. A mid-sized installation
+with 1,000 people needs two web servers for availability, the relay, and
+enough pump processes for its peak, worked out in [Sizing](#sizing).
 
 ---
 
 ## What limits a server
 
-| | Without the pump (default) | With the pump (`RUNTIME.STREAM_PUMP`) |
-| --- | --- | --- |
-| Who holds a chat answer | A PHP worker of the `streams` pool, from the first byte to the last | A pump process (`SYNAPLAN_ROLE=pump`). The web request only copies frames from Redis, and with `SYNAPLAN_RELAY=1` the watchdog holds the client connection instead of PHP |
-| Answers at once per server | `FRANKENPHP_STREAM_WORKER_NUM` (default: the same as `FRANKENPHP_WORKER_NUM`, 16) | Pump processes × 1 turn each; the watchdog relay holds up to `WATCHDOG_STREAM_SLOTS` (320) client connections |
-| What happens past the limit | The request waits for a free worker up to `FRANKENPHP_MAX_WAIT_TIME` (15 s), then `503 server_busy` with `Retry-After: 5` | The turn queues in Redis until a pump is free; the client sees the answer start later, not an error |
-| What the rest of the API feels | Nothing: short requests have their own `api` pool | Nothing |
-| What adding capacity costs | One database connection per PHP worker, on every web node | One database connection per pump process |
+| | Without the pump (default) | Pump, no relay | Pump and relay (`SYNAPLAN_RELAY=1`) |
+| --- | --- | --- | --- |
+| Who calls the provider | A PHP worker of the `streams` pool | A pump process (`SYNAPLAN_ROLE=pump`), one turn each | A pump process, one turn each |
+| Who holds the browser connection | The same `streams` worker | A `streams` worker, copying frames from Redis | The watchdog relay; PHP only admits the turn |
+| Answers at once per server | `FRANKENPHP_STREAM_WORKER_NUM` (default: the same as `FRANKENPHP_WORKER_NUM`, 16) | The smaller of the `streams` workers and the pump processes | The smaller of `WATCHDOG_STREAM_SLOTS` (320) and the pump processes |
+| Past the connection limit | Waits for a free worker up to `FRANKENPHP_MAX_WAIT_TIME` (15 s), then `503 server_busy` with `Retry-After: 5` | The same as without the pump | `503 server_busy` with `Retry-After: 5` at once, from the relay |
+| Admitted, but every pump is busy | — | The turn queues in Redis; the answer starts later, and the `streams` worker waits with it | The turn queues in Redis; the answer starts later |
+| What the rest of the API feels | Nothing: short requests have their own `api` pool | Nothing | Nothing |
+| What adding capacity costs | One database connection per PHP worker, on every web node | The same, plus one per pump process | One database connection per pump process |
 
 Memory is not the limit: an extra booted PHP worker costs about 3.3 MB, and
 a held stream raises a worker by about 5 MB. Processor time is not the
@@ -91,7 +95,8 @@ asked, then the answer):
 | --- | ---: | ---: |
 | No pump, 24 stream workers per server | 24; the 25th waits, then "busy" | 2–3 |
 | No pump, 16 stream workers (default) | 16 | 3–4 |
-| Pump on, 2 web servers | the pump processes you run (one turn each) | 2 web servers for availability, **40–55 pump processes** at the peak, spread over the nodes |
+| Pump without the relay, 24 stream workers per server | 24: the `streams` pool still holds every answer | 2–3, plus a pump process per answer |
+| Pump and relay (`SYNAPLAN_RELAY=1`), 2 web servers | up to 320 connections per server; one answer per pump process | 2 web servers for availability, **40–55 pump processes** at the peak, spread over the nodes |
 
 Take the seconds per answer and the peak from your own installation, not
 from this example: **Admin → Server load → Requests** shows the p95 of chat
@@ -108,10 +113,10 @@ working.
 | Tab | Answers | Look at |
 | --- | --- | --- |
 | **Servers** | Is a server full or silent? | "AI answers at once" against its total, today's peak and the sizing hint under it; a server that stopped reporting is marked with the time it was last seen |
-| **Requests** | Which kind of request is slow, and where did the slowest one spend its time? | Sort by p95; open one of the slowest requests of the last hour to see the parts bar (waiting, PHP, AI, tools, database, outbound) and its calls; copy the request ID to search the logs |
+| **Requests** | Which kind of request is slow, and where did the slowest one spend its time? | Sort by p95; open one of the slowest requests of the last hour to see the parts bar (waiting, PHP, AI, tools, database, outbound) and its calls; copy the request ID to search the logs. The legend shows what was measured for each part; the parts can overlap (a tool can call an AI model), so the bar is an estimate |
 | **AI calls** | Which provider or model got slower or more expensive? | First word p50 / p95 per model, the whole call p95, and hooks: the time Synaplan adds around each call |
-| **Tools** | Do tool calls fail or wait for approval? | The waiting column; the button opens **Approvals** when approvals are on |
-| **Outbound** | Where does Synaplan call out to, and what would the outbound filter refuse? | With `EGRESS.MODE=report`, rows marked "Would be refused"; **Allow** puts the host on `EGRESS.ALLOW`, **Remove** takes it off. In `off` mode nothing is recorded |
+| **Tools** | Do tool calls fail or ask for approval? | "Asked for approval" counts the window's calls; the button counts what still waits for you and opens **Approvals** when approvals are on |
+| **Outbound** | Where does Synaplan call out to, and what would the outbound filter refuse? | With `EGRESS.MODE=report`, rows marked "Would be refused"; **Allow** puts the host on `EGRESS.ALLOW`, **Remove** asks, then takes it off. In `off` mode nothing is recorded |
 
 Percentiles come from fixed buckets (1, 5, 10, 25, 50, 100, 250, 500 ms,
 1, 2.5, 5, 10, 30, 60 s), so a p95 of "500 ms" means "between 250 and 500
@@ -128,8 +133,8 @@ timings and counts only — never a prompt, an answer or a tool argument.
 | `FRANKENPHP_WORKER_NUM` | `16` | Environment | Short requests show waiting on **Requests** (rare) |
 | `FRANKENPHP_MAX_WAIT_TIME` | `15s` | Environment | Never for capacity; it only decides how long a full server makes people wait before "busy" |
 | `FRANKENPHP_NUM_THREADS` | unset | Environment | Only when you must cap threads; it must exceed both pools together |
-| `RUNTIME.STREAM_PUMP`, `RUNTIME.STREAM_PUMP_PERCENT` | `off`, `0` | `BCONFIG`, owner 0 | You want the long waits out of the web request: start with `all` and a small percent |
-| Pump processes | 1 (compose service `pump`) | `docker compose up --scale pump=N`, or the chart's `pump.replicas` | Turns queue: answers start later while **Servers** shows the web workers idle |
+| `RUNTIME.STREAM_PUMP`, `RUNTIME.STREAM_PUMP_PERCENT` | `off`, `0` | `BCONFIG`, owner 0 | You want the provider call out of the web request: start with `all` and a small percent, and turn on the relay to free the `streams` pool too |
+| Pump processes | 1 (compose service `pump`) | `docker compose up --scale pump=N`, or the chart's `pump.replicaCount` | Turns queue: answers start later while every pump process holds a turn |
 | `SYNAPLAN_RELAY`, `WATCHDOG_STREAM_SLOTS` | off, `320` | Environment, web role | The relay holds client connections in the watchdog instead of PHP; slots cap them per server |
 
 `RUNTIME_OPTIONS.md` lists every runtime switch;

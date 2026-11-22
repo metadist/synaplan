@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Egress;
 
 use App\AI\Catalog\ProviderCatalog;
 use App\Observability\RequestTimelineContext;
+use App\Repository\ConfigRepository;
 use App\Service\Egress\EgressConfig;
 use App\Service\Egress\EgressDestinationStanding;
 use PHPUnit\Framework\TestCase;
@@ -81,6 +82,22 @@ final class EgressDestinationStandingTest extends TestCase
 
         self::assertSame('typed', $egress[0]['destination']);
         self::assertSame('crm.example.com:443', $egress[1]['destination']);
+    }
+
+    public function testABatchReadsTheAllowListOnce(): void
+    {
+        $repository = $this->createMock(ConfigRepository::class);
+        $repository->expects(self::once())
+            ->method('getValuesForOwners')
+            ->with([0], 'EGRESS', 'ALLOW')
+            ->willReturn([0 => '["crm.example.com"]']);
+        $standing = new EgressDestinationStanding(new EgressConfig($repository), self::$catalog ??= ProviderCatalog::builtIn());
+
+        $standings = $standing->ofAll(['crm.example.com:443', 'hooks.example.org:8443', 'other.example.net:443']);
+
+        self::assertSame('listed', $standings['crm.example.com:443']['state']);
+        self::assertSame('not_listed', $standings['hooks.example.org:8443']['state']);
+        self::assertSame('not_listed', $standings['other.example.net:443']['state']);
     }
 
     private function standing(): EgressDestinationStanding

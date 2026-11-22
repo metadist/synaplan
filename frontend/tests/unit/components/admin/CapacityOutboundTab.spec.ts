@@ -121,8 +121,9 @@ describe('CapacityOutboundTab', () => {
     wrapper.unmount()
   })
 
-  it('removes a rule without asking while the filter only reports', async () => {
+  it('asks before removing a rule while the filter only reports, and removes it on confirm', async () => {
     mockOutbound.mockResolvedValue(report('report'))
+    mockConfirm.mockResolvedValue(true)
     const wrapper = mountTab()
     await flushPromises()
 
@@ -131,8 +132,23 @@ describe('CapacityOutboundTab', () => {
       .trigger('click')
     await flushPromises()
 
-    expect(mockConfirm).not.toHaveBeenCalled()
+    expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({ danger: false }))
     expect(mockRemove).toHaveBeenCalledWith('*.example.net')
+    wrapper.unmount()
+  })
+
+  it('keeps the rule when removal is cancelled while the filter only reports', async () => {
+    mockOutbound.mockResolvedValue(report('report'))
+    mockConfirm.mockResolvedValue(false)
+    const wrapper = mountTab()
+    await flushPromises()
+
+    await row(wrapper, 'hooks.example.net')
+      .find('[data-testid="btn-capacity-outbound-remove"]')
+      .trigger('click')
+    await flushPromises()
+
+    expect(mockRemove).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 

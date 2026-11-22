@@ -1831,7 +1831,8 @@
       "ai": "KI",
       "tools": "Tools",
       "outbound": "Ausgehend",
-      "db": "Datenbank"
+      "db": "Datenbank",
+      "overlap": "Diese Zeiten überschneiden sich (ein Werkzeug kann ein KI-Modell aufrufen, KI und Werkzeuge gehen über das Netz), daher ergeben sie zusammen mehr als die Anfrage. Der Balken ist eine Schätzung."
     },
     "status": {
       "2xx": "Beantwortet",
@@ -1982,7 +1983,8 @@
       "col": {
         "source": "Quelle",
         "kind": "Art",
-        "calls": "Aufrufe"
+        "calls": "Aufrufe",
+        "askedApproval": "Freigabe angefragt"
       }
     },
     "outbound": {
@@ -2021,6 +2023,7 @@
       "removed": "{rule} ist nicht mehr auf der Erlaubnisliste.",
       "removeTitle": "Von der Erlaubnisliste entfernen?",
       "removeEnforce": "Der Filter weist Aufrufe an {rule} ab der nächsten Anfrage ab.",
+      "removeReport": "Aufrufe an {rule} gehen weiter hinaus, solange der Filter nur meldet oder aus ist. Sie erscheinen wieder als nicht gelistet und werden abgewiesen, sobald der Filter abweist.",
       "invalidRule": "Dieses Ziel kann nicht auf die Erlaubnisliste.",
       "saveFailed": "Die Erlaubnisliste konnte nicht gespeichert werden. Versuchen Sie es gleich noch einmal."
     }

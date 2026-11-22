@@ -1827,7 +1827,8 @@
       "ai": "IA",
       "tools": "Herramientas",
       "outbound": "Salientes",
-      "db": "Base de datos"
+      "db": "Base de datos",
+      "overlap": "Estos tiempos se solapan (una herramienta puede llamar a un modelo de IA, y la IA y las herramientas salen por la red), por eso suman más que la solicitud. La barra es una estimación."
     },
     "status": {
       "2xx": "Respondida",
@@ -1978,7 +1979,8 @@
       "col": {
         "source": "Origen",
         "kind": "Tipo",
-        "calls": "Llamadas"
+        "calls": "Llamadas",
+        "askedApproval": "Pidió aprobación"
       }
     },
     "outbound": {
@@ -2017,6 +2019,7 @@
       "removed": "{rule} ya no está en la lista de permitidos.",
       "removeTitle": "¿Quitar de la lista de permitidos?",
       "removeEnforce": "El filtro rechazará las llamadas a {rule} desde la próxima solicitud.",
+      "removeReport": "Las llamadas a {rule} siguen saliendo mientras el filtro solo informa o está apagado. Vuelven a aparecer como no incluidas y se rechazarán cuando el filtro rechace.",
       "invalidRule": "Ese destino no puede ir en la lista de permitidos.",
       "saveFailed": "No se pudo guardar la lista de permitidos. Inténtelo de nuevo en un momento."
     }

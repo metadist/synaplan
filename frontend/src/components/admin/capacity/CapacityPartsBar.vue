@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatDuration, share, type RequestPart } from '@/utils/capacityTimeline'
+import { formatDuration, partsOverlap, share, type RequestPart } from '@/utils/capacityTimeline'
 
 /**
- * Where one request's time went, as one stacked bar. The bar is decoration:
- * the legend (or the aria-label when the legend is hidden) says every part
- * in words.
+ * Where one request's time went, as one stacked bar. The bar is an estimate
+ * and decoration: the legend (or the aria-label when the legend is hidden)
+ * says every part in words, with what was measured for it.
  */
 const props = defineProps<{
   parts: RequestPart[]
@@ -17,9 +17,11 @@ const props = defineProps<{
 const { t } = useI18n()
 
 const visible = computed(() => props.parts.filter((part) => part.ms > 0))
+const overlap = computed(() => partsOverlap(props.parts, props.total))
 const summary = computed(() =>
-  visible.value
-    .map((part) => `${t(`capacity.parts.${part.key}`)} ${formatDuration(part.ms)}`)
+  props.parts
+    .filter((part) => (part.measured ?? part.ms) > 0)
+    .map((part) => `${t(`capacity.parts.${part.key}`)} ${formatDuration(part.measured ?? part.ms)}`)
     .join(' · ')
 )
 </script>
@@ -56,8 +58,11 @@ const summary = computed(() =>
           aria-hidden="true"
         ></span>
         <span>{{ t(`capacity.parts.${part.key}`) }}</span>
-        <span class="txt-primary tabular-nums">{{ formatDuration(part.ms) }}</span>
+        <span class="txt-primary tabular-nums">{{ formatDuration(part.measured ?? part.ms) }}</span>
       </li>
     </ul>
+    <p v-if="legend && overlap" class="text-xs txt-secondary" data-testid="capacity-parts-overlap">
+      {{ t('capacity.parts.overlap') }}
+    </p>
   </div>
 </template>

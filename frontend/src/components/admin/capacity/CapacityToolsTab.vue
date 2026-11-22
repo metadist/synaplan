@@ -1,26 +1,31 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import CapacityReportState from './CapacityReportState.vue'
 import { isApprovalsEnabled } from '@/composables/useApprovalsFeature'
 import { useCapacityLabels } from '@/composables/useCapacityLabels'
 import { useCapacityReport } from '@/composables/useCapacityReport'
 import { capacityApi } from '@/services/api/capacityApi'
+import { useApprovalsStore } from '@/stores/approvals'
 import { formatDuration } from '@/utils/capacityTimeline'
 
 /**
  * Admin › Capacity › Tools (AU33): how tool calls of the recent requests
- * ended, per source and kind. Calls that wait for a person lead to
- * Approvals; this tab never shows which tool or what it was asked.
+ * ended, per source and kind. The table counts calls that asked for
+ * approval in the window; the Approvals link counts what still waits for
+ * this administrator. This tab never shows which tool or what it was asked.
  */
 const { t } = useI18n()
 const { label } = useCapacityLabels()
 const { report, loading, unavailable, failed, load } = useCapacityReport(() => capacityApi.tools())
 
-const waiting = computed(() =>
-  (report.value?.tools ?? []).reduce((acc, row) => acc + row.waiting, 0)
-)
+const approvals = useApprovalsStore()
+const waiting = computed(() => approvals.pendingCount)
 const approvalsOn = computed(() => isApprovalsEnabled())
+
+onMounted(() => {
+  if (approvalsOn.value) void approvals.load('pending')
+})
 
 const th = 'py-2 px-3 font-medium txt-secondary text-right whitespace-nowrap'
 const td = 'py-2 px-3 text-right tabular-nums txt-secondary'
@@ -73,7 +78,7 @@ const td = 'py-2 px-3 text-right tabular-nums txt-secondary'
                 <th :class="th">{{ t('capacity.tools.col.calls') }}</th>
                 <th :class="th">{{ t('capacity.toolOutcome.done') }}</th>
                 <th :class="th">{{ t('capacity.toolOutcome.refused') }}</th>
-                <th :class="th">{{ t('capacity.toolOutcome.needs_approval') }}</th>
+                <th :class="th">{{ t('capacity.tools.col.askedApproval') }}</th>
                 <th :class="th">{{ t('capacity.toolOutcome.failed') }}</th>
                 <th :class="th">p95</th>
               </tr>

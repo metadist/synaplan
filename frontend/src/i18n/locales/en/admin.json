@@ -1831,7 +1831,8 @@
       "ai": "AI",
       "tools": "Tools",
       "outbound": "Outbound",
-      "db": "Database"
+      "db": "Database",
+      "overlap": "These times overlap (a tool can call an AI model, and AI and tools go out over the network), so they add up to more than the request. The bar is an estimate."
     },
     "status": {
       "2xx": "Answered",
@@ -1982,7 +1983,8 @@
       "col": {
         "source": "Source",
         "kind": "Kind",
-        "calls": "Calls"
+        "calls": "Calls",
+        "askedApproval": "Asked for approval"
       }
     },
     "outbound": {
@@ -2021,6 +2023,7 @@
       "removed": "{rule} is off the allow list.",
       "removeTitle": "Remove from the allow list?",
       "removeEnforce": "The filter refuses calls to {rule} from the next request on.",
+      "removeReport": "Calls to {rule} still go out while the filter only reports or is off. They show as not listed again, and are refused once the filter is set to refuse.",
       "invalidRule": "That destination cannot go on the allow list.",
       "saveFailed": "The allow list could not be saved. Try again in a moment."
     }

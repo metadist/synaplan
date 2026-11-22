@@ -1827,7 +1827,8 @@
       "ai": "Yapay zekâ",
       "tools": "Araçlar",
       "outbound": "Giden",
-      "db": "Veritabanı"
+      "db": "Veritabanı",
+      "overlap": "Bu süreler örtüşür (bir araç bir yapay zekâ modelini çağırabilir, yapay zekâ ve araçlar ağ üzerinden çıkar), bu yüzden toplamları isteğin süresini aşar. Çubuk bir tahmindir."
     },
     "status": {
       "2xx": "Yanıtlandı",
@@ -1978,7 +1979,8 @@
       "col": {
         "source": "Kaynak",
         "kind": "Tür",
-        "calls": "Çağrılar"
+        "calls": "Çağrılar",
+        "askedApproval": "Onay istendi"
       }
     },
     "outbound": {
@@ -2017,6 +2019,7 @@
       "removed": "{rule} artık izin listesinde değil.",
       "removeTitle": "İzin listesinden kaldırılsın mı?",
       "removeEnforce": "Filtre, bir sonraki istekten itibaren {rule} hedefine giden çağrıları reddeder.",
+      "removeReport": "Filtre yalnızca raporladığı veya kapalı olduğu sürece {rule} hedefine giden çağrılar çıkmaya devam eder. Yeniden listede değil olarak görünürler ve filtre reddetmeye ayarlandığında reddedilirler.",
       "invalidRule": "Bu hedef izin listesine eklenemez.",
       "saveFailed": "İzin listesi kaydedilemedi. Birazdan tekrar deneyin."
     }
