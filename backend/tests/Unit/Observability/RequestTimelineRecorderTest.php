@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Observability;
 
+use App\AI\Catalog\ProviderCatalog;
 use App\AI\Pipeline\AiCall;
 use App\AI\Pipeline\AiCallContext;
 use App\AI\Pipeline\AiCallOptions;
@@ -21,9 +22,13 @@ use App\Observability\RequestIdGenerator;
 use App\Observability\RequestTimelineContext;
 use App\Observability\RequestTimelineStore;
 use App\Observability\ServerIdentity;
+use App\Service\Egress\EgressConfig;
+use App\Service\Egress\EgressDestinationStanding;
 use App\Service\Infrastructure\RedisService;
+use App\Service\Observability\CapacityOutboundReport;
 use App\Service\Observability\CapacityService;
 use App\Service\Observability\CapacityTimelineService;
+use App\Service\Observability\CapacityToolsReport;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ControllerEvent;
@@ -150,7 +155,13 @@ final class RequestTimelineRecorderTest extends \PHPUnit\Framework\TestCase
 
         // Verify AdminCapacityController endpoints
         $timelineService = new CapacityTimelineService($store, $identity);
-        $controller = new AdminCapacityController($this->createStub(CapacityService::class), $timelineService);
+        $egressConfig = new EgressConfig();
+        $controller = new AdminCapacityController(
+            $this->createStub(CapacityService::class),
+            $timelineService,
+            new CapacityToolsReport($store, $identity),
+            new CapacityOutboundReport($store, $identity, $egressConfig, new EgressDestinationStanding($egressConfig, ProviderCatalog::builtIn())),
+        );
         $this->wireJsonSerializer($controller);
 
         $reqResp = $controller->requests();
@@ -168,6 +179,14 @@ final class RequestTimelineRecorderTest extends \PHPUnit\Framework\TestCase
         self::assertCount(2, $aiPayload['models']);
         self::assertCount(2, $aiPayload['sources']);
         self::assertNotEmpty($state->hashes);
+
+        $toolsPayload = json_decode((string) $controller->tools()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertTrue($toolsPayload['success']);
+        self::assertSame('mcp', $toolsPayload['tools'][0]['source']);
+
+        $outboundPayload = json_decode((string) $controller->outbound()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertTrue($outboundPayload['success']);
+        self::assertContains('api.openai.com:443', array_column($outboundPayload['destinations'], 'destination'));
     }
 
     public function testBoundedLabelsReplaceUnknownModelWithCustomAndNeverExposeRawPath(): void

@@ -1255,7 +1255,9 @@
         "messages_gateway_flags": "Gateway settings changed",
         "messages_gateway_upstream": "Gateway address changed",
         "messages_gateway_aliases": "Model aliases changed",
-        "tool_executed": "Tool calls"
+        "tool_executed": "Tool calls",
+        "egress_allow_added": "Outbound destination allowed",
+        "egress_allow_removed": "Outbound destination removed"
       },
       "what": "What happened",
       "emptyNote": "This log records who did what. It does not open chat or file contents.",
@@ -1755,7 +1757,8 @@
     "role": {
       "web": "Web",
       "worker": "Background work",
-      "scheduler": "Scheduled jobs"
+      "scheduler": "Scheduled jobs",
+      "pump": "Chat answer delivery"
     },
     "card": {
       "connectedHere": "You are connected to this server.",
@@ -1808,6 +1811,218 @@
       "failed": "The events could not be read.",
       "empty": "No warnings from this server in the last hour.",
       "window": "Warnings and errors of the last hour, newest first, at most 20."
+    },
+    "sizingGuide": "Open the sizing guide",
+    "tabs": {
+      "label": "Capacity views",
+      "servers": "Servers",
+      "requests": "Requests",
+      "ai": "AI calls",
+      "tools": "Tools",
+      "outbound": "Outbound"
+    },
+    "reports": {
+      "loading": "Reading the recent requests…",
+      "unavailable": "The recent requests cannot be read right now because the shared cache does not answer. Synaplan keeps working."
+    },
+    "parts": {
+      "wait": "Waiting for PHP",
+      "php": "PHP",
+      "ai": "AI",
+      "tools": "Tools",
+      "outbound": "Outbound",
+      "db": "Database"
+    },
+    "status": {
+      "2xx": "Answered",
+      "4xx": "Rejected",
+      "5xx": "Error",
+      "busy": "Too busy"
+    },
+    "egressStatus": {
+      "2xx": "OK",
+      "4xx": "Rejected",
+      "5xx": "Error",
+      "blocked": "Refused by the filter"
+    },
+    "routeClass": {
+      "chat_stream": "Chat answers",
+      "widget_message": "Widget messages",
+      "openai_api": "OpenAI-compatible API",
+      "messages_api": "Messages API",
+      "files": "Files",
+      "search": "Search",
+      "admin": "Administration",
+      "auth": "Sign-in",
+      "config": "Settings",
+      "mcp": "MCP server",
+      "webhook": "Webhooks",
+      "media": "Media",
+      "other": "Other"
+    },
+    "aiSource": {
+      "chat_web": "Chat",
+      "chat_stream": "Chat (streamed)",
+      "widget": "Widget",
+      "email": "Email",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "openai_api": "OpenAI-compatible API",
+      "messages_api": "Messages API",
+      "saved_task": "Saved tasks",
+      "sorter": "Message sorting",
+      "memory": "Memories",
+      "summary": "Summaries",
+      "vectorize": "File indexing",
+      "rerank": "Reranking",
+      "media": "Media",
+      "voice_live": "Live voice",
+      "probe": "Provider checks",
+      "system": "System"
+    },
+    "capability": {
+      "chat": "Chat",
+      "chat_stream": "Chat (streamed)",
+      "embed": "Embedding",
+      "embed_batch": "Embedding (batch)",
+      "vision": "Image reading",
+      "image": "Image creation",
+      "video_start": "Video creation",
+      "video_poll": "Video status",
+      "transcribe": "Transcription",
+      "synthesize": "Speech",
+      "synthesize_stream": "Speech (streamed)",
+      "passthrough": "Passthrough",
+      "voice_session": "Voice session",
+      "probe": "Check"
+    },
+    "toolSource": {
+      "builtin": "Built-in tools",
+      "mcp": "MCP servers",
+      "document": "Document tools",
+      "skill": "Skills",
+      "plugin": "Plugins",
+      "custom": "Custom tools",
+      "compute": "Code runner"
+    },
+    "toolKind": {
+      "read": "Reads",
+      "write": "Changes",
+      "destructive": "Deletes"
+    },
+    "toolOutcome": {
+      "done": "Done",
+      "refused": "Refused",
+      "needs_approval": "Waiting for approval",
+      "failed": "Failed",
+      "timed_out": "Timed out"
+    },
+    "requests": {
+      "title": "Requests by kind",
+      "window": "{count} request over the last {window} | {count} requests over the last {window}",
+      "empty": "No requests recorded yet. They appear here within seconds of the first chat or API call.",
+      "sortBy": "Sort by",
+      "sort": {
+        "p95_ms": "Slowest (p95)",
+        "p99_ms": "Slowest (p99)",
+        "requests": "Most requests",
+        "errors": "Most errors",
+        "busy": "Most often too busy"
+      },
+      "col": {
+        "route": "Kind",
+        "requests": "Requests",
+        "perMinute": "Per minute",
+        "errors": "Errors",
+        "busy": "Too busy",
+        "wait": "Waited for PHP (p95)"
+      },
+      "waitNotMeasured": "This server does not measure the wait for a free PHP worker.",
+      "slowestTitle": "Slowest in the last hour",
+      "slowestHint": "Open one to see where its time went. Only timings are kept, never what was asked.",
+      "slowestEmpty": "No requests in the last hour.",
+      "mostly": "Mostly {part}: {duration}",
+      "aiCalls": "AI calls",
+      "toolCalls": "Tool calls",
+      "outboundCalls": "Outbound calls",
+      "firstWord": "first word after {duration}",
+      "tokens": "{in} tokens in, {out} out",
+      "database": "No database queries | 1 database query, {duration} | {count} database queries, {duration}",
+      "requestId": "Request ID",
+      "copyId": "Copy ID",
+      "idCopied": "Request ID copied. Search the logs for it.",
+      "idCopyFailed": "The request ID could not be copied."
+    },
+    "ai": {
+      "empty": "No AI calls in the recent requests.",
+      "modelsTitle": "By provider and model",
+      "modelsHint": "From {count} AI call in the recent requests | From {count} AI calls in the recent requests",
+      "sourcesTitle": "By part of Synaplan",
+      "col": {
+        "model": "Provider · model",
+        "calls": "Calls",
+        "failures": "Failures",
+        "firstWord": "First word (p50 / p95)",
+        "duration": "Whole call (p95)",
+        "tokens": "Tokens in / out",
+        "cost": "Cost",
+        "hooks": "Hooks (p95)",
+        "source": "Asked by",
+        "share": "Share"
+      },
+      "hooksHint": "Time Synaplan itself spent around the call: checks, logging and the timeline.",
+      "legend": "The first word is when the answer started to appear. Hooks are the time Synaplan adds around each call."
+    },
+    "tools": {
+      "title": "Tool calls",
+      "hint": "How the tool calls of the recent requests ended. Which tool and what it was asked stay in the audit log.",
+      "empty": "No tool calls in the recent requests.",
+      "openApprovals": "Open Approvals ({count} waiting) | Open Approvals ({count} waiting)",
+      "failedHint": "Failed includes calls that timed out.",
+      "col": {
+        "source": "Source",
+        "kind": "Kind",
+        "calls": "Calls"
+      }
+    },
+    "outbound": {
+      "title": "Destinations",
+      "hint": "Where Synaplan called out to in the recent requests. Addresses a user typed are counted together and never listed.",
+      "empty": "No outbound calls in the recent requests.",
+      "emptyOff": "Outbound calls are not recorded while the outbound filter is off.",
+      "typed": "Addresses typed by users",
+      "openSetting": "Open the setting",
+      "mode": {
+        "off": "The outbound filter is off: every destination is allowed and outbound calls are not recorded. Set it to “report” to see where Synaplan calls out to and which calls it would refuse.",
+        "report": "The outbound filter only reports: calls it would refuse still go through and are marked here.",
+        "enforce": "The outbound filter refuses every destination that is neither built in nor on the allow list."
+      },
+      "state": {
+        "builtin": "Built in",
+        "listed": "Allowed by {rule}",
+        "notListed": "Not on the allow list",
+        "wouldBeRefused": "Would be refused",
+        "refused": "Refused",
+        "typed": "Checked when typed"
+      },
+      "col": {
+        "destination": "Destination",
+        "requests": "Calls",
+        "failures": "Errors",
+        "refused": "Refused",
+        "state": "Filter",
+        "action": "Action"
+      },
+      "allow": "Allow",
+      "allowLabel": "Allow {rule}",
+      "remove": "Remove",
+      "removeLabel": "Remove {rule} from the allow list",
+      "allowed": "{rule} is on the allow list.",
+      "removed": "{rule} is off the allow list.",
+      "removeTitle": "Remove from the allow list?",
+      "removeEnforce": "The filter refuses calls to {rule} from the next request on.",
+      "invalidRule": "That destination cannot go on the allow list.",
+      "saveFailed": "The allow list could not be saved. Try again in a moment."
     }
   }
 }

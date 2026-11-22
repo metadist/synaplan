@@ -1255,7 +1255,9 @@
         "messages_gateway_flags": "Gateway-Einstellungen geändert",
         "messages_gateway_upstream": "Gateway-Adresse geändert",
         "messages_gateway_aliases": "Modell-Aliase geändert",
-        "tool_executed": "Werkzeugaufrufe"
+        "tool_executed": "Werkzeugaufrufe",
+        "egress_allow_added": "Ausgehendes Ziel erlaubt",
+        "egress_allow_removed": "Ausgehendes Ziel entfernt"
       },
       "what": "Was passiert ist",
       "emptyNote": "Dieses Protokoll hält fest, wer was getan hat. Es öffnet keine Chat- oder Dateiinhalte.",
@@ -1755,7 +1757,8 @@
     "role": {
       "web": "Web",
       "worker": "Hintergrundarbeit",
-      "scheduler": "Geplante Aufgaben"
+      "scheduler": "Geplante Aufgaben",
+      "pump": "Auslieferung der Chat-Antworten"
     },
     "card": {
       "connectedHere": "Sie sind mit diesem Server verbunden.",
@@ -1808,6 +1811,218 @@
       "failed": "Die Ereignisse konnten nicht gelesen werden.",
       "empty": "Keine Warnungen von diesem Server in der letzten Stunde.",
       "window": "Warnungen und Fehler der letzten Stunde, neueste zuerst, höchstens 20."
+    },
+    "sizingGuide": "Anleitung zur Dimensionierung öffnen",
+    "tabs": {
+      "label": "Kapazitätsansichten",
+      "servers": "Server",
+      "requests": "Anfragen",
+      "ai": "KI-Aufrufe",
+      "tools": "Tools",
+      "outbound": "Ausgehend"
+    },
+    "reports": {
+      "loading": "Die letzten Anfragen werden gelesen…",
+      "unavailable": "Die letzten Anfragen können gerade nicht gelesen werden, weil der gemeinsame Cache nicht antwortet. Synaplan arbeitet weiter."
+    },
+    "parts": {
+      "wait": "Warten auf PHP",
+      "php": "PHP",
+      "ai": "KI",
+      "tools": "Tools",
+      "outbound": "Ausgehend",
+      "db": "Datenbank"
+    },
+    "status": {
+      "2xx": "Beantwortet",
+      "4xx": "Abgelehnt",
+      "5xx": "Fehler",
+      "busy": "Ausgelastet"
+    },
+    "egressStatus": {
+      "2xx": "OK",
+      "4xx": "Abgelehnt",
+      "5xx": "Fehler",
+      "blocked": "Vom Filter abgewiesen"
+    },
+    "routeClass": {
+      "chat_stream": "Chat-Antworten",
+      "widget_message": "Widget-Nachrichten",
+      "openai_api": "OpenAI-kompatible API",
+      "messages_api": "Messages-API",
+      "files": "Dateien",
+      "search": "Suche",
+      "admin": "Verwaltung",
+      "auth": "Anmeldung",
+      "config": "Einstellungen",
+      "mcp": "MCP-Server",
+      "webhook": "Webhooks",
+      "media": "Medien",
+      "other": "Sonstiges"
+    },
+    "aiSource": {
+      "chat_web": "Chat",
+      "chat_stream": "Chat (gestreamt)",
+      "widget": "Widget",
+      "email": "E-Mail",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "openai_api": "OpenAI-kompatible API",
+      "messages_api": "Messages-API",
+      "saved_task": "Gespeicherte Aufgaben",
+      "sorter": "Nachrichtensortierung",
+      "memory": "Erinnerungen",
+      "summary": "Zusammenfassungen",
+      "vectorize": "Dateiindexierung",
+      "rerank": "Neusortierung",
+      "media": "Medien",
+      "voice_live": "Live-Sprache",
+      "probe": "Anbieterprüfungen",
+      "system": "System"
+    },
+    "capability": {
+      "chat": "Chat",
+      "chat_stream": "Chat (gestreamt)",
+      "embed": "Embedding",
+      "embed_batch": "Embedding (Stapel)",
+      "vision": "Bilder lesen",
+      "image": "Bilderzeugung",
+      "video_start": "Videoerzeugung",
+      "video_poll": "Videostatus",
+      "transcribe": "Transkription",
+      "synthesize": "Sprachausgabe",
+      "synthesize_stream": "Sprachausgabe (gestreamt)",
+      "passthrough": "Durchleitung",
+      "voice_session": "Sprachsitzung",
+      "probe": "Prüfung"
+    },
+    "toolSource": {
+      "builtin": "Eingebaute Tools",
+      "mcp": "MCP-Server",
+      "document": "Dokument-Tools",
+      "skill": "Skills",
+      "plugin": "Plugins",
+      "custom": "Eigene Tools",
+      "compute": "Code-Ausführung"
+    },
+    "toolKind": {
+      "read": "Liest",
+      "write": "Ändert",
+      "destructive": "Löscht"
+    },
+    "toolOutcome": {
+      "done": "Erledigt",
+      "refused": "Abgelehnt",
+      "needs_approval": "Wartet auf Freigabe",
+      "failed": "Fehlgeschlagen",
+      "timed_out": "Zeitüberschreitung"
+    },
+    "requests": {
+      "title": "Anfragen nach Art",
+      "window": "{count} Anfrage in den letzten {window} | {count} Anfragen in den letzten {window}",
+      "empty": "Noch keine Anfragen erfasst. Sie erscheinen hier Sekunden nach dem ersten Chat oder API-Aufruf.",
+      "sortBy": "Sortieren nach",
+      "sort": {
+        "p95_ms": "Langsamste (p95)",
+        "p99_ms": "Langsamste (p99)",
+        "requests": "Meiste Anfragen",
+        "errors": "Meiste Fehler",
+        "busy": "Am häufigsten ausgelastet"
+      },
+      "col": {
+        "route": "Art",
+        "requests": "Anfragen",
+        "perMinute": "Pro Minute",
+        "errors": "Fehler",
+        "busy": "Ausgelastet",
+        "wait": "Wartezeit auf PHP (p95)"
+      },
+      "waitNotMeasured": "Dieser Server misst die Wartezeit auf einen freien PHP-Worker nicht.",
+      "slowestTitle": "Die langsamsten der letzten Stunde",
+      "slowestHint": "Öffnen Sie eine, um zu sehen, wohin ihre Zeit ging. Gespeichert werden nur Zeiten, nie der Inhalt.",
+      "slowestEmpty": "Keine Anfragen in der letzten Stunde.",
+      "mostly": "Vor allem {part}: {duration}",
+      "aiCalls": "KI-Aufrufe",
+      "toolCalls": "Tool-Aufrufe",
+      "outboundCalls": "Ausgehende Aufrufe",
+      "firstWord": "erstes Wort nach {duration}",
+      "tokens": "{in} Tokens hinein, {out} heraus",
+      "database": "Keine Datenbankabfragen | 1 Datenbankabfrage, {duration} | {count} Datenbankabfragen, {duration}",
+      "requestId": "Anfrage-ID",
+      "copyId": "ID kopieren",
+      "idCopied": "Anfrage-ID kopiert. Suchen Sie damit in den Logs.",
+      "idCopyFailed": "Die Anfrage-ID konnte nicht kopiert werden."
+    },
+    "ai": {
+      "empty": "Keine KI-Aufrufe in den letzten Anfragen.",
+      "modelsTitle": "Nach Anbieter und Modell",
+      "modelsHint": "Aus {count} KI-Aufruf der letzten Anfragen | Aus {count} KI-Aufrufen der letzten Anfragen",
+      "sourcesTitle": "Nach Bereich von Synaplan",
+      "col": {
+        "model": "Anbieter · Modell",
+        "calls": "Aufrufe",
+        "failures": "Fehler",
+        "firstWord": "Erstes Wort (p50 / p95)",
+        "duration": "Ganzer Aufruf (p95)",
+        "tokens": "Tokens hinein / heraus",
+        "cost": "Kosten",
+        "hooks": "Hooks (p95)",
+        "source": "Angefragt von",
+        "share": "Anteil"
+      },
+      "hooksHint": "Zeit, die Synaplan selbst um den Aufruf herum braucht: Prüfungen, Protokoll und Zeitleiste.",
+      "legend": "Das erste Wort ist der Moment, in dem die Antwort zu erscheinen beginnt. Hooks sind die Zeit, die Synaplan um jeden Aufruf ergänzt."
+    },
+    "tools": {
+      "title": "Tool-Aufrufe",
+      "hint": "Wie die Tool-Aufrufe der letzten Anfragen endeten. Welches Tool und was es tun sollte, steht im Audit-Log.",
+      "empty": "Keine Tool-Aufrufe in den letzten Anfragen.",
+      "openApprovals": "Freigaben öffnen ({count} wartet) | Freigaben öffnen ({count} warten)",
+      "failedHint": "Fehlgeschlagen enthält auch Aufrufe mit Zeitüberschreitung.",
+      "col": {
+        "source": "Quelle",
+        "kind": "Art",
+        "calls": "Aufrufe"
+      }
+    },
+    "outbound": {
+      "title": "Ziele",
+      "hint": "Wohin Synaplan in den letzten Anfragen hinaus verbunden hat. Von Nutzern eingegebene Adressen werden zusammengezählt und nie aufgelistet.",
+      "empty": "Keine ausgehenden Aufrufe in den letzten Anfragen.",
+      "emptyOff": "Solange der Ausgangsfilter aus ist, werden ausgehende Aufrufe nicht aufgezeichnet.",
+      "typed": "Von Nutzern eingegebene Adressen",
+      "openSetting": "Einstellung öffnen",
+      "mode": {
+        "off": "Der Ausgangsfilter ist aus: Jedes Ziel ist erlaubt, und ausgehende Aufrufe werden nicht aufgezeichnet. Stellen Sie ihn auf „report“, um zu sehen, wohin Synaplan Aufrufe sendet und welche er abweisen würde.",
+        "report": "Der Ausgangsfilter meldet nur: Aufrufe, die er abweisen würde, gehen trotzdem durch und sind hier markiert.",
+        "enforce": "Der Ausgangsfilter weist jedes Ziel ab, das weder eingebaut noch auf der Erlaubnisliste ist."
+      },
+      "state": {
+        "builtin": "Eingebaut",
+        "listed": "Erlaubt durch {rule}",
+        "notListed": "Nicht auf der Erlaubnisliste",
+        "wouldBeRefused": "Würde abgewiesen",
+        "refused": "Abgewiesen",
+        "typed": "Bei Eingabe geprüft"
+      },
+      "col": {
+        "destination": "Ziel",
+        "requests": "Aufrufe",
+        "failures": "Fehler",
+        "refused": "Abgewiesen",
+        "state": "Filter",
+        "action": "Aktion"
+      },
+      "allow": "Erlauben",
+      "allowLabel": "{rule} erlauben",
+      "remove": "Entfernen",
+      "removeLabel": "{rule} von der Erlaubnisliste entfernen",
+      "allowed": "{rule} steht auf der Erlaubnisliste.",
+      "removed": "{rule} ist nicht mehr auf der Erlaubnisliste.",
+      "removeTitle": "Von der Erlaubnisliste entfernen?",
+      "removeEnforce": "Der Filter weist Aufrufe an {rule} ab der nächsten Anfrage ab.",
+      "invalidRule": "Dieses Ziel kann nicht auf die Erlaubnisliste.",
+      "saveFailed": "Die Erlaubnisliste konnte nicht gespeichert werden. Versuchen Sie es gleich noch einmal."
     }
   }
 }

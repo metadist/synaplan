@@ -1255,7 +1255,9 @@
         "messages_gateway_flags": "Réglages de la passerelle modifiés",
         "messages_gateway_upstream": "Adresse de la passerelle modifiée",
         "messages_gateway_aliases": "Alias de modèles modifiés",
-        "tool_executed": "Appels d'outils"
+        "tool_executed": "Appels d'outils",
+        "egress_allow_added": "Destination sortante autorisée",
+        "egress_allow_removed": "Destination sortante retirée"
       },
       "what": "Ce qui s’est passé",
       "emptyNote": "Ce journal indique qui a fait quoi. Il n’ouvre pas le contenu des chats ni des fichiers.",
@@ -1755,7 +1757,8 @@
     "role": {
       "web": "Web",
       "worker": "Travail en arrière-plan",
-      "scheduler": "Tâches planifiées"
+      "scheduler": "Tâches planifiées",
+      "pump": "Livraison des réponses du chat"
     },
     "card": {
       "connectedHere": "Vous êtes connecté à ce serveur.",
@@ -1808,6 +1811,218 @@
       "failed": "Les événements n’ont pas pu être lus.",
       "empty": "Aucun avertissement de ce serveur depuis une heure.",
       "window": "Avertissements et erreurs de la dernière heure, du plus récent au plus ancien, 20 au plus."
+    },
+    "sizingGuide": "Ouvrir le guide de dimensionnement",
+    "tabs": {
+      "label": "Vues de capacité",
+      "servers": "Serveurs",
+      "requests": "Requêtes",
+      "ai": "Appels IA",
+      "tools": "Outils",
+      "outbound": "Sortant"
+    },
+    "reports": {
+      "loading": "Lecture des requêtes récentes…",
+      "unavailable": "Les requêtes récentes ne peuvent pas être lues pour le moment, car le cache partagé ne répond pas. Synaplan continue de fonctionner."
+    },
+    "parts": {
+      "wait": "Attente de PHP",
+      "php": "PHP",
+      "ai": "IA",
+      "tools": "Outils",
+      "outbound": "Sortant",
+      "db": "Base de données"
+    },
+    "status": {
+      "2xx": "Répondue",
+      "4xx": "Rejetée",
+      "5xx": "Erreur",
+      "busy": "Trop occupé"
+    },
+    "egressStatus": {
+      "2xx": "OK",
+      "4xx": "Rejetée",
+      "5xx": "Erreur",
+      "blocked": "Refusée par le filtre"
+    },
+    "routeClass": {
+      "chat_stream": "Réponses du chat",
+      "widget_message": "Messages du widget",
+      "openai_api": "API compatible OpenAI",
+      "messages_api": "API Messages",
+      "files": "Fichiers",
+      "search": "Recherche",
+      "admin": "Administration",
+      "auth": "Connexion",
+      "config": "Paramètres",
+      "mcp": "Serveur MCP",
+      "webhook": "Webhooks",
+      "media": "Médias",
+      "other": "Autres"
+    },
+    "aiSource": {
+      "chat_web": "Chat",
+      "chat_stream": "Chat (en flux)",
+      "widget": "Widget",
+      "email": "E-mail",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "openai_api": "API compatible OpenAI",
+      "messages_api": "API Messages",
+      "saved_task": "Tâches enregistrées",
+      "sorter": "Tri des messages",
+      "memory": "Souvenirs",
+      "summary": "Résumés",
+      "vectorize": "Indexation des fichiers",
+      "rerank": "Reclassement",
+      "media": "Médias",
+      "voice_live": "Voix en direct",
+      "probe": "Vérifications des fournisseurs",
+      "system": "Système"
+    },
+    "capability": {
+      "chat": "Chat",
+      "chat_stream": "Chat (en flux)",
+      "embed": "Embedding",
+      "embed_batch": "Embedding (lot)",
+      "vision": "Lecture d’images",
+      "image": "Création d’images",
+      "video_start": "Création de vidéo",
+      "video_poll": "État de la vidéo",
+      "transcribe": "Transcription",
+      "synthesize": "Synthèse vocale",
+      "synthesize_stream": "Synthèse vocale (en flux)",
+      "passthrough": "Relais direct",
+      "voice_session": "Session vocale",
+      "probe": "Vérification"
+    },
+    "toolSource": {
+      "builtin": "Outils intégrés",
+      "mcp": "Serveurs MCP",
+      "document": "Outils de documents",
+      "skill": "Compétences",
+      "plugin": "Plugins",
+      "custom": "Outils personnalisés",
+      "compute": "Exécution de code"
+    },
+    "toolKind": {
+      "read": "Lit",
+      "write": "Modifie",
+      "destructive": "Supprime"
+    },
+    "toolOutcome": {
+      "done": "Terminé",
+      "refused": "Refusé",
+      "needs_approval": "En attente d’approbation",
+      "failed": "Échoué",
+      "timed_out": "Délai dépassé"
+    },
+    "requests": {
+      "title": "Requêtes par type",
+      "window": "{count} requête sur les dernières {window} | {count} requêtes sur les dernières {window}",
+      "empty": "Aucune requête enregistrée pour l’instant. Elles apparaissent ici quelques secondes après le premier chat ou appel d’API.",
+      "sortBy": "Trier par",
+      "sort": {
+        "p95_ms": "Plus lentes (p95)",
+        "p99_ms": "Plus lentes (p99)",
+        "requests": "Plus de requêtes",
+        "errors": "Plus d’erreurs",
+        "busy": "Le plus souvent occupé"
+      },
+      "col": {
+        "route": "Type",
+        "requests": "Requêtes",
+        "perMinute": "Par minute",
+        "errors": "Erreurs",
+        "busy": "Trop occupé",
+        "wait": "Attente de PHP (p95)"
+      },
+      "waitNotMeasured": "Ce serveur ne mesure pas l’attente d’un worker PHP libre.",
+      "slowestTitle": "Les plus lentes de la dernière heure",
+      "slowestHint": "Ouvrez-en une pour voir où son temps est passé. Seuls les temps sont conservés, jamais ce qui a été demandé.",
+      "slowestEmpty": "Aucune requête dans la dernière heure.",
+      "mostly": "Surtout {part} : {duration}",
+      "aiCalls": "Appels IA",
+      "toolCalls": "Appels d’outils",
+      "outboundCalls": "Appels sortants",
+      "firstWord": "premier mot après {duration}",
+      "tokens": "{in} tokens en entrée, {out} en sortie",
+      "database": "Aucune requête en base de données | 1 requête en base de données, {duration} | {count} requêtes en base de données, {duration}",
+      "requestId": "ID de requête",
+      "copyId": "Copier l’ID",
+      "idCopied": "ID de requête copié. Recherchez-le dans les journaux.",
+      "idCopyFailed": "L’ID de requête n’a pas pu être copié."
+    },
+    "ai": {
+      "empty": "Aucun appel IA dans les requêtes récentes.",
+      "modelsTitle": "Par fournisseur et modèle",
+      "modelsHint": "Sur {count} appel IA des requêtes récentes | Sur {count} appels IA des requêtes récentes",
+      "sourcesTitle": "Par partie de Synaplan",
+      "col": {
+        "model": "Fournisseur · modèle",
+        "calls": "Appels",
+        "failures": "Échecs",
+        "firstWord": "Premier mot (p50 / p95)",
+        "duration": "Appel complet (p95)",
+        "tokens": "Tokens entrée / sortie",
+        "cost": "Coût",
+        "hooks": "Hooks (p95)",
+        "source": "Demandé par",
+        "share": "Part"
+      },
+      "hooksHint": "Temps passé par Synaplan autour de l’appel : contrôles, journalisation et chronologie.",
+      "legend": "Le premier mot est le moment où la réponse a commencé à s’afficher. Les hooks sont le temps que Synaplan ajoute à chaque appel."
+    },
+    "tools": {
+      "title": "Appels d’outils",
+      "hint": "Comment se sont terminés les appels d’outils des requêtes récentes. L’outil et ce qui lui a été demandé restent dans le journal d’audit.",
+      "empty": "Aucun appel d’outil dans les requêtes récentes.",
+      "openApprovals": "Ouvrir les approbations ({count} en attente) | Ouvrir les approbations ({count} en attente)",
+      "failedHint": "Échoué inclut les appels dont le délai est dépassé.",
+      "col": {
+        "source": "Source",
+        "kind": "Type",
+        "calls": "Appels"
+      }
+    },
+    "outbound": {
+      "title": "Destinations",
+      "hint": "Où Synaplan s’est connecté dans les requêtes récentes. Les adresses saisies par un utilisateur sont comptées ensemble et jamais listées.",
+      "empty": "Aucun appel sortant dans les requêtes récentes.",
+      "emptyOff": "Les appels sortants ne sont pas enregistrés tant que le filtre sortant est désactivé.",
+      "typed": "Adresses saisies par les utilisateurs",
+      "openSetting": "Ouvrir le paramètre",
+      "mode": {
+        "off": "Le filtre sortant est désactivé : toute destination est autorisée et les appels sortants ne sont pas enregistrés. Passez-le sur « report » pour voir où Synaplan envoie ses appels et lesquels il refuserait.",
+        "report": "Le filtre sortant signale seulement : les appels qu’il refuserait passent quand même et sont marqués ici.",
+        "enforce": "Le filtre sortant refuse toute destination qui n’est ni intégrée ni sur la liste d’autorisation."
+      },
+      "state": {
+        "builtin": "Intégrée",
+        "listed": "Autorisée par {rule}",
+        "notListed": "Pas sur la liste d’autorisation",
+        "wouldBeRefused": "Serait refusée",
+        "refused": "Refusée",
+        "typed": "Vérifiée à la saisie"
+      },
+      "col": {
+        "destination": "Destination",
+        "requests": "Appels",
+        "failures": "Erreurs",
+        "refused": "Refusés",
+        "state": "Filtre",
+        "action": "Action"
+      },
+      "allow": "Autoriser",
+      "allowLabel": "Autoriser {rule}",
+      "remove": "Retirer",
+      "removeLabel": "Retirer {rule} de la liste d’autorisation",
+      "allowed": "{rule} est sur la liste d’autorisation.",
+      "removed": "{rule} n’est plus sur la liste d’autorisation.",
+      "removeTitle": "Retirer de la liste d’autorisation ?",
+      "removeEnforce": "Le filtre refusera les appels vers {rule} dès la prochaine requête.",
+      "invalidRule": "Cette destination ne peut pas aller sur la liste d’autorisation.",
+      "saveFailed": "La liste d’autorisation n’a pas pu être enregistrée. Réessayez dans un instant."
     }
   }
 }

@@ -295,6 +295,15 @@
 
     /* Telegram channel mark. Dark ink on light cards (6.4:1 on #f5f5f5). */
     --channel-telegram: #0b5f86;
+
+    /* Where one request's time went (Admin › Capacity › Requests). Each part
+       is >= 4.5:1 on a white card; the legend repeats every part as text. */
+    --part-wait: #b45309;
+    --part-php: #475569;
+    --part-ai: #003fc7;
+    --part-tools: #7c3aed;
+    --part-outbound: #0f766e;
+    --part-db: #be185d;
   }
 
   /* OLED black sits on top of `.dark`: page and sidebar are pure black,
@@ -379,6 +388,14 @@
     --usage-track: rgba(109, 154, 224, 0.18);
     --usage-epoch-a: #6d9ae0;
     --usage-epoch-b: #93c5fd;
+
+    /* Request parts — dark theme, each >= 4.5:1 on #172133. */
+    --part-wait: #fbbf24;
+    --part-php: #94a3b8;
+    --part-ai: #6d9ae0;
+    --part-tools: #c4b5fd;
+    --part-outbound: #5eead4;
+    --part-db: #f9a8d4;
 
     /* Subscription tiers — dark theme. The accents lighten so they stay visible
        on the dark card, which flips `--plan-on-accent` to a dark ink. */

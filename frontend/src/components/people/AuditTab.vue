@@ -139,6 +139,8 @@ const ACTION_KEYS: Record<string, string> = {
   'messages_gateway.flags': 'people.audit.action.messages_gateway_flags',
   'messages_gateway.upstream': 'people.audit.action.messages_gateway_upstream',
   'messages_gateway.aliases': 'people.audit.action.messages_gateway_aliases',
+  'egress.allow_added': 'people.audit.action.egress_allow_added',
+  'egress.allow_removed': 'people.audit.action.egress_allow_removed',
   'tool.executed': 'people.audit.action.tool_executed',
 }
 

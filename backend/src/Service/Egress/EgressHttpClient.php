@@ -528,7 +528,7 @@ final class EgressHttpClient implements HttpClientInterface
         $ms = (int) ((hrtime(true) - $started) / 1_000_000);
         $this->metrics->record($this->policy->metricDestination($url, $options), $outcome, $ms);
         if (null !== $this->timeline && $this->timeline->isStarted()) {
-            $this->timeline->recordEgress($url, 'refused' === $outcome ? 0 : $status, $ms);
+            $this->timeline->recordEgress($url, 'refused' === $outcome ? 0 : $status, $ms, EgressCall::isTyped($options));
         }
     }
 
