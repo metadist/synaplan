@@ -63,6 +63,8 @@ export const getProviderIcon = (provider: string): string => {
     return 'mdi:transit-connection-variant'
   } else if (providerLower.includes('scaleway')) {
     return 'simple-icons:scaleway'
+  } else if (providerCompact.includes('llmtr')) {
+    return 'mdi:robot-outline'
   }
 
   return 'mdi:robot'
@@ -107,6 +109,9 @@ export const getProviderFlag = (provider: string): string => {
   } else if (p.replace(/[\s_-]/g, '').includes('a2agent')) {
     // Mainland-China model vendors behind the A2Agent gateway.
     return 'circle-flags:cn'
+  } else if (p.replace(/[\s_-]/g, '').includes('llmtr')) {
+    // LLMTR's own rows run on servers in Turkey.
+    return 'circle-flags:tr'
   } else if (p.includes('mistral') || p.includes('scaleway')) {
     // Scaleway Generative APIs run in Paris. Every model on that provider
     // is French infrastructure, including Llama, Qwen and Whisper rows.

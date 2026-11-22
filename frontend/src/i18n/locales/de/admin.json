@@ -1096,6 +1096,10 @@
       "title": "Scaleway-API-Schlüssel",
       "message": "Erstelle einen Secret Key in der Scaleway-Konsole (IAM → API-Schlüssel) und füge ihn hier ein. Damit stehen die Generative APIs bereit, die in Paris gehostet werden. Prompts werden von Scaleway in Frankreich verarbeitet."
     },
+    "llmtr": {
+      "title": "LLMTR-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel bei LLMTR und füge ihn hier ein. Damit stehen in der Türkei gehostete Modelle bereit (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Prompts für diese Modelle werden in der Türkei verarbeitet."
+    },
     "huggingface": {
       "title": "HuggingFace-API-Token",
       "message": "Erstelle ein Access-Token in den HuggingFace-Einstellungen und füge es hier ein, um HuggingFace-Inference-Modelle zu nutzen."
