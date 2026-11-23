@@ -6,6 +6,12 @@
 
 Build agents on your own documents and put them wherever work happens: web, WhatsApp, email, Outlook, Nextcloud and ownCloud. Mix local models with the best cloud AI, see what every answer costs, and decide what the AI is allowed to do – open source, on your server or ours.
 
+<p align="center">
+  <img src="docs/images/synaplan-product.gif" alt="Synaplan in about 30 seconds: a chat answer and its cost, ready-made agents, models with a cost on each one, then WhatsApp, email, Outlook, Nextcloud and ownCloud" width="100%">
+</p>
+
+<p align="center"><sub>A chat answer and its cost, agents, the model for each job, then the apps it connects to.</sub></p>
+
 [**Run it in up to five minutes**](#quickstart) &nbsp;·&nbsp; [**Try it hosted**](https://web.synaplan.com/) &nbsp;·&nbsp; [**Docs**](https://docs.synaplan.com/) &nbsp;·&nbsp; [**Discord**](https://discord.com/invite/kQB3eDjWfF)
 
 [![Latest release](https://img.shields.io/github/v/release/metadist/synaplan)](https://github.com/metadist/synaplan/releases)
@@ -16,15 +22,7 @@ Build agents on your own documents and put them wherever work happens: web, What
 
 </div>
 
-<p align="center">
-  <img src="docs/images/synaplan-admin-tour.gif" alt="A thirty-second tour of Synaplan: a chat answer and its cost, default models with cost badges, the file library, generated images and audio, and connected apps" width="100%">
-</p>
-
-<p align="center"><sub>Chat, the cost of every answer, your files, generated media and connected apps – in about 30 seconds.</sub></p>
-
 <p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a></p>
-
-<!-- The GIF above is docs/images/synaplan-admin-tour.gif. scripts/build-readme-tour.sh rebuilds the tour film and stills. -->
 
 ---
 
