@@ -43,6 +43,7 @@ class AppleAuthController extends AbstractController
 {
     private const APPLE_AUTH_URL = 'https://appleid.apple.com/auth/authorize';
     private const APPLE_TOKEN_URL = 'https://appleid.apple.com/auth/token';
+    private const PLACEHOLDER_MAIL_SUFFIX = '@privaterelay.appleid.local';
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -144,7 +145,7 @@ class AppleAuthController extends AbstractController
 
             $claims = $this->identityTokenVerifier->verify($identityToken);
             $profile = $this->parseUserField($userField);
-            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $statePayload, ClientAddress::resolve($request));
+            $this->signupGate->assertAppleSignup($claims['sub'], self::verifiedEmail($claims), $statePayload, ClientAddress::resolve($request));
             $user = $this->findOrCreateUser(
                 $claims,
                 $profile,
@@ -178,7 +179,7 @@ class AppleAuthController extends AbstractController
                 new OA\Property(property: 'identityToken', type: 'string', description: 'Apple identity token (JWT) from the native sign-in'),
                 new OA\Property(property: 'firstName', type: 'string', nullable: true, description: 'Given name, only present on the first authorization'),
                 new OA\Property(property: 'lastName', type: 'string', nullable: true, description: 'Family name, only present on the first authorization'),
-                new OA\Property(property: 'email', type: 'string', nullable: true, description: 'Email, only present on the first authorization'),
+                new OA\Property(property: 'email', type: 'string', nullable: true, description: 'Not used. The account address is read from the identity token only.'),
                 new OA\Property(property: 'language', type: 'string', nullable: true, description: 'UI language used during signup (de, en, es, fr, tr).', example: 'de'),
             ]
         )
@@ -215,7 +216,7 @@ class AppleAuthController extends AbstractController
 
         // MOBILE-APP SEAM: no browser challenge on the native sheet — only the signup limits and pause switch apply.
         try {
-            $this->signupGate->assertAppleSignup($claims['sub'], $claims['email'] ?? $profile['email'], $nativeAdmission = $this->nativeAdmission($body), ClientAddress::resolve($request), true);
+            $this->signupGate->assertAppleSignup($claims['sub'], self::verifiedEmail($claims), $nativeAdmission = $this->nativeAdmission($body), ClientAddress::resolve($request), true);
             $user = $this->findOrCreateUser($claims, $profile, AccountLanguage::normalize($body['language'] ?? null), $nativeAdmission);
         } catch (SignupBlockedException $e) {
             return new JsonResponse(['success' => false, 'error' => $e->getMessage(), 'code' => $e->getReasonCode()], $e->getHttpStatus());
@@ -320,36 +321,36 @@ class AppleAuthController extends AbstractController
     private function findOrCreateUser(array $claims, array $profile, ?string $signupLanguage = null, array $admissionState = []): User
     {
         $appleSub = $claims['sub'];
-        $email = $claims['email'] ?? $profile['email'];
+        $email = self::verifiedEmail($claims);
 
-        // The stable key is Apple's `sub` (survives private-relay email changes);
-        // fall back to email only for accounts created via another provider.
+        // The stable key is Apple's `sub` (survives private-relay email changes).
+        // An account created through another door is matched only by an address
+        // Apple signed as verified. The address a client sends next to the token
+        // is not proof of anything and never selects an account.
         $user = $this->userRepository->findByAppleSub($appleSub);
-        if (!$user && null !== $email && '' !== $email) {
+        if (!$user && null !== $email) {
             $user = $this->userRepository->findOneBy(['mail' => $email]);
         }
 
         $isNewUser = false;
+        $appleEmail = $email;
 
         if ($user) {
             if ($user->isManagedExternally()) {
                 throw new \RuntimeException('Apple Sign-In is not allowed for an organization-managed account');
             }
         } else {
-            // Apple may withhold the email on later logins; when it never gave us
+            // Apple may withhold the email on later logins; without a verified
             // one, synthesize a stable placeholder from the immutable subject.
-            if (null === $email || '' === $email) {
-                $email = $appleSub.'@privaterelay.appleid.local';
-            }
-
             $isNewUser = true;
-            $user = $this->signupGate->createAccount(SignupDoor::Apple, $email, $claims['emailVerified']);
+            $appleEmail ??= $appleSub.self::PLACEHOLDER_MAIL_SUFFIX;
+            $user = $this->signupGate->createAccount(SignupDoor::Apple, $appleEmail, null !== $email);
         }
 
         $details = $user->getUserDetails();
         $details['apple_sub'] = $appleSub;
-        if (null !== $email) {
-            $details['apple_email'] = $email;
+        if (null !== $appleEmail) {
+            $details['apple_email'] = $appleEmail;
         }
         $details['apple_is_private_email'] = $claims['isPrivateEmail'];
         $details['apple_last_login'] = (new \DateTime())->format('Y-m-d H:i:s');
@@ -368,13 +369,26 @@ class AppleAuthController extends AbstractController
             $user->applySignupLanguage($signupLanguage);
         }
 
-        if (!$user->isEmailVerified() && $claims['emailVerified']) {
+        if (!$user->isEmailVerified() && null !== $email) {
             $user->setEmailVerified(true);
         }
 
         $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
 
         return $user;
+    }
+
+    /**
+     * The address Apple vouches for: present in the signed token and marked
+     * verified there. Anything else is treated as no address at all.
+     *
+     * @param array{sub: string, email: ?string, emailVerified: bool, isPrivateEmail: bool} $claims
+     */
+    private static function verifiedEmail(array $claims): ?string
+    {
+        $email = $claims['email'];
+
+        return $claims['emailVerified'] && null !== $email && '' !== $email ? $email : null;
     }
 
     private function extractFirstName(User $user): ?string
