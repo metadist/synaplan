@@ -31,6 +31,10 @@ final class Gemini4ModelsTest extends TestCase
             ['google:gemini-4-carbon:chat'],
             ['google:gemini-4-argon:pic2text'],
             ['GEMINI-4-HYDROGEN'],
+            ['gemini-4-neon'],
+            ['models/gemini-4-neon'],
+            ['google:gemini-4-neon:pic2text'],
+            ['GEMINI-4-NEON'],
         ];
     }
 
@@ -55,6 +59,10 @@ final class Gemini4ModelsTest extends TestCase
             ['gemini-4-hydrogen-preview'],
             ['gemini-4-hydrogenx'],
             ['custom-gemini-4-hydrogen'],
+            ['gemini-4-neon-cyber'],
+            ['gemini-4-neon-preview'],
+            ['gemini-4-neonx'],
+            ['custom-gemini-4-neon'],
             ['gemini-4-carbon-preview'],
             ['gemini-4-carbonx'],
             ['custom-gemini-4-carbon'],
@@ -78,6 +86,11 @@ final class Gemini4ModelsTest extends TestCase
         self::assertSame('high', Gemini4Models::thinkingLevel('xhigh', 'gemini-4-carbon'));
         self::assertSame('high', Gemini4Models::thinkingLevel('max', 'gemini-4-hydrogen-cyber'));
         self::assertNull(Gemini4Models::thinkingLevel('minimal', 'gemini-4-hydrogen'));
+        self::assertSame('xhigh', Gemini4Models::thinkingLevel('xhigh', 'gemini-4-neon'));
+        self::assertSame('xhigh', Gemini4Models::thinkingLevel('max', 'google:gemini-4-neon:chat'));
+        self::assertSame('high', Gemini4Models::thinkingLevel('xhigh', 'gemini-4-neon-preview'));
+        self::assertSame('low', Gemini4Models::thinkingLevel('none', 'gemini-4-neon'));
+        self::assertNull(Gemini4Models::thinkingLevel('minimal', 'gemini-4-neon'));
     }
 
     public function testThinkingLevelFromMessagesRequestMapsDisabledEffortAndBudget(): void
@@ -122,6 +135,12 @@ final class Gemini4ModelsTest extends TestCase
         self::assertSame('high', Gemini4Models::thinkingLevelFromMessagesRequest([
             'thinking' => ['type' => 'enabled', 'budget_tokens' => 32768],
         ], 'gemini-4-hydrogen-cyber'));
+        self::assertSame('xhigh', Gemini4Models::thinkingLevelFromMessagesRequest([
+            'thinking' => ['type' => 'enabled', 'budget_tokens' => 32768],
+        ], 'gemini-4-neon'));
+        self::assertSame('high', Gemini4Models::thinkingLevelFromMessagesRequest([
+            'thinking' => ['type' => 'enabled', 'budget_tokens' => 32768],
+        ], 'gemini-4-neon-cyber'));
         self::assertNull(Gemini4Models::thinkingLevelFromMessagesRequest([
             'thinking' => ['type' => 'adaptive'],
         ]));
