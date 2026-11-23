@@ -166,4 +166,76 @@ final class SsrfGuardTest extends TestCase
             self::assertTrue($this->guard->isBlockedHost($host, allowOperatorNetwork: true), "blocked even with operator network: {$host}");
         }
     }
+
+    /**
+     * Spellings the resolver does not answer for but the HTTP client dials
+     * as an internal address: hex, octal, short and integer IPv4, digits and
+     * dots IDNA maps to ASCII, a trailing root dot.
+     *
+     * @return list<array{0: string}>
+     */
+    public static function disguisedInternalHosts(): array
+    {
+        return [
+            ['0x7f.0x0.0x0.0x1'],
+            ['0x7f.1'],
+            ['0x7f.0.0.1'],
+            ['0177.0.0.1'],
+            ['0xac.0x12.0x0.0xb'],
+            ['0xa9.0xfe.0xa9.0xfe'],
+            ['2130706433'],
+            ['127.1'],
+            ['0x7f000001'],
+            ['①②⑦.0.0.1'],
+            ['127。0。0。1'],
+            ['１２７.０.０.１'],
+            ['127.0.0.1.'],
+            ['localhost.'],
+            ['[::ffff:127.0.0.1]'],
+            ['[::ffff:7f00:1]'],
+            ['[64:ff9b::7f00:1]'],
+            ['[64:ff9b::a9fe:a9fe]'],
+            ['[64:ff9b::a00:1]'],
+        ];
+    }
+
+    #[DataProvider('disguisedInternalHosts')]
+    public function testBlocksInternalAddressesInAnySpelling(string $host): void
+    {
+        self::assertTrue($this->guard->isBlockedHost($host), "expected blocked host: {$host}");
+        self::assertTrue($this->guard->isBlockedUrl('http://'.$host.':6333/collections'), "expected blocked URL: {$host}");
+        self::assertSame([], $this->guard->pinnedIps($host), "nothing to pin: {$host}");
+    }
+
+    public function testAnUnreadableSpellingStaysBlockedForAnOperator(): void
+    {
+        foreach (['0x7f.1', '0xac.0x12.0x0.0xb', '2130706433', '127.1'] as $host) {
+            self::assertTrue($this->guard->isBlockedHost($host, allowOperatorNetwork: true), "blocked for an operator: {$host}");
+            self::assertSame([], $this->guard->pinnedIps($host, allowOperatorNetwork: true), "nothing to pin: {$host}");
+        }
+    }
+
+    public function testRefusesANameWithoutAnAddress(): void
+    {
+        self::assertTrue($this->guard->isBlockedHost('no-such-host.invalid'));
+        self::assertTrue($this->guard->isBlockedHost('no-such-host.invalid', allowOperatorNetwork: true));
+        self::assertTrue($this->guard->isBlockedUrl('https://no-such-host.invalid/page'));
+        self::assertSame([], $this->guard->pinnedIps('no-such-host.invalid'));
+        self::assertSame([], $this->guard->pinnedResolveOption('https://no-such-host.invalid/page'));
+    }
+
+    public function testNat64LiteralFollowsTheEmbeddedIpv4Address(): void
+    {
+        self::assertTrue($this->guard->isBlockedIp('64:ff9b::7f00:1'));
+        self::assertTrue($this->guard->isBlockedIp('64:ff9b::c0a8:101'));
+        self::assertTrue($this->guard->isBlockedIp('64:ff9b::a00:1', allowOperatorNetwork: true));
+        self::assertFalse($this->guard->isBlockedIp('64:ff9b::808:808'));
+    }
+
+    public function testFullWidthSpellingOfAPublicAddressIsReadAsThatAddress(): void
+    {
+        self::assertFalse($this->guard->isBlockedHost('８.８.８.８'));
+        self::assertSame(['8.8.8.8'], $this->guard->pinnedIps('８.８.８.８'));
+        self::assertFalse($this->guard->isBlockedHost('8.8.8.8.'));
+    }
 }

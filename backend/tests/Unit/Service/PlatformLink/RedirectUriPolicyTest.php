@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\PlatformLink;
 
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
 use App\Service\PlatformLink\RedirectUriPolicy;
+use App\Service\Security\FixtureHostResolver;
 use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -17,7 +18,7 @@ final class RedirectUriPolicyTest extends TestCase
 
     protected function setUp(): void
     {
-        $guard = new SsrfGuard();
+        $guard = new SsrfGuard(new FixtureHostResolver());
         $this->prod = new RedirectUriPolicy($guard, 'prod');
         $this->dev = new RedirectUriPolicy($guard, 'dev');
     }

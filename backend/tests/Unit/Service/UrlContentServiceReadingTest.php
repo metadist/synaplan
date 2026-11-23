@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service;
 
 use App\Service\Research\UrlContentService;
+use App\Service\Security\FixtureHostResolver;
 use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -52,7 +53,7 @@ final class UrlContentServiceReadingTest extends TestCase
             };
         });
 
-        $result = (new UrlContentService($client, new SsrfGuard(), new NullLogger()))->fetchForReading('https://short.example/abc');
+        $result = (new UrlContentService($client, new SsrfGuard(new FixtureHostResolver()), new NullLogger()))->fetchForReading('https://short.example/abc');
 
         self::assertTrue($result->success);
         self::assertSame('https://short.example/abc', $result->url, 'the URL the user gave stays the citation key');
@@ -74,7 +75,7 @@ final class UrlContentServiceReadingTest extends TestCase
             return new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => 'http://169.254.169.254/latest/meta-data/']]);
         });
 
-        $result = (new UrlContentService($client, new SsrfGuard(), new NullLogger()))->fetchForReading('https://public.example.com/go');
+        $result = (new UrlContentService($client, new SsrfGuard(new FixtureHostResolver()), new NullLogger()))->fetchForReading('https://public.example.com/go');
 
         self::assertFalse($result->success);
         self::assertSame('blocked_address', $result->blockedReason);
@@ -89,7 +90,7 @@ final class UrlContentServiceReadingTest extends TestCase
             return new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => $target]]);
         });
 
-        $result = (new UrlContentService($client, new SsrfGuard(), new NullLogger()))->fetchForReading('https://loop.example.com/a');
+        $result = (new UrlContentService($client, new SsrfGuard(new FixtureHostResolver()), new NullLogger()))->fetchForReading('https://loop.example.com/a');
 
         self::assertFalse($result->success);
         self::assertSame('redirect_loop', $result->blockedReason);
@@ -116,7 +117,7 @@ final class UrlContentServiceReadingTest extends TestCase
             };
         });
 
-        $result = (new UrlContentService($client, new SsrfGuard(), new NullLogger()))->fetchForReading('https://lnkd.in/p/d_-_Y6Ye');
+        $result = (new UrlContentService($client, new SsrfGuard(new FixtureHostResolver()), new NullLogger()))->fetchForReading('https://lnkd.in/p/d_-_Y6Ye');
 
         self::assertTrue($result->success);
         self::assertSame('https://www.handelsblatt.com/politik/uae-investiert-40-milliarden/', $result->finalUrl);
@@ -136,7 +137,7 @@ final class UrlContentServiceReadingTest extends TestCase
             default => new MockResponse('unexpected '.$url, ['http_code' => 500]),
         });
 
-        $result = (new UrlContentService($client, new SsrfGuard(), new NullLogger()))->fetchForReading('https://go.example.com/x');
+        $result = (new UrlContentService($client, new SsrfGuard(new FixtureHostResolver()), new NullLogger()))->fetchForReading('https://go.example.com/x');
 
         self::assertTrue($result->success);
         self::assertSame('https://www.example.com/landing', $result->finalUrl);
@@ -221,7 +222,7 @@ final class UrlContentServiceReadingTest extends TestCase
             return new MockResponse('<html><body><p>'.str_repeat('Some page text. ', 30).'</p></body></html>', ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]);
         });
 
-        $results = (new UrlContentService($client, new SsrfGuard(), new NullLogger()))->fetchManyForReading([
+        $results = (new UrlContentService($client, new SsrfGuard(new FixtureHostResolver()), new NullLogger()))->fetchManyForReading([
             'https://a.example.com/',
             'https://a.example.com/',
             'https://b.example.com/',
@@ -239,7 +240,7 @@ final class UrlContentServiceReadingTest extends TestCase
             'https://s.example/1' => new MockResponse('', ['http_code' => 302, 'response_headers' => ['location' => 'https://www.example.com/full']]),
             default => new MockResponse($body, ['http_code' => 200, 'response_headers' => ['content-type' => 'text/html']]),
         });
-        $service = new UrlContentService($client, new SsrfGuard(), new NullLogger());
+        $service = new UrlContentService($client, new SsrfGuard(new FixtureHostResolver()), new NullLogger());
 
         $prompt = $service->formatForPrompt([$service->fetchForReading('https://s.example/1')]);
 
@@ -254,7 +255,7 @@ final class UrlContentServiceReadingTest extends TestCase
     {
         return new UrlContentService(
             new MockHttpClient($responses),
-            new SsrfGuard(),
+            new SsrfGuard(new FixtureHostResolver()),
             new NullLogger(),
         );
     }

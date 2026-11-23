@@ -6,6 +6,7 @@ namespace App\Service\Research;
 
 use App\Service\Egress\EgressCall;
 use App\Service\File\FileHelper;
+use App\Service\Security\GuardedHttpFetch;
 use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -62,6 +63,9 @@ final readonly class UrlContentService
 
     /** Reading mode: redirect hops followed manually (each hop is SSRF-checked). */
     private const MAX_READ_REDIRECTS = 5;
+    private const MAX_FETCH_REDIRECTS = 3;
+    private const MAX_CRAWL_REDIRECTS = 5;
+    private const MAX_ROBOTS_REDIRECTS = 2;
 
     /** Reading mode: how many URLs one call may read. */
     public const MAX_READ_URLS = 6;
@@ -85,11 +89,14 @@ final readonly class UrlContentService
      */
     private const MIN_USEFUL_TEXT_CHARS = 80;
 
+    private GuardedHttpFetch $guarded;
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private SsrfGuard $ssrfGuard,
         private LoggerInterface $logger,
     ) {
+        $this->guarded = new GuardedHttpFetch($httpClient, $ssrfGuard);
     }
 
     /**
@@ -236,14 +243,13 @@ final readonly class UrlContentService
         }
 
         try {
-            $response = $this->httpClient->request('GET', $url, EgressCall::typed([
+            $response = $this->guarded->request('GET', $url, [
                 'timeout' => self::TIMEOUT_SECONDS,
-                'max_redirects' => 3,
                 'headers' => [
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'text/html,application/xhtml+xml,text/plain',
                 ],
-            ]));
+            ], self::MAX_FETCH_REDIRECTS);
 
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 400) {
@@ -370,7 +376,7 @@ final readonly class UrlContentService
                     if (null === $location || '' === $location) {
                         return $this->readFailure($url, $hostname, $current, sprintf('HTTP %d without Location', $statusCode), 'bad_redirect');
                     }
-                    $current = $this->resolveRelativeUrl($current, $location);
+                    $current = GuardedHttpFetch::absoluteUrl($current, $location);
                     continue;
                 }
 
@@ -573,35 +579,10 @@ final readonly class UrlContentService
         if ('' === $target) {
             return null;
         }
-        $absolute = $this->resolveRelativeUrl($base, $target);
+        $absolute = GuardedHttpFetch::absoluteUrl($base, $target);
         $scheme = strtolower((string) parse_url($absolute, PHP_URL_SCHEME));
 
         return in_array($scheme, ['http', 'https'], true) ? $absolute : null;
-    }
-
-    private function resolveRelativeUrl(string $base, string $location): string
-    {
-        if (preg_match('#^https?://#i', $location)) {
-            return $location;
-        }
-
-        $parsed = parse_url($base);
-        $scheme = $parsed['scheme'] ?? 'https';
-        $host = $parsed['host'] ?? '';
-        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
-        $origin = $scheme.'://'.$host.$port;
-
-        if (str_starts_with($location, '//')) {
-            return $scheme.':'.$location;
-        }
-        if (str_starts_with($location, '/')) {
-            return $origin.$location;
-        }
-
-        $path = $parsed['path'] ?? '/';
-        $dir = substr($path, 0, (int) strrpos($path, '/') + 1);
-
-        return $origin.$dir.$location;
     }
 
     private function registrableDomain(string $host): string
@@ -708,14 +689,13 @@ final readonly class UrlContentService
         }
 
         try {
-            $response = $this->httpClient->request('GET', $url, EgressCall::typed([
+            $response = $this->guarded->request('GET', $url, [
                 'timeout' => self::CRAWL_TIMEOUT_SECONDS,
-                'max_redirects' => 5,
                 'headers' => [
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'text/html,application/xhtml+xml,application/json,text/plain',
                 ],
-            ]));
+            ], self::MAX_CRAWL_REDIRECTS);
 
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 400) {
@@ -856,14 +836,13 @@ final readonly class UrlContentService
         }
 
         try {
-            $response = $this->httpClient->request($method, $url, EgressCall::typed([
+            $response = $this->guarded->request($method, $url, [
                 'timeout' => self::TIMEOUT_SECONDS,
-                'max_redirects' => 3,
                 'headers' => array_merge([
                     'User-Agent' => self::USER_AGENT,
                     'Accept' => 'application/json,text/plain',
                 ], $headers),
-            ]));
+            ], self::MAX_FETCH_REDIRECTS);
 
             $statusCode = $response->getStatusCode();
             if ($statusCode >= 400) {
@@ -1163,11 +1142,10 @@ final readonly class UrlContentService
         $robotsUrl = "{$scheme}://{$host}/robots.txt";
 
         try {
-            $response = $this->httpClient->request('GET', $robotsUrl, EgressCall::typed([
+            $response = $this->guarded->request('GET', $robotsUrl, [
                 'timeout' => self::ROBOTS_TXT_TIMEOUT,
-                'max_redirects' => 2,
                 'headers' => ['User-Agent' => self::USER_AGENT],
-            ]));
+            ], self::MAX_ROBOTS_REDIRECTS);
 
             if ($response->getStatusCode() >= 400) {
                 return true;

@@ -368,6 +368,8 @@ services:
             # Research-eval doubles exist only in the test environment (RQ2).
             - '../src/Plug/WebSearch/Adapter/TestWebSearchAdapter.php'
             - '../src/Service/Research/Run/Source/FixtureSourceReader.php'
+            # Answers for host names that exist only in tests.
+            - '../src/Service/Security/FixtureHostResolver.php'
 
     # Multi-task parallel media offload (Sprint 4): subprocess dispatcher needs
     # the project dir for Symfony Process cwd. Alias binds the interface.
@@ -1785,4 +1787,10 @@ when@test:
         App\Service\Research\Run\Source\FixtureSourceReader:
             arguments:
                 $pagesDir: '%kernel.project_dir%/tests/Fixtures/research/pages'
+
+        # Test hosts (files.example.org, …) exist nowhere; the SSRF guard
+        # refuses a name without an address.
+        App\Service\Security\FixtureHostResolver: ~
+        App\Service\Security\HostResolver:
+            alias: App\Service\Security\FixtureHostResolver
 

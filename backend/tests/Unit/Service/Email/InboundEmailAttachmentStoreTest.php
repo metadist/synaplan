@@ -9,6 +9,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Service\Email\InboundEmailAttachmentStore;
 use App\Service\File\FileStorageService;
+use App\Service\Security\FixtureHostResolver;
 use App\Service\Security\SsrfGuard;
 use App\Service\Usage\StorageQuotaService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -422,7 +423,7 @@ final class InboundEmailAttachmentStoreTest extends TestCase
     ): InboundEmailAttachmentStore {
         return new InboundEmailAttachmentStore(
             $client,
-            $guard ?? new SsrfGuard(),
+            $guard ?? new SsrfGuard(new FixtureHostResolver()),
             $this->storage,
             $this->em,
             new NullLogger(),

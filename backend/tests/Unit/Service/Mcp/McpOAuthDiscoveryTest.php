@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Mcp;
 use App\Service\Mcp\McpOAuthDiscovery;
 use App\Service\Mcp\McpOAuthException;
 use App\Service\Mcp\McpOAuthFailure;
+use App\Service\Security\FixtureHostResolver;
 use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -387,6 +388,6 @@ final class McpOAuthDiscoveryTest extends TestCase
             return array_shift($responses) ?? new MockResponse('{}', ['http_code' => 404]);
         };
 
-        return new McpOAuthDiscovery(new MockHttpClient($factory), new SsrfGuard(), new NullLogger());
+        return new McpOAuthDiscovery(new MockHttpClient($factory), new SsrfGuard(new FixtureHostResolver()), new NullLogger());
     }
 }

@@ -27,6 +27,12 @@ final readonly class SsrfGuard
     /** Only these URL schemes may be fetched on behalf of a user. */
     private const ALLOWED_SCHEMES = ['http', 'https'];
 
+    /** A host label curl would parse as a number: decimal, octal or hex. */
+    private const NUMERIC_LABEL = '/^(?:0x[0-9a-f]*|[0-9]+)$/';
+
+    /** First 96 bits of the NAT64 well-known prefix 64:ff9b::/96. */
+    private const NAT64_PREFIX = "\x00\x64\xff\x9b\x00\x00\x00\x00\x00\x00\x00\x00";
+
     /**
      * IPv4 ranges {@see isOperatorNetworkIp} accepts, as [network, prefix bits].
      *
@@ -39,6 +45,11 @@ final readonly class SsrfGuard
         ['127.0.0.0', 8],
         ['100.64.0.0', 10],
     ];
+
+    public function __construct(
+        private HostResolver $resolver = new DnsHostResolver(),
+    ) {
+    }
 
     /**
      * True when the URL must NOT be fetched: bad/missing scheme or host, a
@@ -73,7 +84,7 @@ final readonly class SsrfGuard
      */
     public function isBlockedHost(string $host, bool $allowOperatorNetwork = false): bool
     {
-        $host = strtolower(trim($host, "[] \t"));
+        $host = $this->canonicalHost($host);
         if ('' === $host) {
             return true;
         }
@@ -89,13 +100,17 @@ final readonly class SsrfGuard
 
         // Hostname → resolve every A/AAAA record; ANY private/reserved answer
         // blocks the target (DNS-rebinding style setups often mix records).
-        foreach ($this->resolveIps($host) as $ip) {
+        // A name without an answer is refused as well: the HTTP client may
+        // read it differently than the resolver did, so there is no address
+        // this guard could vouch for.
+        $ips = $this->resolveIps($host);
+        foreach ($ips as $ip) {
             if ($this->isBlockedIp($ip, $allowOperatorNetwork)) {
                 return true;
             }
         }
 
-        return false;
+        return [] === $ips;
     }
 
     /**
@@ -107,7 +122,9 @@ final readonly class SsrfGuard
      */
     public function resolvedIps(string $host): array
     {
-        return $this->resolveIps(strtolower(trim($host, "[] \t")));
+        $host = $this->canonicalHost($host);
+
+        return '' === $host || false !== filter_var($host, \FILTER_VALIDATE_IP) ? [] : $this->resolveIps($host);
     }
 
     /**
@@ -126,7 +143,7 @@ final readonly class SsrfGuard
      */
     public function pinnedIps(string $host, bool $allowOperatorNetwork = false): array
     {
-        $host = strtolower(trim($host, "[] \t"));
+        $host = $this->canonicalHost($host);
         if ('' === $host) {
             return [];
         }
@@ -147,7 +164,8 @@ final readonly class SsrfGuard
      * HTTP client `resolve` option that connects a hostname to the public
      * address this guard accepted. Without it the client resolves the name a
      * second time, and a rebinding DNS answer could point it somewhere
-     * private. Literal IPs and names that do not resolve need no pin.
+     * private. A literal IP needs no pin. A name without a public answer
+     * gets none either; {@see isBlockedUrl} has already refused it.
      *
      * @return array{resolve?: array<string, string>}
      */
@@ -222,6 +240,11 @@ final readonly class SsrfGuard
 
     private function isNotGloballyRoutable(string $ip): bool
     {
+        $embedded = $this->nat64EmbeddedIpv4($ip);
+        if (null !== $embedded) {
+            $ip = $embedded;
+        }
+
         // NO_PRIV_RANGE: RFC 1918 + IPv6 ULA. NO_RES_RANGE: loopback,
         // link-local, 0.0.0.0/8, 240/4 and friends. GLOBAL_RANGE (PHP ≥ 8.2)
         // additionally rejects everything IANA lists as not globally
@@ -235,36 +258,65 @@ final readonly class SsrfGuard
         return false === filter_var($ip, \FILTER_VALIDATE_IP, $this->blockedIpFlags());
     }
 
+    /**
+     * The IPv4 address inside a NAT64 literal (64:ff9b::/96, RFC 6052). A
+     * NAT64 gateway forwards such a packet to that IPv4 address, so the
+     * embedded address decides. Null for every other address.
+     */
+    private function nat64EmbeddedIpv4(string $ip): ?string
+    {
+        $packed = false !== filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV6) ? inet_pton($ip) : false;
+        if (false === $packed || !str_starts_with($packed, self::NAT64_PREFIX)) {
+            return null;
+        }
+        $embedded = inet_ntop(substr($packed, 12));
+
+        return false === $embedded ? null : $embedded;
+    }
+
+    /**
+     * The host as the HTTP client will dial it: lower case, IDNA-mapped
+     * (full-width digits and dots become ASCII), without the root dot.
+     * Empty when it cannot be dialled as written. That includes a name whose
+     * last label is a number but which is not a dotted quad (`0x7f.1`,
+     * `2130706433`, `127.1`): curl reads those as IPv4 addresses, the
+     * resolver does not, so the two would disagree about the target.
+     */
+    private function canonicalHost(string $host): string
+    {
+        $host = strtolower(trim($host, "[] \t"));
+        if ('' === $host || str_contains($host, ':')) {
+            return $host;
+        }
+
+        $ascii = idn_to_ascii($host, \IDNA_DEFAULT, \INTL_IDNA_VARIANT_UTS46);
+        if (false === $ascii) {
+            return '';
+        }
+        $host = rtrim(strtolower($ascii), '.');
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP)) {
+            return $host;
+        }
+
+        $dot = strrpos($host, '.');
+        $lastLabel = false === $dot ? $host : substr($host, $dot + 1);
+
+        return 1 === preg_match(self::NUMERIC_LABEL, $lastLabel) ? '' : $host;
+    }
+
     private function blockedIpFlags(): int
     {
         return \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE | \FILTER_FLAG_GLOBAL_RANGE;
     }
 
     /**
-     * Resolve a hostname to all its A + AAAA records. Failures resolve to an
-     * empty list — an unresolvable host will fail the fetch itself; the guard
-     * only has to catch hosts that resolve INTO a blocked range.
+     * Every A and AAAA answer for a hostname. A failed lookup is an empty
+     * list, which {@see isBlockedHost} refuses.
      *
      * @return list<string>
      */
     private function resolveIps(string $host): array
     {
-        $ips = [];
-
-        $v4 = @gethostbynamel($host);
-        if (is_array($v4)) {
-            $ips = $v4;
-        }
-
-        $aaaa = @dns_get_record($host, \DNS_AAAA);
-        if (is_array($aaaa)) {
-            foreach ($aaaa as $record) {
-                if (is_string($record['ipv6'] ?? null) && '' !== $record['ipv6']) {
-                    $ips[] = $record['ipv6'];
-                }
-            }
-        }
-
-        return array_values(array_unique($ips));
+        return $this->resolver->addresses($host);
     }
 }
