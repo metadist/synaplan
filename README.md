@@ -64,6 +64,7 @@ The first start downloads everything and takes 5–15 minutes. After that, Synap
 | **Kubernetes** | Helm charts for clusters | [synaplan-charts](https://github.com/metadist/synaplan-charts) |
 | **Coolify** | Paste the service file, then Deploy. Not in the Coolify catalog yet | [On Coolify](deploy/coolify/README.md) |
 | **One click** | [RepoCloud](https://repocloud.io/details/Synaplan/) · [Elestio](https://elest.io/open-source/synaplan) | – |
+| **Railway** | Optional one-click template for the published image | [Deploy on Railway](https://railway.com/deploy/synaplan) |
 | **Public sector (EU/CH)** | openDesk, Nextcloud and OpenCloud, on-premises or in an EU cloud | [synaplan.eu](https://www.synaplan.eu/) |
 
 A Linux server in one line:
