@@ -59,6 +59,9 @@ Synaplan has been accepted into Elestio's Fully Managed Catalog.
   `100.64.0.0/10`, `169.254.0.0/16`, and any other block you do not announce.
 - A released Synaplan version to pin instead of `latest`
 
+How many people one server carries, and when to add one, is in
+[Capacity and Sizing](CAPACITY.md).
+
 By default the production stack exposes only the web service, on
 `127.0.0.1:8000`. The opt-in `local-tls` profile also publishes ports 80 and
 443. MariaDB, Redis, Centrifugo, Tika, and Qdrant remain on its internal network.

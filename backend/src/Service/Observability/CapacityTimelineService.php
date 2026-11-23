@@ -34,8 +34,10 @@ final readonly class CapacityTimelineService
      *         busy: int,
      *         p50_ms: int,
      *         p95_ms: int,
-     *         p99_ms: int
+     *         p99_ms: int,
+     *         wait_p95_ms: ?int
      *     }>,
+     *     window_seconds: int,
      *     slowest: list<array<string, mixed>>
      * }
      *
@@ -51,9 +53,10 @@ final readonly class CapacityTimelineService
         $now = new \DateTimeImmutable();
         $cutoffTs = $now->getTimestamp() - self::SLOWEST_WINDOW_SECONDS;
 
-        /** @var array<string, array{requests: int, errors: int, busy: int, buckets: array<string, int>}> $byRoute */
+        /** @var array<string, array{requests: int, errors: int, busy: int, buckets: array<string, int>, wait: array<string, int>}> $byRoute */
         $byRoute = [];
         $slowestCandidates = [];
+        $oldestTs = $now->getTimestamp();
 
         foreach ($records as $record) {
             $rc = (string) $record['route_class'];
@@ -61,7 +64,12 @@ final readonly class CapacityTimelineService
             $totalMs = (int) $record['total_ms'];
             $bucket = TimelineHistogram::bucketKey($totalMs);
 
-            $byRoute[$rc] ??= ['requests' => 0, 'errors' => 0, 'busy' => 0, 'buckets' => []];
+            $byRoute[$rc] ??= ['requests' => 0, 'errors' => 0, 'busy' => 0, 'buckets' => [], 'wait' => []];
+            $oldestTs = min($oldestTs, (int) $record['ts']);
+            if (isset($record['wait_ms'])) {
+                $waitBucket = TimelineHistogram::bucketKey((int) $record['wait_ms']);
+                $byRoute[$rc]['wait'][$waitBucket] = ($byRoute[$rc]['wait'][$waitBucket] ?? 0) + 1;
+            }
             ++$byRoute[$rc]['requests'];
             if ('5xx' === $sc) {
                 ++$byRoute[$rc]['errors'];
@@ -86,6 +94,7 @@ final readonly class CapacityTimelineService
                 'p50_ms' => TimelineHistogram::percentile($stats['buckets'], 0.50),
                 'p95_ms' => TimelineHistogram::percentile($stats['buckets'], 0.95),
                 'p99_ms' => TimelineHistogram::percentile($stats['buckets'], 0.99),
+                'wait_p95_ms' => [] !== $stats['wait'] ? TimelineHistogram::percentile($stats['wait'], 0.95) : null,
             ];
         }
 
@@ -96,6 +105,7 @@ final readonly class CapacityTimelineService
             'served_by' => $this->identity->id(),
             'generated_at' => $now->format(\DateTimeInterface::ATOM),
             'route_classes' => $routeClasses,
+            'window_seconds' => max(0, $now->getTimestamp() - $oldestTs),
             'slowest' => $slowest,
         ];
     }

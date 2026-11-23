@@ -33,6 +33,8 @@ final class RequestTimelineContext implements ResetInterface
         'other',
     ];
 
+    public const TYPED_DESTINATION = 'typed';
+
     private ?string $requestId = null;
     private int $startedTs = 0;
     private int $startedHrtimeNs = 0;
@@ -202,11 +204,17 @@ final class RequestTimelineContext implements ResetInterface
         ];
     }
 
-    public function recordEgress(string $urlOrHost, int $statusCode, int $durationMs): void
+    /**
+     * A URL a person typed is stored as {@see self::TYPED_DESTINATION}: its
+     * host is theirs, not the installation's, and must not grow the list.
+     */
+    public function recordEgress(string $urlOrHost, int $statusCode, int $durationMs, bool $typed = false): void
     {
         $host = parse_url($urlOrHost, \PHP_URL_HOST);
         $port = parse_url($urlOrHost, \PHP_URL_PORT);
-        if (\is_string($host) && '' !== $host) {
+        if ($typed) {
+            $dest = self::TYPED_DESTINATION;
+        } elseif (\is_string($host) && '' !== $host) {
             $scheme = parse_url($urlOrHost, \PHP_URL_SCHEME);
             $resolvedPort = \is_int($port) ? $port : ('http' === $scheme ? 80 : 443);
             $dest = strtolower($host).':'.$resolvedPort;

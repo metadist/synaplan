@@ -76,7 +76,7 @@ Start here to understand what Synaplan ships with, choose the right deployment t
 | **1.2** | **[Installation & Deployment](INSTALLATION.md)** | How to deploy via one-file Quickstart, production `deploy/compose.yaml`, closed-network TLS, or local development (`make up`). |
 | **1.3** | **[Configuration & AI Providers](CONFIGURATION.md)** | Where settings live (`backend/.env` vs. Admin UI vs. `BCONFIG`), first-run wizard, OIDC/SSO login, and connecting cloud or local AI providers. |
 | **1.4** | **[Feature Flags & Module Gates](FEATURE_FLAGS.md)** | How every platform feature flag resolves (`FEATURE_*` env pin → user → group → global `BCONFIG`) and how to hide unconfigured modules. |
-| **1.5** | **[Runtime & Outbound Options](RUNTIME_OPTIONS.md)** | Quick reference for FrankenPHP `api` and `streams` worker pools, the capacity watchdog, usage hook, and outbound HTTP switches. |
+| **1.5** | **[Runtime & Outbound Options](RUNTIME_OPTIONS.md)** | Quick reference for FrankenPHP `api` and `streams` worker pools, the capacity watchdog, usage hook, and outbound HTTP switches. Sizing a server or a cluster from those pools is in **[Capacity and Sizing](CAPACITY.md)** (draft, dev-stack numbers). |
 | **1.6** | **[Updating a Self-Hosted Instance](UPDATE_SELFHOST.md)** | The four-step backup, version pin, upgrade, and rollback workflow for `deploy/` and Docker GUI Quickstart volumes. |
 | **1.7** | **[Updating on Elestio](UPDATE_ELESTIO.md)** | Taking a manual recovery snapshot, updating `SYNAPLAN_VERSION`, and redeploying an Elestio CI/CD pipeline. |
 | **1.8** | **[Updating on AWS Marketplace](UPDATE_AWS.md)** | Connecting via AWS Session Manager, snapshotting the EBS data volume, and running `sudo synaplan-update`. |
