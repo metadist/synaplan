@@ -7,10 +7,10 @@
 Build agents on your own documents and put them wherever work happens: web, WhatsApp, email, Outlook, Nextcloud and ownCloud. Mix local models with the best cloud AI, see what every answer costs, and decide what the AI is allowed to do – open source, on your server or ours.
 
 <p align="center">
-  <img src="docs/images/synaplan-product.gif" alt="Synaplan in about 30 seconds: a chat answer and its cost, ready-made agents, models with a cost on each one, then WhatsApp, email, Outlook, Nextcloud and ownCloud" width="100%">
+  <img src="docs/images/synaplan-product.gif" alt="Synaplan in about 30 seconds: a chat answer and its cost, ready-made agents, models with a cost on each one, then the tools it connects, from WhatsApp, email and Outlook to Nextcloud, Dropbox and more" width="100%">
 </p>
 
-<p align="center"><sub>A chat answer and its cost, agents, the model for each job, then the apps it connects to.</sub></p>
+<p align="center"><sub>A chat answer and its cost, agents, the model for each job, then the tools it connects: WhatsApp, email, Outlook, Nextcloud, Dropbox, and more.</sub></p>
 
 [**Run it in up to five minutes**](#quickstart) &nbsp;·&nbsp; [**Try it hosted**](https://web.synaplan.com/) &nbsp;·&nbsp; [**Docs**](https://docs.synaplan.com/) &nbsp;·&nbsp; [**Discord**](https://discord.com/invite/kQB3eDjWfF)
 
