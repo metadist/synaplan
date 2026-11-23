@@ -83,10 +83,10 @@ class OidcTokenServiceTest extends TestCase
         $jwtValidator->expects($this->once())
             ->method('validateToken')
             ->with(
-                token: 'jwt',
-                jwksUri: $this->anything(),
-                expectedIssuer: $this->anything(),
-                expectedAudience: 'synaplan-app',
+                'jwt',
+                $this->anything(),
+                $this->anything(),
+                'synaplan-app',
             )
             ->willReturn(['sub' => 'user-1']);
 
@@ -103,10 +103,10 @@ class OidcTokenServiceTest extends TestCase
         $jwtValidator->expects($this->once())
             ->method('validateToken')
             ->with(
-                token: 'jwt',
-                jwksUri: $this->anything(),
-                expectedIssuer: $this->anything(),
-                expectedAudience: 'override-audience',
+                'jwt',
+                $this->anything(),
+                $this->anything(),
+                'override-audience',
             )
             ->willReturn(['sub' => 'user-1']);
 
@@ -141,10 +141,10 @@ class OidcTokenServiceTest extends TestCase
         $jwtValidator->expects($this->once())
             ->method('validateToken')
             ->with(
-                token: 'jwt',
-                jwksUri: $this->anything(),
-                expectedIssuer: $this->anything(),
-                expectedAudience: 'synaplan-app',
+                'jwt',
+                $this->anything(),
+                $this->anything(),
+                'synaplan-app',
             )
             ->willReturn(['sub' => 'user-1', 'email' => 'u@example.com']);
 
@@ -164,10 +164,10 @@ class OidcTokenServiceTest extends TestCase
         $jwtValidator->expects($this->once())
             ->method('validateToken')
             ->with(
-                token: 'jwt',
-                jwksUri: $this->anything(),
-                expectedIssuer: $this->anything(),
-                expectedAudience: 'override-audience',
+                'jwt',
+                $this->anything(),
+                $this->anything(),
+                'override-audience',
             )
             ->willReturn(['sub' => 'user-1']);
 
@@ -188,10 +188,10 @@ class OidcTokenServiceTest extends TestCase
         $jwtValidator->expects($this->once())
             ->method('validateToken')
             ->with(
-                token: 'jwt',
-                jwksUri: $this->anything(),
-                expectedIssuer: $this->anything(),
-                expectedAudience: null,
+                'jwt',
+                $this->anything(),
+                $this->anything(),
+                null,
             )
             ->willReturn(['sub' => 'user-1']);
 

@@ -121,10 +121,10 @@ final class OidcLoginClaimsTest extends TestCase
         $jwtValidator->expects($this->once())
             ->method('validateToken')
             ->with(
-                token: $this->jwt(),
-                jwksUri: self::JWKS,
-                expectedIssuer: self::REALM,
-                expectedAudience: 'synaplan-app',
+                $this->jwt(),
+                self::JWKS,
+                self::REALM,
+                'synaplan-app',
             )
             ->willReturn([
                 'sub' => 'kc-user-1',
