@@ -32,11 +32,17 @@ test.describe('@ci Agents builder name autosave', () => {
       await expect(name).toHaveValue(originalName, { timeout: TIMEOUTS.STANDARD })
       await page.locator('[data-testid="details-basics-advanced"] summary').click()
 
-      const patch = page.waitForResponse(
-        (response) =>
-          /\/api\/v1\/agents\/\d+$/.test(new URL(response.url()).pathname) &&
-          response.request().method() === 'PATCH'
-      )
+      // Loading the builder can PATCH a generated greeting while this save is
+      // still debounced. Reload only after the request that carries the typed line.
+      const patch = page.waitForResponse((response) => {
+        if (response.request().method() !== 'PATCH') {
+          return false
+        }
+        if (!/\/api\/v1\/agents\/\d+$/.test(new URL(response.url()).pathname)) {
+          return false
+        }
+        return (response.request().postData() ?? '').includes(greeting)
+      })
       await greetingField.fill(greeting)
       await name.fill('')
       const response = await patch
