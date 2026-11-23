@@ -85,6 +85,7 @@ use App\Service\Chat\Stream\StreamUsageRecorder;
 use App\Service\Document\ChatDocumentOutput;
 use App\Service\Email\EmailChatService;
 use App\Service\Email\EmailWebhookIdempotencyService;
+use App\Service\Email\InboundEmailRelayAuth;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\RawMimeEmailParser;
 use App\Service\Email\Turn\EmailAnswerStore;
@@ -406,7 +407,10 @@ final class AiPathHarness
             $this->createStub(InternalEmailService::class),
             $this->createStub(DiscordNotificationService::class),
             new NullLogger(),
+            new InboundEmailRelayAuth('app-secret-of-the-test-instance'),
         );
+        $relay = $this->createStub(User::class);
+        $relay->method('getRoles')->willReturn(['ROLE_USER', 'ROLE_ADMIN']);
         $email = $intake->accept(Request::create(
             '/api/v1/webhooks/email',
             'POST',
@@ -421,7 +425,7 @@ final class AiPathHarness
                 'body' => 'When do you open on Saturday?',
                 'message_id' => '<m1@example.com>',
             ], \JSON_THROW_ON_ERROR),
-        ));
+        ), $relay);
 
         $generator = $this->chatReplyGenerator($facade, $em);
         $turn = $this->chatTurn('When do you open on Saturday?', ['channel' => 'EMAIL']);

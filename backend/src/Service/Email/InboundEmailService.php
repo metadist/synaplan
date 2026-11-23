@@ -16,6 +16,7 @@ final readonly class InboundEmailService
     public function __construct(
         private HttpClientInterface $httpClient,
         private LoggerInterface $logger,
+        private InboundEmailRelayAuth $relayAuth,
         private string $mailhogApiUrl = 'http://mailhog:8025/api/v2',
         private ?string $gmailUsername = null,
         private ?string $gmailPassword = null,
@@ -106,18 +107,18 @@ final readonly class InboundEmailService
     public function forwardToWebhook(array $emailData, string $webhookUrl): array
     {
         try {
+            // The webhook only takes mail from a trusted relay; the signature covers these exact bytes.
+            $body = json_encode([
+                'from' => $emailData['from'],
+                'to' => $emailData['to'],
+                'subject' => $emailData['subject'],
+                'body' => $emailData['body'],
+                'message_id' => $emailData['message_id'],
+                'in_reply_to' => $emailData['in_reply_to'],
+            ], JSON_THROW_ON_ERROR);
             $response = $this->httpClient->request('POST', $webhookUrl, [
-                'json' => [
-                    'from' => $emailData['from'],
-                    'to' => $emailData['to'],
-                    'subject' => $emailData['subject'],
-                    'body' => $emailData['body'],
-                    'message_id' => $emailData['message_id'],
-                    'in_reply_to' => $emailData['in_reply_to'],
-                ],
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                ],
+                'body' => $body,
+                'headers' => ['Content-Type' => 'application/json'] + $this->relayAuth->headers($body),
             ]);
 
             return [

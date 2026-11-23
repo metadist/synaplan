@@ -52,11 +52,13 @@ EmailReply (sends reply in the same email thread with generated files & doc link
 
 ### Incoming Email Webhook
 
-Configure your mail server or relay to forward inbound emails to Synaplan's webhook:
+Configure your mail server or relay to forward inbound emails to Synaplan's webhook.
+
+The webhook maps the `from` address to an account and answers as that account, so it only accepts mail from the relay of the instance. Send the API key of an **administrator** in `X-API-Key` (create it on the API keys page while signed in as an admin). A request without a key is answered `401`, a key of a non-admin account `403`. Your relay is responsible for the sender address it forwards: check SPF/DKIM/DMARC before you hand a message to Synaplan. The built-in smart-mailbox poller needs no key; it signs its own requests.
 
 ```bash
 POST /api/v1/webhooks/email
-X-API-Key: sk_your_api_key
+X-API-Key: sk_admin_api_key
 Content-Type: application/json
 
 {
@@ -74,11 +76,12 @@ Content-Type: application/json
 ```json
 {
   "success": true,
-  "response": "AI generated response text",
-  "chat_id": 123,
-  "context": "topic"
+  "message_id": 456,
+  "chat_id": 123
 }
 ```
+
+The answer itself is sent to the sender by email; it is not part of the webhook response.
 
 ### Outgoing Email (SMTP)
 

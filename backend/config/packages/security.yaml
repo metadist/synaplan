@@ -245,7 +245,9 @@ security:
         # to trust a user_id parameter.
         - { path: ^/widget\.php, roles: PUBLIC_ACCESS }
 
-        # Webhook endpoints (email webhook is public, WhatsApp requires verification)
+        # Webhook endpoints. Public to the firewall because each one checks its
+        # own caller: email takes an administrator API key or the poller's
+        # signature (InboundEmailRelayAuth), WhatsApp and Telegram verify theirs.
         - { path: ^/api/v1/webhooks/email, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/whatsapp, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/webhooks/telegram/, roles: PUBLIC_ACCESS }

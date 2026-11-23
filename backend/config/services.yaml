@@ -846,6 +846,12 @@ services:
     # Internal Email Service (system emails - uses SMTP from ENV)
     App\Service\Email\InternalEmailService: ~
 
+    # Trusted-relay check of the inbound email webhook. Derives its own
+    # signing key from APP_SECRET.
+    App\Service\Email\InboundEmailRelayAuth:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
     # Inbound Email Service (fetches emails from Gmail IMAP or Mailhog)
     App\Service\Email\InboundEmailService:
         arguments:

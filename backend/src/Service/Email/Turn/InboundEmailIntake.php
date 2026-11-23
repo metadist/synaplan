@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Security\AccountAccess;
 use App\Service\Email\EmailChatService;
 use App\Service\Email\EmailWebhookIdempotencyService;
+use App\Service\Email\InboundEmailRelayAuth;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\RawMimeEmailParser;
 use App\Service\Notification\DiscordNotificationService;
@@ -19,10 +20,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * First stage of an inbound email turn: accepts the relay's email or
- * answers it without a turn. In order: the payload, a raw MIME body read as
- * its text (#1077), the keyword address, the idempotency check (a redelivery
- * is answered as the duplicate it is, never twice), the sender's account
- * (an unknown sender gets an anonymous one) and the account's message limit.
+ * answers it without a turn. In order: the caller (only the instance's own
+ * relay may speak for a sender, see InboundEmailRelayAuth), the payload, a
+ * raw MIME body read as its text (#1077), the keyword address, the
+ * idempotency check (a redelivery is answered as the duplicate it is, never
+ * twice), the sender's account (an unknown sender gets an anonymous one) and
+ * the account's message limit.
  * A refused sender and a spent limit are told by mail.
  */
 final readonly class InboundEmailIntake
@@ -35,14 +38,25 @@ final readonly class InboundEmailIntake
         private InternalEmailService $mailer,
         private DiscordNotificationService $discord,
         private LoggerInterface $logger,
+        private InboundEmailRelayAuth $relayAuth,
     ) {
     }
 
     /**
      * @throws InboundEmailAnswered
      */
-    public function accept(Request $request): InboundEmail
+    public function accept(Request $request, ?User $caller = null): InboundEmail
     {
+        if (!$this->relayAuth->trusts($request, $caller)) {
+            $this->logger->warning('Email webhook refused: caller is not a trusted relay', ['ip' => $request->getClientIp(), 'authenticated' => null !== $caller]);
+
+            if (null === $caller) {
+                throw InboundEmailAnswered::json(['success' => false, 'error' => 'Authentication required'], Response::HTTP_UNAUTHORIZED);
+            }
+
+            throw InboundEmailAnswered::json(['success' => false, 'error' => 'Only an administrator API key may deliver inbound email'], Response::HTTP_FORBIDDEN);
+        }
+
         $data = json_decode($request->getContent(), true);
         if (!$data) {
             throw InboundEmailAnswered::json(['success' => false, 'error' => 'Invalid JSON payload'], Response::HTTP_BAD_REQUEST);

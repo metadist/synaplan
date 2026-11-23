@@ -1,11 +1,16 @@
 /**
  * Smoke: Smart-Email flow (Inbound Webhook → AI → SMTP → MailHog).
  * Request-only. Backend: POST /api/v1/webhooks/email.
+ *
+ * The webhook answers as the account behind `from`, so it only takes mail
+ * from the instance's relay. The spec delivers as an administrator.
  */
 
 import { test, expect } from '../test-setup'
 import { fetchMessages, getPlainTextBody, toMatches } from '../helpers/email'
 import { getApiUrl } from '../config/config'
+import { getAuthHeaders } from '../helpers/auth'
+import { CREDENTIALS } from '../config/credentials'
 import { INTEGRATION } from '../config/integration-data'
 
 const WEBHOOK_PATH = '/api/v1/webhooks/email'
@@ -53,6 +58,7 @@ test.describe('@ci @smoke Smart-Email', () => {
 
     await test.step('Act: POST /api/v1/webhooks/email', async () => {
       const res = await request.post(webhookUrl(), {
+        headers: await getAuthHeaders(request, CREDENTIALS.getAdminCredentials()),
         data: {
           from: testFrom,
           to: TEST_TO,
@@ -94,6 +100,36 @@ test.describe('@ci @smoke Smart-Email', () => {
     })
   })
 
+  test('a caller without a credential is refused and gets no reply', async ({
+    request,
+    playwright,
+  }) => {
+    const testFrom = uniqueEmailSender()
+    // `request` carries the worker user's session; an outsider has none.
+    const anonymous = await playwright.request.newContext({
+      storageState: { cookies: [], origins: [] },
+    })
+    try {
+      const res = await anonymous.post(webhookUrl(), {
+        data: {
+          from: testFrom,
+          to: TEST_TO,
+          subject: 'Unsigned',
+          body: 'What is machine learning?',
+        },
+      })
+      expect(res.status()).toBe(401)
+      const json = await res.json()
+      expect(json.success).toBe(false)
+      expect(json.response).toBeUndefined()
+    } finally {
+      await anonymous.dispose()
+    }
+
+    const messages = await fetchMessages(request)
+    expect(messages.filter((m) => toMatches(m, testFrom)).length).toBe(0)
+  })
+
   test('invalid payload returns 400 and sends no reply', async ({ request }) => {
     const testFrom = uniqueEmailSender()
     let baselineCount = 0
@@ -104,6 +140,7 @@ test.describe('@ci @smoke Smart-Email', () => {
 
     await test.step('Act: POST with missing required body', async () => {
       const res = await request.post(webhookUrl(), {
+        headers: await getAuthHeaders(request, CREDENTIALS.getAdminCredentials()),
         data: {
           from: testFrom,
           to: TEST_TO,
@@ -131,6 +168,7 @@ test.describe('@ci @smoke Smart-Email', () => {
   }) => {
     const testFrom = uniqueEmailSender()
     const res = await request.post(webhookUrl(), {
+      headers: await getAuthHeaders(request, CREDENTIALS.getAdminCredentials()),
       data: {
         from: testFrom,
         to: TEST_TO,

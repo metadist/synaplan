@@ -37,7 +37,7 @@ final class EmailReplyTest extends TestCase
 
         self::assertSame([['usage'], ['store', 'See [Doc:x].'], ['mail', 'linked: See [Doc:x].', '<m1@example.com>', 'test', 'm', null]], $this->steps);
         self::assertSame(
-            ['success' => true, 'message_id' => null, 'chat_id' => null, 'response' => ['text' => 'See [Doc:x].', 'metadata' => ['provider' => 'test', 'model' => 'm']], 'user_info' => ['is_anonymous' => true, 'rate_limit_level' => 'ANONYMOUS']],
+            ['success' => true, 'message_id' => null, 'chat_id' => null],
             $payload,
         );
     }
@@ -60,7 +60,7 @@ final class EmailReplyTest extends TestCase
         self::assertSame([['discord', 'processing', 'raw failure'], ['mail', 'Please try again.', '<m1@example.com>', 'test', null, null]], $this->steps);
     }
 
-    public function testAFailedMediaAnswerStripsDiagnosticsFromTheRelayResponse(): void
+    public function testTheRelayLearnsNeitherTheAnswerNorItsDiagnostics(): void
     {
         $payload = $this->reply([
             'success' => true,
@@ -75,8 +75,8 @@ final class EmailReplyTest extends TestCase
             ],
         ])->answer($this->email(), $this->stored());
 
-        self::assertArrayNotHasKey('chat_error_debug', $payload['response']['metadata']);
-        self::assertSame('unknown', $payload['response']['metadata']['chat_error_reason']);
+        self::assertSame(['success' => true, 'message_id' => null, 'chat_id' => null], $payload);
+        self::assertStringNotContainsString('safety block', json_encode($this->steps, JSON_THROW_ON_ERROR));
     }
 
     public function testATurnThatBreaksIsReportedWithoutItsDetails(): void

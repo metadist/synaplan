@@ -8,6 +8,7 @@ use App\Entity\Message;
 use App\Entity\User;
 use App\Service\Email\EmailChatService;
 use App\Service\Email\EmailWebhookIdempotencyService;
+use App\Service\Email\InboundEmailRelayAuth;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\RawMimeEmailParser;
 use App\Service\Email\Turn\InboundEmail;
@@ -15,6 +16,7 @@ use App\Service\Email\Turn\InboundEmailAnswered;
 use App\Service\Email\Turn\InboundEmailIntake;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
+use App\Tests\Support\EmailWebhookControllerFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -24,6 +26,35 @@ final class InboundEmailIntakeTest extends TestCase
 {
     /** @var list<mixed> */
     private array $steps = [];
+
+    public function testAMailFromAnUnknownCallerIsRefusedBeforeAnyAccountIsTouched(): void
+    {
+        $unsigned = Request::create('/api/v1/webhooks/email', 'POST', content: $this->mail());
+        $forged = Request::create('/api/v1/webhooks/email', 'POST', content: $this->mail());
+        $forged->headers->add([InboundEmailRelayAuth::TIMESTAMP_HEADER => (string) time(), InboundEmailRelayAuth::SIGNATURE_HEADER => str_repeat('0', 64)]);
+        $tampered = Request::create('/api/v1/webhooks/email', 'POST', content: $this->mail('victim@example.com'));
+        $tampered->headers->add(EmailWebhookControllerFactory::relayAuth()->headers($this->mail()));
+
+        $refused = [401, ['success' => false, 'error' => 'Authentication required']];
+        foreach ([$unsigned, $forged, $tampered] as $request) {
+            self::assertSame($refused, $this->answered($this->intake(), '', $request));
+        }
+        self::assertSame([], $this->steps);
+    }
+
+    public function testOnlyAnAdministratorMaySpeakForASender(): void
+    {
+        $unsigned = static fn (string $content): Request => Request::create('/api/v1/webhooks/email', 'POST', content: $content);
+
+        self::assertSame(
+            [403, ['success' => false, 'error' => 'Only an administrator API key may deliver inbound email']],
+            $this->answered($this->intake(), '', $unsigned($this->mail()), $this->caller(['ROLE_USER'])),
+        );
+        self::assertSame([], $this->steps);
+
+        $email = $this->intake()->accept($unsigned($this->mail()), $this->caller(['ROLE_USER', 'ROLE_ADMIN']));
+        self::assertSame('ada@example.com', $email->fromEmail);
+    }
 
     public function testAPayloadThatIsNotJsonIsAnswered(): void
     {
@@ -83,7 +114,7 @@ final class InboundEmailIntakeTest extends TestCase
             $limits = $this->createStub(RateLimitService::class);
             $limits->method('checkLimit')->willReturn(['allowed' => true]);
 
-            (new InboundEmailIntake($this->createStub(RawMimeEmailParser::class), $idempotency, $chats, $limits, $this->createStub(InternalEmailService::class), $this->createStub(DiscordNotificationService::class), new NullLogger()))
+            (new InboundEmailIntake($this->createStub(RawMimeEmailParser::class), $idempotency, $chats, $limits, $this->createStub(InternalEmailService::class), $this->createStub(DiscordNotificationService::class), new NullLogger(), EmailWebhookControllerFactory::relayAuth()))
                 ->accept($this->request(['from' => 'ada@example.com', 'to' => 'smart@synaplan.net', 'body' => 'Hi', 'message_id' => $messageId]));
         }
 
@@ -175,7 +206,7 @@ final class InboundEmailIntakeTest extends TestCase
             $this->steps[] = ['discord', $type];
         });
 
-        return new InboundEmailIntake($mime, $idempotency, $chats, $limits, $mailer, $discord, new NullLogger());
+        return new InboundEmailIntake($mime, $idempotency, $chats, $limits, $mailer, $discord, new NullLogger(), EmailWebhookControllerFactory::relayAuth());
     }
 
     private function accept(InboundEmailIntake $intake, string $body = 'MIME-Version: 1.0'): InboundEmail
@@ -192,6 +223,17 @@ final class InboundEmailIntakeTest extends TestCase
         return $user;
     }
 
+    /**
+     * @param list<string> $roles
+     */
+    private function caller(array $roles): User
+    {
+        $caller = $this->createStub(User::class);
+        $caller->method('getRoles')->willReturn($roles);
+
+        return $caller;
+    }
+
     private function mail(string $from = 'ada@example.com'): string
     {
         return json_encode(['from' => $from, 'to' => 'smart@synaplan.net', 'subject' => 'Hi', 'body' => 'Question'], JSON_THROW_ON_ERROR);
@@ -202,16 +244,16 @@ final class InboundEmailIntakeTest extends TestCase
      */
     private function request(array $mail): Request
     {
-        return Request::create('/api/v1/webhooks/email', 'POST', content: json_encode($mail, JSON_THROW_ON_ERROR));
+        return EmailWebhookControllerFactory::relayRequest(json_encode($mail, JSON_THROW_ON_ERROR));
     }
 
     /**
      * @return array{0: int, 1: array<string, mixed>}
      */
-    private function answered(InboundEmailIntake $intake, string $content): array
+    private function answered(InboundEmailIntake $intake, string $content, ?Request $request = null, ?User $caller = null): array
     {
         try {
-            $intake->accept(Request::create('/api/v1/webhooks/email', 'POST', content: $content));
+            $intake->accept($request ?? EmailWebhookControllerFactory::relayRequest($content), $caller);
         } catch (InboundEmailAnswered $answered) {
             return [$answered->httpStatus, $answered->payload];
         }

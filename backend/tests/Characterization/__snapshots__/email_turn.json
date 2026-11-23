@@ -5,30 +5,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -139,30 +116,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -185,30 +139,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 2>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -381,30 +312,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -525,30 +433,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -670,39 +555,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "file": {
-                                "path": "/api/v1/files/uploads/characterization-email/cat.png",
-                                "type": "image"
-                            },
-                            "local_path": "characterization-email/cat.png",
-                            "media_type": "image",
-                            "media_usage": {
-                                "images": 1
-                            },
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "Here is your cat."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -848,30 +701,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -1004,30 +834,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": true,
-                        "rate_limit_level": "ANONYMOUS"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -1142,30 +949,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -1440,30 +1224,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {
@@ -1572,30 +1333,7 @@
                 "json": {
                     "chat_id": "<chat_id 1>",
                     "message_id": "<message_id 1>",
-                    "response": {
-                        "metadata": {
-                            "docs": [
-                                {
-                                    "slug": "using-synaplan",
-                                    "title": "Using Synaplan",
-                                    "url": "https://docs.example/using-synaplan"
-                                }
-                            ],
-                            "model": "test-model",
-                            "model_id": 12,
-                            "provider": "test",
-                            "usage": {
-                                "completion_tokens": 4,
-                                "prompt_tokens": 3
-                            }
-                        },
-                        "text": "We open at 9 on Saturday. See [Doc:using-synaplan]."
-                    },
-                    "success": true,
-                    "user_info": {
-                        "is_anonymous": false,
-                        "rate_limit_level": "PRO"
-                    }
+                    "success": true
                 },
                 "mails": [
                     {

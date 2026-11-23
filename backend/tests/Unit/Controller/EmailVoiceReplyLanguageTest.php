@@ -30,7 +30,6 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Container;
 use Symfony\Component\Filesystem\Filesystem;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -211,7 +210,7 @@ final class EmailVoiceReplyLanguageTest extends TestCase
         $container->set('serializer', $serializer);
         $controller->setContainer($container);
 
-        $request = Request::create('/api/v1/webhooks/email', 'POST', content: json_encode([
+        $request = EmailWebhookControllerFactory::relayRequest(json_encode([
             'from' => $from,
             'to' => 'smart@synaplan.net',
             'subject' => 'Frage',

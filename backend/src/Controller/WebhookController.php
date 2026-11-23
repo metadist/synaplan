@@ -48,7 +48,7 @@ class WebhookController extends AbstractController
     #[OA\Post(
         path: '/api/v1/webhooks/email',
         summary: 'Email webhook endpoint',
-        description: 'Handles incoming emails for processing by AI assistant. Authentication via API Key required.',
+        description: 'Handles incoming emails for processing by AI assistant. The caller speaks for the sender in `from`, so it must be the relay of this instance: send the API key of an administrator (`X-API-Key`). The reply goes to the sender by mail; the response only confirms delivery.',
         tags: ['Webhooks']
     )]
     #[OA\RequestBody(
@@ -90,12 +90,13 @@ class WebhookController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid payload or missing fields')]
-    #[OA\Response(response: 401, description: 'Invalid API key')]
+    #[OA\Response(response: 401, description: 'Missing or invalid API key')]
+    #[OA\Response(response: 403, description: 'The API key does not belong to an administrator')]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
-    public function email(Request $request): JsonResponse
+    public function email(Request $request, #[CurrentUser] ?User $user = null): JsonResponse
     {
         try {
-            $email = $this->emailIntake->accept($request);
+            $email = $this->emailIntake->accept($request, $user);
         } catch (InboundEmailAnswered $answered) {
             return $this->json($answered->payload, $answered->httpStatus);
         }

@@ -11,6 +11,7 @@ use App\Entity\MessageMeta;
 use App\Entity\User;
 use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Email\InboundEmailAttachmentStore;
+use App\Service\Email\InboundEmailRelayAuth;
 use App\Service\Message\MessageProcessor;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
@@ -169,7 +170,8 @@ final class EmailTurnCharacterizationTest extends WebTestCase
         $answers = [];
         $deliveries = $case['deliveries'] ?? 1;
         foreach (is_int($deliveries) ? array_fill(0, $deliveries, []) : $deliveries as $override) {
-            $client->request('POST', '/api/v1/webhooks/email', [], [], ['CONTENT_TYPE' => 'application/json'], $case['raw'] ?? json_encode($override + $mail, JSON_THROW_ON_ERROR));
+            $content = $case['raw'] ?? json_encode($override + $mail, JSON_THROW_ON_ERROR);
+            $client->request('POST', '/api/v1/webhooks/email', [], [], ['CONTENT_TYPE' => 'application/json'] + $this->relayHeaders($content), $content);
             $answers[] = $this->answerToTheRelay($client) + ['mails' => $this->mails((string) $mail['to'])];
         }
         $em->clear();
@@ -282,6 +284,24 @@ final class EmailTurnCharacterizationTest extends WebTestCase
         $user->setEmailVerified(true);
         $em->persist($user);
         $em->flush();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    /**
+     * The turn starts at the instance's own mailbox poller, which signs what it forwards.
+     *
+     * @return array<string, string>
+     */
+    private function relayHeaders(string $content): array
+    {
+        $headers = (new InboundEmailRelayAuth((string) static::getContainer()->getParameter('kernel.secret')))->headers($content);
+
+        return [
+            'HTTP_X_SYNAPLAN_TIMESTAMP' => $headers[InboundEmailRelayAuth::TIMESTAMP_HEADER],
+            'HTTP_X_SYNAPLAN_SIGNATURE' => $headers[InboundEmailRelayAuth::SIGNATURE_HEADER],
+        ];
     }
 
     /**

@@ -26,7 +26,6 @@ use App\Tests\Support\EmailWebhookControllerFactory;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\Container;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Serializer\SerializerInterface;
 
 final class EmailWebhookDocReferenceTest extends TestCase
@@ -130,7 +129,7 @@ final class EmailWebhookDocReferenceTest extends TestCase
         $container->set('serializer', $serializer);
         $controller->setContainer($container);
 
-        $request = Request::create('/api/v1/webhooks/email', 'POST', content: json_encode([
+        $request = EmailWebhookControllerFactory::relayRequest(json_encode([
             'from' => 'person@example.com',
             'to' => 'smart@synaplan.net',
             'subject' => 'Question',

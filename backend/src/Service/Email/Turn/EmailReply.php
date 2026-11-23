@@ -16,7 +16,8 @@ use Psr\Log\LoggerInterface;
  * Last stage of an inbound email turn: the answer, by mail. The processor
  * answers the stored email; its usage is recorded, a spoken reply is added
  * when the email asked for one, the answer is stored, and the reply goes to
- * the sender in the same thread with its files and doc links resolved. A
+ * the sender in the same thread with its files and doc links resolved; the
+ * relay only learns that it was delivered, never the answer. A
  * failed answer still tells the sender by mail, and the relay is never
  * asked to deliver the email again.
  */
@@ -73,8 +74,6 @@ final readonly class EmailReply
             'success' => true,
             'message_id' => $stored->message->getId(),
             'chat_id' => $stored->chat->getId(),
-            'response' => ['text' => $answer, 'metadata' => $metadata],
-            'user_info' => ['is_anonymous' => $email->isAnonymous, 'rate_limit_level' => $email->user->getRateLimitLevel()],
         ];
     }
 

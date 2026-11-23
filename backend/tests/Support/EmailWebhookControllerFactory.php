@@ -10,6 +10,7 @@ use App\Service\Chat\ConversationSummaryRefreshDispatcher;
 use App\Service\Email\EmailChatService;
 use App\Service\Email\EmailWebhookIdempotencyService;
 use App\Service\Email\InboundEmailAttachmentStore;
+use App\Service\Email\InboundEmailRelayAuth;
 use App\Service\Email\InternalEmailService;
 use App\Service\Email\RawMimeEmailParser;
 use App\Service\Email\Turn\EmailAnswerStore;
@@ -28,6 +29,7 @@ use App\Service\RateLimitService;
 use App\Service\WhatsApp\Turn\WhatsAppTurn;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * The webhook controller with the real email turn stages, built from the
@@ -35,6 +37,22 @@ use Psr\Log\NullLogger;
  */
 final class EmailWebhookControllerFactory
 {
+    public static function relayAuth(): InboundEmailRelayAuth
+    {
+        return new InboundEmailRelayAuth('app-secret-of-the-test-instance');
+    }
+
+    /**
+     * The request as the instance's own mailbox poller sends it.
+     */
+    public static function relayRequest(string $content): Request
+    {
+        $request = Request::create('/api/v1/webhooks/email', 'POST', content: $content);
+        $request->headers->add(self::relayAuth()->headers($content));
+
+        return $request;
+    }
+
     /**
      * @param array{
      *     em: EntityManagerInterface,
@@ -69,7 +87,7 @@ final class EmailWebhookControllerFactory
             $logger,
             'verify-token',
             $doubles['errors'],
-            new InboundEmailIntake($doubles['mime'], $doubles['idempotency'], $doubles['emailChats'], $doubles['limits'], $doubles['mailer'], $doubles['discord'], $logger),
+            new InboundEmailIntake($doubles['mime'], $doubles['idempotency'], $doubles['emailChats'], $doubles['limits'], $doubles['mailer'], $doubles['discord'], $logger, self::relayAuth()),
             new EmailConversation($doubles['emailChats'], $doubles['attachments'], $doubles['em']),
             new EmailReply(
                 $doubles['processor'],
