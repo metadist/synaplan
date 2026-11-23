@@ -71,15 +71,17 @@ final readonly class StreamRequestResolver
         $trackId = $params->get('trackId', time());
         $chatId = self::optionalString($params->get('chatId', null));
         $flags = self::flags($params);
-        $modelId = self::optionalString($params->get('modelId', null));
+        // A widget visitor streams as the widget owner: the widget decides the
+        // model and the assistant, the visitor's parameters do not.
+        $modelId = $caller->isWidget() ? null : self::optionalString($params->get('modelId', null));
         $fileIds = $params->get('fileIds', '');
         $promptTopic = $params->get('promptTopic');
         $promptId = $params->get('promptId');
 
         $agent = $this->agents->resolve(
             $user,
-            $params->getInt('agentId') ?: null,
-            self::isTruthyFlag($params->get('draft')),
+            $caller->isWidget() ? null : ($params->getInt('agentId') ?: null),
+            !$caller->isWidget() && self::isTruthyFlag($params->get('draft')),
             is_numeric($chatId) ? (int) $chatId : null,
         );
 

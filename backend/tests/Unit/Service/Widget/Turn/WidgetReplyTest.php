@@ -213,6 +213,6 @@ final class WidgetReplyTest extends TestCase
         $widget = (new Widget())->setWidgetId('wdg_1')->setTaskPromptTopic('tools:widget-default');
         $session = (new WidgetSession())->setWidgetId('wdg_1')->setSessionId('sess');
 
-        return new WidgetTurn($widget, $this->createStub(User::class), $session, $config, 'Hi', [], null, '', false);
+        return new WidgetTurn($widget, $this->createStub(User::class), $session, $config, 'Hi', [], '', false);
     }
 }

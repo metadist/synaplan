@@ -110,7 +110,8 @@ final readonly class WidgetConversation
 
     private function chat(WidgetTurn $turn): Chat
     {
-        $chat = $this->ownedChat($turn, $turn->session->getChatId()) ?? $this->ownedChat($turn, $turn->chatId);
+        // Only the chat this session opened: a chat id from the visitor would name any chat of the owner.
+        $chat = $this->sessionChat($turn);
         if (null !== $chat) {
             $chat->updateTimestamp();
             $this->em->flush();
@@ -139,8 +140,9 @@ final readonly class WidgetConversation
         return $chat;
     }
 
-    private function ownedChat(WidgetTurn $turn, ?int $chatId): ?Chat
+    private function sessionChat(WidgetTurn $turn): ?Chat
     {
+        $chatId = $turn->session->getChatId();
         $chat = $chatId ? $this->chats->find($chatId) : null;
 
         return $chat instanceof Chat && $chat->getUserId() === $turn->owner->getId() ? $chat : null;

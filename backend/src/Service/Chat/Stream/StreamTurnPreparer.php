@@ -139,15 +139,11 @@ final readonly class StreamTurnPreparer
             $state->chat = $chat;
         }
 
-        // A guest may only write into the chat of their own session.
-        $guestSession = $turn->caller->guestSession;
-        if (null !== $guestSession) {
-            $sessionChatId = $guestSession->getChatId();
-            if (null === $sessionChatId || $sessionChatId !== (int) $turn->chatId) {
-                $sse->send('error', ['error' => 'Chat does not belong to this guest session']);
+        // A guest and a widget visitor may only write into the chat of their own session.
+        if (!$turn->caller->mayWriteInto((int) $turn->chatId)) {
+            $sse->send('error', ['error' => $turn->caller->isGuest() ? 'Chat does not belong to this guest session' : 'Chat does not belong to this widget session']);
 
-                return false;
-            }
+            return false;
         }
 
         return true;
@@ -247,7 +243,8 @@ final readonly class StreamTurnPreparer
     }
 
     /**
-     * Files of any status (uploaded, extracted, vectorized) the person owns.
+     * Files of any status (uploaded, extracted, vectorized) the caller may
+     * attach: a person's own, a widget visitor's session uploads.
      * A persisted message is flushed and reloaded so its file collection is
      * fresh — refresh() is not reliable for collections.
      */
@@ -257,7 +254,7 @@ final readonly class StreamTurnPreparer
         $fileCount = 0;
         foreach ($turn->input->fileIds as $fileId) {
             $file = $this->em->getRepository(File::class)->find($fileId);
-            if ($file && $file->getUserId() === $turn->caller->user->getId()) {
+            if ($file && $turn->caller->mayAttach($file)) {
                 $incoming->addFile($file);
                 $file->keepAfterChatSend($turn->incognito);
                 ++$fileCount;

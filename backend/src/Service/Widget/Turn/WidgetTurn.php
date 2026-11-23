@@ -26,7 +26,6 @@ final readonly class WidgetTurn
         public array $config,
         public string $text,
         public array $files,
-        public ?int $chatId,
         public string $externalUserId,
         public bool $heldForOperator,
     ) {

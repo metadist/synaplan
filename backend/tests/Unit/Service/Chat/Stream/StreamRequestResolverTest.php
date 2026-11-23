@@ -119,6 +119,32 @@ final class StreamRequestResolverTest extends TestCase
         self::assertSame([], $turn->incognitoHistory);
     }
 
+    public function testAWidgetVisitorChoosesNeitherTheModelNorTheAssistant(): void
+    {
+        $owner = new User();
+        $agents = $this->createMock(StreamAgentPinResolver::class);
+        $agents->expects(self::once())->method('resolve')->with($owner, null, false, 7)->willReturn(null);
+
+        $turn = $this->resolve(
+            ['message' => 'Hi', 'chatId' => '7', 'modelId' => '249', 'agentId' => 5, 'draft' => true],
+            new StreamCaller($owner, 'en', widgetSession: new WidgetSession()),
+            $agents,
+        );
+
+        self::assertNull($turn->options->modelId);
+    }
+
+    public function testAPersonChoosesTheModelAndTheAssistant(): void
+    {
+        $person = new User();
+        $agents = $this->createMock(StreamAgentPinResolver::class);
+        $agents->expects(self::once())->method('resolve')->with($person, 5, true, 7)->willReturn(null);
+
+        $turn = $this->resolve(['message' => 'Hi', 'chatId' => '7', 'modelId' => '249', 'agentId' => 5, 'draft' => true], new StreamCaller($person, 'en'), $agents);
+
+        self::assertSame('249', $turn->options->modelId);
+    }
+
     public function testTheBodyOverridesTheQueryAndBooleansBecomeFlags(): void
     {
         $request = Request::create(
@@ -217,7 +243,7 @@ final class StreamRequestResolverTest extends TestCase
     /**
      * @param array<string, mixed> $body
      */
-    private function resolve(array $body, ?StreamCaller $caller = null): StreamTurnRequest
+    private function resolve(array $body, ?StreamCaller $caller = null, ?StreamAgentPinResolver $agents = null): StreamTurnRequest
     {
         $request = Request::create(
             '/api/v1/messages/stream',
@@ -226,10 +252,10 @@ final class StreamRequestResolverTest extends TestCase
             content: json_encode($body, JSON_THROW_ON_ERROR),
         );
 
-        return $this->resolver($caller)->resolve($request, $caller->user ?? new User());
+        return $this->resolver($caller, $agents)->resolve($request, $caller->user ?? new User());
     }
 
-    private function resolver(?StreamCaller $caller = null): StreamRequestResolver
+    private function resolver(?StreamCaller $caller = null, ?StreamAgentPinResolver $agents = null): StreamRequestResolver
     {
         $callers = $this->createStub(StreamCallerResolver::class);
         $callers->method('resolve')->willReturn($caller ?? new StreamCaller(new User(), 'en'));
@@ -239,7 +265,7 @@ final class StreamRequestResolverTest extends TestCase
 
         return new StreamRequestResolver(
             $callers,
-            $this->createStub(StreamAgentPinResolver::class),
+            $agents ?? $this->createStub(StreamAgentPinResolver::class),
             $this->createStub(EntityManagerInterface::class),
             $this->createStub(PromptService::class),
             $rateLimits,

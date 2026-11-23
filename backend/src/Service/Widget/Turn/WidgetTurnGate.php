@@ -75,7 +75,6 @@ final readonly class WidgetTurnGate
             config: $config,
             text: (string) $data['text'],
             files: $files,
-            chatId: !empty($data['chatId']) ? (int) $data['chatId'] : null,
             externalUserId: isset($data['externalUserId']) && \is_string($data['externalUserId']) ? trim($data['externalUserId']) : '',
             heldForOperator: $heldForOperator,
         );

@@ -123,7 +123,7 @@ final class WidgetAnswerStoreTest extends TestCase
         $owner = $this->createStub(User::class);
         $owner->method('getId')->willReturn(7);
 
-        return new WidgetTurn((new Widget())->setWidgetId('wdg_1'), $owner, $this->session, [], 'Hi', [], null, '', false);
+        return new WidgetTurn((new Widget())->setWidgetId('wdg_1'), $owner, $this->session, [], 'Hi', [], '', false);
     }
 
     /**

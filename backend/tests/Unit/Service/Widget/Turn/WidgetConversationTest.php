@@ -52,9 +52,23 @@ final class WidgetConversationTest extends TestCase
     {
         $this->session->setChatId(5);
         $this->chats[5] = $this->chat(8);
+
+        $stored = $this->conversation()->store($this->turn());
+
+        self::assertNotSame($this->chats[5], $stored->chat);
+        self::assertContains(['persist', 'chat'], $this->steps);
+    }
+
+    public function testAFreshSessionNeverJoinsAnotherChatOfTheOwner(): void
+    {
+        // Chat 6 is the owner's own; the visitor only knows its number.
         $this->chats[6] = $this->chat(7);
 
-        self::assertSame($this->chats[6], $this->conversation()->store($this->turn(chatId: 6))->chat);
+        $stored = $this->conversation()->store($this->turn());
+
+        self::assertNotSame($this->chats[6], $stored->chat);
+        self::assertSame('widget', $stored->chat->getSource());
+        self::assertContains(['persist', 'chat'], $this->steps);
     }
 
     public function testANewChatOpensWithTheWelcomeBeforeTheVisitorsMessage(): void
@@ -162,12 +176,12 @@ final class WidgetConversationTest extends TestCase
      * @param array<string, mixed> $config
      * @param array<mixed>         $files
      */
-    private function turn(array $config = [], string $text = 'Hi', array $files = [], ?int $chatId = null): WidgetTurn
+    private function turn(array $config = [], string $text = 'Hi', array $files = []): WidgetTurn
     {
         $owner = $this->createStub(User::class);
         $owner->method('getId')->willReturn(7);
 
-        return new WidgetTurn((new Widget())->setWidgetId('wdg_1')->setName('Shop'), $owner, $this->session, $config, $text, $files, $chatId, '', false);
+        return new WidgetTurn((new Widget())->setWidgetId('wdg_1')->setName('Shop'), $owner, $this->session, $config, $text, $files, '', false);
     }
 
     private function chat(int $userId): Chat

@@ -129,8 +129,8 @@ final class WidgetTurnGateTest extends TestCase
         ], JSON_THROW_ON_ERROR)));
 
         self::assertSame(
-            ['Hi', [3, 'x'], 12, 'user-1', false, ['messageLimit' => 3, 'allowedDomains' => []]],
-            [$turn->text, $turn->files, $turn->chatId, $turn->externalUserId, $turn->heldForOperator, $turn->config],
+            ['Hi', [3, 'x'], 'user-1', false, ['messageLimit' => 3, 'allowedDomains' => []]],
+            [$turn->text, $turn->files, $turn->externalUserId, $turn->heldForOperator, $turn->config],
         );
         self::assertSame([$this->session, $this->owner], [$turn->session, $turn->owner]);
     }

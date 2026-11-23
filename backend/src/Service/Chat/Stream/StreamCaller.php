@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Chat\Stream;
 
+use App\Entity\File;
 use App\Entity\GuestSession;
 use App\Entity\User;
 use App\Entity\WidgetSession;
@@ -43,6 +44,34 @@ final readonly class StreamCaller
     public function isGuest(): bool
     {
         return null !== $this->guestSession;
+    }
+
+    /**
+     * A widget visitor and a guest stream as a user they are not, so that
+     * user's chats are not theirs: they write only into the chat their own
+     * session opened.
+     */
+    public function mayWriteInto(int $chatId): bool
+    {
+        $session = $this->widgetSession ?? $this->guestSession;
+        if (null === $session) {
+            return true;
+        }
+
+        return null !== $session->getChatId() && $session->getChatId() === $chatId;
+    }
+
+    /**
+     * A person attaches the files they own. A widget visitor streams as the
+     * widget owner and attaches only what their own session uploaded.
+     */
+    public function mayAttach(File $file): bool
+    {
+        if (null !== $this->widgetSession) {
+            return null !== $this->widgetSession->getId() && $file->getUserSessionId() === $this->widgetSession->getId();
+        }
+
+        return $file->getUserId() === $this->user->getId();
     }
 
     /**
