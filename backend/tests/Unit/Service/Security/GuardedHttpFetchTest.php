@@ -162,19 +162,22 @@ final class GuardedHttpFetchTest extends TestCase
      */
     private function fetch(array $answers): GuardedHttpFetch
     {
-        $client = new class($this->sent, $answers) extends MockHttpClient {
+        $record = function (string $method, string $url, array $options): void {
+            $this->sent[] = ['method' => $method, 'url' => $url, 'options' => $options];
+        };
+        $client = new class($record, $answers) extends MockHttpClient {
             /**
-             * @param list<array{method: string, url: string, options: array<string, mixed>}> $sent
-             * @param array<string, MockResponse>                                              $answers
+             * @param \Closure(string, string, array<string, mixed>): void $record
+             * @param array<string, MockResponse>                          $answers
              */
-            public function __construct(private array &$sent, private array $answers)
+            public function __construct(private \Closure $record, private array $answers)
             {
                 parent::__construct();
             }
 
             public function request(string $method, string $url, array $options = []): \Symfony\Contracts\HttpClient\ResponseInterface
             {
-                $this->sent[] = ['method' => $method, 'url' => $url, 'options' => $options];
+                ($this->record)($method, $url, $options);
                 $this->setResponseFactory([$this->answers[$url] ?? new MockResponse('unexpected '.$url, ['http_code' => 500])]);
 
                 return parent::request($method, $url, $options);
