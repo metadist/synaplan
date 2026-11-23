@@ -5,12 +5,12 @@
 # logo: svgs/synaplan.svg
 # port: 80
 
-x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.9.0}
+x-app-image: &app-image ghcr.io/metadist/synaplan:${SYNAPLAN_VERSION:-5.10.0}
 
 x-app-environment: &app-environment
   APP_ENV: prod
   APP_DEBUG: "0"
-  APP_VERSION: ${SYNAPLAN_VERSION:-5.9.0}
+  APP_VERSION: ${SYNAPLAN_VERSION:-5.10.0}
   SYNAPLAN_PLATFORM: coolify
   APP_URL: ${SERVICE_URL_BACKEND}
   FRONTEND_URL: ${SERVICE_URL_BACKEND}
