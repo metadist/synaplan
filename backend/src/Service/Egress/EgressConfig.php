@@ -72,7 +72,9 @@ final class EgressConfig implements ResetInterface
             return [];
         }
         try {
-            $raw = $this->configRepository->getValue(0, self::CONFIG_GROUP, self::KEY_ALLOW);
+            // A scalar read, not an entity: a managed entity keeps the value it
+            // was first loaded with, and the allow-list editor needs the latest.
+            $raw = $this->configRepository->getValuesForOwners([0], self::CONFIG_GROUP, self::KEY_ALLOW)[0] ?? null;
         } catch (\Throwable) {
             return [];
         }

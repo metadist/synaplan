@@ -1255,7 +1255,9 @@
         "messages_gateway_flags": "Ağ geçidi ayarları değiştirildi",
         "messages_gateway_upstream": "Ağ geçidi adresi değiştirildi",
         "messages_gateway_aliases": "Model takma adları değiştirildi",
-        "tool_executed": "Araç çağrıları"
+        "tool_executed": "Araç çağrıları",
+        "egress_allow_added": "Giden hedefe izin verildi",
+        "egress_allow_removed": "Giden hedef kaldırıldı"
       },
       "what": "Ne oldu",
       "emptyNote": "Bu kayıt kimin ne yaptığını tutar. Sohbet veya dosya içeriğini açmaz.",
@@ -1755,7 +1757,8 @@
     "role": {
       "web": "Web",
       "worker": "Arka plan işi",
-      "scheduler": "Zamanlanmış görevler"
+      "scheduler": "Zamanlanmış görevler",
+      "pump": "Sohbet yanıtlarının iletimi"
     },
     "card": {
       "connectedHere": "Bu sunucuya bağlısınız.",
@@ -1808,6 +1811,221 @@
       "failed": "Olaylar okunamadı.",
       "empty": "Son bir saatte bu sunucudan uyarı yok.",
       "window": "Son bir saatin uyarı ve hataları, en yenisi önce, en fazla 20."
+    },
+    "sizingGuide": "Boyutlandırma kılavuzunu aç",
+    "tabs": {
+      "label": "Kapasite görünümleri",
+      "servers": "Sunucular",
+      "requests": "İstekler",
+      "ai": "Yapay zekâ çağrıları",
+      "tools": "Araçlar",
+      "outbound": "Giden"
+    },
+    "reports": {
+      "loading": "Son istekler okunuyor…",
+      "unavailable": "Ortak önbellek yanıt vermediği için son istekler şu anda okunamıyor. Synaplan çalışmaya devam ediyor."
+    },
+    "parts": {
+      "wait": "PHP bekleme",
+      "php": "PHP",
+      "ai": "Yapay zekâ",
+      "tools": "Araçlar",
+      "outbound": "Giden",
+      "db": "Veritabanı",
+      "overlap": "Bu süreler örtüşür (bir araç bir yapay zekâ modelini çağırabilir, yapay zekâ ve araçlar ağ üzerinden çıkar), bu yüzden toplamları isteğin süresini aşar. Çubuk bir tahmindir."
+    },
+    "status": {
+      "2xx": "Yanıtlandı",
+      "4xx": "Reddedildi",
+      "5xx": "Hata",
+      "busy": "Çok yoğun"
+    },
+    "egressStatus": {
+      "2xx": "Tamam",
+      "4xx": "Reddedildi",
+      "5xx": "Hata",
+      "blocked": "Filtre tarafından reddedildi"
+    },
+    "routeClass": {
+      "chat_stream": "Sohbet yanıtları",
+      "widget_message": "Widget mesajları",
+      "openai_api": "OpenAI uyumlu API",
+      "messages_api": "Messages API",
+      "files": "Dosyalar",
+      "search": "Arama",
+      "admin": "Yönetim",
+      "auth": "Oturum açma",
+      "config": "Ayarlar",
+      "mcp": "MCP sunucusu",
+      "webhook": "Webhook’lar",
+      "media": "Medya",
+      "other": "Diğer"
+    },
+    "aiSource": {
+      "chat_web": "Sohbet",
+      "chat_stream": "Sohbet (akış)",
+      "widget": "Widget",
+      "email": "E-posta",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "openai_api": "OpenAI uyumlu API",
+      "messages_api": "Messages API",
+      "saved_task": "Kayıtlı görevler",
+      "sorter": "Mesaj sıralama",
+      "memory": "Anılar",
+      "summary": "Özetler",
+      "vectorize": "Dosya dizinleme",
+      "rerank": "Yeniden sıralama",
+      "media": "Medya",
+      "voice_live": "Canlı ses",
+      "probe": "Sağlayıcı kontrolleri",
+      "system": "Sistem"
+    },
+    "capability": {
+      "chat": "Sohbet",
+      "chat_stream": "Sohbet (akış)",
+      "embed": "Embedding",
+      "embed_batch": "Embedding (toplu)",
+      "vision": "Görsel okuma",
+      "image": "Görsel oluşturma",
+      "video_start": "Video oluşturma",
+      "video_poll": "Video durumu",
+      "transcribe": "Yazıya dökme",
+      "synthesize": "Seslendirme",
+      "synthesize_stream": "Seslendirme (akış)",
+      "passthrough": "Doğrudan aktarım",
+      "voice_session": "Ses oturumu",
+      "probe": "Kontrol"
+    },
+    "toolSource": {
+      "builtin": "Yerleşik araçlar",
+      "mcp": "MCP sunucuları",
+      "document": "Belge araçları",
+      "skill": "Beceriler",
+      "plugin": "Eklentiler",
+      "custom": "Özel araçlar",
+      "compute": "Kod çalıştırıcı"
+    },
+    "toolKind": {
+      "read": "Okur",
+      "write": "Değiştirir",
+      "destructive": "Siler"
+    },
+    "toolOutcome": {
+      "done": "Tamamlandı",
+      "refused": "Reddedildi",
+      "needs_approval": "Onay bekliyor",
+      "failed": "Başarısız",
+      "timed_out": "Zaman aşımı"
+    },
+    "requests": {
+      "title": "Türe göre istekler",
+      "window": "Son {window} içinde {count} istek | Son {window} içinde {count} istek",
+      "empty": "Henüz kayıtlı istek yok. İlk sohbet veya API çağrısından saniyeler sonra burada görünür.",
+      "sortBy": "Sırala",
+      "sort": {
+        "p95_ms": "En yavaş (p95)",
+        "p99_ms": "En yavaş (p99)",
+        "requests": "En çok istek",
+        "errors": "En çok hata",
+        "busy": "En sık yoğun"
+      },
+      "col": {
+        "route": "Tür",
+        "requests": "İstekler",
+        "perMinute": "Dakikada",
+        "errors": "Hatalar",
+        "busy": "Çok yoğun",
+        "wait": "PHP bekleme (p95)"
+      },
+      "waitNotMeasured": "Bu sunucu boş bir PHP işçisini bekleme süresini ölçmüyor.",
+      "slowestTitle": "Son bir saatin en yavaşları",
+      "slowestHint": "Sürenin nereye gittiğini görmek için birini açın. Yalnızca süreler tutulur, ne sorulduğu asla.",
+      "slowestEmpty": "Son bir saatte istek yok.",
+      "mostly": "Çoğunlukla {part}: {duration}",
+      "aiCalls": "Yapay zekâ çağrıları",
+      "toolCalls": "Araç çağrıları",
+      "outboundCalls": "Giden çağrılar",
+      "firstWord": "ilk kelime {duration} sonra",
+      "tokens": "{in} giriş, {out} çıkış token’ı",
+      "database": "Veritabanı sorgusu yok | 1 veritabanı sorgusu, {duration} | {count} veritabanı sorgusu, {duration}",
+      "requestId": "İstek kimliği",
+      "copyId": "Kimliği kopyala",
+      "idCopied": "İstek kimliği kopyalandı. Günlüklerde arayın.",
+      "idCopyFailed": "İstek kimliği kopyalanamadı."
+    },
+    "ai": {
+      "empty": "Son isteklerde yapay zekâ çağrısı yok.",
+      "modelsTitle": "Sağlayıcı ve modele göre",
+      "modelsHint": "Son isteklerdeki {count} yapay zekâ çağrısından | Son isteklerdeki {count} yapay zekâ çağrısından",
+      "sourcesTitle": "Synaplan bölümüne göre",
+      "col": {
+        "model": "Sağlayıcı · model",
+        "calls": "Çağrılar",
+        "failures": "Hatalar",
+        "firstWord": "İlk kelime (p50 / p95)",
+        "duration": "Tüm çağrı (p95)",
+        "tokens": "Token giriş / çıkış",
+        "cost": "Maliyet",
+        "hooks": "Kancalar (p95)",
+        "source": "İsteyen",
+        "share": "Pay"
+      },
+      "hooksHint": "Synaplan’ın çağrı çevresinde harcadığı süre: kontroller, kayıt ve zaman çizelgesi.",
+      "legend": "İlk kelime, yanıtın görünmeye başladığı andır. Kancalar, Synaplan’ın her çağrıya eklediği süredir."
+    },
+    "tools": {
+      "title": "Araç çağrıları",
+      "hint": "Son isteklerdeki araç çağrılarının nasıl sonuçlandığı. Hangi araç ve ondan ne istendiği denetim günlüğünde kalır.",
+      "empty": "Son isteklerde araç çağrısı yok.",
+      "openApprovals": "Onayları aç ({count} bekliyor) | Onayları aç ({count} bekliyor)",
+      "failedHint": "Başarısız, zaman aşımına uğrayan çağrıları da içerir.",
+      "col": {
+        "source": "Kaynak",
+        "kind": "Tür",
+        "calls": "Çağrılar",
+        "askedApproval": "Onay istendi"
+      }
+    },
+    "outbound": {
+      "title": "Hedefler",
+      "hint": "Synaplan’ın son isteklerde dışarıya bağlandığı yerler. Kullanıcının yazdığı adresler birlikte sayılır ve asla listelenmez.",
+      "empty": "Son isteklerde giden çağrı yok.",
+      "emptyOff": "Giden trafik filtresi kapalıyken giden çağrılar kaydedilmez.",
+      "typed": "Kullanıcıların yazdığı adresler",
+      "openSetting": "Ayarı aç",
+      "mode": {
+        "off": "Giden trafik filtresi kapalı: her hedefe izin veriliyor ve giden çağrılar kaydedilmiyor. Synaplan'ın nereye çağrı yaptığını ve hangilerini reddedeceğini görmek için filtreyi “report” olarak ayarlayın.",
+        "report": "Giden trafik filtresi yalnızca bildiriyor: reddedeceği çağrılar yine geçer ve burada işaretlenir.",
+        "enforce": "Giden trafik filtresi, yerleşik olmayan ve izin listesinde bulunmayan her hedefi reddeder."
+      },
+      "state": {
+        "builtin": "Yerleşik",
+        "listed": "{rule} ile izinli",
+        "notListed": "İzin listesinde değil",
+        "wouldBeRefused": "Reddedilirdi",
+        "refused": "Reddedildi",
+        "typed": "Yazılırken denetlenir"
+      },
+      "col": {
+        "destination": "Hedef",
+        "requests": "Çağrılar",
+        "failures": "Hatalar",
+        "refused": "Reddedilen",
+        "state": "Filtre",
+        "action": "İşlem"
+      },
+      "allow": "İzin ver",
+      "allowLabel": "{rule} için izin ver",
+      "remove": "Kaldır",
+      "removeLabel": "{rule} kuralını izin listesinden kaldır",
+      "allowed": "{rule} izin listesinde.",
+      "removed": "{rule} artık izin listesinde değil.",
+      "removeTitle": "İzin listesinden kaldırılsın mı?",
+      "removeEnforce": "Filtre, bir sonraki istekten itibaren {rule} hedefine giden çağrıları reddeder.",
+      "removeReport": "Filtre yalnızca raporladığı veya kapalı olduğu sürece {rule} hedefine giden çağrılar çıkmaya devam eder. Yeniden listede değil olarak görünürler ve filtre reddetmeye ayarlandığında reddedilirler.",
+      "invalidRule": "Bu hedef izin listesine eklenemez.",
+      "saveFailed": "İzin listesi kaydedilemedi. Birazdan tekrar deneyin."
     }
   }
 }

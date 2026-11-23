@@ -26,6 +26,7 @@
 
 ## Related Guides
 
+- **Sizing:** How the pool sizes, the stream pump and the relay translate into answers at once per server, and how to read **Admin → Server load**, is in [Capacity and Sizing](CAPACITY.md).
 - **Feature & tool switches:** `TOOLS.REGISTRY_ENABLED` and wave feature flags are listed in [Feature Flags & Module Gates](FEATURE_FLAGS.md).
 - **Adding a provider to the allowlist:** A provider is one class whose endpoints automatically join the outbound allowlist—see [Adding an AI Provider](PROVIDERS.md).
 - **Architecture & egress internals:** See [Backend Architecture](ARCHITECTURE.md) (worker pools, provider catalog, tool path) and [Outbound Traffic & Egress Control](EGRESS.md) (what is wrapped and how the optional egress gateway works).
