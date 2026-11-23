@@ -8,6 +8,9 @@
         })
       }}
     </p>
+    <p class="txt-secondary text-sm" data-testid="text-runs-as-line">
+      {{ $t('assistants.triggers.runsAsLine') }}
+    </p>
 
     <div
       class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-light-border/30 dark:border-dark-border/20 px-3 py-2"
@@ -60,7 +63,9 @@
           :data-testid="`row-event-${event.id}`"
         >
           <p class="txt-primary text-sm">{{ sentenceForEvent(event) }}</p>
-          <p class="txt-secondary text-sm">{{ runsAsLabel(event.kind) }}</p>
+          <p v-if="isDepartmentMail(event)" class="txt-secondary text-sm">
+            {{ $t('assistants.triggers.runsAsDepartmentMail') }}
+          </p>
           <div class="flex flex-wrap items-center gap-2">
             <label class="inline-flex items-center gap-2 text-sm txt-primary">
               <input
@@ -101,7 +106,6 @@
             :data-testid="`row-schedule-${item.id}`"
           >
             <p class="txt-primary text-sm">{{ sentenceForSchedule(item) }}</p>
-            <p class="txt-secondary text-sm">{{ $t('assistants.triggers.runsAsYou') }}</p>
             <p class="txt-secondary text-sm">
               {{ $t('assistants.triggers.savedUnderAutomations') }}
             </p>
@@ -378,14 +382,8 @@ function sentenceForSchedule(item: TriggerSchedule): string {
   })
 }
 
-function runsAsLabel(kind: EventKind | undefined): string {
-  if (kind === 'mail' || kind === 'api') {
-    return t('assistants.triggers.runsAsYou')
-  }
-  if (kind === 'mcp' || kind === 'desktop') {
-    return t('assistants.triggers.runsAsAppUser')
-  }
-  return t('assistants.triggers.runsAsPerson')
+function isDepartmentMail(event: TriggerEvent): boolean {
+  return event.kind === 'mail' && Boolean(event.department)
 }
 
 onMounted(async () => {

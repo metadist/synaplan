@@ -30,6 +30,14 @@ vi.mock('@/services/api/agentsApi', async (importOriginal) => {
   }
 })
 
+const getPromptMock = vi.fn()
+
+vi.mock('@/services/api/promptsApi', () => ({
+  promptsApi: {
+    getPrompt: (...args: unknown[]) => getPromptMock(...args),
+  },
+}))
+
 vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({
     error: errorMock,
@@ -80,6 +88,8 @@ describe('AssistantPublishSection', () => {
     warningMock.mockReset()
     confirmMock.mockReset()
     confirmMock.mockResolvedValue(false)
+    getPromptMock.mockReset()
+    getPromptMock.mockResolvedValue({ prompt: '' })
     vi.mocked(agentsApi.publish).mockReset()
     vi.mocked(agentsApi.update).mockReset()
     vi.mocked(agentsApi.get).mockReset()
@@ -122,6 +132,41 @@ describe('AssistantPublishSection', () => {
 
     expect(agentsApi.publish).not.toHaveBeenCalled()
     expect(errorMock).not.toHaveBeenCalledWith('Could not publish the assistant')
+  })
+
+  it('offers the derived description once before sharing an agent that has none', async () => {
+    getPromptMock.mockResolvedValue({
+      prompt: 'Write an offer from the price list and cite every price. Use the current list only.',
+    })
+    vi.mocked(agentsApi.update).mockResolvedValue(agent())
+    const wrapper = mountSection()
+
+    await wrapper.get('[data-testid="btn-share-assistant"]').trigger('click')
+    const field = await vi.waitFor(() => wrapper.get('[data-testid="input-share-description"]'))
+    expect((field.element as HTMLTextAreaElement).value).toBe(
+      'Write an offer from the price list and cite every price.'
+    )
+
+    await wrapper.get('[data-testid="btn-share-description-save"]').trigger('click')
+    await vi.waitFor(() => {
+      expect(agentsApi.update).toHaveBeenCalledWith(3, {
+        description: 'Write an offer from the price list and cite every price.',
+      })
+    })
+    expect(wrapper.find('[data-testid="section-share-description"]').exists()).toBe(false)
+    expect(useAgentsStore().current?.description).toBe(
+      'Write an offer from the price list and cite every price.'
+    )
+  })
+
+  it('shares straight away when a description already exists', async () => {
+    useAgentsStore().current = agent({ description: 'Already described.' })
+    const wrapper = mountSection()
+
+    await wrapper.get('[data-testid="btn-share-assistant"]').trigger('click')
+
+    expect(wrapper.find('[data-testid="section-share-description"]').exists()).toBe(false)
+    expect(getPromptMock).not.toHaveBeenCalled()
   })
 
   it('reloads the assistant when publish reports nothing_changed', async () => {
