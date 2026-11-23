@@ -93,7 +93,7 @@ trait BuildsAllModules
                 $this->createStub(AppleReceiptVerifierInterface::class),
                 $this->createStub(GooglePlayVerifierInterface::class),
             ),
-            new WhatsappModule(false, '', ''),
+            new WhatsappModule(false, '', '', ''),
             new TelegramModule(false),
             new FederationModule('http://localhost:8000', false),
             new ComputeModule($probe, $this->createStub(ComputeConfig::class), '', ''),

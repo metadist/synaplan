@@ -401,7 +401,7 @@ final class PlatformCapabilityInventoryTest extends TestCase
         $modules = [
             OfficeConvertModule::ID => new OfficeConvertModule($probe, $officeUrl),
             PiperTtsModule::ID => new PiperTtsModule($probe, $ttsUrl),
-            WhatsappModule::ID => new WhatsappModule(false, '', ''),
+            WhatsappModule::ID => new WhatsappModule(false, '', '', ''),
         ];
 
         $factories = [];

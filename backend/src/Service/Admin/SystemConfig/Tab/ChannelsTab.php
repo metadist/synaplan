@@ -55,6 +55,11 @@ final readonly class ChannelsTab implements SystemConfigTab
                 description: 'WhatsApp access token',
                 sensitive: true,
             ),
+            'WHATSAPP_APP_SECRET' => new FieldDefinition(
+                type: 'password',
+                description: 'Meta app secret; incoming webhook calls are checked against its signature',
+                sensitive: true,
+            ),
             'WHATSAPP_WEBHOOK_VERIFY_TOKEN' => new FieldDefinition(
                 type: 'password',
                 description: 'Webhook verification token',

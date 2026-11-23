@@ -455,28 +455,6 @@ class WhatsAppServiceTest extends TestCase
         $service->markAsRead('wamid.test123', $this->testPhoneNumberId);
     }
 
-    public function testVerifyWebhookSignature(): void
-    {
-        $payload = json_encode(['test' => 'data']);
-        $secret = 'test_secret';
-        $validSignature = 'sha256='.hash_hmac('sha256', $payload, $secret);
-
-        $result = $this->service->verifyWebhookSignature($payload, $validSignature, $secret);
-
-        $this->assertTrue($result);
-    }
-
-    public function testVerifyWebhookSignatureInvalid(): void
-    {
-        $payload = json_encode(['test' => 'data']);
-        $secret = 'test_secret';
-        $invalidSignature = 'sha256=invalid_signature';
-
-        $result = $this->service->verifyWebhookSignature($payload, $invalidSignature, $secret);
-
-        $this->assertFalse($result);
-    }
-
     public function testSendMediaSuccess(): void
     {
         $response = $this->createMock(ResponseInterface::class);

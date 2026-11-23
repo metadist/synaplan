@@ -89,31 +89,38 @@ final class CommerceAndChannelModulesTest extends TestCase
         $this->assertSame(['iap_verify'], $routes);
     }
 
-    public function testWhatsappMirrorsWhatsAppServiceAvailability(): void
+    public function testWhatsappNeedsTheAccessTokenAndTheAppSecret(): void
     {
-        $this->assertFalse((new WhatsappModule(false, 'token', 'verify'))->isConfigured());
-        $this->assertFalse((new WhatsappModule(true, '', 'verify'))->isConfigured());
-        $this->assertTrue((new WhatsappModule(true, 'token', ''))->isConfigured(), 'the verify token is not part of isAvailable()');
-        $this->assertTrue((new WhatsappModule(true, 'token', 'verify'))->isConfigured());
+        $this->assertFalse((new WhatsappModule(false, 'token', 'verify', 'secret'))->isConfigured());
+        $this->assertFalse((new WhatsappModule(true, '', 'verify', 'secret'))->isConfigured());
+        $this->assertFalse((new WhatsappModule(true, 'token', 'verify', ''))->isConfigured(), 'without the app secret no inbound message can be verified');
+        $this->assertTrue((new WhatsappModule(true, 'token', '', 'secret'))->isConfigured(), 'the verify token is only needed for the handshake');
+        $this->assertTrue((new WhatsappModule(true, 'token', 'verify', 'secret'))->isConfigured());
     }
 
     public function testWhatsappStatusNamesMissingKeys(): void
     {
-        $absent = (new WhatsappModule(false, '', ''))->status();
+        $absent = (new WhatsappModule(false, '', '', ''))->status();
         $this->assertSame('absent', $absent->state());
-        $this->assertSame(['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN'], $absent->details['missing']);
+        $this->assertSame(['WHATSAPP_ENABLED', 'WHATSAPP_ACCESS_TOKEN', 'WHATSAPP_APP_SECRET', 'WHATSAPP_WEBHOOK_VERIFY_TOKEN'], $absent->details['missing']);
 
-        $noVerify = (new WhatsappModule(true, 'EAAB-secret-token', ''))->status();
+        $noSecret = (new WhatsappModule(true, 'EAAB-secret-token', 'verify', ''))->status();
+        $this->assertFalse($noSecret->configured);
+        $this->assertSame(['WHATSAPP_APP_SECRET'], $noSecret->details['missing']);
+
+        $noVerify = (new WhatsappModule(true, 'EAAB-secret-token', '', 'meta-app-secret'))->status();
         $this->assertSame('needs_setup', $noVerify->state());
         $this->assertSame(['WHATSAPP_WEBHOOK_VERIFY_TOKEN'], $noVerify->details['missing']);
-        $this->assertStringNotContainsString('EAAB-secret-token', json_encode($noVerify->toArray(), JSON_THROW_ON_ERROR));
+        $encoded = json_encode($noVerify->toArray(), JSON_THROW_ON_ERROR);
+        $this->assertStringNotContainsString('EAAB-secret-token', $encoded);
+        $this->assertStringNotContainsString('meta-app-secret', $encoded);
 
-        $this->assertSame('available', (new WhatsappModule(true, 'token', 'verify'))->status()->state());
+        $this->assertSame('available', (new WhatsappModule(true, 'token', 'verify', 'secret'))->status()->state());
     }
 
     public function testWhatsappNeverGatesTheMetaHandshakeOrTheStatusRoute(): void
     {
-        $routes = (new WhatsappModule(true, 'token', 'verify'))->routeNames();
+        $routes = (new WhatsappModule(true, 'token', 'verify', 'secret'))->routeNames();
 
         $this->assertNotContains('api_webhooks_whatsapp_verify', $routes);
         $this->assertNotContains('api_phone_verify_status', $routes);

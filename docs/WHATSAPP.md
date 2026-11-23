@@ -25,6 +25,7 @@ Connect Synaplan to WhatsApp Business API for AI-powered messaging.
 2. Create or select a business account
 3. Add WhatsApp to your business
 4. Get your **Access Token** from the API settings
+5. Copy the **App Secret** from App settings → Basic
 
 ### 2. Configure Environment
 
@@ -33,8 +34,14 @@ Add to `backend/.env`:
 ```bash
 WHATSAPP_ENABLED=true
 WHATSAPP_ACCESS_TOKEN=your_meta_access_token
+WHATSAPP_APP_SECRET=your_meta_app_secret
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_custom_verify_token
 ```
+
+`WHATSAPP_APP_SECRET` is required. Meta signs every webhook call with it
+(`X-Hub-Signature-256`), and Synaplan refuses a call without a matching
+signature. While it is empty the channel is not configured and the webhook
+answers 404.
 
 ### 3. Configure Webhook in Meta
 
@@ -138,6 +145,9 @@ Response → WhatsApp
 1. Check webhook URL is publicly accessible (HTTPS)
 2. Verify token matches in Meta and `.env`
 3. Check subscription includes `messages`
+4. `WHATSAPP_APP_SECRET` is the App Secret of the Meta app that owns the
+   webhook. A wrong value answers `401 Invalid signature`; an empty one
+   answers 404 (`feature_not_configured`)
 
 ### Messages not sending
 
@@ -156,7 +166,7 @@ Response → WhatsApp
 ## API Reference
 
 ```bash
-# Webhook endpoint (called by Meta)
+# Webhook endpoint (called by Meta, signed with X-Hub-Signature-256)
 POST /api/v1/webhooks/whatsapp
 
 # Webhook verification (called by Meta)
@@ -168,7 +178,8 @@ GET /api/v1/webhooks/whatsapp?hub.verify_token=...
 ## Security Notes
 
 - Access token is never exposed to clients
-- Webhook verify token prevents spoofing
+- Every webhook call must carry Meta's signature, made with the app secret
+- The verify token is only used for Meta's one-time handshake
 - Phone numbers are hashed for privacy
 - Rate limiting prevents abuse
 

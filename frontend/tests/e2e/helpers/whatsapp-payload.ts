@@ -2,6 +2,33 @@
  * Meta Cloud API webhook payloads for POST /api/v1/webhooks/whatsapp.
  */
 
+import { createHmac } from 'node:crypto'
+
+/** Matches WHATSAPP_APP_SECRET in backend/.env.test. Not a real secret. */
+const E2E_APP_SECRET = 'e2e-whatsapp-app-secret'
+
+/**
+ * The request Meta would send: the serialized body and its
+ * X-Hub-Signature-256, made with the app secret. The backend refuses a
+ * webhook call without a matching signature.
+ */
+export function signedWebhookRequest(payload: object): {
+  data: string
+  headers: Record<string, string>
+} {
+  const data = JSON.stringify(payload)
+  const secret = process.env.WHATSAPP_APP_SECRET || E2E_APP_SECRET
+  const signature = createHmac('sha256', secret).update(data).digest('hex')
+
+  return {
+    data,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Hub-Signature-256': `sha256=${signature}`,
+    },
+  }
+}
+
 const PHONE_NUMBER_ID = '123456789012345'
 const DISPLAY_PHONE = '15550001234'
 

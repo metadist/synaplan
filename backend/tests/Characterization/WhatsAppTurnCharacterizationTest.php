@@ -44,11 +44,13 @@ final class WhatsAppTurnCharacterizationTest extends WebTestCase
     private const SNAPSHOT = __DIR__.'/__snapshots__/whatsapp_turn.json';
     private const PHONE_NUMBER_ID = '1098765';
     private const TIMESTAMP = 1792240000;
+    private const APP_SECRET = 'characterization-app-secret';
 
     /** The service is enabled and links to a fixed app, whatever the machine's environment says. */
     private const ENVIRONMENT = [
         'WHATSAPP_ENABLED' => 'true',
         'WHATSAPP_ACCESS_TOKEN' => 'characterization',
+        'WHATSAPP_APP_SECRET' => self::APP_SECRET,
         'WHATSAPP_GRAPH_API_BASE_URL' => 'https://graph.characterization.test',
         'APP_URL' => 'https://app.characterization.test',
     ];
@@ -186,7 +188,11 @@ final class WhatsAppTurnCharacterizationTest extends WebTestCase
 
         $answers = [];
         for ($delivery = 0; $delivery < ($case['deliveries'] ?? 1); ++$delivery) {
-            $client->request('POST', '/api/v1/webhooks/whatsapp', [], [], ['CONTENT_TYPE' => 'application/json'], json_encode($this->payload($id, $phone, $case['message']), JSON_THROW_ON_ERROR));
+            $body = json_encode($this->payload($id, $phone, $case['message']), JSON_THROW_ON_ERROR);
+            $client->request('POST', '/api/v1/webhooks/whatsapp', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_X_HUB_SIGNATURE_256' => 'sha256='.hash_hmac('sha256', $body, self::APP_SECRET),
+            ], $body);
             $answers[] = $this->webhookAnswer($client);
         }
         $em->clear();

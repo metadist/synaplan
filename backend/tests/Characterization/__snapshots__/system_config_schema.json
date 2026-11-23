@@ -2086,6 +2086,14 @@
                 "tab": "channels",
                 "type": "password"
             },
+            "WHATSAPP_APP_SECRET": {
+                "default": "",
+                "description": "Meta app secret; incoming webhook calls are checked against its signature",
+                "section": "whatsapp",
+                "sensitive": true,
+                "tab": "channels",
+                "type": "password"
+            },
             "WHATSAPP_DISPLAY_NUMBERS": {
                 "default": "",
                 "description": "E.164 numbers people write to for verification, comma-separated",
@@ -2420,6 +2428,7 @@
                         "fields": [
                             "WHATSAPP_ENABLED",
                             "WHATSAPP_ACCESS_TOKEN",
+                            "WHATSAPP_APP_SECRET",
                             "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
                             "WHATSAPP_DISPLAY_NUMBERS"
                         ],
@@ -3954,6 +3963,11 @@
                 "isSet": false,
                 "value": ""
             },
+            "WHATSAPP_APP_SECRET": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
             "WHATSAPP_DISPLAY_NUMBERS": {
                 "isMasked": false,
                 "isSet": false,
@@ -5309,6 +5323,11 @@
                 "value": "true"
             },
             "WHATSAPP_ACCESS_TOKEN": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "WHATSAPP_APP_SECRET": {
                 "isMasked": false,
                 "isSet": false,
                 "value": ""
@@ -7708,6 +7727,14 @@
                 "tab": "channels",
                 "type": "password"
             },
+            "WHATSAPP_APP_SECRET": {
+                "default": "",
+                "description": "Meta app secret; incoming webhook calls are checked against its signature",
+                "section": "whatsapp",
+                "sensitive": true,
+                "tab": "channels",
+                "type": "password"
+            },
             "WHATSAPP_DISPLAY_NUMBERS": {
                 "default": "",
                 "description": "E.164 numbers people write to for verification, comma-separated",
@@ -8042,6 +8069,7 @@
                         "fields": [
                             "WHATSAPP_ENABLED",
                             "WHATSAPP_ACCESS_TOKEN",
+                            "WHATSAPP_APP_SECRET",
                             "WHATSAPP_WEBHOOK_VERIFY_TOKEN",
                             "WHATSAPP_DISPLAY_NUMBERS"
                         ],
@@ -9757,6 +9785,11 @@
                 "isSet": false,
                 "value": ""
             },
+            "WHATSAPP_APP_SECRET": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
             "WHATSAPP_DISPLAY_NUMBERS": {
                 "isMasked": false,
                 "isSet": false,
@@ -10952,6 +10985,11 @@
                 "value": "true"
             },
             "WHATSAPP_ACCESS_TOKEN": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "WHATSAPP_APP_SECRET": {
                 "isMasked": false,
                 "isSet": false,
                 "value": ""
@@ -12169,6 +12207,11 @@
                 "value": "true"
             },
             "WHATSAPP_ACCESS_TOKEN": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "WHATSAPP_APP_SECRET": {
                 "isMasked": false,
                 "isSet": false,
                 "value": ""
@@ -13522,6 +13565,11 @@
                 "isSet": false,
                 "value": ""
             },
+            "WHATSAPP_APP_SECRET": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
             "WHATSAPP_DISPLAY_NUMBERS": {
                 "isMasked": false,
                 "isSet": false,
@@ -14867,6 +14915,11 @@
                 "value": "true"
             },
             "WHATSAPP_ACCESS_TOKEN": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
+            "WHATSAPP_APP_SECRET": {
                 "isMasked": false,
                 "isSet": false,
                 "value": ""

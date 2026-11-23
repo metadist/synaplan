@@ -414,6 +414,7 @@ services:
       # External API Keys loaded from backend/.env via env_file
       # WhatsApp Business API - Fully Dynamic Multi-Number Support
       WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_APP_SECRET: ${WHATSAPP_APP_SECRET:-}
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-}
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-false}
       WHATSAPP_DISPLAY_NUMBERS: ${WHATSAPP_DISPLAY_NUMBERS:-}

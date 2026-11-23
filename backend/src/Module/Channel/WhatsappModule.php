@@ -15,8 +15,9 @@ use App\Module\Contract\ModuleStatus;
  *
  * Deliberately env-only: `WhatsAppService` pulls in sixteen collaborators, so
  * the descriptor reads the same two values `WhatsAppService::isAvailable()`
- * uses instead of instantiating the service. `status()` names missing keys,
- * never their values.
+ * uses instead of instantiating the service, plus the app secret: without it
+ * no inbound message can be told from a forged one, so the channel is not
+ * configured. `status()` names missing keys, never their values.
  *
  * Never listed: `api_webhooks_whatsapp_verify` (Meta's GET handshake — the
  * very step that makes the channel configured) and `api_phone_verify_status`
@@ -30,6 +31,8 @@ final class WhatsappModule implements FeatureModuleInterface
         private readonly bool $enabled,
         private readonly string $accessToken,
         private readonly string $webhookVerifyToken,
+        #[\SensitiveParameter]
+        private readonly string $appSecret,
     ) {
     }
 
@@ -48,6 +51,7 @@ final class WhatsappModule implements FeatureModuleInterface
         return ConfiguredBy::env(
             'WHATSAPP_ENABLED',
             'WHATSAPP_ACCESS_TOKEN',
+            'WHATSAPP_APP_SECRET',
             'WHATSAPP_WEBHOOK_VERIFY_TOKEN',
             'WHATSAPP_GRAPH_API_BASE_URL',
             'WHATSAPP_DISPLAY_NUMBERS',
@@ -56,7 +60,7 @@ final class WhatsappModule implements FeatureModuleInterface
 
     public function isConfigured(): bool
     {
-        return $this->enabled && '' !== trim($this->accessToken);
+        return $this->enabled && '' !== trim($this->accessToken) && '' !== trim($this->appSecret);
     }
 
     public function status(): ModuleStatus
@@ -67,6 +71,9 @@ final class WhatsappModule implements FeatureModuleInterface
         }
         if ('' === trim($this->accessToken)) {
             $missing[] = 'WHATSAPP_ACCESS_TOKEN';
+        }
+        if ('' === trim($this->appSecret)) {
+            $missing[] = 'WHATSAPP_APP_SECRET';
         }
         if ('' === trim($this->webhookVerifyToken)) {
             $missing[] = 'WHATSAPP_WEBHOOK_VERIFY_TOKEN';

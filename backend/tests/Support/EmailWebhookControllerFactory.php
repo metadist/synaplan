@@ -27,6 +27,7 @@ use App\Service\ModelConfigService;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
 use App\Service\WhatsApp\Turn\WhatsAppTurn;
+use App\Service\WhatsApp\WhatsAppWebhookAuth;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpFoundation\Request;
@@ -85,7 +86,7 @@ final class EmailWebhookControllerFactory
             $doubles['whatsApp'],
             $doubles['emailChats'],
             $logger,
-            'verify-token',
+            new WhatsAppWebhookAuth('app-secret', 'verify-token'),
             $doubles['errors'],
             new InboundEmailIntake($doubles['mime'], $doubles['idempotency'], $doubles['emailChats'], $doubles['limits'], $doubles['mailer'], $doubles['discord'], $logger, self::relayAuth()),
             new EmailConversation($doubles['emailChats'], $doubles['attachments'], $doubles['em']),

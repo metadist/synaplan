@@ -193,6 +193,7 @@ parameters:
     env(IAP_STORE_PRICE_BUSINESS): '129.99'
     env(WHATSAPP_ACCESS_TOKEN): ''
     env(WHATSAPP_WEBHOOK_VERIFY_TOKEN): ''
+    env(WHATSAPP_APP_SECRET): ''
     env(WHATSAPP_ENABLED): 'false'
     env(WHATSAPP_DISPLAY_NUMBERS): ''
     env(TELEGRAM_ENABLED): 'false'
@@ -732,10 +733,12 @@ services:
             $appUrl: '%env(APP_URL)%'
             $uploadsDir: '%kernel.project_dir%/var/uploads'
 
-    # Webhook Controller - Bind WhatsApp Verify Token
-    App\Controller\WebhookController:
-        bind:
-            $whatsappWebhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+    # Meta signs the webhook body with the app secret; the GET handshake
+    # carries the verify token.
+    App\Service\WhatsApp\WhatsAppWebhookAuth:
+        arguments:
+            $appSecret: '%env(WHATSAPP_APP_SECRET)%'
+            $verifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
 
     # MCP (Model Context Protocol) Streamable HTTP endpoint
     App\Controller\McpController:
@@ -1504,6 +1507,7 @@ services:
             $enabled: '%env(bool:WHATSAPP_ENABLED)%'
             $accessToken: '%env(WHATSAPP_ACCESS_TOKEN)%'
             $webhookVerifyToken: '%env(WHATSAPP_WEBHOOK_VERIFY_TOKEN)%'
+            $appSecret: '%env(WHATSAPP_APP_SECRET)%'
 
     App\Module\Channel\TelegramModule:
         arguments:

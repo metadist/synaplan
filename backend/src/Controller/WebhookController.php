@@ -15,6 +15,7 @@ use App\Service\Message\MessageProcessor;
 use App\Service\RateLimitService;
 use App\Service\Usage\FacadeMeteredChat;
 use App\Service\WhatsApp\Turn\WhatsAppTurn;
+use App\Service\WhatsApp\WhatsAppWebhookAuth;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -36,7 +37,7 @@ class WebhookController extends AbstractController
         private WhatsAppTurn $whatsAppTurn,
         private EmailChatService $emailChatService,
         private LoggerInterface $logger,
-        private string $whatsappWebhookVerifyToken,
+        private WhatsAppWebhookAuth $whatsappAuth,
         private ChatErrorPresenter $chatErrorPresenter,
         private InboundEmailIntake $emailIntake,
         private EmailConversation $emailConversation,
@@ -121,18 +122,19 @@ class WebhookController extends AbstractController
         $mode = $request->query->get('hub_mode');
         $token = $request->query->get('hub_verify_token');
         $challenge = $request->query->get('hub_challenge');
+        $tokenMatches = $this->whatsappAuth->acceptsVerifyToken(is_string($token) ? $token : null);
 
-        if ('subscribe' === $mode && $token === $this->whatsappWebhookVerifyToken) {
+        if ('subscribe' === $mode && $tokenMatches) {
             $this->logger->info('WhatsApp webhook verified');
 
-            return new Response($challenge, Response::HTTP_OK, [
+            return new Response((string) $challenge, Response::HTTP_OK, [
                 'Content-Type' => 'text/plain',
             ]);
         }
 
         $this->logger->warning('WhatsApp webhook verification failed', [
             'mode' => $mode,
-            'token_match' => $token === $this->whatsappWebhookVerifyToken,
+            'token_match' => $tokenMatches,
         ]);
 
         return new Response('Forbidden', Response::HTTP_FORBIDDEN);
@@ -143,17 +145,27 @@ class WebhookController extends AbstractController
      *
      * POST /api/v1/webhooks/whatsapp
      *
-     * Receives messages from Meta WhatsApp Business API.
-     * No authentication required - users are automatically found/created based on phone number.
-     * Anonymous users get ANONYMOUS rate limits until they verify their phone.
+     * Receives messages from Meta WhatsApp Business API. The body must carry
+     * Meta's X-Hub-Signature-256, made with the app secret. The sender needs
+     * no account: users are found or created from the phone number, and
+     * anonymous users get ANONYMOUS rate limits until they verify their phone.
      * https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples
      */
     #[Route('/whatsapp', name: 'whatsapp', methods: ['POST'])]
     #[OA\Post(
         path: '/api/v1/webhooks/whatsapp',
         summary: 'WhatsApp webhook endpoint',
-        description: 'Handles incoming WhatsApp messages. No authentication required - anonymous users allowed.',
-        tags: ['Webhooks']
+        description: 'Handles incoming WhatsApp messages from Meta. The request must carry the X-Hub-Signature-256 header: "sha256=" followed by the HMAC-SHA256 of the raw body, keyed with the Meta app secret (WHATSAPP_APP_SECRET). The sender needs no Synaplan account.',
+        tags: ['Webhooks'],
+        parameters: [
+            new OA\Parameter(
+                name: 'X-Hub-Signature-256',
+                in: 'header',
+                required: true,
+                description: 'Signature of the raw request body, as Meta sends it',
+                schema: new OA\Schema(type: 'string', example: 'sha256=5d5b09f6dcb2d53a5fffc60c4ac0d55fabdf556069d6631545f42aa6e3500f2e')
+            ),
+        ]
     )]
     #[OA\Response(
         response: 200,
@@ -171,16 +183,29 @@ class WebhookController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Invalid webhook payload')]
+    #[OA\Response(
+        response: 401,
+        description: 'Signature missing or not made with the configured app secret',
+        content: new OA\JsonContent(
+            required: ['success', 'error'],
+            properties: [
+                new OA\Property(property: 'success', type: 'boolean', example: false),
+                new OA\Property(property: 'error', type: 'string', example: 'Invalid signature'),
+            ]
+        )
+    )]
     #[OA\Response(response: 429, description: 'Rate limit exceeded')]
     public function whatsapp(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent(), true);
+        if (!$this->whatsappAuth->acceptsSignature($request->getContent(), $request->headers->get(WhatsAppWebhookAuth::SIGNATURE_HEADER))) {
+            $this->logger->warning('WhatsApp webhook refused: signature missing or wrong');
 
+            return $this->json(['success' => false, 'error' => 'Invalid signature'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        $data = json_decode($request->getContent(), true);
         if (!$data || !isset($data['entry'])) {
-            return $this->json([
-                'success' => false,
-                'error' => 'Invalid WhatsApp webhook payload',
-            ], Response::HTTP_BAD_REQUEST);
+            return $this->json(['success' => false, 'error' => 'Invalid WhatsApp webhook payload'], Response::HTTP_BAD_REQUEST);
         }
 
         try {
@@ -218,11 +243,7 @@ class WebhookController extends AbstractController
                         $dto = IncomingMessageDto::fromPayload($incomingMsg, $value);
 
                         // 3. The WhatsApp turn answers the message
-                        $responses[] = $this->whatsAppTurn->handle(
-                            $dto,
-                            $userResult['user'],
-                            $userResult['is_anonymous'] ?? false
-                        );
+                        $responses[] = $this->whatsAppTurn->handle($dto, $userResult['user'], $userResult['is_anonymous'] ?? false);
                     }
                 }
             }

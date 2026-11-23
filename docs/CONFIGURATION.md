@@ -790,6 +790,7 @@ thumbnails and PDF export leaves the two URLs empty.
 ```bash
 WHATSAPP_ENABLED=true
 WHATSAPP_ACCESS_TOKEN=your_meta_access_token
+WHATSAPP_APP_SECRET=your_meta_app_secret
 WHATSAPP_WEBHOOK_VERIFY_TOKEN=your_verify_token
 ```
 

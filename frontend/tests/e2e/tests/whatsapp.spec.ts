@@ -22,6 +22,7 @@ import {
   metaPayloadText,
   metaPayloadImage,
   metaPayloadAudio,
+  signedWebhookRequest,
   uniqueWaSender,
   PHONE_NUMBER_ID,
 } from '../helpers/whatsapp-payload'
@@ -34,7 +35,7 @@ function webhookUrl(): string {
 }
 
 async function postWebhookAndAssert2xx(request: APIRequestContext, payload: object): Promise<void> {
-  const res = await request.post(webhookUrl(), { data: payload })
+  const res = await request.post(webhookUrl(), signedWebhookRequest(payload))
   expect(res.status()).toBeGreaterThanOrEqual(200)
   expect(res.status()).toBeLessThan(300)
   const json = await res.json()
@@ -46,6 +47,25 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
 
   test.beforeEach(async ({ request }, testInfo) => {
     await resetStub(request, getStubBaseUrl(), makeRunId(testInfo.testId))
+  })
+
+  test('unsigned webhook call is refused and sends nothing', async ({ request }) => {
+    const baseUrl = getStubBaseUrl()
+    const payload = metaPayloadText(`smoke-unsigned-${Date.now()}`, uniqueWaSender(), 'ping')
+
+    const unsigned = await request.post(webhookUrl(), { data: payload })
+    expect(unsigned.status()).toBe(401)
+
+    const forged = await request.post(webhookUrl(), {
+      data: JSON.stringify(payload),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Hub-Signature-256': `sha256=${'0'.repeat(64)}`,
+      },
+    })
+    expect(forged.status()).toBe(401)
+
+    expect(countPostMessages(await getStubRequests(request, baseUrl))).toBe(0)
   })
 
   test('text: webhook 2xx, exactly one outbound, contract, idempotency', async ({
@@ -96,7 +116,7 @@ test.describe('@ci @whatsapp @smoke WhatsApp', () => {
     const payload = metaPayloadText(messageId, testFrom, 'ping')
 
     await test.step('Act: POST webhook (stub 500 on outbound)', async () => {
-      const res = await request.post(webhookUrl(), { data: payload })
+      const res = await request.post(webhookUrl(), signedWebhookRequest(payload))
       expect(res.status()).toBeGreaterThanOrEqual(200)
       expect(res.status()).toBeLessThan(300)
       const json = await res.json()

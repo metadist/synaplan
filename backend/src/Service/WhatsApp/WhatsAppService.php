@@ -35,6 +35,7 @@ final class WhatsAppService
     ];
 
     private const DEFAULT_GRAPH_BASE = 'https://graph.facebook.com';
+    private const MEDIA_ID_PATTERN = '/^[A-Za-z0-9._-]+$/';
 
     private string $accessToken;
     private bool $enabled;
@@ -656,19 +657,6 @@ final class WhatsAppService
     }
 
     /**
-     * Verify webhook signature.
-     */
-    public function verifyWebhookSignature(string $payload, string $signature, string $verifyToken): bool
-    {
-        $expectedSignature = hash_hmac('sha256', $payload, $verifyToken);
-
-        // Remove 'sha256=' prefix if present
-        $signature = str_replace('sha256=', '', $signature);
-
-        return hash_equals($expectedSignature, $signature);
-    }
-
-    /**
      * Format phone number for WhatsApp (remove +, spaces, dashes).
      */
     private function formatPhoneNumber(string $phone): string
@@ -687,6 +675,10 @@ final class WhatsAppService
 
         if (empty($phoneNumberId)) {
             throw new \InvalidArgumentException('Phone Number ID is required for getting media URL.');
+        }
+        if (1 !== preg_match(self::MEDIA_ID_PATTERN, $mediaId) || str_contains($mediaId, '..')) {
+            // The id becomes a path segment of the Graph URL.
+            return null;
         }
 
         $url = sprintf(
