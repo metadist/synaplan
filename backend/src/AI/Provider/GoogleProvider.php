@@ -125,13 +125,13 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 structuredOutput: StructuredOutputDialect::GOOGLE_RESPONSE_JSON_SCHEMA,
                 catalogToolUse: true,
                 gatewayVisionRewrite: true,
-                // Hydrogen is the only public Gemini id that accepts xhigh.
+                // Hydrogen and Neon are the public Gemini ids that accept xhigh.
                 // The match is exact so a suffixed id (gemini-4-hydrogen-cyber)
                 // stays on the shared ladder and is not offered that level.
                 reasoning: new ReasoningLadder([
                     new ReasoningLevelRule(
                         ReasoningMatch::Exact,
-                        ['gemini-4-hydrogen'],
+                        ['gemini-4-hydrogen', 'gemini-4-neon'],
                         ['low', 'medium', 'high', 'xhigh'],
                     ),
                     new ReasoningLevelRule(ReasoningMatch::Any, [], ['low', 'medium', 'high']),

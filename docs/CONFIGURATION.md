@@ -420,6 +420,19 @@ the US. Create a key at [cloud.cerebras.ai](https://cloud.cerebras.ai/) under
 **API Keys**; a free trial is available with a smaller context (65K) and rate limits.
 Docs: [inference-docs.cerebras.ai](https://inference-docs.cerebras.ai/).
 
+### LLMTR (sovereign, Turkey)
+
+```bash
+LLMTR_API_KEY=your_key_here
+```
+
+OpenAI-compatible chat at `https://llmtr.com/v1`. The catalog rows are the
+models LLMTR hosts in Turkey: Gemma 4 (tools, images as base64), Qwen 3.8 27B
+(tools and JSON schema, text only), Trendyol Asure 12B (Turkish chat and
+images, no tools) and Muse Glimmer 30B (tools, images, reasoning stays on).
+The same key also reaches global providers; those are not seeded. Create a
+key at [llmtr.com](https://llmtr.com/). Docs: [llmtr.com/docs/en](https://llmtr.com/docs/en/).
+
 ### HuggingFace
 
 ```bash

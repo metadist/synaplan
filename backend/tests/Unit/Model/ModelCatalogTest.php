@@ -766,6 +766,7 @@ class ModelCatalogTest extends TestCase
             'gemini-4-argon' => ['google:gemini-4-argon', 0.10],
             'gemini-4-carbon' => ['google:gemini-4-carbon', 0.10],
             'gemini-4-hydrogen' => ['google:gemini-4-hydrogen', 0.075],
+            'gemini-4-neon' => ['google:gemini-4-neon', 0.15],
             'gemini-3.7-flash' => ['google:gemini-3.7-flash', 0.075],
             'gemini-3.6-flash' => ['google:gemini-3.6-flash', 0.075],
             'gemini-3.5-flash-lite' => ['google:gemini-3.5-flash-lite', 0.03],
@@ -2037,6 +2038,40 @@ class ModelCatalogTest extends TestCase
         $this->assertNotContains('image', $chat[0]['json']['features'] ?? []);
         $this->assertSame('1048576', $chat[0]['json']['meta']['context_window'] ?? null);
         $this->assertSame('medium', $chat[0]['json']['meta']['reasoning_effort_default'] ?? null);
+        $this->assertSame(65536, $chat[0]['json']['max_tokens'] ?? null);
+    }
+
+    /**
+     * Gemini 4 Neon is a flat $3 / $15 per 1M for the whole 1M window on the
+     * paid tier. Implicit cache hits are 95% off ($0.15). The public id is the
+     * only catalogued variant, and the default thinking level is high.
+     */
+    public function testGemini4NeonIsCataloguedAtTheFlatPaidPrice(): void
+    {
+        $chat = ModelCatalog::find('google:gemini-4-neon:chat');
+        $vision = ModelCatalog::find('google:gemini-4-neon:pic2text');
+        $this->assertCount(1, $chat);
+        $this->assertCount(1, $vision);
+        $this->assertSame(446, $chat[0]['id']);
+        $this->assertSame(447, $vision[0]['id']);
+        $this->assertNull(ModelCatalog::contextPricing('gemini-4-neon'));
+        $this->assertSame([], ModelCatalog::find('google:gemini-4-neon-preview'));
+
+        foreach ([$chat[0], $vision[0]] as $row) {
+            $this->assertSame('gemini-4-neon', $row['providerId']);
+            $this->assertSame('per1M', $row['inUnit']);
+            $this->assertSame('per1M', $row['outUnit']);
+            $this->assertEqualsWithDelta(3.00, (float) $row['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(15.00, (float) $row['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.15, (float) ($row['json']['cache_read_price_per_1M'] ?? 0), 1e-9);
+            $this->assertStringContainsString('paid', (string) ($row['json']['description'] ?? ''));
+        }
+
+        $this->assertContains('tool_use', $chat[0]['json']['features'] ?? []);
+        $this->assertContains('reasoning', $chat[0]['json']['features'] ?? []);
+        $this->assertNotContains('image', $chat[0]['json']['features'] ?? []);
+        $this->assertSame('1048576', $chat[0]['json']['meta']['context_window'] ?? null);
+        $this->assertSame('high', $chat[0]['json']['meta']['reasoning_effort_default'] ?? null);
         $this->assertSame(65536, $chat[0]['json']['max_tokens'] ?? null);
     }
 

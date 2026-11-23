@@ -571,7 +571,7 @@ final class GoogleChat
      * Gemini 4 has no off switch. The lowest level is `low`; an omitted effort
      * leaves Google's default in place. An explicit thinking_budget is ignored.
      * `minimal` is not a valid level and is not sent. `xhigh` is sent only for
-     * Hydrogen.
+     * Hydrogen and Neon.
      *
      * @param array<string, mixed> $options
      *

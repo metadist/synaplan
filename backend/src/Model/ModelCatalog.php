@@ -3993,6 +3993,63 @@ class ModelCatalog
             ],
         ],
         // ----------------------------------------------------------------
+        // Gemini 4 Neon. Model card, pricing, and what's new pages read
+        // 2026-11-23, stable id gemini-4-neon.
+        // https://aistudio.google.com/docs/models/gemini-4-neon
+        // https://aistudio.google.com/docs/whats-new-gemini-4-neon
+        // Flat standard paid price for the whole 1M window: $3 input / $15
+        // output per 1M (output includes thinking). Implicit cache hits (from
+        // 4,096 tokens) are 95% off ($0.15). There is no explicit cache API.
+        // Thinking levels are low, medium, high (default), and xhigh. Paid
+        // tier only (no free tier). The public id is the only one offered.
+        // ----------------------------------------------------------------
+        [
+            'id' => 446,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Neon',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-neon',
+            'priceIn' => 3.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 15.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Neon - frontier model for complex reasoning, coding, agentic workflows, and multimodal work. 1M token context shared by input, thinking, and output. Thinking levels low, medium, high (default), and xhigh. $3 input / $15 output per 1M tokens. Implicit cached input is 95% off ($0.15). Requires a paid Google AI API tier (no free tier).',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-4-neon'],
+                'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                'cache_read_price_per_1M' => 0.15,
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536', 'reasoning_effort_default' => 'high'],
+            ],
+        ],
+        [
+            'id' => 447,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Neon (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-neon',
+            'priceIn' => 3.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 15.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Neon for image, video, audio, and PDF understanding. $3 input / $15 output per 1M tokens (cached input $0.15). Requires a paid Google AI API tier (no free tier).',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-4-neon'],
+                'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.15,
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        // ----------------------------------------------------------------
         // Google Gemini 3.6 / 3.7 / 3.8 Flash + 3.5 Flash-Lite + Omni video
         // + Nano Banana 2 Lite + Gemini 3.5 Transcribe.
         // Live-probed against generativelanguage.googleapis.com/v1beta on
@@ -7264,6 +7321,127 @@ class ModelCatalog
                 'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
                 'cache_read_price_per_1M' => 0.0893,
                 'meta' => ['context_window' => '262144', 'max_output' => '32768', 'host' => 'api.scaleway.ai', 'jurisdiction' => 'FR', 'preview' => true],
+            ],
+        ],
+        // ==================== LLMTR (Turkey) ====================
+        // First-party rows under llmtr/, hosted in Turkey. Prices from
+        // GET https://llmtr.com/v1/models on 2026-11-21 (USD per token → per1M).
+        // The same key also lists global providers (moonshot/, zai/, …); those
+        // are not seeded here. Trendyol Asure does not accept tools.
+        // https://llmtr.com/docs/en/gateway/llmtr-gemma/
+        [
+            'id' => 441,
+            'service' => 'LLMTR',
+            'name' => 'Gemma 4',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'llmtr/gemma-4',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 5.00,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Gemma 4 26B-A4B on LLMTR hardware in Turkey. Tools, optional reasoning (off unless asked) and images as base64. 128K context. $2 / $5 per million tokens; cached input is $0.50.',
+                'max_tokens' => 16384,
+                'params' => ['model' => 'llmtr/gemma-4'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'multilingual'],
+                'cache_read_price_per_1M' => 0.50,
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'host' => 'llmtr.com', 'jurisdiction' => 'TR'],
+            ],
+        ],
+        [
+            'id' => 442,
+            'service' => 'LLMTR',
+            'name' => 'Gemma 4 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'llmtr/gemma-4',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 5.00,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Gemma 4 on LLMTR — image understanding. Images must be base64 data URLs; a remote https address is rejected.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'llmtr/gemma-4'],
+                'features' => ['vision', 'ocr', 'multilingual'],
+                'cache_read_price_per_1M' => 0.50,
+                'meta' => ['supports_images' => true, 'host' => 'llmtr.com', 'jurisdiction' => 'TR'],
+            ],
+        ],
+        [
+            'id' => 443,
+            'service' => 'LLMTR',
+            'name' => 'Qwen 3.8 27B',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'llmtr/qwen3-8-27b',
+            'priceIn' => 5.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 7.00,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Qwen 3.8 27B on LLMTR hardware in Turkey — agents, code and long documents. Tools and JSON schema. Text only. 262K context. $5 / $7 per million tokens; cached input is $1.25.',
+                'max_tokens' => 32768,
+                'params' => ['model' => 'llmtr/qwen3-8-27b'],
+                'features' => ['reasoning', 'tool_use', 'code', 'multilingual'],
+                'cache_read_price_per_1M' => 1.25,
+                'meta' => ['context_window' => '262144', 'max_output' => '32768', 'host' => 'llmtr.com', 'jurisdiction' => 'TR'],
+            ],
+        ],
+        [
+            'id' => 444,
+            'service' => 'LLMTR',
+            'name' => 'Trendyol Asure 12B',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'llmtr/trendyol-asure-12b',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.50,
+            'outUnit' => 'per1M',
+            'quality' => 6,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Trendyol Asure 12B on LLMTR hardware in Turkey — Turkish chat, RAG and commerce text, and it can read images. No tool calling. 40K context. $0.10 / $0.50 per million tokens.',
+                'max_tokens' => 8192,
+                'params' => ['model' => 'llmtr/trendyol-asure-12b'],
+                'features' => ['vision', 'multilingual'],
+                'cache_read_price_per_1M' => 0.025,
+                'meta' => ['context_window' => '40960', 'max_output' => '8192', 'host' => 'llmtr.com', 'jurisdiction' => 'TR'],
+            ],
+        ],
+        [
+            'id' => 445,
+            'service' => 'LLMTR',
+            'name' => 'Muse Glimmer 30B',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'llmtr/muse-glimmer-30b-tr',
+            'priceIn' => 2.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 5.00,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Muse Glimmer 30B on LLMTR hardware in Turkey — agents and reasoning, and it can read images. Reasoning stays on. Tools. 128K context. $2 / $5 per million tokens; cached input is $0.50.',
+                'max_tokens' => 16384,
+                'params' => ['model' => 'llmtr/muse-glimmer-30b-tr'],
+                'features' => ['vision', 'reasoning', 'tool_use', 'multilingual'],
+                'cache_read_price_per_1M' => 0.50,
+                'meta' => ['context_window' => '131072', 'max_output' => '16384', 'host' => 'llmtr.com', 'jurisdiction' => 'TR'],
             ],
         ],
     ];

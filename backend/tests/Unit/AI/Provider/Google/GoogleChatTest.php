@@ -271,6 +271,33 @@ final class GoogleChatTest extends TestCase
         self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
     }
 
+    public function testNeonSendsExtraHighAndDropsSampling(): void
+    {
+        $chat = $this->chat([self::json([
+            'candidates' => [['content' => ['parts' => [['text' => 'Visible.']]], 'finishReason' => 'STOP']],
+            'usageMetadata' => ['promptTokenCount' => 10, 'candidatesTokenCount' => 4, 'thoughtsTokenCount' => 6],
+        ])]);
+
+        $chat->chat([['role' => 'user', 'content' => 'Hi']], [
+            'model' => 'gemini-4-neon',
+            'temperature' => 2.5,
+            'top_p' => 1.5,
+            'top_k' => 100,
+            'thinking_budget' => 0,
+            'reasoning_effort' => 'max',
+        ]);
+
+        $request = $this->requests()[0];
+        $config = $request['body']['generationConfig'];
+        self::assertSame(65536, $config['maxOutputTokens']);
+        self::assertSame(['thinkingLevel' => 'xhigh'], $config['thinkingConfig']);
+        self::assertArrayNotHasKey('temperature', $config);
+        self::assertArrayNotHasKey('topP', $config);
+        self::assertArrayNotHasKey('topK', $config);
+        self::assertStringEndsWith('/models/gemini-4-neon:generateContent', $request['url']);
+        self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
+    }
+
     public function testHydrogenClampsMaxEffortAndLeavesMinimalUnsent(): void
     {
         $chat = $this->chat([

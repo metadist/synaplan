@@ -1092,6 +1092,10 @@
       "title": "Clave API de Scaleway",
       "message": "Crea una clave secreta en la consola de Scaleway (IAM → claves API) y pégala aquí. Así se activan las API generativas alojadas en París. Los prompts los procesa Scaleway en Francia."
     },
+    "llmtr": {
+      "title": "Clave API de LLMTR",
+      "message": "Crea una clave API en LLMTR y pégala aquí. Así se activan modelos alojados en Turquía (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Los prompts de esos modelos se procesan en Turquía."
+    },
     "huggingface": {
       "title": "Token API de HuggingFace",
       "message": "Crea un token de acceso en la configuración de HuggingFace y pégalo aquí para usar los modelos de HuggingFace Inference."
@@ -1251,7 +1255,9 @@
         "messages_gateway_flags": "Ajustes de la puerta de enlace cambiados",
         "messages_gateway_upstream": "Dirección de la puerta de enlace cambiada",
         "messages_gateway_aliases": "Alias de modelos cambiados",
-        "tool_executed": "Llamadas a herramientas"
+        "tool_executed": "Llamadas a herramientas",
+        "egress_allow_added": "Destino saliente permitido",
+        "egress_allow_removed": "Destino saliente quitado"
       },
       "what": "Qué ocurrió",
       "emptyNote": "Este registro indica quién hizo qué. No abre el contenido de chats ni de archivos.",
@@ -1751,7 +1757,8 @@
     "role": {
       "web": "Web",
       "worker": "Trabajo en segundo plano",
-      "scheduler": "Tareas programadas"
+      "scheduler": "Tareas programadas",
+      "pump": "Entrega de respuestas del chat"
     },
     "card": {
       "connectedHere": "Está conectado a este servidor.",
@@ -1804,6 +1811,221 @@
       "failed": "No se pudieron leer los eventos.",
       "empty": "Sin avisos de este servidor en la última hora.",
       "window": "Avisos y errores de la última hora, los más recientes primero, como máximo 20."
+    },
+    "sizingGuide": "Abrir la guía de dimensionamiento",
+    "tabs": {
+      "label": "Vistas de capacidad",
+      "servers": "Servidores",
+      "requests": "Solicitudes",
+      "ai": "Llamadas de IA",
+      "tools": "Herramientas",
+      "outbound": "Salientes"
+    },
+    "reports": {
+      "loading": "Leyendo las solicitudes recientes…",
+      "unavailable": "Las solicitudes recientes no se pueden leer ahora porque la caché compartida no responde. Synaplan sigue funcionando."
+    },
+    "parts": {
+      "wait": "Espera a PHP",
+      "php": "PHP",
+      "ai": "IA",
+      "tools": "Herramientas",
+      "outbound": "Salientes",
+      "db": "Base de datos",
+      "overlap": "Estos tiempos se solapan (una herramienta puede llamar a un modelo de IA, y la IA y las herramientas salen por la red), por eso suman más que la solicitud. La barra es una estimación."
+    },
+    "status": {
+      "2xx": "Respondida",
+      "4xx": "Rechazada",
+      "5xx": "Error",
+      "busy": "Demasiado ocupado"
+    },
+    "egressStatus": {
+      "2xx": "OK",
+      "4xx": "Rechazada",
+      "5xx": "Error",
+      "blocked": "Rechazada por el filtro"
+    },
+    "routeClass": {
+      "chat_stream": "Respuestas de chat",
+      "widget_message": "Mensajes del widget",
+      "openai_api": "API compatible con OpenAI",
+      "messages_api": "API de mensajes",
+      "files": "Archivos",
+      "search": "Búsqueda",
+      "admin": "Administración",
+      "auth": "Inicio de sesión",
+      "config": "Ajustes",
+      "mcp": "Servidor MCP",
+      "webhook": "Webhooks",
+      "media": "Multimedia",
+      "other": "Otras"
+    },
+    "aiSource": {
+      "chat_web": "Chat",
+      "chat_stream": "Chat (en streaming)",
+      "widget": "Widget",
+      "email": "Correo",
+      "whatsapp": "WhatsApp",
+      "telegram": "Telegram",
+      "openai_api": "API compatible con OpenAI",
+      "messages_api": "API de mensajes",
+      "saved_task": "Tareas guardadas",
+      "sorter": "Clasificación de mensajes",
+      "memory": "Memorias",
+      "summary": "Resúmenes",
+      "vectorize": "Indexación de archivos",
+      "rerank": "Reordenación",
+      "media": "Multimedia",
+      "voice_live": "Voz en directo",
+      "probe": "Comprobaciones de proveedores",
+      "system": "Sistema"
+    },
+    "capability": {
+      "chat": "Chat",
+      "chat_stream": "Chat (en streaming)",
+      "embed": "Embedding",
+      "embed_batch": "Embedding (lote)",
+      "vision": "Lectura de imágenes",
+      "image": "Creación de imágenes",
+      "video_start": "Creación de vídeo",
+      "video_poll": "Estado del vídeo",
+      "transcribe": "Transcripción",
+      "synthesize": "Voz",
+      "synthesize_stream": "Voz (en streaming)",
+      "passthrough": "Paso directo",
+      "voice_session": "Sesión de voz",
+      "probe": "Comprobación"
+    },
+    "toolSource": {
+      "builtin": "Herramientas integradas",
+      "mcp": "Servidores MCP",
+      "document": "Herramientas de documentos",
+      "skill": "Habilidades",
+      "plugin": "Plugins",
+      "custom": "Herramientas propias",
+      "compute": "Ejecución de código"
+    },
+    "toolKind": {
+      "read": "Lee",
+      "write": "Cambia",
+      "destructive": "Borra"
+    },
+    "toolOutcome": {
+      "done": "Hecha",
+      "refused": "Rechazada",
+      "needs_approval": "Esperando aprobación",
+      "failed": "Fallida",
+      "timed_out": "Tiempo agotado"
+    },
+    "requests": {
+      "title": "Solicitudes por tipo",
+      "window": "{count} solicitud en los últimos {window} | {count} solicitudes en los últimos {window}",
+      "empty": "Aún no hay solicitudes registradas. Aparecen aquí segundos después del primer chat o llamada a la API.",
+      "sortBy": "Ordenar por",
+      "sort": {
+        "p95_ms": "Más lentas (p95)",
+        "p99_ms": "Más lentas (p99)",
+        "requests": "Más solicitudes",
+        "errors": "Más errores",
+        "busy": "Más veces ocupado"
+      },
+      "col": {
+        "route": "Tipo",
+        "requests": "Solicitudes",
+        "perMinute": "Por minuto",
+        "errors": "Errores",
+        "busy": "Ocupado",
+        "wait": "Espera a PHP (p95)"
+      },
+      "waitNotMeasured": "Este servidor no mide la espera hasta un worker PHP libre.",
+      "slowestTitle": "Las más lentas de la última hora",
+      "slowestHint": "Abra una para ver a dónde fue su tiempo. Solo se guardan tiempos, nunca lo que se pidió.",
+      "slowestEmpty": "No hubo solicitudes en la última hora.",
+      "mostly": "Sobre todo {part}: {duration}",
+      "aiCalls": "Llamadas de IA",
+      "toolCalls": "Llamadas a herramientas",
+      "outboundCalls": "Llamadas salientes",
+      "firstWord": "primera palabra tras {duration}",
+      "tokens": "{in} tokens de entrada, {out} de salida",
+      "database": "Sin consultas a la base de datos | 1 consulta a la base de datos, {duration} | {count} consultas a la base de datos, {duration}",
+      "requestId": "ID de solicitud",
+      "copyId": "Copiar ID",
+      "idCopied": "ID de solicitud copiado. Búsquelo en los registros.",
+      "idCopyFailed": "No se pudo copiar el ID de solicitud."
+    },
+    "ai": {
+      "empty": "No hay llamadas de IA en las solicitudes recientes.",
+      "modelsTitle": "Por proveedor y modelo",
+      "modelsHint": "De {count} llamada de IA en las solicitudes recientes | De {count} llamadas de IA en las solicitudes recientes",
+      "sourcesTitle": "Por parte de Synaplan",
+      "col": {
+        "model": "Proveedor · modelo",
+        "calls": "Llamadas",
+        "failures": "Fallos",
+        "firstWord": "Primera palabra (p50 / p95)",
+        "duration": "Llamada completa (p95)",
+        "tokens": "Tokens entrada / salida",
+        "cost": "Coste",
+        "hooks": "Hooks (p95)",
+        "source": "Pedida por",
+        "share": "Proporción"
+      },
+      "hooksHint": "Tiempo que Synaplan dedica alrededor de la llamada: comprobaciones, registro y línea de tiempo.",
+      "legend": "La primera palabra es cuando la respuesta empezó a aparecer. Los hooks son el tiempo que Synaplan añade a cada llamada."
+    },
+    "tools": {
+      "title": "Llamadas a herramientas",
+      "hint": "Cómo terminaron las llamadas a herramientas de las solicitudes recientes. Qué herramienta y qué se le pidió quedan en el registro de auditoría.",
+      "empty": "No hay llamadas a herramientas en las solicitudes recientes.",
+      "openApprovals": "Abrir Aprobaciones ({count} en espera) | Abrir Aprobaciones ({count} en espera)",
+      "failedHint": "Fallidas incluye las llamadas con tiempo agotado.",
+      "col": {
+        "source": "Origen",
+        "kind": "Tipo",
+        "calls": "Llamadas",
+        "askedApproval": "Pidió aprobación"
+      }
+    },
+    "outbound": {
+      "title": "Destinos",
+      "hint": "A dónde se conectó Synaplan en las solicitudes recientes. Las direcciones que escribe un usuario se cuentan juntas y nunca se listan.",
+      "empty": "No hay llamadas salientes en las solicitudes recientes.",
+      "emptyOff": "Las llamadas salientes no se registran mientras el filtro de salida está desactivado.",
+      "typed": "Direcciones escritas por usuarios",
+      "openSetting": "Abrir el ajuste",
+      "mode": {
+        "off": "El filtro de salida está desactivado: se permite cualquier destino y las llamadas salientes no se registran. Póngalo en «report» para ver a dónde llama Synaplan y qué llamadas rechazaría.",
+        "report": "El filtro de salida solo informa: las llamadas que rechazaría siguen pasando y se marcan aquí.",
+        "enforce": "El filtro de salida rechaza cualquier destino que no esté integrado ni en la lista de permitidos."
+      },
+      "state": {
+        "builtin": "Integrado",
+        "listed": "Permitido por {rule}",
+        "notListed": "No está en la lista de permitidos",
+        "wouldBeRefused": "Se rechazaría",
+        "refused": "Rechazado",
+        "typed": "Se comprueba al escribirla"
+      },
+      "col": {
+        "destination": "Destino",
+        "requests": "Llamadas",
+        "failures": "Errores",
+        "refused": "Rechazadas",
+        "state": "Filtro",
+        "action": "Acción"
+      },
+      "allow": "Permitir",
+      "allowLabel": "Permitir {rule}",
+      "remove": "Quitar",
+      "removeLabel": "Quitar {rule} de la lista de permitidos",
+      "allowed": "{rule} está en la lista de permitidos.",
+      "removed": "{rule} ya no está en la lista de permitidos.",
+      "removeTitle": "¿Quitar de la lista de permitidos?",
+      "removeEnforce": "El filtro rechazará las llamadas a {rule} desde la próxima solicitud.",
+      "removeReport": "Las llamadas a {rule} siguen saliendo mientras el filtro solo informa o está apagado. Vuelven a aparecer como no incluidas y se rechazarán cuando el filtro rechace.",
+      "invalidRule": "Ese destino no puede ir en la lista de permitidos.",
+      "saveFailed": "No se pudo guardar la lista de permitidos. Inténtelo de nuevo en un momento."
     }
   }
 }

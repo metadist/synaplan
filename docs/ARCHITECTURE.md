@@ -203,7 +203,8 @@ client address Caddy accepted. Dev and the ordinary test stack stay on
 
 Adding the stream pool holds one more set of database connections on each
 web node. Check Galera `max_connections` before enabling it, and enable it
-on one node first.
+on one node first. [Capacity and Sizing](CAPACITY.md) turns the pool sizes
+into answers at once per server and servers per installation.
 
 - **Database.** A FrankenPHP worker keeps its Doctrine connections between
   requests, so a held connection follows every worker, streaming or idle.

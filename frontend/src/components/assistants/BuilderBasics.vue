@@ -23,42 +23,48 @@
         {{ errorFor('name') }}
       </p>
     </label>
-    <label class="block">
-      <span class="txt-secondary text-sm">{{ $t('assistants.description') }}</span>
-      <textarea
-        :value="description"
-        rows="3"
-        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-        :placeholder="$t('assistants.descriptionPlaceholder')"
-        data-testid="input-assistant-description"
-        @input="patchDescription(($event.target as HTMLTextAreaElement).value)"
-      />
-      <p
-        v-if="errorFor('description')"
-        class="text-sm text-red-600 dark:text-red-400 mt-1"
-        data-testid="error-description"
-      >
-        {{ errorFor('description') }}
-      </p>
-    </label>
-    <label class="block">
-      <span class="txt-secondary text-sm">{{ $t('assistants.greeting') }}</span>
-      <input
-        :value="greeting"
-        type="text"
-        class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
-        :placeholder="$t('assistants.greetingPlaceholder')"
-        data-testid="input-assistant-greeting"
-        @input="patchGreeting(($event.target as HTMLInputElement).value)"
-      />
-      <p
-        v-if="errorFor('behaviour.greeting')"
-        class="text-sm text-red-600 dark:text-red-400 mt-1"
-        data-testid="error-greeting"
-      >
-        {{ errorFor('behaviour.greeting') }}
-      </p>
-    </label>
+    <details class="space-y-3" data-testid="details-basics-advanced" :open="hasTextErrors">
+      <summary class="txt-primary text-sm font-medium cursor-pointer">
+        {{ $t('assistants.advancedSettings') }}
+      </summary>
+      <p class="txt-secondary text-sm">{{ $t('assistants.textsDerivedHint') }}</p>
+      <label class="block">
+        <span class="txt-secondary text-sm">{{ $t('assistants.description') }}</span>
+        <textarea
+          :value="description"
+          rows="3"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :placeholder="$t('assistants.descriptionPlaceholder')"
+          data-testid="input-assistant-description"
+          @input="patchDescription(($event.target as HTMLTextAreaElement).value)"
+        />
+        <p
+          v-if="errorFor('description')"
+          class="text-sm text-red-600 dark:text-red-400 mt-1"
+          data-testid="error-description"
+        >
+          {{ errorFor('description') }}
+        </p>
+      </label>
+      <label class="block">
+        <span class="txt-secondary text-sm">{{ $t('assistants.greeting') }}</span>
+        <input
+          :value="greeting"
+          type="text"
+          class="mt-1 w-full px-3 py-2 rounded-xl surface-card border border-light-border/30 dark:border-dark-border/20 txt-primary text-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand)]"
+          :placeholder="$t('assistants.greetingPlaceholder')"
+          data-testid="input-assistant-greeting"
+          @input="patchGreeting(($event.target as HTMLInputElement).value)"
+        />
+        <p
+          v-if="errorFor('behaviour.greeting')"
+          class="text-sm text-red-600 dark:text-red-400 mt-1"
+          data-testid="error-greeting"
+        >
+          {{ errorFor('behaviour.greeting') }}
+        </p>
+      </label>
+    </details>
     <div>
       <p class="txt-secondary text-sm mb-2">{{ $t('assistants.starterPrompts') }}</p>
       <div v-for="(prompt, index) in starterPrompts" :key="index" class="flex gap-2 mb-2">
@@ -98,6 +104,10 @@ const starterPrompts = computed(() => store.current?.draft?.behaviour.starterPro
 function errorFor(path: string): string | undefined {
   return store.fieldErrors[path]
 }
+
+const hasTextErrors = computed(() =>
+  Boolean(errorFor('description') || errorFor('behaviour.greeting'))
+)
 
 function mutateDraft(patchBehaviour: Partial<AgentDraft['behaviour']>): void {
   if (!store.current) {

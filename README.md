@@ -6,7 +6,15 @@
 
 Build agents on your own documents and put them wherever work happens: web, WhatsApp, email, Outlook, Nextcloud and ownCloud. Mix local models with the best cloud AI, see what every answer costs, and decide what the AI is allowed to do – open source, on your server or ours.
 
-[**Run it in up to five minutes**](#quickstart) &nbsp;·&nbsp; [**Try it hosted**](https://web.synaplan.com/) &nbsp;·&nbsp; [**Docs**](https://docs.synaplan.com/) &nbsp;·&nbsp; [**Discord**](https://discord.com/invite/kQB3eDjWfF)
+<p align="center">
+  <img src="docs/images/synaplan-product.gif" alt="Synaplan in about 30 seconds: a chat answer and its cost, ready-made agents, models with a cost on each one, then the tools it connects, from WhatsApp, email and Outlook to Nextcloud, Dropbox and more" width="100%">
+</p>
+
+<p align="center"><sub>A chat answer and its cost, agents, the model for each job, then the tools it connects: WhatsApp, email, Outlook, Nextcloud, Dropbox, and more.</sub></p>
+
+<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a></p>
+
+[**Run it**](#quickstart) &nbsp;·&nbsp; [**Try it hosted**](https://web.synaplan.com/) &nbsp;·&nbsp; [**Docs**](https://docs.synaplan.com/) &nbsp;·&nbsp; [**Discord**](https://discord.com/invite/kQB3eDjWfF)
 
 [![Latest release](https://img.shields.io/github/v/release/metadist/synaplan)](https://github.com/metadist/synaplan/releases)
 [![GitHub stars](https://img.shields.io/github/stars/metadist/synaplan?style=flat&logo=github)](https://github.com/metadist/synaplan/stargazers)
@@ -16,26 +24,13 @@ Build agents on your own documents and put them wherever work happens: web, What
 
 </div>
 
-<p align="center">
-  <img src="docs/images/synaplan-admin-tour.gif" alt="A thirty-second tour of Synaplan: a chat answer and its cost, default models with cost badges, the file library, generated images and audio, and connected apps" width="100%">
-</p>
-
-<p align="center"><sub>Chat, the cost of every answer, your files, generated media and connected apps – in about 30 seconds.</sub></p>
-
-<p align="center"><a href="https://www.youtube.com/watch?v=WjO9mE43uec">▶ Watch the full demo on YouTube</a></p>
-
-<!-- The GIF above is docs/images/synaplan-admin-tour.gif. scripts/build-readme-tour.sh rebuilds the tour film and stills. -->
-
 ---
 
 ## Own the flow
 
-- **Own your channels.** The AI answers on your website, in WhatsApp, by email, in Outlook and inside Nextcloud and ownCloud – with the same knowledge and the same rules everywhere.
-- **Own your models.** Hundreds of models from OpenAI, Anthropic, Google, Mistral, sovereign EU providers or locally via Ollama. Mix them per task: sensitive work stays local, everything else gets the best model for the job.
-- **Own your costs.** Every answer shows its model and price. A planner splits bigger requests into steps and spends the expensive model only where it matters.
-- **Own the decisions.** Actions like sending mail or creating tickets wait for your approval, and every step is logged.
+The same assistant answers on your website, in WhatsApp, by email, in Outlook and inside Nextcloud and ownCloud. Sensitive work can stay on Ollama. Everything else can go to OpenAI, Anthropic, Google, Mistral or a sovereign EU provider. Every answer shows its model and its price. A planner spends the expensive model only where it matters, and a mail or a ticket goes out only after a person approves it.
 
-**Running in production at** Megaherz Yoga · SANI Pflegedienst · National Secure Cloud · PlateArt
+It runs in production at a yoga studio ([Megaherz Yoga](https://megaherz-yoga.com)), a care service (SANI Pflegedienst), a public-sector cloud (National Secure Cloud) and a number-plate maker (PlateArt).
 
 ---
 
@@ -67,7 +62,9 @@ The first start downloads everything and takes 5–15 minutes. After that, Synap
 | **Closed network** | No route to the internet, HTTPS on your LAN address | [Closed network](docs/PLATFORM_REFERENCE.md#closed-network) |
 | **Linux server** | The installer pins a release, generates secrets and runs a smoke test | [On a server](docs/PLATFORM_REFERENCE.md#on-a-server) |
 | **Kubernetes** | Helm charts for clusters | [synaplan-charts](https://github.com/metadist/synaplan-charts) |
-| **One click** | [RepoCloud](https://repocloud.io/details/Synaplan/) · [Elestio](https://elest.io/open-source/synaplan) · [Railway](https://railway.com/deploy/synaplan) | – |
+| **Coolify** | Paste the service file, then Deploy. Not in the Coolify catalog yet | [On Coolify](deploy/coolify/README.md) |
+| **One click** | [RepoCloud](https://repocloud.io/details/Synaplan/) · [Elestio](https://elest.io/open-source/synaplan) | – |
+| **Railway** | Optional one-click template for the published image | [Deploy on Railway](https://railway.com/deploy/synaplan) |
 | **Public sector (EU/CH)** | openDesk, Nextcloud and OpenCloud, on-premises or in an EU cloud | [synaplan.eu](https://www.synaplan.eu/) |
 
 A Linux server in one line:
@@ -98,18 +95,11 @@ If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
 ## Where the AI shows up
 
-| Surface | What it does | Get it |
-| --- | --- | --- |
-| **Web app** | Full chat and admin UI, light and dark, five languages | This repo |
-| **Mobile apps** | Chat, documents and voice on iPhone and Android – on web.synaplan.com or your own server | [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) · [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme) |
-| **Outlook add-in** | Find and process mail inside Outlook (Web, new & classic, Mac) without sending it anywhere | [Synamail](https://github.com/metadist/Synamail) |
-| **Chat widget** | An AI chat on any website with one snippet, human takeover included | [Widget guide](https://docs.synaplan.com/widget) |
-| **WhatsApp & email** | The AI answers on the channel the question came in on | [WhatsApp](docs/WHATSAPP.md) · [Email](docs/EMAIL.md) |
-| **Nextcloud, ownCloud & OpenCloud** | Use the AI inside your file cloud, with its files as knowledge – your file store stays in charge | [Nextcloud](https://web.synaplan.com/apps/nextcloud) · [ownCloud](https://web.synaplan.com/apps/owncloud) · [OpenCloud](https://github.com/metadist/synaplan-opencloud) |
-| **Synaplan Desktop** | Pair a computer and run skills on it (no installer yet – build from source) | [synaplan-desktop](https://github.com/metadist/synaplan-desktop) |
-| **MCP & Claude Code** | Your knowledge and memories as MCP tools, plus an Anthropic-compatible endpoint | [MCP guide](https://docs.synaplan.com/mcp) |
+The web app in this repo is the full chat, in five languages, light and dark. The same account is on the [App Store](https://apps.apple.com/app/id6784278288?ct=github-readme) and [Google Play](https://play.google.com/store/apps/details?id=com.synaplan.app&referrer=utm_source%3Dgithub-readme). Mail stays inside Outlook with the [Synamail](https://github.com/metadist/Synamail) add-in.
 
-**Connects to** Microsoft 365 · Dropbox · Nextcloud / ownCloud / WebDAV · CalDAV · IMAP · Jira & Confluence · your own MCP servers – [how to connect](docs/CONNECTIONS.md)
+One snippet puts a [chat widget](https://docs.synaplan.com/widget) on a website, and a person can take the conversation over. [WhatsApp](docs/WHATSAPP.md) and [email](docs/EMAIL.md) answer on the channel the question came in on. The file store stays in charge: [Nextcloud](https://web.synaplan.com/apps/nextcloud), [ownCloud](https://web.synaplan.com/apps/owncloud) and [OpenCloud](https://github.com/metadist/synaplan-opencloud).
+
+[Synaplan Desktop](https://github.com/metadist/synaplan-desktop) pairs a computer and runs skills on it. There is no installer yet, so you build it from source. [MCP](https://docs.synaplan.com/mcp) exposes your knowledge to Claude Code and any other client. The same assistant also reaches Microsoft 365, Dropbox, WebDAV, CalDAV, IMAP, Jira, Confluence and your own MCP servers. [How to connect.](docs/CONNECTIONS.md)
 
 ---
 
@@ -127,9 +117,7 @@ If you only want a chat window, Open WebUI or LibreChat gets you there faster.
 
 ## Under the hood
 
-- **Stack:** Symfony (PHP) backend, Vue frontend, MariaDB VECTOR or Qdrant for document search, Redis, Docker.
-- **Lean core:** app, database and Redis. Local AI, office files, web search, voice and more are building blocks you switch on when you need them.
-- **Open by design:** OpenAPI REST API, MCP server and client, an Anthropic-compatible `/v1/messages` endpoint and a plugin system – extend Synaplan without forking it.
+Symfony and Vue, MariaDB VECTOR or Qdrant, Redis, Docker. The core is the app, the database and Redis. Local AI, office files, web search and voice are blocks you switch on. The API is OpenAPI, there is an MCP server and client, an Anthropic-compatible `/v1/messages` endpoint and a plugin system, so you can extend it without forking it.
 
 [Docs](https://docs.synaplan.com/) · [Technical manual](docs/README.md) · [Platform reference](docs/PLATFORM_REFERENCE.md) · [Discussions](https://github.com/metadist/synaplan/discussions) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md) · [Discord](https://discord.com/invite/kQB3eDjWfF)
 

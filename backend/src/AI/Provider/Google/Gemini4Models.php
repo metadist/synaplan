@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\AI\Provider\Google;
 
 /**
- * Public Gemini 4 ids (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`)
- * that share one request shape.
+ * Public Gemini 4 ids (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`,
+ * `gemini-4-neon`) that share one request shape.
  *
  * They accept `thinkingLevel` and reject `thinkingBudget` and `minimal` with
- * HTTP 400. Argon and Carbon accept `low`, `medium`, and `high`. Hydrogen adds
- * `xhigh`. Sampling parameters (`temperature`, `topP`, `topK`) are ignored when
+ * HTTP 400. Argon and Carbon accept `low`, `medium`, and `high`. Hydrogen and
+ * Neon add `xhigh`. Sampling parameters (`temperature`, `topP`, `topK`) are ignored when
  * in range and rejected when out of range, so this path never sends them.
  * Permissive cyber ids are not public API models and must not match, so a
  * request for one never takes this path.
@@ -35,20 +35,20 @@ final class Gemini4Models
     public static function usesThinkingLevel(string $model): bool
     {
         return 1 === preg_match(
-            '/(?:^|[:\/])gemini-4-(?:argon|carbon|hydrogen)(?:$|[:\/])/',
+            '/(?:^|[:\/])gemini-4-(?:argon|carbon|hydrogen|neon)(?:$|[:\/])/',
             strtolower(trim($model)),
         );
     }
 
     /**
-     * Hydrogen is the only public Gemini 4 id that accepts `xhigh`.
-     * A suffixed id (`gemini-4-hydrogen-cyber`, `gemini-4-hydrogen-preview`)
+     * Hydrogen and Neon are the public Gemini 4 ids that accept `xhigh`.
+     * A suffixed id (`gemini-4-hydrogen-cyber`, `gemini-4-neon-preview`)
      * does not.
      */
     public static function acceptsExtraHigh(string $model): bool
     {
         return 1 === preg_match(
-            '/(?:^|[:\/])gemini-4-hydrogen(?:$|[:\/])/',
+            '/(?:^|[:\/])gemini-4-(?:hydrogen|neon)(?:$|[:\/])/',
             strtolower(trim($model)),
         );
     }
@@ -58,9 +58,9 @@ final class Gemini4Models
      *
      * Gemini 4 has no off switch (`minimal` returns HTTP 400), so `off`/`none`
      * map to `low` and `minimal` is not sent. `xhigh` and `max` pass through as
-     * `xhigh` only for Hydrogen; Argon and Carbon clamp them to `high`. Omitted
-     * or unrecognised values return null so Google's own default applies
-     * (`medium` on Argon and Carbon, `high` on Hydrogen).
+     * `xhigh` only for Hydrogen and Neon; Argon and Carbon clamp them to `high`.
+     * Omitted or unrecognised values return null so Google's own default
+     * applies (`medium` on Argon and Carbon, `high` on Hydrogen and Neon).
      */
     public static function thinkingLevel(?string $effort, ?string $model = null): ?string
     {
