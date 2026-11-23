@@ -19,6 +19,7 @@ use PhpOffice\PhpWord\IOFactory as PhpWordIOFactory;
 use PhpOffice\PhpWord\TemplateProcessor;
 use Plugin\Synaform\Service\ApplicantUrlChecker;
 use Plugin\Synaform\Service\ApplicantUrlFetch;
+use Plugin\Synaform\Service\CandidateImageStore;
 use Plugin\Synaform\Service\TemplateHtmlPreviewService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -143,6 +144,7 @@ class SynaformController extends AbstractController
         private FileProcessor $fileProcessor,
         private TemplateHtmlPreviewService $htmlPreviewService,
         private ApplicantUrlChecker $applicantUrls,
+        private CandidateImageStore $candidateImages,
         private HttpClientInterface $http,
         #[Autowire('%app.upload_dir%')] private string $uploadDir,
     ) {
@@ -1832,7 +1834,7 @@ class SynaformController extends AbstractController
             'form_id' => $data['form_id'] ?? 'default',
             'template_id' => $data['template_id'] ?? null,
             'status' => $data['status'] ?? 'draft',
-            'field_values' => $data['field_values'] ?? [],
+            'field_values' => $this->candidateImages->withoutClientImages(is_array($data['field_values'] ?? null) ? $data['field_values'] : []),
             'files' => [],
             // GDPR / data-retention: when set to a positive integer the
             // dataset is flagged for deletion after that many months from
@@ -1934,7 +1936,8 @@ class SynaformController extends AbstractController
                     }
                     $cleaned[$k] = $v;
                 }
-                $existing[$field] = $cleaned;
+                $stored = is_array($existing[$field] ?? null) ? $existing[$field] : [];
+                $existing[$field] = $this->candidateImages->withoutClientImages($cleaned, $stored);
                 continue;
             }
             $existing[$field] = $data[$field];
@@ -2152,7 +2155,7 @@ class SynaformController extends AbstractController
             if (!$cvFile) {
                 return $this->json(['success' => false, 'error' => 'No CV file found'], Response::HTTP_NOT_FOUND);
             }
-            $storedAs = $cvFile['stored_as'] ?? '';
+            $storedAs = basename((string) ($cvFile['stored_as'] ?? ''));
             if ($storedAs && is_file($dir.'/'.$storedAs)) {
                 unlink($dir.'/'.$storedAs);
             }
@@ -2162,7 +2165,7 @@ class SynaformController extends AbstractController
             if (!isset($additionalDocs[$fileIndex])) {
                 return $this->json(['success' => false, 'error' => 'File not found at index'], Response::HTTP_NOT_FOUND);
             }
-            $storedAs = $additionalDocs[$fileIndex]['stored_as'] ?? '';
+            $storedAs = basename((string) ($additionalDocs[$fileIndex]['stored_as'] ?? ''));
             if ($storedAs && is_file($dir.'/'.$storedAs)) {
                 unlink($dir.'/'.$storedAs);
             }
@@ -4642,7 +4645,7 @@ class SynaformController extends AbstractController
             $this->processBlockGroups($tp, $classified['blockGroups'], $arrays);
             $this->processCheckboxes($tp, $classified['checkboxes'], $variables, $designerMap);
             $this->processLists($tp, $classified['lists'], $variables, $designerMap);
-            $floatingImages = $this->processImages($tp, $formFields, $entry);
+            $floatingImages = $this->processImages($tp, $formFields, $entry, $userId, $candidateId);
             $this->processScalars($tp, $classified['scalars'], $variables);
 
             $docId = 'doc_'.bin2hex(random_bytes(6));
@@ -4984,7 +4987,7 @@ class SynaformController extends AbstractController
         }
 
         $ext = $this->mimeToExtension($mime);
-        $dir = $this->uploadDir.'/'.$userId.'/synaform/candidates/'.$candidateId.'/images';
+        $dir = $this->candidateImages->directory($userId, $candidateId);
         if (!is_dir($dir)) {
             mkdir($dir, 0o755, true);
         }
@@ -5041,14 +5044,15 @@ class SynaformController extends AbstractController
         if (!$entry) {
             return $this->json(['success' => false, 'error' => 'Entry not found'], Response::HTTP_NOT_FOUND);
         }
-        $meta = $entry['field_values'][$key] ?? null;
-        if (!is_array($meta) || empty($meta['path']) || !is_file($meta['path'])) {
+        $file = $this->candidateImages->locate($userId, $candidateId, $entry['field_values'][$key] ?? null);
+        if (null === $file) {
             return $this->json(['success' => false, 'error' => 'Image not found'], Response::HTTP_NOT_FOUND);
         }
 
-        return new BinaryFileResponse($meta['path'], 200, [
-            'Content-Type' => $meta['mime'] ?? 'application/octet-stream',
+        return new BinaryFileResponse($file, 200, [
+            'Content-Type' => $this->candidateImages->mimeOf($file),
             'Cache-Control' => 'private, max-age=60',
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -5072,9 +5076,9 @@ class SynaformController extends AbstractController
         if (!$entry) {
             return $this->json(['success' => false, 'error' => 'Entry not found'], Response::HTTP_NOT_FOUND);
         }
-        $meta = $entry['field_values'][$key] ?? null;
-        if (is_array($meta) && !empty($meta['path']) && is_file($meta['path'])) {
-            @unlink($meta['path']);
+        $file = $this->candidateImages->locate($userId, $candidateId, $entry['field_values'][$key] ?? null);
+        if (null !== $file) {
+            @unlink($file);
         }
         if (isset($entry['field_values'][$key])) {
             unset($entry['field_values'][$key]);
@@ -5127,8 +5131,7 @@ class SynaformController extends AbstractController
             if (($field['type'] ?? '') !== 'image' || empty($field['key'])) {
                 continue;
             }
-            $meta = $entry['field_values'][(string) $field['key']] ?? null;
-            if (is_array($meta) && !empty($meta['path']) && is_file($meta['path'])) {
+            if (null !== $this->candidateImages->locate($userId, $candidateId, $entry['field_values'][(string) $field['key']] ?? null)) {
                 continue;
             }
             $emptyImageFields[] = $field;
@@ -9050,7 +9053,7 @@ class SynaformController extends AbstractController
      *
      * @return array<string, array{path: string, mime: string, designer: array<string, mixed>}> float-configured images keyed by variable key
      */
-    private function processImages(TemplateProcessor $tp, array $formFields, array $entry): array
+    private function processImages(TemplateProcessor $tp, array $formFields, array $entry, int $userId, string $candidateId): array
     {
         $floating = [];
         foreach ($formFields as $field) {
@@ -9058,8 +9061,8 @@ class SynaformController extends AbstractController
                 continue;
             }
             $key = (string) $field['key'];
-            $meta = $entry['field_values'][$key] ?? null;
-            if (!is_array($meta) || empty($meta['path']) || !is_file($meta['path'])) {
+            $file = $this->candidateImages->locate($userId, $candidateId, $entry['field_values'][$key] ?? null);
+            if (null === $file) {
                 continue;
             }
 
@@ -9067,8 +9070,8 @@ class SynaformController extends AbstractController
             if (($designer['placement'] ?? 'inline') === 'float') {
                 $tp->setValue($key, '[[SYNIMG|'.$key.']]');
                 $floating[$key] = [
-                    'path' => (string) $meta['path'],
-                    'mime' => (string) ($meta['mime'] ?? 'image/png'),
+                    'path' => $file,
+                    'mime' => $this->candidateImages->mimeOf($file),
                     'designer' => $designer,
                 ];
                 continue;
@@ -9079,7 +9082,7 @@ class SynaformController extends AbstractController
 
             try {
                 $tp->setImageValue($key, [
-                    'path' => $meta['path'],
+                    'path' => $file,
                     'width' => $width,
                     'height' => $height,
                     'ratio' => !empty($designer['preserve_ratio']),
