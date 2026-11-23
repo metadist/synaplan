@@ -3993,6 +3993,63 @@ class ModelCatalog
             ],
         ],
         // ----------------------------------------------------------------
+        // Gemini 4 Neon. Model card, pricing, and what's new pages read
+        // 2026-11-23, stable id gemini-4-neon.
+        // https://aistudio.google.com/docs/models/gemini-4-neon
+        // https://aistudio.google.com/docs/whats-new-gemini-4-neon
+        // Flat standard paid price for the whole 1M window: $3 input / $15
+        // output per 1M (output includes thinking). Implicit cache hits (from
+        // 4,096 tokens) are 95% off ($0.15). There is no explicit cache API.
+        // Thinking levels are low, medium, high (default), and xhigh. Paid
+        // tier only (no free tier). The public id is the only one offered.
+        // ----------------------------------------------------------------
+        [
+            'id' => 446,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Neon',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-neon',
+            'priceIn' => 3.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 15.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Neon - frontier model for complex reasoning, coding, agentic workflows, and multimodal work. 1M token context shared by input, thinking, and output. Thinking levels low, medium, high (default), and xhigh. $3 input / $15 output per 1M tokens. Implicit cached input is 95% off ($0.15). Requires a paid Google AI API tier (no free tier).',
+                'max_tokens' => 65536,
+                'params' => ['model' => 'gemini-4-neon'],
+                'features' => ['reasoning', 'vision', 'audio', 'tool_use'],
+                'cache_read_price_per_1M' => 0.15,
+                'meta' => ['family' => 'google', 'jurisdiction' => 'US', 'context_window' => '1048576', 'max_output' => '65536', 'reasoning_effort_default' => 'high'],
+            ],
+        ],
+        [
+            'id' => 447,
+            'service' => 'Google',
+            'name' => 'Gemini 4 Neon (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-4-neon',
+            'priceIn' => 3.00,
+            'inUnit' => 'per1M',
+            'priceOut' => 15.00,
+            'outUnit' => 'per1M',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Gemini 4 Neon for image, video, audio, and PDF understanding. $3 input / $15 output per 1M tokens (cached input $0.15). Requires a paid Google AI API tier (no free tier).',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gemini-4-neon'],
+                'features' => ['vision'],
+                'cache_read_price_per_1M' => 0.15,
+                'meta' => ['supports_images' => true, 'supports_video' => true],
+            ],
+        ],
+        // ----------------------------------------------------------------
         // Google Gemini 3.6 / 3.7 / 3.8 Flash + 3.5 Flash-Lite + Omni video
         // + Nano Banana 2 Lite + Gemini 3.5 Transcribe.
         // Live-probed against generativelanguage.googleapis.com/v1beta on

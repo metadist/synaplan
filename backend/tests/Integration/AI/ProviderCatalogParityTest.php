@@ -422,6 +422,8 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['google', 'gemini-4-hydrogen', ['low', 'medium', 'high', 'xhigh']],
         ['google', 'gemini-4-carbon', ['low', 'medium', 'high']],
         ['google', 'gemini-4-hydrogen-cyber', ['low', 'medium', 'high']],
+        ['google', 'gemini-4-neon', ['low', 'medium', 'high', 'xhigh']],
+        ['google', 'gemini-4-neon-preview', ['low', 'medium', 'high']],
         ['anthropic', 'claude-sonnet-5-5-20260601', ['low', 'medium', 'high', 'xhigh', 'max']],
         ['anthropic', 'claude-opus-4-6', ['low', 'medium', 'high']],
         ['anthropic', 'claude-opus-4-7', ['low', 'medium', 'high']],
