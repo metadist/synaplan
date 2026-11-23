@@ -1,5 +1,15 @@
 # Architecture update — status
 
+> **2026-11-22 — S6 started.** Admin › Server load has five tabs: Servers,
+> Requests (sortable p50/p95, the slowest requests with a parts bar),
+> AI calls, Tools and Outbound (would-be-refused destinations, Allow and
+> Remove on `EGRESS.ALLOW`). `docs/CAPACITY.md` is a draft with dev-stack
+> numbers; M1 and M6 replace them. The chart side (AU34) is a separate
+> synaplan-charts pull request checked with `helm template` only.
+> `EGRESS.MODE` stays `off`. Not built yet: a pump metric, a pump drain
+> deadline and a watchdog drain endpoint. The compose `pump` service lacks
+> `LOCK_DSN` and restarts in a loop on a plain dev stack.
+
 > **2026-11-14 — S5, web chat.** A signed-in web chat can leave the web
 > worker. `RUNTIME.STREAM_PUMP` stays `off` and `STREAM_PUMP_PERCENT` stays
 > `0`. The pump role waits for a job. `SYNAPLAN_RELAY` stays unset, so the
@@ -114,6 +124,7 @@ measurement and a rollout are entries here, not chat messages.
 | 2026-11-08 | AU25b | [#3035](https://github.com/metadist/synaplan/pull/3035) | merged | Tool calls chip, one sentence per source, approval id opens Approvals. A resumed run stores that id |
 | 2026-11-19 | AU26 | #3193 | merged | One `AgentToolLoop` under document chat and both gateways; limits are `ToolLoopLimits` (profile input, `ToolLimits` the defaults). `tool_loops.json` unchanged. `GatewayToolLoop` 1,274 → 223 lines, out of the size ledger |
 | 2026-11-14 | S5 web chat | this branch | open | Pump role, run stream, watchdog relay behind `SYNAPLAN_RELAY`, live re-attach. Flags stay off. Gateways, widget, guest and incognito stay in the request. AU32 waits for the soak |
+| 2026-11-22 | AU33 + AU35 draft | this branch | open | Server load tabs; Outbound edits `EGRESS.ALLOW`; the `pump` role is accepted by the servers API. `docs/CAPACITY.md` marked draft, dev-stack numbers |
 
 ## 2026-11-19 — AU26: one agent loop
 

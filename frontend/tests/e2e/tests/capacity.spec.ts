@@ -172,6 +172,284 @@ test.describe('@ci Capacity', () => {
   })
 })
 
+/**
+ * Admin › Capacity › Requests, AI calls, Tools and Outbound (AU33, journeys
+ * J-AU-2 and J-AU-3). The CI stack has no Redis, so the timeline reports are
+ * route mocks; Allow and Remove on the Outbound tab go to the real backend
+ * and change the real allow list.
+ */
+test.describe('@ci Capacity timeline', () => {
+  test.beforeEach(async ({ page }) => {
+    await login(page, CREDENTIALS.getAdminCredentials())
+  })
+
+  test('J-AU-2 find the slowest request and see where its time went', async ({ page }) => {
+    await mockReport(page, 'requests', requestsReport())
+    await mockReport(page, 'ai-calls', aiCallsReport())
+    await page.goto('/admin/capacity')
+    await expect(page.locator(selectors.pages.capacity)).toBeVisible({ timeout: TIMEOUTS.STANDARD })
+    await expect(page.locator(selectors.capacity.sizingGuide)).toHaveAttribute(
+      'href',
+      /docs\/CAPACITY\.md$/
+    )
+
+    await page.locator(selectors.capacity.tab('requests')).click()
+    await expect(page).toHaveURL(/[?&]tab=requests/)
+    const routes = page.locator(selectors.capacity.routeRow)
+    await expect(routes.first()).toHaveAttribute('data-route', 'chat_stream')
+    await expect(routes.first().locator(selectors.capacity.routeP95)).toHaveText('8.4 s')
+
+    await page.locator(selectors.capacity.requestsSort).selectOption('requests')
+    await expect(routes.first()).toHaveAttribute('data-route', 'files')
+
+    const slowest = page.locator(selectors.capacity.slowRequest).first()
+    await expect(slowest).toHaveAttribute('data-request-id', 'req-slow-1')
+    await expect(slowest.locator(selectors.capacity.slowTotal)).toHaveText('12 s')
+    await expect(slowest.locator(selectors.capacity.slowLargest)).toHaveText('Mostly AI: 9.0 s')
+    await slowest.locator('summary').click()
+    const detail = slowest.locator(selectors.capacity.slowDetail)
+    await expect(detail).toBeVisible()
+    await expect(detail.locator(selectors.capacity.partsLegend)).toContainText('Database')
+    await expect(detail).toContainText('first word after 820 ms')
+    await expect(detail).toContainText('Refused by the filter')
+    await expect(detail.locator(selectors.capacity.slowId)).toHaveText('req-slow-1')
+
+    await page.locator(selectors.capacity.tab('ai')).click()
+    await expect(page).toHaveURL(/[?&]tab=ai/)
+    const model = page.locator(selectors.capacity.aiModelRow).first()
+    await expect(model).toContainText('anthropic')
+    await expect(model).toContainText('0.0420')
+    await expect(page.locator(selectors.capacity.aiSourceRow).first()).toContainText('Chat')
+  })
+
+  test('J-AU-3 allow a destination the filter does not know, then remove it again', async ({
+    page,
+  }) => {
+    const host = `capacity-e2e-${Date.now()}.example.test`
+    const state = { mode: 'report' as 'report' | 'enforce', listed: false }
+    await page.route('**/api/v1/admin/capacity/outbound', async (route) => {
+      await route.fulfill({ json: outboundReport(host, state) })
+    })
+    // Allow and Remove reach the real backend; only the answer is watched.
+    await page.route('**/api/v1/admin/egress/allow', async (route) => {
+      const response = await route.fetch()
+      const body = (await response.json()) as { success: boolean; rules: string[] }
+      if (body.success) state.listed = body.rules.includes(host)
+      await route.fulfill({ response, json: body })
+    })
+
+    try {
+      await page.goto('/admin/capacity?tab=outbound')
+      const outbound = page.locator(selectors.capacity.outbound)
+      await expect(outbound).toHaveAttribute('data-mode', 'report', {
+        timeout: TIMEOUTS.STANDARD,
+      })
+      const typed = page.locator(`${selectors.capacity.outboundRow}[data-destination="typed"]`)
+      await expect(typed.locator(selectors.capacity.outboundAllow)).toHaveCount(0)
+
+      const row = page.locator(`${selectors.capacity.outboundRow}[data-destination="${host}"]`)
+      await expect(row.locator(selectors.capacity.outboundState)).toHaveText('Would be refused')
+      await row.locator(selectors.capacity.outboundAllow).click()
+      await expect(row).toHaveAttribute('data-state', 'listed')
+      await expect(row.locator(selectors.capacity.outboundRemove)).toBeVisible()
+      expect(state.listed, 'the real allow list now holds the host').toBe(true)
+
+      // Once the filter refuses, taking a rule off asks first.
+      state.mode = 'enforce'
+      await page.reload()
+      await expect(outbound).toHaveAttribute('data-mode', 'enforce', {
+        timeout: TIMEOUTS.STANDARD,
+      })
+      await row.locator(selectors.capacity.outboundRemove).click()
+      await page.locator(selectors.dialog.cancelBtn).click()
+      await expect(row).toHaveAttribute('data-state', 'listed')
+      expect(state.listed).toBe(true)
+
+      await row.locator(selectors.capacity.outboundRemove).click()
+      await page.locator(selectors.dialog.confirmBtn).click()
+      await expect(row).toHaveAttribute('data-state', 'not_listed')
+      await expect(row.locator(selectors.capacity.outboundState)).toHaveText('Refused')
+      expect(state.listed, 'the real allow list no longer holds the host').toBe(false)
+
+      await page.locator(selectors.capacity.outboundSetting).click()
+      await expect(page.locator('[data-config-field="EGRESS_MODE"]')).toHaveAttribute(
+        'data-testid',
+        'config-field-highlighted',
+        { timeout: TIMEOUTS.STANDARD }
+      )
+    } finally {
+      await page.unroute('**/api/v1/admin/egress/allow')
+      await page.request.delete(`${getApiUrl()}/api/v1/admin/egress/allow`, {
+        data: { rule: host },
+      })
+    }
+  })
+
+  test('tool calls that asked for approval link to what still waits', async ({ page }) => {
+    await page.route('**/api/v1/config/runtime', async (route) => {
+      const response = await route.fetch()
+      const body = (await response.json()) as { features?: Record<string, unknown> }
+      body.features = { ...body.features, toolsApprovalsEnabled: true }
+      await route.fulfill({ response, json: body })
+    })
+    // The table counts the window's history; the link counts this viewer's open approvals.
+    await page.route('**/api/v1/approvals?*', async (route) => {
+      await route.fulfill({ json: { success: true, pendingCount: 1, approvals: [] } })
+    })
+    await mockReport(page, 'tools', {
+      ...meta(),
+      tools: [
+        {
+          source: 'mcp',
+          kind: 'write',
+          calls: 5,
+          done: 2,
+          refused: 1,
+          waiting: 2,
+          failed: 0,
+          p95_ms: 1400,
+        },
+      ],
+    })
+    await page.goto('/admin/capacity?tab=tools')
+    const row = page.locator(selectors.capacity.toolRow).first()
+    await expect(row).toContainText('MCP servers', { timeout: TIMEOUTS.STANDARD })
+    await expect(row.locator(selectors.capacity.toolWaiting)).toHaveText('2')
+    await expect(page.locator(selectors.capacity.approvalsLink)).toContainText('1 waiting')
+    await page.locator(selectors.capacity.approvalsLink).click()
+    await expect(page).toHaveURL(/\/approvals/)
+  })
+})
+
+function meta(): Record<string, unknown> {
+  return { success: true, served_by: 'web1', generated_at: new Date().toISOString() }
+}
+
+async function mockReport(page: Page, name: string, body: Record<string, unknown>) {
+  await page.route(`**/api/v1/admin/capacity/${name}`, async (route) => {
+    await route.fulfill({ json: body })
+  })
+}
+
+function route(routeClass: string, requests: number, p95: number): Record<string, unknown> {
+  return {
+    route_class: routeClass,
+    requests,
+    errors: 0,
+    busy: 0,
+    p50_ms: Math.round(p95 / 3),
+    p95_ms: p95,
+    p99_ms: p95 + 500,
+    wait_p95_ms: null,
+  }
+}
+
+function requestsReport(): Record<string, unknown> {
+  return {
+    ...meta(),
+    window_seconds: 3600,
+    route_classes: [route('files', 240, 310), route('chat_stream', 42, 8400)],
+    slowest: [
+      {
+        id: 'req-slow-1',
+        ts: Math.floor(Date.now() / 1000) - 300,
+        server: 'web1',
+        route_class: 'chat_stream',
+        status_class: '2xx',
+        total_ms: 12_000,
+        php_ms: 12_000,
+        db_ms: 400,
+        db_queries: 18,
+        ai: [
+          {
+            provider: 'anthropic',
+            model: 'claude',
+            capability: 'chat_stream',
+            source: 'chat_stream',
+            ttft_ms: 820,
+            duration_ms: 9000,
+            tokens_in: 1200,
+            tokens_out: 640,
+            cost: '0.0420',
+            outcome: 'ok',
+            hooks_ms: 12,
+          },
+        ],
+        tools: [],
+        egress: [
+          { destination: 'api.anthropic.com', status_class: '2xx', duration_ms: 9000 },
+          { destination: 'unknown.example.org', status_class: 'blocked', duration_ms: 2 },
+        ],
+        user_id: null,
+      },
+    ],
+  }
+}
+
+function aiCallsReport(): Record<string, unknown> {
+  return {
+    ...meta(),
+    models: [
+      {
+        provider: 'anthropic',
+        model: 'claude',
+        capability: 'chat_stream',
+        calls: 1,
+        failures: 0,
+        ttft_p50_ms: 820,
+        ttft_p95_ms: 820,
+        duration_p95_ms: 9000,
+        tokens_in: 1200,
+        tokens_out: 640,
+        cost: '0.042',
+        hooks_ms_p95: 12,
+      },
+    ],
+    sources: [
+      {
+        source: 'chat_web',
+        calls: 1,
+        failures: 0,
+        tokens_in: 1200,
+        tokens_out: 640,
+        cost: '0.042',
+      },
+    ],
+  }
+}
+
+function outboundReport(
+  host: string,
+  state: { mode: 'report' | 'enforce'; listed: boolean }
+): Record<string, unknown> {
+  return {
+    ...meta(),
+    mode: state.mode,
+    destinations: [
+      {
+        destination: host,
+        requests: 3,
+        failures: 0,
+        refused: state.mode === 'enforce' && !state.listed ? 3 : 0,
+        p95_ms: 180,
+        state: state.listed ? 'listed' : 'not_listed',
+        rule: state.listed ? host : null,
+        allow_rule: state.listed ? null : host,
+      },
+      {
+        destination: 'typed',
+        requests: 1,
+        failures: 0,
+        refused: 0,
+        p95_ms: 90,
+        state: 'typed',
+        rule: null,
+        allow_rule: null,
+      },
+    ],
+  }
+}
+
 function server(id: string, overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id,
