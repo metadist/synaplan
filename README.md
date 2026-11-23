@@ -30,7 +30,7 @@ Build agents on your own documents and put them wherever work happens: web, What
 
 The same assistant answers on your website, in WhatsApp, by email, in Outlook and inside Nextcloud and ownCloud. Sensitive work can stay on Ollama. Everything else can go to OpenAI, Anthropic, Google, Mistral or a sovereign EU provider. Every answer shows its model and its price. A planner spends the expensive model only where it matters, and a mail or a ticket goes out only after a person approves it.
 
-It runs in production at a yoga studio ([Megaherz Yoga](https://megaherz-yoga.com)), a care service (SANI Pflegedienst) and a public-sector cloud (National Secure Cloud).
+It runs in production at a yoga studio ([Megaherz Yoga](https://megaherz-yoga.com)), a care service (SANI Pflegedienst), a public-sector cloud (National Secure Cloud) and an ecommerce solution for custom-made kitchen panels.
 
 ---
 
