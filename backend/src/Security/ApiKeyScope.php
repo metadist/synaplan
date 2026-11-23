@@ -380,7 +380,8 @@ final class ApiKeyScope
      *   POST /v1/chat/completions → also chat (exact routes, PLATFORM_ROUTES)
      *   POST /api/v1/platform-links/identities/adopt → chat, files or rag
      *   POST /api/v1/cloud/status, GET /api/v1/cloud/files → files
-     *   /api/v1/platform-links/deliveries, /pickups, PUT read-scope, POST sources/events → files
+     *   /api/v1/platform-links/deliveries, /pickups, PUT read-scope, POST sources/events,
+     *   PUT oidc-cloud → files
      *   /api/v1/cloud/watches (not from-message), POST /api/v1/cloud/trials → cloud:watch
      *   POST /api/v1/cloud/watches/from-message → no key (session only)
      *   GET /api/v1/config/memory-service/check → chat OR memories
@@ -570,6 +571,7 @@ final class ApiKeyScope
             || self::matchesPrefix($path, '/api/v1/platform-links/deliveries')
             || self::matchesPrefix($path, '/api/v1/platform-links/pickups')
             || ('PUT' === $method && '/api/v1/platform-links/read-scope' === $path)
+            || ('PUT' === $method && '/api/v1/platform-links/oidc-cloud' === $path)
             || ('POST' === $method && '/api/v1/platform-links/sources/events' === $path);
     }
 

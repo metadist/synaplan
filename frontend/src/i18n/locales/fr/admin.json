@@ -909,6 +909,13 @@
     },
     "webSearch": {
       "lead": "Choisissez qui interroge le web pour le chat. La prochaine recherche utilise le nouveau fournisseur, sans redémarrage. La requête de test affiche des titres pour confirmer que cela fonctionne.",
+      "enabled": "Recherche web",
+      "enabledHint": "Lorsque ceci est désactivé, le chat ne cherche pas sur le web.",
+      "apiKeyKept": "Une clé est enregistrée. Collez-en une nouvelle pour la remplacer.",
+      "braveCount": "Résultats par recherche",
+      "braveRestart": "Une nouvelle clé Brave ou un nouveau nombre de résultats s'applique après le redémarrage du serveur.",
+      "peopleChoose": "Plus d'un moteur est prêt : chaque personne choisit le sien dans Préférences. Celui-ci reste le choix par défaut tant qu'elle ne le fait pas.",
+      "oneEngine": "Un seul moteur est prêt : tout le monde l'utilise.",
       "docs": "Documentation",
       "healthAvailable": "disponible",
       "healthUnavailable": "indisponible",
@@ -1088,6 +1095,10 @@
     "scaleway": {
       "title": "Clé API Scaleway",
       "message": "Créez une clé secrète dans la console Scaleway (IAM → clés API), puis collez-la ici. Cela active les API génératives hébergées à Paris. Les invites sont traitées par Scaleway en France."
+    },
+    "llmtr": {
+      "title": "Clé API LLMTR",
+      "message": "Créez une clé API chez LLMTR, puis collez-la ici. Cela active des modèles hébergés en Turquie (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Les invites de ces modèles sont traitées en Turquie."
     },
     "huggingface": {
       "title": "Jeton API HuggingFace",

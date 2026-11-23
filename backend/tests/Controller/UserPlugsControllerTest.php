@@ -37,7 +37,7 @@ final class UserPlugsControllerTest extends WebTestCase
         $body = $this->json();
         self::assertFalse($body['allowed'] ?? true);
         self::assertSame('brave', $body['active'] ?? null);
-        self::assertNotEmpty($body['options'] ?? []);
+        self::assertIsArray($body['options'] ?? null);
     }
 
     public function testPutIsForbiddenWhenOverrideIsOff(): void
@@ -70,8 +70,8 @@ final class UserPlugsControllerTest extends WebTestCase
 
         self::assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
         $body = $this->json();
-        self::assertTrue($body['allowed'] ?? false);
         self::assertSame('tavily', $body['active'] ?? null);
+        self::assertFalse($body['allowed'] ?? true);
 
         $config->setValue(0, PlugConfigService::CONFIG_GROUP, PlugConfigService::KEY_WEB_SEARCH_USER_OVERRIDE_ALLOWED, '0');
         $config->deleteValue((int) $user->getId(), PlugConfigService::CONFIG_GROUP, PlugConfigService::KEY_WEB_SEARCH_PROVIDER);

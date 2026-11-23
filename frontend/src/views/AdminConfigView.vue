@@ -551,7 +551,7 @@ onBeforeUnmount(() => {
             <BrandingStyleResetCard v-if="currentTab.id === 'branding'" :config="systemConfig" />
 
             <section
-              v-if="currentTab.sections.length > 0"
+              v-if="currentTab.sections.length > 0 && currentTab.panel !== 'web-search'"
               class="space-y-3"
               :aria-labelledby="currentTab.panel ? `config-settings-${currentTab.id}` : undefined"
             >

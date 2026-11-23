@@ -114,6 +114,7 @@ parameters:
     env(TAVILY_API_KEY): ''
     env(EXA_API_KEY): ''
     env(FIRECRAWL_API_KEY): ''
+    env(SPECSTREAM_API_KEY): ''
     env(JINA_API_KEY): ''
     env(COHERE_API_KEY): ''
     env(VOYAGE_API_KEY): ''
@@ -457,6 +458,7 @@ services:
                 tavily: '%env(TAVILY_API_KEY)%'
                 exa: '%env(EXA_API_KEY)%'
                 firecrawl: '%env(FIRECRAWL_API_KEY)%'
+                specstream: '%env(SPECSTREAM_API_KEY)%'
                 jina: '%env(JINA_API_KEY)%'
                 cohere: '%env(COHERE_API_KEY)%'
                 voyage: '%env(VOYAGE_API_KEY)%'
@@ -1420,6 +1422,7 @@ services:
     App\Service\Chat\Loop\ChatRunModel: '@App\Service\Chat\Loop\FacadeChatRunModel'
     App\Service\Chat\Loop\ChatRunBudget: '@App\Service\Chat\Loop\MonthlyChatRunBudget'
     App\Service\Chat\Loop\ChatRunToolbox: '@App\Service\Chat\Loop\RegistryChatRunToolbox'
+    App\Service\Chat\Loop\ChatRunCheckModel: '@App\Service\Chat\Loop\ConfiguredChatRunCheckModel'
 
     # Research keys extend the kernel's; a plain RunKeys stays the kernel store.
     App\Service\Run\RunKeys: '@App\Service\Run\RedisRunKeys'

@@ -65,14 +65,21 @@ final class UserPlugsController extends AbstractController
 
         $options = [];
         foreach ($this->registry->all() as $adapter) {
+            if (!$adapter->health()->available) {
+                continue;
+            }
             $options[] = [
                 'key' => $adapter->key(),
                 'label' => $adapter->descriptor()->label,
             ];
         }
 
+        $allowed = $this->plugConfig->isWebSearchEnabled()
+            && $this->plugConfig->isWebSearchUserOverrideAllowed()
+            && \count($options) >= 2;
+
         return $this->json([
-            'allowed' => $this->plugConfig->isWebSearchUserOverrideAllowed(),
+            'allowed' => $allowed,
             'active' => $this->plugConfig->webSearchProvider((int) $user->getId()),
             'options' => $options,
         ]);

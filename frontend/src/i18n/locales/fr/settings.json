@@ -752,10 +752,21 @@
     },
     "webSearch": {
       "title": "Recherche web",
-      "description": "Utilisez un autre fournisseur de recherche que celui défini par votre administrateur pour tout le monde.",
-      "useMyOwn": "Utiliser ma propre recherche",
+      "description": "Choisissez le moteur qui répond à vos questions. Le choix de l'administrateur s'applique tant que vous n'en choisissez pas un.",
+      "useMyOwn": "Moteur de recherche",
       "saved": "Votre fournisseur de recherche a été enregistré.",
       "saveFailed": "Votre fournisseur de recherche n’a pas pu être enregistré"
+    },
+    "chatRunLimit": {
+      "title": "Limite de coût par réponse longue",
+      "description": "Lorsque le chat enchaîne plusieurs étapes pour une réponse, il peut dépenser au plus cette part de votre budget mensuel. À la limite, il arrête de chercher et répond avec ce qu'il a trouvé.",
+      "share": "Part de votre budget mensuel",
+      "option": "{percent} % – jusqu'à {amount} par réponse",
+      "default": "par défaut",
+      "monthly": "Votre budget mensuel : {amount}",
+      "noBudget": "Votre offre n'a pas de budget mensuel, il n'y a donc pas de limite de coût par réponse. Une réponse longue s'arrête quand même si elle tourne en rond.",
+      "saved": "Votre limite de coût a été enregistrée.",
+      "saveFailed": "Votre limite de coût n'a pas pu être enregistrée"
     },
     "account": {
       "title": "Compte",

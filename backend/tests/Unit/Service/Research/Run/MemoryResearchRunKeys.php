@@ -216,6 +216,10 @@ final class MemoryResearchRunKeys implements ResearchRunKeys
         return $seq;
     }
 
+    public function awaitEvent(string $listKey, int $afterSeq, int $blockMs): void
+    {
+    }
+
     public function putSourceText(string $runId, string $sourceId, string $text): bool
     {
         $expiresAt = $this->runExpiresAt($runId);

@@ -55,6 +55,7 @@ final class EgressBuiltinDestinations
         'api.telegram.org',
         'graph.facebook.com',
         'api.search.brave.com',
+        'api.specstream.ai',
         'accounts.google.com',
         'androidpublisher.googleapis.com',
         'oauth2.googleapis.com',

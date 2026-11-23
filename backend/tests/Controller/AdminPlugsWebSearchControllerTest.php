@@ -50,6 +50,7 @@ final class AdminPlugsWebSearchControllerTest extends WebTestCase
         self::assertContains('tavily', $keys);
         self::assertContains('exa', $keys);
         self::assertContains('firecrawl', $keys);
+        self::assertContains('specstream', $keys);
         self::assertContains('perplexity', $keys);
     }
 
@@ -88,7 +89,7 @@ final class AdminPlugsWebSearchControllerTest extends WebTestCase
         $body = $this->json();
         self::assertSame('searxng', $body['active'] ?? null);
         self::assertSame('brave', $body['fallback'] ?? null);
-        self::assertTrue($body['userOverrideAllowed'] ?? false);
+        self::assertFalse($body['userOverrideAllowed'] ?? true);
 
         $this->client->request(
             'PUT',

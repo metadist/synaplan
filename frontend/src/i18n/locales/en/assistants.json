@@ -289,9 +289,13 @@
     }
   },
   "templates": {
-    "pickTitle": "New agent",
-    "pickSubtitle": "Start from a ready-made agent, or start with an empty one.",
-    "searchPlaceholder": "Search templates",
+    "pickTitle": "What should your agent do?",
+    "pickSubtitle": "Pick a ready-made one and make it yours, or start with an empty one.",
+    "groups": {
+      "schedule": "Runs by itself",
+      "chat": "Answers in the chat"
+    },
+    "searchPlaceholder": "Search examples",
     "all": "All",
     "startEmpty": "Start empty",
     "startEmptyHint": "A blank agent. You write the instructions yourself.",
@@ -375,68 +379,68 @@
       "plugin": "Plugins"
     },
     "offerWriter": {
-      "title": "Offer writer",
+      "title": "Write an offer from your price list",
       "summary": "Writes an offer from your price list and cites every price.",
       "needsPriceList": "Needs the folder with your price list.",
       "try1": "Write an offer for Müller GmbH for 10 licenses.",
       "try2": "Which prices in the list apply to a one-year support contract?"
     },
     "hrHandbook": {
-      "title": "HR handbook",
+      "title": "Answer handbook questions, with the passage",
       "summary": "Answers questions about the written handbook and cites the passage. It does not make hiring decisions.",
       "needsHandbook": "Needs the folder with your handbook.",
       "try1": "How many days of leave does the handbook allow?",
       "try2": "What does the handbook say about working from home?"
     },
     "tenderResponse": {
-      "title": "Tender response",
+      "title": "Draft tender answers from your files",
       "summary": "Drafts answers to tender questions and cites the source file.",
       "needsFolder": "Needs the folder with your tender documents.",
       "try1": "Answer the question about our support hours, and cite the file.",
       "try2": "Which documents do we still need for this tender?"
     },
     "contractSummary": {
-      "title": "Contract summary",
+      "title": "Summarise a contract in plain words",
       "summary": "Summarises a contract in plain language. This is not legal advice.",
       "needsFile": "Needs the contract file.",
       "try1": "Summarise the parties, the term and the payment.",
       "try2": "What happens if we end the contract early?"
     },
     "meetingMinutes": {
-      "title": "Meeting minutes",
+      "title": "Turn notes into decisions and action items",
       "summary": "Turns notes or a transcript into decisions and action items.",
       "try1": "Turn these notes into minutes with decisions and action items.",
       "try2": "List only the actions, with the owner when one was named."
     },
     "socialPosts": {
-      "title": "Social posts",
+      "title": "Draft three posts from a press release",
       "summary": "Drafts three posts from a press release, without adding facts.",
       "try1": "Write three posts from this press release.",
       "try2": "Make a shorter version of the second post."
     },
     "itHelpdesk": {
-      "title": "IT helpdesk",
+      "title": "Answer IT questions from your help articles",
       "summary": "Writes a first answer from your help articles and cites the article. It does not open a ticket.",
       "needsArticles": "Needs the folder with your help articles.",
       "try1": "A colleague cannot connect to the VPN. What should they try first?",
       "try2": "How do we reset a forgotten password?"
     },
     "dailyBriefing": {
-      "title": "Daily briefing",
+      "title": "Your morning briefing, every weekday",
       "summary": "A weekday morning briefing from your mailbox.",
       "needsMail": "Connect your mailbox so the briefing can read it.",
       "try1": "What in my mailbox needs a decision today?",
       "try2": "Skip newsletters and list only the messages I should answer."
     },
     "regulationWatch": {
-      "title": "Regulation watch",
+      "title": "Tell you when a watched page changes",
       "summary": "Reports a change on a page you watch and cites the page. It does not invent a change.",
       "needsPage": "Add the pages you want watched. You do this under Saved tasks.",
       "try1": "What changed on the pages I watch?",
       "try2": "Did the fee schedule change, or is it unchanged?"
     },
     "expertResearch": {
-      "title": "Expert research",
+      "title": "Answer from your own documents",
       "summary": "Answers from your own documents and cites the passage. It says when the documents do not contain the answer.",
       "needsFolder": "Needs the folder with your documents.",
       "needsResearch": "Research is turned off on this server. This agent still answers from the folder you choose.",
@@ -444,7 +448,7 @@
       "try2": "What does our note say about the notice period?"
     },
     "serviceDesk": {
-      "title": "Citizens' service desk",
+      "title": "Answer website visitors from your documents",
       "summary": "Answers website visitors from your approved documents, in their language, and cites the passage. It does not send a request and it does not decide the case.",
       "needsFolder": "Needs the folder with the approved documents.",
       "needsWidget": "Publish this agent, then put it on a chat widget. Visitors only hear it after it is published.",

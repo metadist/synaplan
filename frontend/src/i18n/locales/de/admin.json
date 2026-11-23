@@ -909,6 +909,13 @@
     },
     "webSearch": {
       "lead": "Wählen Sie, wer im Web für den Chat sucht. Die nächste Suche nutzt den neuen Anbieter — ohne Neustart. Die Testabfrage zeigt Titel, damit Sie sehen, dass es funktioniert.",
+      "enabled": "Websuche",
+      "enabledHint": "Wenn dies aus ist, sucht der Chat nicht im Web.",
+      "apiKeyKept": "Ein Schlüssel ist gespeichert. Fügen Sie einen neuen ein, um ihn zu ersetzen.",
+      "braveCount": "Ergebnisse pro Suche",
+      "braveRestart": "Ein neuer Brave-Schlüssel oder eine neue Anzahl gilt nach einem Neustart des Servers.",
+      "peopleChoose": "Mehr als eine Suchmaschine ist bereit. Jede Person wählt ihre in den Einstellungen. Diese hier ist die Vorgabe, bis sie das tut.",
+      "oneEngine": "Nur eine Suchmaschine ist bereit. Alle nutzen sie.",
       "docs": "Dokumentation",
       "healthAvailable": "verfügbar",
       "healthUnavailable": "nicht verfügbar",
@@ -1088,6 +1095,10 @@
     "scaleway": {
       "title": "Scaleway-API-Schlüssel",
       "message": "Erstelle einen Secret Key in der Scaleway-Konsole (IAM → API-Schlüssel) und füge ihn hier ein. Damit stehen die Generative APIs bereit, die in Paris gehostet werden. Prompts werden von Scaleway in Frankreich verarbeitet."
+    },
+    "llmtr": {
+      "title": "LLMTR-API-Schlüssel",
+      "message": "Erstelle einen API-Schlüssel bei LLMTR und füge ihn hier ein. Damit stehen in der Türkei gehostete Modelle bereit (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Prompts für diese Modelle werden in der Türkei verarbeitet."
     },
     "huggingface": {
       "title": "HuggingFace-API-Token",

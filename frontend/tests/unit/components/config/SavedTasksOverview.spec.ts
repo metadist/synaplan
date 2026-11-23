@@ -58,6 +58,7 @@ const task: SavedTask = {
     params: { when: 'manual' },
   },
   instructionPreview: 'Summarize my inbox',
+  delivery: 'reply',
   waitingApprovalCount: 0,
 }
 

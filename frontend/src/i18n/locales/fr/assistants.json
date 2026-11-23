@@ -289,9 +289,13 @@
     "publishedOnly": "Seuls les agents publiés sont inclus. Les brouillons restent sur ce compte."
   },
   "templates": {
-    "pickTitle": "Nouvel agent",
-    "pickSubtitle": "Partez d’un agent prêt, ou d’un agent vide.",
-    "searchPlaceholder": "Chercher un modèle",
+    "pickTitle": "Que doit faire votre agent ?",
+    "pickSubtitle": "Choisissez-en un tout prêt et adaptez-le, ou partez d’un agent vide.",
+    "groups": {
+      "schedule": "Fonctionne tout seul",
+      "chat": "Répond dans le chat"
+    },
+    "searchPlaceholder": "Rechercher des exemples",
     "all": "Tous",
     "startEmpty": "Partir de zéro",
     "startEmptyHint": "Un agent vide. Vous écrivez les consignes vous-même.",
@@ -375,68 +379,68 @@
       "plugin": "Plugins"
     },
     "offerWriter": {
-      "title": "Rédacteur d’offres",
+      "title": "Rédiger une offre depuis vos tarifs",
       "summary": "Rédige une offre à partir de votre liste de prix et cite chaque prix.",
       "needsPriceList": "Il faut le dossier avec votre liste de prix.",
       "try1": "Rédige une offre pour Müller GmbH pour 10 licences.",
       "try2": "Quels prix de la liste s’appliquent à un contrat de support d’un an ?"
     },
     "hrHandbook": {
-      "title": "Manuel RH",
+      "title": "Répondre aux questions du manuel, passage à l’appui",
       "summary": "Répond aux questions sur le manuel écrit et cite le passage. Il ne prend pas de décision d’embauche.",
       "needsHandbook": "Il faut le dossier avec votre manuel.",
       "try1": "Combien de jours de congé le manuel prévoit-il ?",
       "try2": "Que dit le manuel sur le travail à domicile ?"
     },
     "tenderResponse": {
-      "title": "Réponse à un appel d’offres",
+      "title": "Rédiger des réponses d’appel d’offres depuis vos fichiers",
       "summary": "Rédige des réponses aux questions d’un appel d’offres et cite le fichier source.",
       "needsFolder": "Il faut le dossier avec vos documents d’appel d’offres.",
       "try1": "Réponds à la question sur nos horaires de support et cite le fichier.",
       "try2": "Quels documents nous manquent encore pour cet appel d’offres ?"
     },
     "contractSummary": {
-      "title": "Résumé de contrat",
+      "title": "Résumer un contrat en mots simples",
       "summary": "Résume un contrat en langage simple. Ce n’est pas un conseil juridique.",
       "needsFile": "Il faut le fichier du contrat.",
       "try1": "Résume les parties, la durée et le paiement.",
       "try2": "Que se passe-t-il si nous arrêtons le contrat plus tôt ?"
     },
     "meetingMinutes": {
-      "title": "Compte rendu",
+      "title": "Transformer des notes en décisions et actions",
       "summary": "Transforme des notes ou une transcription en décisions et en actions.",
       "try1": "Transforme ces notes en compte rendu avec décisions et actions.",
       "try2": "Liste seulement les actions, avec la personne quand elle a été nommée."
     },
     "socialPosts": {
-      "title": "Publications",
+      "title": "Rédiger trois publications depuis un communiqué",
       "summary": "Rédige trois publications à partir d’un communiqué, sans ajouter de faits.",
       "try1": "Écris trois publications à partir de ce communiqué.",
       "try2": "Fais une version plus courte de la deuxième."
     },
     "itHelpdesk": {
-      "title": "Support informatique",
+      "title": "Répondre aux questions informatiques depuis vos articles d’aide",
       "summary": "Écrit une première réponse à partir de vos articles d’aide et cite l’article. Il n’ouvre pas de ticket.",
       "needsArticles": "Il faut le dossier avec vos articles d’aide.",
       "try1": "Une collègue n’arrive pas à se connecter au VPN. Que doit-elle essayer d’abord ?",
       "try2": "Comment réinitialiser un mot de passe oublié ?"
     },
     "dailyBriefing": {
-      "title": "Briefing du matin",
+      "title": "Votre briefing du matin, chaque jour ouvré",
       "summary": "Un briefing en semaine le matin à partir de votre messagerie.",
       "needsMail": "Connectez votre messagerie pour que le briefing puisse la lire.",
       "try1": "Qu’est-ce qui dans ma messagerie demande une décision aujourd’hui ?",
       "try2": "Laisse les newsletters de côté et liste seulement les messages auxquels je dois répondre."
     },
     "regulationWatch": {
-      "title": "Veille réglementaire",
+      "title": "Vous prévenir quand une page surveillée change",
       "summary": "Signale un changement sur une page que vous suivez et cite la page. Il n’invente pas de changement.",
       "needsPage": "Ajoutez les pages à suivre. Cela se fait dans Tâches enregistrées.",
       "try1": "Qu’est-ce qui a changé sur les pages que je suis ?",
       "try2": "Le barème des frais a-t-il changé, ou est-il inchangé ?"
     },
     "expertResearch": {
-      "title": "Recherche interne",
+      "title": "Répondre depuis vos propres documents",
       "summary": "Répond à partir de vos propres documents et cite le passage. Il dit quand les documents ne contiennent pas la réponse.",
       "needsFolder": "Il faut le dossier avec vos documents.",
       "needsResearch": "La recherche est désactivée sur ce serveur. Cet agent répond quand même à partir du dossier que vous choisissez.",
@@ -444,7 +448,7 @@
       "try2": "Que dit notre note sur le délai de préavis ?"
     },
     "serviceDesk": {
-      "title": "Accueil des usagers",
+      "title": "Répondre aux visiteurs du site depuis vos documents",
       "summary": "Répond aux visiteurs de votre site à partir de vos documents approuvés, dans leur langue, et cite le passage. Il n’envoie pas de demande et ne tranche pas le dossier.",
       "needsFolder": "Il faut le dossier avec les documents approuvés.",
       "needsWidget": "Publiez cet agent, puis placez-le sur un widget de chat. Les visiteurs ne l’entendent qu’après la publication.",

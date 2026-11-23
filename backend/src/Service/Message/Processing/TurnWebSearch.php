@@ -7,6 +7,7 @@ namespace App\Service\Message\Processing;
 use App\Entity\Message;
 use App\Plug\WebSearch\WebSearchGateway;
 use App\Repository\SearchResultRepository;
+use App\Service\Chat\Loop\ChatLoopGate;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Message\AttachmentSearchContextResolver;
 use App\Service\Message\Chat\FreshInfoRequest;
@@ -42,6 +43,7 @@ final readonly class TurnWebSearch
         private LoggerInterface $logger,
         private ?SearchResultRepository $searchResultRepository = null,
         private ?WebResearchService $webResearch = null,
+        private ?ChatLoopGate $loop = null,
     ) {
     }
 
@@ -58,6 +60,10 @@ final readonly class TurnWebSearch
      */
     public function run(Message $message, array $classification, array $promptMetadata, array $options, array $history, TurnStatus $status, ?PerfTimer $perfTimer = null): array
     {
+        // On the loop the model searches and reads pages itself, with tools.
+        if (true === $this->loop?->forTurn($message, $options, $classification)) {
+            return ['classification' => $classification, 'searchResults' => null, 'searchOnRequest' => false];
+        }
         $topic = $classification['topic'] ?? 'general';
         $promptMetadata = $this->applyRuntimeToolFlags($promptMetadata, $classification['runtime_profile'] ?? $options['runtime_profile'] ?? null);
         $promptToolInternet = PromptToolFlag::read($promptMetadata, 'tool_internet');

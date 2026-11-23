@@ -39,6 +39,8 @@ final readonly class SavedTaskRunner
      */
     public const CHAT_INSTRUCTION_TOPIC_PREFIX = 'saved-';
 
+    private SavedTaskDelivery $delivery;
+
     public function __construct(
         private SavedTaskConfig $config,
         private SavedTaskRepository $tasks,
@@ -55,6 +57,9 @@ final readonly class SavedTaskRunner
         private LoggerInterface $logger,
         private SavedTaskOutcomeNarrator $outcomeNarrator = new SavedTaskOutcomeNarrator(),
     ) {
+        // Stateless derivation; kept out of the constructor on purpose so the
+        // frozen constructor size (size ratchet) does not grow.
+        $this->delivery = new SavedTaskDelivery();
     }
 
     /**
@@ -172,17 +177,7 @@ final readonly class SavedTaskRunner
                 return ['run' => $run, 'task' => $task];
             }
 
-            $this->recordRun($user, $result, $chat, $text);
-
-            $run->markCompleted($messageId, [] !== $snapshot ? ['cards' => $snapshot] : null);
-            $task->recordSuccess();
-            $this->runs->save($run);
-            $this->tasks->save($task);
-            if (null !== $task->getId()) {
-                $this->runs->prune($task->getId(), new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
-            }
-
-            return ['run' => $run, 'task' => $task];
+            return $this->completeRun($task, $run, $user, $result, $chat, $text, $messageId, $snapshot);
         } catch (\Throwable $e) {
             $this->logger->warning('SavedTaskRunner: run failed', [
                 'task_id' => $task->getId(),
@@ -530,6 +525,72 @@ final readonly class SavedTaskRunner
             (string) ($result['response']['content'] ?? ''),
             ['chat_id' => $chat->getId()],
         ));
+    }
+
+    /**
+     * Counts the run, delivers the reply when the task chose email, and
+     * closes the books. A result that should have been mailed but could not
+     * be is a failed run, never a silent success.
+     *
+     * @param array<string, mixed>                            $result
+     * @param list<array<string, mixed>>|array<string, mixed> $snapshot
+     *
+     * @return array{run: SavedTaskRun, task: SavedTask}
+     */
+    private function completeRun(SavedTask $task, SavedTaskRun $run, User $user, array $result, Chat $chat, string $text, ?int $messageId, array $snapshot): array
+    {
+        $this->recordRun($user, $result, $chat, $text);
+
+        if ($this->delivery->runnerMailsTheReply($task)) {
+            $mailError = $this->mailReplyToOwner($task, $user, $result);
+            if (null !== $mailError) {
+                return $this->fail($task, $run, $mailError, $messageId, $snapshot);
+            }
+        }
+
+        $run->markCompleted($messageId, [] !== $snapshot ? ['cards' => $snapshot] : null);
+        $task->recordSuccess();
+        $this->runs->save($run);
+        $this->tasks->save($task);
+        if (null !== $task->getId()) {
+            $this->runs->prune($task->getId(), new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
+        }
+
+        return ['run' => $run, 'task' => $task];
+    }
+
+    /**
+     * Mails the run's reply to the account owner when the task's delivery
+     * target is email. Returns the user-facing reason when nothing was sent.
+     *
+     * @param array<string, mixed> $result
+     */
+    private function mailReplyToOwner(SavedTask $task, User $user, array $result): ?string
+    {
+        $content = is_string($result['response']['content'] ?? null) ? trim($result['response']['content']) : '';
+        if ('' === $content) {
+            return null;
+        }
+        $address = trim($user->getMail());
+        if ('' === $address || str_ends_with(strtolower($address), '@synaplan.local')) {
+            return 'This task should mail its result, but this account has no email address.';
+        }
+        if (!$user->isEmailVerified()) {
+            return 'This task should mail its result, but the account email address is not verified yet.';
+        }
+
+        try {
+            $this->mail->sendTaskResultEmail($address, $task->getName(), $content);
+        } catch (\Throwable $e) {
+            $this->logger->warning('SavedTaskRunner: result mail failed', [
+                'task_id' => $task->getId(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return 'The result could not be emailed. It is saved in the task chat.';
+        }
+
+        return null;
     }
 
     private function notifyPaused(SavedTask $task, string $reason): void

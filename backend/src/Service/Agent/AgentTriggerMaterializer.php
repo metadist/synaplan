@@ -147,6 +147,7 @@ final readonly class AgentTriggerMaterializer
             [
                 'enabled' => true,
                 'allowUnattended' => (bool) ($schedule['allowUnattended'] ?? false),
+                'delivery' => is_string($schedule['delivery'] ?? null) ? $schedule['delivery'] : 'chat',
                 'triggerType' => SavedTask::TRIGGER_SCHEDULE,
                 'triggerConfig' => [
                     'kind' => 'cron',

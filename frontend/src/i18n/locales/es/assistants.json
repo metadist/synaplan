@@ -289,9 +289,13 @@
     "publishedOnly": "Solo se incluyen los agentes publicados. Los borradores se quedan en esta cuenta."
   },
   "templates": {
-    "pickTitle": "Nuevo agente",
-    "pickSubtitle": "Empiece con un agente listo o con uno vacío.",
-    "searchPlaceholder": "Buscar plantillas",
+    "pickTitle": "¿Qué debe hacer tu agente?",
+    "pickSubtitle": "Elige uno listo y adáptalo, o empieza con uno vacío.",
+    "groups": {
+      "schedule": "Funciona por su cuenta",
+      "chat": "Responde en el chat"
+    },
+    "searchPlaceholder": "Buscar ejemplos",
     "all": "Todas",
     "startEmpty": "Empezar vacío",
     "startEmptyHint": "Un agente en blanco. Usted escribe las instrucciones.",
@@ -375,68 +379,68 @@
       "plugin": "Plugins"
     },
     "offerWriter": {
-      "title": "Redactor de ofertas",
+      "title": "Redactar una oferta desde tu lista de precios",
       "summary": "Escribe una oferta a partir de su lista de precios y cita cada precio.",
       "needsPriceList": "Necesita la carpeta con su lista de precios.",
       "try1": "Escribe una oferta para Müller GmbH por 10 licencias.",
       "try2": "¿Qué precios de la lista valen para un contrato de soporte de un año?"
     },
     "hrHandbook": {
-      "title": "Manual de RR. HH.",
+      "title": "Responder preguntas del manual citando el pasaje",
       "summary": "Responde preguntas sobre el manual escrito y cita el pasaje. No toma decisiones de contratación.",
       "needsHandbook": "Necesita la carpeta con su manual.",
       "try1": "¿Cuántos días de vacaciones permite el manual?",
       "try2": "¿Qué dice el manual sobre trabajar desde casa?"
     },
     "tenderResponse": {
-      "title": "Respuesta a licitación",
+      "title": "Redactar respuestas a licitaciones desde tus archivos",
       "summary": "Redacta respuestas a preguntas de una licitación y cita el archivo de origen.",
       "needsFolder": "Necesita la carpeta con sus documentos de licitación.",
       "try1": "Responde la pregunta sobre nuestro horario de soporte y cita el archivo.",
       "try2": "¿Qué documentos nos faltan todavía para esta licitación?"
     },
     "contractSummary": {
-      "title": "Resumen de contrato",
+      "title": "Resumir un contrato en lenguaje sencillo",
       "summary": "Resume un contrato en lenguaje sencillo. No es asesoramiento legal.",
       "needsFile": "Necesita el archivo del contrato.",
       "try1": "Resume las partes, el plazo y el pago.",
       "try2": "¿Qué pasa si terminamos el contrato antes?"
     },
     "meetingMinutes": {
-      "title": "Acta de reunión",
+      "title": "Convertir notas en decisiones y tareas",
       "summary": "Convierte notas o una transcripción en decisiones y tareas.",
       "try1": "Convierte estas notas en un acta con decisiones y tareas.",
       "try2": "Lista solo las tareas, con la persona cuando se haya nombrado."
     },
     "socialPosts": {
-      "title": "Publicaciones",
+      "title": "Redactar tres publicaciones desde un comunicado",
       "summary": "Redacta tres publicaciones a partir de una nota de prensa, sin añadir datos.",
       "try1": "Escribe tres publicaciones a partir de esta nota de prensa.",
       "try2": "Haz una versión más corta de la segunda."
     },
     "itHelpdesk": {
-      "title": "Mesa de ayuda de TI",
+      "title": "Responder preguntas de TI desde tus artículos de ayuda",
       "summary": "Escribe una primera respuesta con sus artículos de ayuda y cita el artículo. No abre un ticket.",
       "needsArticles": "Necesita la carpeta con sus artículos de ayuda.",
       "try1": "Una compañera no puede conectar la VPN. ¿Qué debe probar primero?",
       "try2": "¿Cómo restablecemos una contraseña olvidada?"
     },
     "dailyBriefing": {
-      "title": "Resumen diario",
+      "title": "Tu resumen de la mañana, cada día laborable",
       "summary": "Un resumen de lunes a viernes por la mañana a partir de su correo.",
       "needsMail": "Conecte su correo para que el resumen pueda leerlo.",
       "try1": "¿Qué hay en mi correo que necesite una decisión hoy?",
       "try2": "Omite los boletines y lista solo los mensajes que debería contestar."
     },
     "regulationWatch": {
-      "title": "Vigilancia de normas",
+      "title": "Avisarte cuando cambie una página vigilada",
       "summary": "Informa de un cambio en una página que usted observa y cita la página. No inventa un cambio.",
       "needsPage": "Añada las páginas que quiere observar. Se hace en Tareas guardadas.",
       "try1": "¿Qué cambió en las páginas que observo?",
       "try2": "¿Cambió el cuadro de tasas, o sigue igual?"
     },
     "expertResearch": {
-      "title": "Investigación propia",
+      "title": "Responder desde tus propios documentos",
       "summary": "Responde desde sus propios documentos y cita el pasaje. Dice cuándo los documentos no contienen la respuesta.",
       "needsFolder": "Necesita la carpeta con sus documentos.",
       "needsResearch": "La investigación está apagada en este servidor. Este agente sigue respondiendo desde la carpeta que elija.",
@@ -444,7 +448,7 @@
       "try2": "¿Qué dice nuestra nota sobre el plazo de preaviso?"
     },
     "serviceDesk": {
-      "title": "Atención a la ciudadanía",
+      "title": "Responder a los visitantes web desde tus documentos",
       "summary": "Responde a quienes visitan su sitio desde sus documentos aprobados, en su idioma, y cita el pasaje. No envía una solicitud y no decide el caso.",
       "needsFolder": "Necesita la carpeta con los documentos aprobados.",
       "needsWidget": "Publique este agente y luego póngalo en un widget de chat. Quienes visitan solo lo oyen después de publicarlo.",

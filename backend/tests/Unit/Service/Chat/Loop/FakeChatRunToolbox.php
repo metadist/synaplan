@@ -8,6 +8,7 @@ use App\Service\Chat\Loop\ChatRunScope;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunToolbox;
 use App\Service\Chat\Loop\ChatToolResult;
+use App\Service\Chat\Loop\ConnectedToolCatalog;
 
 /**
  * Web search as a read, `custom:order` as a write that needs approval, and
@@ -20,8 +21,21 @@ final class FakeChatRunToolbox implements ChatRunToolbox
     /** @var list<array{name: string, args: array<string, mixed>, approvalId: ?int}> */
     public array $runs = [];
 
-    public function declarations(ChatRunScope $scope): array
+    /** @var array<string, string> what a read tool returns, by name, instead of the default */
+    public array $results = [];
+
+    /** @var list<string> tools that fail every time they run */
+    public array $fails = [];
+
+    /** A read answers with its arguments, so every new query finds something new. */
+    public bool $echo = false;
+
+    /** @var list<list<string>> the opened tools each declaration was asked with */
+    public array $openedSeen = [];
+
+    public function declarations(ChatRunScope $scope, array $opened = []): array
     {
+        $this->openedSeen[] = $opened;
         $names = ['web_search', 'custom:order'];
         if (null !== $scope->project) {
             $names[] = 'knowledge_search';
@@ -33,6 +47,11 @@ final class FakeChatRunToolbox implements ChatRunToolbox
     public function run(ChatRunScope $scope, ChatRunState $state, array $call, ?int $approvalId = null): ChatToolResult
     {
         $this->runs[] = ['name' => $call['name'], 'args' => $call['args'], 'approvalId' => $approvalId];
+        if (ConnectedToolCatalog::NAME === $call['name']) {
+            $state->opened[] = 'custom_order';
+
+            return ChatToolResult::text('Open now: custom_order.');
+        }
         if ('custom:order' === $call['name'] && null === $approvalId) {
             return ChatToolResult::waitsFor(self::APPROVAL_ID);
         }
@@ -40,7 +59,14 @@ final class FakeChatRunToolbox implements ChatRunToolbox
             return ChatToolResult::text('This tool is not available in this chat.');
         }
 
-        return ChatToolResult::text('result of '.$call['name']);
+        if (\in_array($call['name'], $this->fails, true)) {
+            return ChatToolResult::failed('The tool failed.');
+        }
+        if ($this->echo) {
+            return ChatToolResult::text('result of '.$call['name'].' for '.json_encode($call['args']));
+        }
+
+        return ChatToolResult::text($this->results[$call['name']] ?? 'result of '.$call['name']);
     }
 
     public function isRead(string $name): bool

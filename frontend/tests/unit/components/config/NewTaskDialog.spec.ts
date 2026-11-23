@@ -93,7 +93,20 @@ describe('NewTaskDialog', () => {
       triggerType: 'schedule',
       triggerConfig: { kind: 'weekly', at: '08:30', tz: 'Europe/Berlin', days: [1, 2, 3, 4, 5] },
       allowUnattended: true,
+      delivery: 'chat',
     })
+  })
+
+  it('asks where the result goes and sends the chosen target with the schedule', async () => {
+    updateTask.mockResolvedValue({ ...task, triggerType: 'schedule' })
+    const wrapper = await mountOpen()
+    await fill(wrapper, 'daily')
+    expect(wrapper.find('[data-testid="delivery-choice"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="btn-delivery-email"]').trigger('click')
+    await wrapper.get('[data-testid="modal-new-task"]').trigger('submit')
+    await flushPromises()
+
+    expect(updateTask).toHaveBeenCalledWith(5, expect.objectContaining({ delivery: 'email' }))
   })
 
   it('says the schedule is missing when only the schedule failed', async () => {

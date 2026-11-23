@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Chat\Stream;
 
+use App\Entity\Chat;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
 use App\Repository\FileRepository;
+use App\Service\Chat\Loop\ChatLoopTurn;
 use App\Service\Chat\Stream\StreamCaller;
 use App\Service\Chat\Stream\StreamChunkRelay;
 use App\Service\Chat\Stream\StreamGeneratedFiles;
@@ -90,12 +92,52 @@ final class StreamReplyPersisterTest extends TestCase
         self::assertSame($file, $reply->generatedFile);
     }
 
+    public function testAHandedOverTurnKeepsTheMessageTheRunAnswersIn(): void
+    {
+        $chat = $this->chat();
+        $row = $this->reply($chat->getId(), 7);
+        $this->em->expects(self::atLeastOnce())->method('find')->with(Message::class, 31)->willReturn($row);
+        $this->em->expects(self::never())->method('persist');
+
+        [$reply] = $this->persist('Let me look.', 'chat', [ChatLoopTurn::REPLY_ID => 31], $chat);
+
+        self::assertSame($row, $reply->outgoing);
+        self::assertSame('Running', $row->getText(), 'the run writes the answer, not the stream');
+    }
+
+    public function testAMessageOfAnotherChatOrPersonIsNotTakenOver(): void
+    {
+        $chat = $this->chat();
+        foreach ([$this->reply(99, 7), $this->reply($chat->getId(), 8)] as $foreign) {
+            $this->em = $this->createMock(EntityManagerInterface::class);
+            $this->em->method('find')->willReturn($foreign);
+
+            [$reply] = $this->persist('Answer', 'chat', [ChatLoopTurn::REPLY_ID => 31], $chat);
+
+            self::assertNotSame($foreign, $reply->outgoing);
+            self::assertSame('Running', $foreign->getText());
+        }
+    }
+
+    private function chat(): Chat
+    {
+        $chat = (new Chat())->setUserId(7);
+        (new \ReflectionProperty(Chat::class, 'id'))->setValue($chat, 3);
+
+        return $chat;
+    }
+
+    private function reply(?int $chatId, int $userId): Message
+    {
+        return (new Message())->setUserId($userId)->setChatId($chatId)->setDirection('OUT')->setText('Running')->setStatus('processing');
+    }
+
     /**
      * @param array<string, mixed> $metadata
      *
      * @return array{0: StreamReply, 1: list<array<string, mixed>>}
      */
-    private function persist(string $responseText, string $topic, array $metadata = []): array
+    private function persist(string $responseText, string $topic, array $metadata = [], ?Chat $chat = null): array
     {
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);
@@ -108,6 +150,7 @@ final class StreamReplyPersisterTest extends TestCase
         );
         $state = new StreamTurnState($turn, new PerfTimer(), ['id' => null, 'name' => null, 'provider' => null]);
         $state->incoming = (new Message())->setUserId(7)->setProviderIndex('WEB')->setText('Make me slides');
+        $state->chat = $chat;
 
         $sse = new SseWriter(captureMode: true);
         $relay = new StreamChunkRelay($sse, $this->createStub(MediaCancellationStore::class), '4242');

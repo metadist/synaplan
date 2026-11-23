@@ -950,9 +950,13 @@ person's link and every token it holds.
 **A cloud that shares Synaplan's identity provider (OpenCloud with the same
 Keycloak)** needs no registration: `PLATFORM_LINKS_OIDC_CLOUD*` configure it
 (see `backend/.env.example`). People's tokens are exchanged in Keycloak; a
-person's link is created on their first call through the cloud. Synaplan
-offers the OpenCloud app copies and pickups, which the app takes from 1.2.0
-on. An older app leaves them waiting: update the app with Synaplan.
+person's link is created on their first call through the cloud. The app
+reports what it takes with `PUT /api/v1/platform-links/oidc-cloud`, using one
+of those people's tokens (`azp` is `PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID`).
+Names this Synaplan does not know are ignored, so a newer app and an older
+core still work together. Until that report has arrived, Synaplan offers no
+copy and no pickup: an older app is never left waiting for an answer. A
+restart keeps the report. Changing the cloud type starts it again.
 
 **What a user sees.** **Channels & integrations → Linked platforms** lists the
 user's own links (platform, host, external id) with *Disconnect*, which ends
@@ -984,13 +988,14 @@ vision → STT). Extra adapters whose keys are not built-in (today:
 `docling`) run first when an admin adds them to a family chain, and fall
 through if they fail, so a down sidecar never blocks an upload.
 
-Web search defaults to Brave (`WEB_SEARCH.PROVIDER=brave`). An admin
-picks Brave, SearXNG, Tavily, Exa, Firecrawl or Perplexity on
-**Admin → System configuration → Web search**, plus an optional
-fallback. The Brave API key and result count sit on the same tab. The next chat search uses the new provider with no restart.
-**Test query** shows up to five titles. Per-user override is
-**Settings → Use my own search**, only when
-`WEB_SEARCH.USER_OVERRIDE_ALLOWED=1`.
+Web search is one switch on **Admin → System configuration → Web search**
+(`WEB_SEARCH.ENABLED`, on when the row is missing). Off means chat does not
+search. On means the admin picks one preferred engine — Brave, SearXNG,
+Tavily, Exa, Firecrawl, SpecStream or Perplexity — plus an optional
+fallback. Brave's API key and result count sit on the Brave card. The next
+chat search uses the new engine with no restart. **Test query** shows up to
+five titles. When two or more engines are ready, each person chooses in
+**Preferences**; the admin's engine is the default until they do.
 
 Rerank stays **off** by default (`RERANK.ENABLED=0`) until a live eval
 shows recall@5 up and p95 latency inside the budget. An admin turns it

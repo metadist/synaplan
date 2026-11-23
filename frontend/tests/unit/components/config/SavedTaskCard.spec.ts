@@ -92,6 +92,7 @@ function task(overrides: Partial<SavedTask> = {}): SavedTask {
     triggerConfig: null,
     graph: null,
     allowUnattended: false,
+    delivery: 'reply',
     chatId: null,
     nextRunAt: null,
     lastRunAt: null,
@@ -154,6 +155,33 @@ describe('SavedTaskCard', () => {
     const pill = wrapper.get('[data-testid="saved-task-waiting-approval"]')
     expect(pill.text()).toContain('Waiting for approval')
     expect(pill.text()).toContain('2')
+  })
+
+  it('says plainly that nothing is sent while a run waits for approval', () => {
+    const wrapper = mountCard(task({ waitingApprovalCount: 1 }))
+    expect(wrapper.get('[data-testid="saved-task-waiting-notice"]').text()).toContain(
+      'Nothing that sends or saves has run yet'
+    )
+  })
+
+  it('offers where the result goes and saves the choice', async () => {
+    const wrapper = mountCard(task())
+    expect(wrapper.find('[data-testid="delivery-choice"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="btn-delivery-email"]').trigger('click')
+    await flushPromises()
+    expect(mockUpdate).toHaveBeenCalledWith(7, { delivery: 'email' })
+  })
+
+  it('shows email as the chosen target when the server says so', () => {
+    const wrapper = mountCard(task({ delivery: 'email' }))
+    expect(wrapper.get('[data-testid="btn-delivery-email"]').attributes('aria-checked')).toBe(
+      'true'
+    )
+  })
+
+  it('leaves the target to the steps when a step saves somewhere', () => {
+    const wrapper = mountCard(task({ delivery: 'folder' }))
+    expect(wrapper.find('[data-testid="delivery-choice"]').exists()).toBe(false)
   })
 
   it('shows the off state when the task is disabled', () => {

@@ -24,6 +24,14 @@ vi.mock('@/composables/useNotification', () => ({
   useNotification: () => ({ error: showError, success, warning }),
 }))
 
+vi.mock('@/services/api/adminConfigApi', () => ({
+  getConfigValues: vi.fn().mockResolvedValue({
+    BRAVE_SEARCH_COUNT: { value: '10', isSet: true, isMasked: false },
+    BRAVE_SEARCH_API_KEY: { value: '', isSet: false, isMasked: false },
+  }),
+  updateConfigValue: vi.fn().mockResolvedValue({ success: true, requiresRestart: false }),
+}))
+
 const noneCapabilities = {
   freshness: false,
   country: false,
@@ -318,5 +326,45 @@ describe('WebSearchPlugTab', () => {
 
     expect(success).toHaveBeenCalledWith('Key saved and verified. The next search can use it.')
     expect(showError).not.toHaveBeenCalled()
+  })
+
+  it('renders SpecStream with the EU badge and key input', async () => {
+    getWebSearchStatus.mockResolvedValueOnce({
+      providers: [
+        {
+          key: 'specstream',
+          label: 'SpecStream',
+          docsUrl: 'https://specstream.ai/docs/search-api',
+          sovereignty: 'EU',
+          capabilities: {
+            freshness: true,
+            country: true,
+            language: true,
+            siteFilter: true,
+            fullContent: true,
+            answer: true,
+          },
+          health: { available: false, reason: 'SpecStream API key is not configured' },
+          keyStatus,
+        },
+      ],
+      active: 'brave',
+      fallback: '',
+      userOverrideAllowed: false,
+    })
+
+    const wrapper = mount(WebSearchPlugTab, {
+      global: {
+        stubs: {
+          Icon: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="web-search-card-specstream"]').text()).toContain('SpecStream')
+    expect(wrapper.get('[data-testid="web-search-sovereignty-specstream"]').text()).toContain('EU')
+    expect(wrapper.find('[data-testid="web-search-key-specstream"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="web-search-save-key-specstream"]').exists()).toBe(true)
   })
 })

@@ -752,10 +752,21 @@
     },
     "webSearch": {
       "title": "Websuche",
-      "description": "Nutzen Sie einen anderen Suchanbieter als den, den Ihre Administration für alle festgelegt hat.",
-      "useMyOwn": "Meine eigene Suche verwenden",
+      "description": "Wählen Sie, welche Suchmaschine Ihre Fragen beantwortet. Die Wahl der Administration gilt, bis Sie eine treffen.",
+      "useMyOwn": "Suchmaschine",
       "saved": "Ihr Suchanbieter wurde gespeichert.",
       "saveFailed": "Ihr Suchanbieter konnte nicht gespeichert werden"
+    },
+    "chatRunLimit": {
+      "title": "Kostenlimit pro langer Antwort",
+      "description": "Wenn der Chat für eine Antwort mehrere Schritte durchläuft, darf er höchstens diesen Anteil deines Monatsbudgets ausgeben. Am Limit hört er auf zu suchen und antwortet mit dem, was er gefunden hat.",
+      "share": "Anteil deines Monatsbudgets",
+      "option": "{percent} % – bis zu {amount} pro Antwort",
+      "default": "Standard",
+      "monthly": "Dein Monatsbudget: {amount}",
+      "noBudget": "Dein Tarif hat kein Monatsbudget, daher gibt es kein Kostenlimit pro Antwort. Eine lange Antwort endet trotzdem, wenn sie sich im Kreis dreht.",
+      "saved": "Dein Kostenlimit wurde gespeichert.",
+      "saveFailed": "Dein Kostenlimit konnte nicht gespeichert werden"
     },
     "account": {
       "title": "Konto",

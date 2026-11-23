@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Chat\Stream;
 
+use App\Service\Chat\Loop\ChatLoopGate;
 use App\Service\Chat\Run\ChatRun;
 use App\Service\Chat\Run\ChatRunRecorder;
 use App\Service\Chat\Run\ChatRunService;
@@ -98,6 +99,7 @@ final readonly class ChatStreamOrchestrator
             return;
         }
 
+        $processingOptions[ChatLoopGate::OPTION] = true;
         $relay = $this->relays->chunks($sse, $turn);
         $result = $this->messageProcessor->processStream(
             $state->incoming(),

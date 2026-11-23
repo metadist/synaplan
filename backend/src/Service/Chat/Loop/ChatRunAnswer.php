@@ -33,9 +33,10 @@ final readonly class ChatRunAnswer
     {
         ++$state->steps;
         $state->modelFailures = 0;
-        $state->costMicro += max(0, $reply->costMicro);
+        $this->spent($state, $reply);
 
         return match ($state->mode) {
+            ChatRunState::MODE_WRAP_UP => $this->wrappedUp($state, $reply->content),
             ChatRunState::MODE_FINISH => $this->finishCall($state, $reply),
             ChatRunState::MODE_FINISH_JSON => $this->finishJson($state, $reply),
             default => [] === $reply->toolCalls ? $this->noTool($state, $reply) : $this->toolCalls($state, $reply),
@@ -55,6 +56,9 @@ final readonly class ChatRunAnswer
      */
     public function failed(ChatRunState $state): ?string
     {
+        if (ChatRunState::MODE_WRAP_UP === $state->mode) {
+            return $this->wrappedUp($state, null);
+        }
         if (ChatRunState::MODE_FINISH === $state->mode) {
             $state->mode = ChatRunState::MODE_FINISH_JSON;
 
@@ -81,9 +85,34 @@ final readonly class ChatRunAnswer
         $this->events->append($state->runId, ChatRunEvents::ENDED, ['status' => $state->status->value, 'reason' => $end->value]);
     }
 
+    /** The wrap-up call answered or failed: the run ends either way, with what it has. */
+    private function wrappedUp(ChatRunState $state, ?string $text): null
+    {
+        $reason = $state->wrapUp ?? ChatRunEnd::CostLimit;
+        $this->end($state, $reason, ChatRunWrapUp::answer($state, $reason, $text));
+
+        return null;
+    }
+
+    private function spent(ChatRunState $state, ChatRunReply $reply): void
+    {
+        $cost = max(0, $reply->costMicro);
+        $state->costMicro += $cost;
+        $state->dearestMicro = max($state->dearestMicro, $cost);
+        // Before the reply joins the transcript: the size of what the call sent.
+        $state->lastCallMicro = $cost;
+        $state->lastCallChars = ChatRunCostEstimate::size($state);
+    }
+
     private function noTool(ChatRunState $state, ChatRunReply $reply): ?string
     {
         if ([] === $state->plan) {
+            $this->end($state, ChatRunEnd::Answered, $reply->content);
+
+            return null;
+        }
+        if ($state->budgetNudged && '' !== trim($reply->content)) {
+            // Told to finish up: text without a tool call is the answer, not another step.
             $this->end($state, ChatRunEnd::Answered, $reply->content);
 
             return null;
@@ -108,7 +137,20 @@ final readonly class ChatRunAnswer
         return ChatRunStep::UNIT;
     }
 
-    private function toolCalls(ChatRunState $state, ChatRunReply $reply): string
+    /**
+     * The first answer, made in the request before the run existed: queue its
+     * calls. The run has no event log yet, so nothing is announced here.
+     */
+    public function seed(ChatRunState $state, ChatRunReply $reply): void
+    {
+        ++$state->steps;
+        $this->spent($state, $reply);
+        // The request streamed it already; the stored answer starts with it.
+        $state->said = ChatRunSpeaker::cap($reply->content);
+        $this->toolCalls($state, $reply, false);
+    }
+
+    private function toolCalls(ChatRunState $state, ChatRunReply $reply, bool $announce = true): string
     {
         $state->nudges = 0;
         $wire = [];
@@ -127,13 +169,15 @@ final readonly class ChatRunAnswer
         foreach ($reply->toolCalls as $i => $call) {
             $answer = match (true) {
                 $i >= $this->maxToolsPerStep => ToolLimits::SKIPPED_RESULT,
-                ChatLoopTools::UPDATE_PLAN === $call['name'] => $this->plan($state, $call['args']),
+                ChatLoopTools::UPDATE_PLAN === $call['name'] => $this->plan($state, $call['args'], $announce),
                 ChatLoopTools::FINISH === $call['name'] => 'finish is offered only when every plan item is done. Keep working.',
                 default => null,
             };
             if (null === $answer) {
                 $state->pending[] = ['id' => $call['id'], 'name' => $call['name'], 'args' => $call['args']];
-                $this->events->append($state->runId, ChatRunEvents::TOOL_CALL, ['tool' => $call['name']]);
+                if ($announce) {
+                    $this->events->append($state->runId, ChatRunEvents::TOOL_CALL, ['tool' => $call['name']]);
+                }
                 continue;
             }
             $state->messages[] = ['role' => 'tool', 'tool_call_id' => $call['id'], 'name' => $call['name'], 'content' => $answer];
@@ -145,10 +189,12 @@ final readonly class ChatRunAnswer
     /**
      * @param array<string, mixed> $args
      */
-    private function plan(ChatRunState $state, array $args): string
+    private function plan(ChatRunState $state, array $args, bool $announce): string
     {
         $text = ChatLoopTools::applyPlan($state, $args);
-        $this->events->append($state->runId, ChatRunEvents::PLAN, ['items' => $state->plan]);
+        if ($announce) {
+            $this->events->append($state->runId, ChatRunEvents::PLAN, ['items' => $state->plan]);
+        }
 
         return $text;
     }

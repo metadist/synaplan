@@ -66,6 +66,38 @@ final class StepApprovalGateTest extends TestCase
         self::assertSame('skill:email_me', $result->metadata['tool']);
     }
 
+    public function testMailToTheOwnerSkipsTheDefaultApproval(): void
+    {
+        $executionGate = $this->createMock(ToolExecutionGate::class);
+        $executionGate->expects(self::never())->method('inspect');
+
+        self::assertNull($this->gate($executionGate)->consult(
+            $this->context(['saved_task' => true, 'saved_task_run_id' => 9]),
+            new TaskNode('n3', Capability::EmailMe),
+            'skill:email_me',
+            ['to' => 'alice@example.com'],
+            deliversToOwner: true,
+        ));
+    }
+
+    public function testMailToTheOwnerStillHonoursAnExplicitBlock(): void
+    {
+        $executionGate = $this->createMock(ToolExecutionGate::class);
+        $executionGate->expects(self::never())->method('inspect');
+
+        $result = $this->gate($executionGate)->consult(
+            $this->context(['saved_task' => true, 'saved_task_run_id' => 9]),
+            new TaskNode('n3', Capability::EmailMe, [], [], ['approval' => 'block']),
+            'skill:email_me',
+            [],
+            deliversToOwner: true,
+        );
+
+        self::assertNotNull($result);
+        self::assertFalse($result->isSuccessful());
+        self::assertSame(ToolExecutionGate::NODE_BLOCK_REFUSAL, $result->error);
+    }
+
     public function testResumeWithOnlyRunIdStaysUnattended(): void
     {
         $executionGate = $this->createMock(ToolExecutionGate::class);

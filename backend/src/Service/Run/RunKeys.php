@@ -80,4 +80,11 @@ interface RunKeys
      * worker cannot bring back a deleted run.
      */
     public function appendEvent(string $seqKey, string $listKey, string $runKey, string $body): ?int;
+
+    /**
+     * Wait until an event after `$afterSeq` is appended to `$listKey`, or
+     * `$blockMs` passed. A blocking read on Redis: the waiter wakes on the
+     * event instead of polling.
+     */
+    public function awaitEvent(string $listKey, int $afterSeq, int $blockMs): void;
 }

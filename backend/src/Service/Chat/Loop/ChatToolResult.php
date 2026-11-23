@@ -6,19 +6,26 @@ namespace App\Service\Chat\Loop;
 
 /**
  * What one tool call of a run gave back: the text for the model, or the
- * approval it now waits for.
+ * approval it now waits for. A failed call still has a text for the model;
+ * circle detection counts failures in a row.
  */
 final readonly class ChatToolResult
 {
     private function __construct(
         public string $text,
         public ?int $approvalId,
+        public bool $failed = false,
     ) {
     }
 
     public static function text(string $text): self
     {
         return new self($text, null);
+    }
+
+    public static function failed(string $text): self
+    {
+        return new self($text, null, true);
     }
 
     public static function waitsFor(int $approvalId): self

@@ -26,7 +26,8 @@ use App\Service\Tool\ToolSource;
  *
  * From the registry: web search, reading a page, and the person's own HTTP
  * and MCP tools, each through {@see ToolInvoker}, so the approval policy
- * applies as everywhere else. Tools that read their folder or file from the
+ * applies as everywhere else. The person's own tools are declared by name
+ * only until the model opens them ({@see ConnectedToolCatalog}). Tools that read their folder or file from the
  * HTTP request, document tools and server-side code are not offered: a run
  * has no request. The project's sources are searched by the loop itself, in
  * the folder resolved for this unit, and only while the chat is in it.
@@ -40,8 +41,8 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
     private const BUILTINS = [WebSearchTool::NAME, WebFetchTool::NAME];
     private const MAX_NAME_LENGTH = 64;
     /** The loop answers these itself; a registry tool of the same name would be declared twice. */
-    private const RESERVED = [KnowledgeSearchTool::NAME, ChatLoopTools::UPDATE_PLAN, ChatLoopTools::FINISH];
-    private const READS = [WebSearchTool::NAME, WebFetchTool::NAME, KnowledgeSearchTool::NAME];
+    private const RESERVED = [KnowledgeSearchTool::NAME, ConnectedToolCatalog::NAME, ChatLoopTools::UPDATE_PLAN, ChatLoopTools::FINISH];
+    private const READS = [WebSearchTool::NAME, WebFetchTool::NAME, KnowledgeSearchTool::NAME, ConnectedToolCatalog::NAME];
 
     public function __construct(
         private ToolRegistry $registry,
@@ -53,11 +54,21 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
     ) {
     }
 
-    public function declarations(ChatRunScope $scope): array
+    public function declarations(ChatRunScope $scope, array $opened = []): array
     {
         $out = [];
+        $connected = false;
         foreach ($this->offered($scope) as $wire => $descriptor) {
+            if (ToolSource::Builtin !== $descriptor->source) {
+                $connected = true;
+                if (!\in_array($wire, $opened, true)) {
+                    continue;
+                }
+            }
             $out[] = self::fn($wire, $descriptor->description, $descriptor->inputSchema);
+        }
+        if ($connected) {
+            $out[] = ConnectedToolCatalog::declaration();
         }
         if (null !== $scope->project) {
             $declaration = $this->knowledge->declaration();
@@ -72,9 +83,14 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
         if (KnowledgeSearchTool::NAME === $call['name']) {
             return $this->sources($scope, $call['args']);
         }
+        if (ConnectedToolCatalog::NAME === $call['name']) {
+            $connected = array_filter($this->offered($scope), static fn (ToolDescriptor $d): bool => ToolSource::Builtin !== $d->source);
+
+            return ChatToolResult::text(ConnectedToolCatalog::run($connected, $state, $call['args']));
+        }
         $descriptor = $this->find($scope, $call['name']);
         if (null === $descriptor) {
-            return ChatToolResult::text(self::NOT_AVAILABLE);
+            return ChatToolResult::failed(self::NOT_AVAILABLE);
         }
         $args = $call['args'];
         if (null !== $approvalId) {
@@ -101,7 +117,9 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
             return ChatToolResult::waitsFor($outcome->approvalId);
         }
 
-        return ChatToolResult::text('' !== $outcome->resultText ? $outcome->resultText : 'The tool returned nothing.');
+        $text = '' !== $outcome->resultText ? $outcome->resultText : 'The tool returned nothing.';
+
+        return ToolOutcomeKind::Done === $outcome->kind ? ChatToolResult::text($text) : ChatToolResult::failed($text);
     }
 
     public function isRead(string $name): bool

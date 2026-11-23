@@ -909,6 +909,13 @@
     },
     "webSearch": {
       "lead": "Choose who looks up the web for chat. The next search uses the new provider — no restart. Test query shows titles so you can see it working.",
+      "enabled": "Web search",
+      "enabledHint": "When this is off, chat does not look things up on the web.",
+      "apiKeyKept": "A key is saved. Paste a new one to replace it.",
+      "braveCount": "Results per search",
+      "braveRestart": "A new Brave key or result count is used after the server restarts.",
+      "peopleChoose": "More than one search engine is ready, so each person chooses theirs in Preferences. This one is the default until they do.",
+      "oneEngine": "One search engine is ready, so everyone uses it.",
       "docs": "Documentation",
       "healthAvailable": "available",
       "healthUnavailable": "unavailable",
@@ -1088,6 +1095,10 @@
     "scaleway": {
       "title": "Scaleway API key",
       "message": "Create a secret key in the Scaleway console (IAM → API keys), then paste it here. This unlocks Generative APIs hosted in Paris. Prompts are processed by Scaleway in France."
+    },
+    "llmtr": {
+      "title": "LLMTR API key",
+      "message": "Create an API key at LLMTR, then paste it here. This unlocks models hosted in Turkey (Gemma 4, Qwen 3.8 27B, Trendyol Asure, Muse Glimmer). Prompts for those models are processed in Turkey."
     },
     "huggingface": {
       "title": "HuggingFace API token",

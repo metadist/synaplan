@@ -20,6 +20,10 @@ final class ChatRunState implements RunState
     public const MODE_FINISH = 'finish';
     public const MODE_FINISH_JSON = 'finish_json';
 
+    /** One last call without tools that writes the result from what the run has (03 §1.3). */
+    public const MODE_WRAP_UP = 'wrap_up';
+    public const MODES = [self::MODE_FREE, self::MODE_FINISH, self::MODE_FINISH_JSON, self::MODE_WRAP_UP];
+
     public const PLAN_PENDING = 'pending';
     public const PLAN_ACTIVE = 'in_progress';
     public const PLAN_DONE = 'done';
@@ -34,13 +38,51 @@ final class ChatRunState implements RunState
     public ?ChatRunEnd $end = null;
     public ?string $waitReason = null;
     public ?string $answer = null;
+
+    /** What the person already saw of this run, the first answer made in the request included. */
+    public string $said = '';
+
+    /**
+     * The note the check before delivery adds under the answer: null until the
+     * check ran, empty when it found nothing to note.
+     */
+    public ?string $note = null;
     public string $mode = self::MODE_FREE;
     public int $steps = 0;
     public int $costMicro = 0;
     public int $nudges = 0;
 
+    /** The dearest single model call of this run, in what the person is billed. */
+    public int $dearestMicro = 0;
+
+    /** The last model call: what it cost and how many characters it sent, for the cost estimate. */
+    public int $lastCallMicro = 0;
+    public int $lastCallChars = 0;
+
+    /** The model's price, fixed at the start; null for a model without one. */
+    public ?ChatRunRates $rates = null;
+
+    /** Whether the model was told once that the budget of this answer is nearly used. */
+    public bool $budgetNudged = false;
+
+    /** Why the run wraps up; set once, when the wrap-up call is asked for. */
+    public ?ChatRunEnd $wrapUp = null;
+
+    /**
+     * What circle detection counts (03 §1.4): calls by their normalised
+     * input, the results seen so far, steps in a row with nothing new, tool
+     * errors in a row, whether the model was told once already, and whether
+     * the step under way found something.
+     *
+     * @var array{calls: array<string, array{tool: string, n: int}>, seen: array<string, true>, stale: int, errors: int, nudged: bool, found: bool, ran: bool}
+     */
+    public array $stall = ChatRunStallDetector::EMPTY;
+
     /** Model calls that failed in a row; a call that answers clears it. */
     public int $modelFailures = 0;
+
+    /** The chat message the answer goes into, written before the run started. */
+    public ?int $replyMessageId = null;
 
     /** @var list<array<string, mixed>> the transcript after the system prompt */
     public array $messages = [];
@@ -53,6 +95,9 @@ final class ChatRunState implements RunState
 
     /** @var array<string, int> a repeated read, by call hash, answered from the transcript */
     public array $reads = [];
+
+    /** @var list<string> connected tools the model opened, whose schemas every later call declares */
+    public array $opened = [];
 
     private int $expected = 1;
     private int $checkpoint = 0;

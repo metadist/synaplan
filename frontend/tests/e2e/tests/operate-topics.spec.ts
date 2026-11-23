@@ -110,13 +110,15 @@ test.describe('@ci Operate topics', () => {
       }
     })
 
-    await test.step('Web search lives in System configuration next to the Brave settings', async () => {
+    await test.step('Web search is one page in System configuration', async () => {
       await page.locator('[data-testid="btn-config-tab-web_search"]').click()
       await expect(page).toHaveURL(/tab=web_search/, { timeout: TIMEOUTS.STANDARD })
       await expect(page.locator('[data-testid="web-search-plug-tab"]')).toBeVisible({
         timeout: TIMEOUTS.STANDARD,
       })
-      await expect(page.locator('#config-section-brave')).toBeVisible()
+      await expect(page.locator('[data-testid="web-search-enabled"]')).toBeVisible()
+      await expect(page.locator('[data-testid="web-search-card-brave"]')).toBeVisible()
+      await expect(page.locator('#config-section-brave')).toHaveCount(0)
     })
 
     await test.step('Tools & automation holds file work and the tool approval rules', async () => {

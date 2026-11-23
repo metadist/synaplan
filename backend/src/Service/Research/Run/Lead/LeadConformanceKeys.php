@@ -97,6 +97,10 @@ final class LeadConformanceKeys implements ResearchRunKeys
         return count($this->events);
     }
 
+    public function awaitEvent(string $listKey, int $afterSeq, int $blockMs): void
+    {
+    }
+
     public function putSourceText(string $runId, string $sourceId, string $text): bool
     {
         return true;

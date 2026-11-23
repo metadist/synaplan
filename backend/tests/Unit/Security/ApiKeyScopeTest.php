@@ -619,4 +619,11 @@ final class ApiKeyScopeTest extends TestCase
         self::assertFalse(ApiKeyScope::isSelfRevoke('PATCH', '/api/v1/apikeys/12', 12));
         self::assertFalse(ApiKeyScope::isSelfRevoke('DELETE', '/api/v1/apikeys/12/extra', 12));
     }
+
+    public function testTheConfiguredCloudReportUsesTheFilesScope(): void
+    {
+        self::assertSame(['files'], ApiKeyScope::requiredScopesForPath('/api/v1/platform-links/oidc-cloud', 'PUT'));
+        self::assertSame([], ApiKeyScope::requiredScopesForPath('/api/v1/platform-links/oidc-cloud', 'GET'));
+        self::assertTrue(ApiKeyScope::allows(['files'], '/api/v1/platform-links/oidc-cloud', 'PUT'));
+    }
 }

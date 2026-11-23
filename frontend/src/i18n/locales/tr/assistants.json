@@ -289,9 +289,13 @@
     "publishedOnly": "Yalnızca yayınlanmış ajanlar dahildir. Taslaklar bu hesapta kalır."
   },
   "templates": {
-    "pickTitle": "Yeni ajan",
-    "pickSubtitle": "Hazır bir ajanla ya da boş bir ajanla başlayın.",
-    "searchPlaceholder": "Şablon ara",
+    "pickTitle": "Ajanın ne yapsın?",
+    "pickSubtitle": "Hazır birini seçip kendine uyarla ya da boş bir ajanla başla.",
+    "groups": {
+      "schedule": "Kendi kendine çalışır",
+      "chat": "Sohbette yanıt verir"
+    },
+    "searchPlaceholder": "Örnek ara",
     "all": "Tümü",
     "startEmpty": "Boş başla",
     "startEmptyHint": "Boş bir ajan. Yönergeleri siz yazarsınız.",
@@ -375,68 +379,68 @@
       "plugin": "Eklentiler"
     },
     "offerWriter": {
-      "title": "Teklif yazarı",
+      "title": "Fiyat listenden bir teklif yaz",
       "summary": "Fiyat listenizden bir teklif yazar ve her fiyatın kaynağını belirtir.",
       "needsPriceList": "Fiyat listenizin olduğu klasör gerekir.",
       "try1": "Müller GmbH için 10 lisanslık bir teklif yaz.",
       "try2": "Listede bir yıllık destek sözleşmesine hangi fiyatlar uyar?"
     },
     "hrHandbook": {
-      "title": "İK el kitabı",
+      "title": "El kitabı sorularını ilgili pasajla yanıtla",
       "summary": "Yazılı el kitabındaki soruları yanıtlar ve pasajı belirtir. İşe alım kararı vermez.",
       "needsHandbook": "El kitabınızın olduğu klasör gerekir.",
       "try1": "El kitabı kaç gün izin veriyor?",
       "try2": "El kitabı evden çalışma hakkında ne diyor?"
     },
     "tenderResponse": {
-      "title": "İhale yanıtı",
+      "title": "Dosyalarından ihale yanıtları tasla",
       "summary": "İhale sorularına yanıt taslakları yazar ve kaynak dosyayı belirtir.",
       "needsFolder": "İhale belgelerinizın olduğu klasör gerekir.",
       "try1": "Destek saatlerimizle ilgili soruyu yanıtla ve dosyayı belirt.",
       "try2": "Bu ihale için hâlâ hangi belgeler eksik?"
     },
     "contractSummary": {
-      "title": "Sözleşme özeti",
+      "title": "Bir sözleşmeyi sade dille özetle",
       "summary": "Bir sözleşmeyi sade dille özetler. Bu hukuki danışmanlık değildir.",
       "needsFile": "Sözleşme dosyası gerekir.",
       "try1": "Tarafları, süreyi ve ödemeyi özetle.",
       "try2": "Sözleşmeyi erken bitirirsek ne olur?"
     },
     "meetingMinutes": {
-      "title": "Toplantı notu",
+      "title": "Notları kararlara ve görevlere dönüştür",
       "summary": "Notları veya bir dökümü kararlara ve görevlere çevirir.",
       "try1": "Bu notları kararlar ve görevler içeren bir tutanağa çevir.",
       "try2": "Yalnızca görevleri listele, adı geçen kişiyi de yaz."
     },
     "socialPosts": {
-      "title": "Sosyal paylaşımlar",
+      "title": "Bir basın bülteninden üç paylaşım tasla",
       "summary": "Bir basın bülteninden üç paylaşım taslağı yazar, yeni bilgi eklemez.",
       "try1": "Bu basın bülteninden üç paylaşım yaz.",
       "try2": "İkincisinin daha kısa bir halini yaz."
     },
     "itHelpdesk": {
-      "title": "BT yardım masası",
+      "title": "BT sorularını yardım makalelerinden yanıtla",
       "summary": "Yardım yazılarınızdan bir ilk yanıt yazar ve yazıyı belirtir. Kayıt açmaz.",
       "needsArticles": "Yardım yazılarınızın olduğu klasör gerekir.",
       "try1": "Bir çalışma arkadaşım VPN’e bağlanamıyor. Önce ne denesin?",
       "try2": "Unutulan bir parolayı nasıl sıfırlarız?"
     },
     "dailyBriefing": {
-      "title": "Günlük özet",
+      "title": "Her hafta içi sabah özetin",
       "summary": "Posta kutunuzdan hafta içi sabah özeti.",
       "needsMail": "Özetin okuyabilmesi için postanızı bağlayın.",
       "try1": "Postamda bugün karar bekleyen ne var?",
       "try2": "Bültenleri atla, yalnızca yanıtlamam gereken iletileri listele."
     },
     "regulationWatch": {
-      "title": "Mevzuat takibi",
+      "title": "İzlenen bir sayfa değişince haber ver",
       "summary": "İzlediğiniz bir sayfadaki değişikliği bildirir ve sayfayı belirtir. Değişiklik uydurmaz.",
       "needsPage": "İzlenmesini istediğiniz sayfaları ekleyin. Bunu Kayıtlı görevler altında yaparsınız.",
       "try1": "İzlediğim sayfalarda ne değişti?",
       "try2": "Ücret tarifesi değişti mi, yoksa aynı mı?"
     },
     "expertResearch": {
-      "title": "Kendi belgelerinde araştırma",
+      "title": "Kendi belgelerinden yanıtla",
       "summary": "Kendi belgelerinizden yanıtlar ve ilgili yeri belirtir. Belgelerde yanıt yoksa bunu söyler.",
       "needsFolder": "Belgelerinizin olduğu klasör gerekir.",
       "needsResearch": "Araştırma bu sunucuda kapalı. Bu ajan yine de seçtiğiniz klasörden yanıt verir.",
@@ -444,7 +448,7 @@
       "try2": "Notumuz fesih süresi hakkında ne diyor?"
     },
     "serviceDesk": {
-      "title": "Vatandaş hizmet masası",
+      "title": "Web sitesi ziyaretçilerini belgelerinden yanıtla",
       "summary": "Sitenizin ziyaretçilerine onaylı belgelerinizden, onların dilinde yanıt verir ve ilgili yeri belirtir. Başvuru göndermez ve dosyayı karara bağlamaz.",
       "needsFolder": "Onaylı belgelerin olduğu klasör gerekir.",
       "needsWidget": "Bu ajanı yayımlayın, sonra bir sohbet widget’ına koyun. Ziyaretçiler onu ancak yayımlandıktan sonra duyar.",

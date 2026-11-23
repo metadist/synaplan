@@ -11,6 +11,7 @@ use App\AI\ToolCalling\ToolCallParser;
 use App\Repository\ConnectionRepository;
 use App\Repository\ModelRepository;
 use App\Repository\PromptRepository;
+use App\Service\Chat\Loop\ChatLoopTurn;
 use App\Service\Chat\ProviderTranscriptCapture;
 use App\Service\Connection\PlannerChannelCatalog;
 use App\Service\Context\ContextCondenser;
@@ -166,6 +167,7 @@ final class ChatHandlerFactory
         ?ModelContextWindow $modelContextWindow = null,
         ?UnreadSourceGuard $unreadSourceGuard = null,
         ?SlashCommandCopy $slashCommandCopy = null,
+        ?ChatLoopTurn $chatLoop = null,
     ): ChatHandler {
         $history = new ConversationHistoryRenderer($conversationFileCatalog);
         $vision = new VisionAttachmentEncoder($uploadDir, $conversationFileCatalog, $generatedImageVisionFlag, $modelRepository, $visionModelResolver, $logger);
@@ -208,6 +210,7 @@ final class ChatHandlerFactory
             $documents,
             new RoutingHandoffResolver($toolCallingTranslator, $toolCallParser, $routingToolset, $logger),
             new PendingMemoryExtraction($memoryExtractionDispatcher, $perfPipelineFlag, $logger),
+            $chatLoop,
         );
     }
 }

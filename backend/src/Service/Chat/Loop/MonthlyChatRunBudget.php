@@ -5,20 +5,19 @@ declare(strict_types=1);
 namespace App\Service\Chat\Loop;
 
 use App\Entity\User;
-use App\Service\RateLimitService;
 
 /**
- * The payer's monthly cost budget, read fresh before each call. It is the
- * only cost guard of a chat run until the run cost cap exists.
+ * The payer's monthly cost budget and the share of it one run may spend,
+ * read fresh before each call.
  */
 final readonly class MonthlyChatRunBudget implements ChatRunBudget
 {
-    public function __construct(private RateLimitService $rateLimits)
+    public function __construct(private ChatRunCostLimit $limit)
     {
     }
 
-    public function allows(User $payer): bool
+    public function allowance(User $payer): ChatRunAllowance
     {
-        return true === $this->rateLimits->checkCostBudget($payer)['allowed'];
+        return $this->limit->allowance($payer);
     }
 }

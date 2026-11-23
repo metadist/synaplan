@@ -267,7 +267,7 @@ describe('DesktopConfiguration', () => {
           stubs: {
             Icon: true,
             Transition: false,
-            Teleport: { template: '<div><slot /></div>' },
+            Teleport: true,
             RouterLink: routerLinkStub,
           },
         },
