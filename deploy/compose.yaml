@@ -139,6 +139,8 @@ x-app-environment: &app-environment
   REALTIME_PUBLIC_WS_URL: ""
   REALTIME_ALLOWED_ORIGINS: "${REALTIME_ALLOWED_ORIGINS:-${APP_URL}}"
   QDRANT_URL: http://qdrant:6333
+  # Empty sends no credential. Set the same value as QDRANT__SERVICE__API_KEY.
+  QDRANT_API_KEY: "${QDRANT_API_KEY:-}"
   TIKA_BASE_URL: http://tika:9998
   # Empty until the `office` profile sets it in x-app-command.
   OFFICE_CONVERT_URL: "${OFFICE_CONVERT_URL:-}"

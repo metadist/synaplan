@@ -208,6 +208,7 @@ final class ModuleOwnershipTest extends TestCase
         'vector_store' => [
             'VECTOR_STORAGE_PROVIDER',
             'QDRANT_URL',
+            'QDRANT_API_KEY',
             'QDRANT_MEMORIES_COLLECTION',
             'QDRANT_DOCUMENTS_COLLECTION',
             'QDRANT_DIGESTS_COLLECTION',

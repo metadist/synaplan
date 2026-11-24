@@ -85,6 +85,9 @@ final class SystemConfigSchemaCharacterizationTest extends TestCase
         }
 
         CleanupSnapshot::assertSame(self::SNAPSHOT, $actual, 'System settings');
+        $snapshot = (string) file_get_contents(self::SNAPSHOT);
+        self::assertStringNotContainsString('qdrant-snapshot-secret', $snapshot);
+        self::assertStringNotContainsString('recaptcha-secret', $snapshot);
     }
 
     /**
@@ -131,6 +134,7 @@ final class SystemConfigSchemaCharacterizationTest extends TestCase
                     'OLLAMA_BASE_URL' => 'http://gpu.internal:11434',
                     'MAILER_DSN' => 'smtp://user:secret@mail:25',
                     'RECAPTCHA_SECRET_KEY' => 'recaptcha-secret',
+                    'QDRANT_API_KEY' => 'qdrant-snapshot-secret',
                     'TIKA_TIMEOUT_MS' => '5000',
                     'WHISPER_ENABLED' => 'true',
                     'APP_SENDER_NAME' => '',

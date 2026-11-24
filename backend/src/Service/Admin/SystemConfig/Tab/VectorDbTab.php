@@ -44,6 +44,11 @@ final readonly class VectorDbTab implements SystemConfigTab
                 description: 'Qdrant REST API URL',
                 default: 'http://qdrant:6333',
             ),
+            'QDRANT_API_KEY' => new FieldDefinition(
+                type: 'password',
+                description: 'Qdrant API key, sent as the api-key header. Leave empty when Qdrant has no authentication.',
+                sensitive: true,
+            ),
         ]);
     }
 

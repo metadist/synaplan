@@ -20,11 +20,15 @@ final class LegacyPointIdMigrator
 {
     private const SCROLL_BATCH_LIMIT = 100;
 
+    private readonly QdrantRest $rest;
+
     public function __construct(
-        private readonly HttpClientInterface $httpClient,
-        private readonly string $qdrantUrl,
+        HttpClientInterface $httpClient,
+        string $qdrantUrl,
         private readonly LoggerInterface $logger,
+        string $qdrantApiKey = '',
     ) {
+        $this->rest = new QdrantRest($httpClient, $qdrantUrl, new QdrantApiKey($qdrantApiKey));
     }
 
     /**
@@ -177,30 +181,11 @@ final class LegacyPointIdMigrator
     /**
      * @param array<string, mixed>|null $body
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     private function qdrantRequest(string $method, string $path, ?array $body = null): array
     {
-        $options = [];
-        if (null !== $body) {
-            $options['headers'] = ['Content-Type' => 'application/json'];
-            $options['json'] = $body;
-        }
-
-        $response = $this->httpClient->request($method, "{$this->qdrantUrl}{$path}", $options);
-        $status = $response->getStatusCode();
-        if ($status < 200 || $status >= 300) {
-            throw new \RuntimeException(sprintf('Qdrant %s %s failed with HTTP %d: %s', $method, $path, $status, $response->getContent(false)));
-        }
-
-        $content = $response->getContent();
-        if ('' === $content) {
-            return [];
-        }
-
-        /** @var array<string, mixed> $decoded */
-        $decoded = json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
-
-        return $decoded;
+        // Body-less calls previously sent no headers. Keep that when no key is set.
+        return $this->rest->request($method, $path, $body, false);
     }
 }

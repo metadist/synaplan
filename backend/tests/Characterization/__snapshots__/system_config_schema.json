@@ -1762,6 +1762,14 @@
                 "tab": "interface",
                 "type": "boolean"
             },
+            "QDRANT_API_KEY": {
+                "default": "",
+                "description": "Qdrant API key, sent as the api-key header. Leave empty when Qdrant has no authentication.",
+                "section": "qdrant",
+                "sensitive": true,
+                "tab": "vectordb",
+                "type": "password"
+            },
             "QDRANT_URL": {
                 "default": "http://qdrant:6333",
                 "description": "Qdrant REST API URL",
@@ -2776,7 +2784,8 @@
                 "sections": [
                     {
                         "fields": [
-                            "QDRANT_URL"
+                            "QDRANT_URL",
+                            "QDRANT_API_KEY"
                         ],
                         "id": "qdrant",
                         "label": "Qdrant"
@@ -3780,6 +3789,11 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "QDRANT_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
             },
             "QDRANT_URL": {
                 "isMasked": false,
@@ -5142,6 +5156,11 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "QDRANT_API_KEY": {
+                "isMasked": true,
+                "isSet": true,
+                "value": "••••••••"
             },
             "QDRANT_URL": {
                 "isMasked": false,
@@ -7403,6 +7422,14 @@
                 "tab": "interface",
                 "type": "boolean"
             },
+            "QDRANT_API_KEY": {
+                "default": "",
+                "description": "Qdrant API key, sent as the api-key header. Leave empty when Qdrant has no authentication.",
+                "section": "qdrant",
+                "sensitive": true,
+                "tab": "vectordb",
+                "type": "password"
+            },
             "QDRANT_URL": {
                 "default": "http://qdrant:6333",
                 "description": "Qdrant REST API URL",
@@ -8448,7 +8475,8 @@
                 "sections": [
                     {
                         "fields": [
-                            "QDRANT_URL"
+                            "QDRANT_URL",
+                            "QDRANT_API_KEY"
                         ],
                         "id": "qdrant",
                         "label": "Qdrant"
@@ -9602,6 +9630,11 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "QDRANT_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
             },
             "QDRANT_URL": {
                 "isMasked": false,
@@ -10806,6 +10839,11 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "QDRANT_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
             },
             "QDRANT_URL": {
                 "isMasked": false,
@@ -12028,6 +12066,11 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "QDRANT_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
             },
             "QDRANT_URL": {
                 "isMasked": false,
@@ -13383,6 +13426,11 @@
                 "locked": false,
                 "value": "true"
             },
+            "QDRANT_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
+            },
             "QDRANT_URL": {
                 "isMasked": false,
                 "isSet": false,
@@ -14736,6 +14784,11 @@
                 "isSet": false,
                 "locked": false,
                 "value": "true"
+            },
+            "QDRANT_API_KEY": {
+                "isMasked": false,
+                "isSet": false,
+                "value": ""
             },
             "QDRANT_URL": {
                 "isMasked": false,

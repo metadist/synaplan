@@ -20,15 +20,25 @@ final readonly class MemoryServiceStatus
     }
 
     /**
-     * @return array{available: bool, configured: bool}
+     * @return array{available: bool, configured: bool, error?: string}
      */
     public function probe(): array
     {
         $configured = '' !== trim($this->qdrantUrl);
+        if (!$configured) {
+            return ['available' => false, 'configured' => false];
+        }
 
-        return [
-            'available' => $configured && $this->memoryService->isReachableNow(),
-            'configured' => $configured,
-        ];
+        if ($this->memoryService->isReachableNow()) {
+            return ['available' => true, 'configured' => true];
+        }
+
+        $result = ['available' => false, 'configured' => true];
+        $reason = $this->memoryService->getQdrantClient()->unavailableReason();
+        if (is_string($reason) && '' !== $reason) {
+            $result['error'] = $reason;
+        }
+
+        return $result;
     }
 }

@@ -39,11 +39,16 @@ final readonly class HttpBytes
     }
 
     /**
+     * @param array<string, string> $headers
+     *
      * @return array{0: int, 1: string} status and body; status 0 when the connection failed
      */
-    public function probe(string $url, int $timeoutSeconds = 5, ?string $user = null, ?string $password = null): array
+    public function probe(string $url, int $timeoutSeconds = 5, ?string $user = null, ?string $password = null, array $headers = []): array
     {
         $options = $this->options($timeoutSeconds);
+        if ([] !== $headers) {
+            $options['headers'] = array_merge($options['headers'], $headers);
+        }
         if (null !== $user && '' !== $user) {
             $options['auth_basic'] = [$user, $password ?? ''];
         }

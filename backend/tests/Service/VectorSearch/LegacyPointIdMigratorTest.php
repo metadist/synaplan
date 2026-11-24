@@ -242,6 +242,35 @@ final class LegacyPointIdMigratorTest extends TestCase
         $this->assertGreaterThan(0, $report->scanned);
     }
 
+    public function testTheApiKeyIsSentAndAnEmptyKeyAddsNoHeader(): void
+    {
+        $withKey = $this->scrollHeaders('qdrant-test-key-not-for-logs');
+        $withoutKey = $this->scrollHeaders('');
+
+        self::assertNotSame('', $withKey);
+        self::assertStringContainsString('qdrant-test-key-not-for-logs', $withKey);
+        self::assertStringContainsString('api-key', strtolower($withKey));
+        self::assertStringNotContainsString('api-key', strtolower($withoutKey));
+    }
+
+    private function scrollHeaders(string $apiKey): string
+    {
+        $sent = '';
+        $migrator = new LegacyPointIdMigrator(
+            httpClient: new MockHttpClient(function (string $method, string $url, array $options) use (&$sent): MockResponse {
+                $sent = (string) json_encode($options['headers'] ?? []);
+
+                return new MockResponse((string) json_encode(['result' => ['points' => [], 'next_page_offset' => null]]), ['http_code' => 200]);
+            }),
+            qdrantUrl: 'http://localhost:6333',
+            logger: new NullLogger(),
+            qdrantApiKey: $apiKey,
+        );
+        $migrator->migrateCollection(self::COLLECTION, false, 0);
+
+        return $sent;
+    }
+
     /**
      * @return array{id: int, payload: array<string, mixed>, vector: list<float>}
      */

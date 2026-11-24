@@ -64,6 +64,7 @@ x-app-environment: &app-environment
   REALTIME_UPSTREAM_ADDR: synaplan_centrifugo_1:8000
 
   QDRANT_URL: http://synaplan_qdrant_1:6333
+  QDRANT_API_KEY: "${QDRANT_API_KEY:-}"
   TIKA_BASE_URL: http://synaplan_tika_1:9998
   # The worker and scheduler block until the web role serves this endpoint. The
   # built-in default addresses the web role as `backend`, which is the service

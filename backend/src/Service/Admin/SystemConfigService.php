@@ -11,6 +11,7 @@ use App\Service\Admin\SystemConfig\SystemConfigValues;
 use App\Service\Admin\SystemConfig\SystemConfigWriter;
 use App\Service\Branding\BrandingService;
 use App\Service\Egress\HttpBytes;
+use App\Service\VectorSearch\QdrantApiKey;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -230,17 +231,40 @@ final readonly class SystemConfigService
             return ['success' => false, 'message' => 'QDRANT_URL not configured'];
         }
 
-        try {
-            [$httpCode] = $this->bytes()->probe($url.'/healthz');
+        $apiKey = new QdrantApiKey((string) ($this->env->value('QDRANT_API_KEY') ?? ''));
+        $headers = $apiKey->apply([]);
+        $base = rtrim($url, '/');
 
+        try {
+            // /healthz is open even when Qdrant requires a key, so a 200 there
+            // is not proof the key is accepted. /collections is.
+            [$httpCode] = $this->bytes()->probe($base.'/healthz', headers: $headers);
+            if (200 !== $httpCode) {
+                return $this->qdrantProbeFailure($apiKey, $httpCode);
+            }
+
+            [$httpCode] = $this->bytes()->probe($base.'/collections', headers: $headers);
             if (200 === $httpCode) {
                 return ['success' => true, 'message' => 'Connected to Qdrant'];
             }
 
-            return ['success' => false, 'message' => 'Qdrant returned HTTP '.$httpCode];
+            return $this->qdrantProbeFailure($apiKey, $httpCode);
         } catch (\Throwable $e) {
             return ['success' => false, 'message' => 'Connection failed: '.$e->getMessage()];
         }
+    }
+
+    /**
+     * @return array{success: bool, message: string}
+     */
+    private function qdrantProbeFailure(QdrantApiKey $apiKey, int $httpCode): array
+    {
+        $auth = $apiKey->failureMessage($httpCode);
+
+        return [
+            'success' => false,
+            'message' => $auth ?? 'Qdrant returned HTTP '.$httpCode,
+        ];
     }
 
     /**

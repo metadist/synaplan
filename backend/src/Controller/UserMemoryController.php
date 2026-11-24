@@ -718,9 +718,10 @@ class UserMemoryController extends AbstractController
         ];
 
         if ($user->isAdmin()) {
+            $reason = $this->memoryService->getQdrantClient()->unavailableReason();
             $payload['debug'] = null !== $e
                 ? $e->getMessage()
-                : 'Qdrant client reports isAvailable() === false. Check QDRANT_URL and that the Qdrant container is reachable.';
+                : ($reason ?? 'Qdrant client reports isAvailable() === false. Check QDRANT_URL and that the Qdrant container is reachable.');
         }
 
         return $this->json($payload, Response::HTTP_SERVICE_UNAVAILABLE);

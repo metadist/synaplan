@@ -129,6 +129,7 @@ parameters:
     env(TIKA_HTTP_PASS): ''
     env(VECTOR_STORAGE_PROVIDER): ''
     env(QDRANT_URL): ''
+    env(QDRANT_API_KEY): ''
     env(QDRANT_MEMORIES_COLLECTION): ''
     env(QDRANT_DOCUMENTS_COLLECTION): ''
     env(QDRANT_DIGESTS_COLLECTION): ''
@@ -1678,6 +1679,7 @@ services:
         arguments:
             $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
             $qdrantUrl: '%env(QDRANT_URL)%'
+            $qdrantApiKey: '%env(QDRANT_API_KEY)%'
             $memoriesCollection: '%env(default::QDRANT_MEMORIES_COLLECTION)%'
             $documentsCollection: '%env(default::QDRANT_DOCUMENTS_COLLECTION)%'
             $digestsCollection: '%env(default::QDRANT_DIGESTS_COLLECTION)%'
@@ -1692,6 +1694,7 @@ services:
         arguments:
             $httpClient: '@Symfony\Contracts\HttpClient\HttpClientInterface'
             $qdrantUrl: '%env(QDRANT_URL)%'
+            $qdrantApiKey: '%env(QDRANT_API_KEY)%'
 
     # Monolog Formatter Factory (for env-based log format switching)
     App\Monolog\MonologFormatterFactory:

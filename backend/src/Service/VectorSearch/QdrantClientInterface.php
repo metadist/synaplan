@@ -408,6 +408,12 @@ interface QdrantClientInterface
     public function refreshHealth(): bool;
 
     /**
+     * Why the last probe says Qdrant cannot be used, when that reason is a
+     * missing or rejected API key. Null when Qdrant is up, or simply down.
+     */
+    public function unavailableReason(): ?string;
+
+    /**
      * Get collection info (point count, status, etc.).
      */
     public function getCollectionInfo(): array;
