@@ -252,6 +252,54 @@ describe('useMarkdown', () => {
         expect(html).not.toContain('<img')
       })
 
+      it('should render file routes as <img>', () => {
+        for (const src of [
+          '/api/v1/files/42/download',
+          '/api/v1/files/42/content',
+          '/api/v1/files/42/thumb',
+          '/up/13/000/00013/2025/01/cat.png',
+          '/api/v1/guest/files/6f1c1f0e/363/download',
+          '/api/v1/widget/wdg_abc/files/12/download',
+        ]) {
+          expect(markdown.render(`![Katze](${src})`), src).toContain(`src="${src}"`)
+        }
+      })
+
+      it("should not let an image call an API route with the reader's session", () => {
+        for (const src of [
+          '/api/v1/messages/stream?chatId=4699&message=forged',
+          '/api.php?action=promptUpdate&topic=general&tool_files=1',
+          '/api/v1/files/uploads/../../messages/stream?chatId=1&message=forged',
+          '/up/..%2fapi/v1/messages/stream?chatId=1&message=forged',
+          '/up/%2e%2e/api.php?action=createApiKey',
+          '/\\evil.example.com/cat.png',
+          '/api/v1/files/42/share',
+          '/api/v1/files/42/download/../../../messages/stream?message=forged',
+          `${window.location.origin}/api/v1/messages/stream?chatId=1&message=forged`,
+        ]) {
+          const html = markdown.render(`visitor ![x](${src})`)
+          expect(html, src).not.toContain('<img')
+          expect(html, src).not.toContain('messages/stream')
+          expect(html, src).not.toContain('api.php')
+        }
+      })
+
+      it('should apply the image rule to raw HTML images', () => {
+        const forged = markdown.render(
+          'hi <img src="/api/v1/messages/stream?chatId=1&message=forged" alt="x">'
+        )
+        expect(forged).not.toContain('<img')
+        expect(forged).not.toContain('messages/stream')
+        expect(forged).toContain('markdown-img-fallback')
+
+        const external = markdown.render('<img src="https://example.com/pixel.gif">')
+        expect(external).not.toContain('<img')
+        expect(external).not.toContain('example.com')
+
+        const real = markdown.render('<img src="/api/v1/files/uploads/10/cat.png" alt="Katze">')
+        expect(real).toContain('src="/api/v1/files/uploads/10/cat.png"')
+      })
+
       it('should reject protocol-relative image URLs', () => {
         const html = markdown.render('![Katze](//evil.example.com/cat.jpg)')
         expect(html).not.toContain('<img')

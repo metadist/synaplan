@@ -63,7 +63,6 @@
     "src/composables/useInputPersistence.ts::usePastedBlocksPersist": 119,
     "src/composables/useLiveVoice.ts::useLiveVoice": 537,
     "src/composables/useLiveVoice.ts::useLiveVoice.begin": 189,
-    "src/composables/useMarkdown.ts::sanitizeHtml": 108,
     "src/composables/useMediaJobPoll.ts::useMediaJobPoll": 108,
     "src/composables/useMessageQuoting.ts::useMessageQuoting": 144,
     "src/composables/useModelSelection.ts::useModelSelection": 225,

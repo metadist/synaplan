@@ -400,61 +400,6 @@ export const apiService = {
       body: JSON.stringify({ userId, message, trackId }),
     })
   },
-
-  streamMessage(
-    userId: number,
-    message: string,
-    onUpdate: (data: Record<string, unknown>) => void,
-    trackId?: number
-  ): () => void {
-    if (useMockData) {
-      // Mock streaming
-      import('@/mocks/chatResponses').then(({ mockStreamingResponse }) => {
-        mockStreamingResponse(message, onUpdate)
-      })
-      return () => {}
-    }
-
-    // Use chatApi for SSE streaming (it handles cookie-based auth)
-    // This is a legacy function - prefer using chatApi.streamMessage directly
-    let eventSource: EventSource | null = null
-
-    // Get SSE token from auth endpoint (EventSource can't send cookies)
-    fetch(`${apiBase()}/auth/token`, {
-      credentials: requestCredentials(),
-      headers: withNativeAuth({}),
-    })
-      .then((res) => res.json())
-      .then(({ token }) => {
-        if (!token) {
-          onUpdate({ status: 'error', error: 'Authentication required' })
-          return
-        }
-
-        eventSource = new EventSource(
-          `${apiBase()}/messages/stream?userId=${userId}&message=${encodeURIComponent(message)}&trackId=${trackId || ''}&token=${token}`
-        )
-
-        eventSource.onmessage = (event) => {
-          const data = JSON.parse(event.data)
-          onUpdate(data)
-
-          if (data.status === 'complete' || data.status === 'error') {
-            eventSource?.close()
-          }
-        }
-
-        eventSource.onerror = () => {
-          eventSource?.close()
-          onUpdate({ status: 'error', error: 'Connection lost' })
-        }
-      })
-      .catch(() => {
-        onUpdate({ status: 'error', error: 'Failed to authenticate' })
-      })
-
-    return () => eventSource?.close()
-  },
 }
 
 // Axios-like API client for filesService

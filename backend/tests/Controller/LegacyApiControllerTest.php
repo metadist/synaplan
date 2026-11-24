@@ -74,6 +74,21 @@ class LegacyApiControllerTest extends WebTestCase
         }
     }
 
+    public function testCookieSessionCannotCallTheLegacyApiThroughGet(): void
+    {
+        // What an <img src> in somebody else's text sends: the URL and the
+        // reader's cookie, nothing else.
+        [$client] = $this->twoAccounts();
+
+        $client->request('GET', '/api.php?action=promptUpdate&topic=general&tool_files=1');
+
+        self::assertResponseStatusCodeSame(405);
+        self::assertSame('POST', $client->getResponse()->headers->get('Allow'));
+
+        $client->request('GET', '/api.php?action=createApiKey');
+        self::assertResponseStatusCodeSame(405);
+    }
+
     public function testSendEmailIsGone(): void
     {
         [$client, , , $token] = $this->twoAccounts();

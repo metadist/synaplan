@@ -21,6 +21,11 @@ use Symfony\Component\Security\Http\Authenticator\Passport\SelfValidatingPasspor
  */
 class QueryTokenAuthenticator extends AbstractAuthenticator
 {
+    /**
+     * Request attribute holding the account a valid query token belongs to.
+     */
+    public const USER_ID_ATTRIBUTE = '_query_token_user_id';
+
     public function __construct(
         private TokenService $tokenService,
         private UserRepository $userRepository,
@@ -53,6 +58,7 @@ class QueryTokenAuthenticator extends AbstractAuthenticator
         }
 
         $this->tokenService->noteAccessToken($request, $payload);
+        $request->attributes->set(self::USER_ID_ATTRIBUTE, (int) $payload['user_id']);
 
         return new SelfValidatingPassport(
             new UserBadge((string) $payload['user_id'], function (string $userIdentifier) {

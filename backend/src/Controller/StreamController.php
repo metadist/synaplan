@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Security\ExplicitCredential;
 use App\Service\Chat\Run\PumpedTurn;
 use App\Service\Chat\Stream\CancelledTurns;
 use App\Service\Chat\Stream\ChatStreamOrchestrator;
@@ -49,7 +50,7 @@ class StreamController extends AbstractController
     #[OA\Get(
         path: '/api/v1/messages/stream',
         summary: 'Stream AI chat response',
-        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. Status events include memories_loaded and docs_loaded (documentation citations for the synaplan topic). NOTE: the message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
+        description: 'Stream AI chat messages with Server-Sent Events (SSE). Supports reasoning models, web search, and file attachments. Status events include memories_loaded and docs_loaded (documentation citations for the synaplan topic). GET is for API clients only: it needs an API key or token on the request (Authorization or X-API-Key header, or the token / api_key query parameter) and answers 405 when the session cookie is the only credential. The message rides in the URL, so long texts can exceed proxy request-line limits (HTTP 431/414) — prefer the POST variant for anything beyond a few KB.',
         security: [['Bearer' => []]],
         tags: ['Messages']
     )]
@@ -233,10 +234,29 @@ class StreamController extends AbstractController
         response: 401,
         description: 'Not authenticated'
     )]
+    #[OA\Response(
+        response: 405,
+        description: 'GET without an API key or token on the request. The session cookie alone starts a turn only through POST.',
+        content: new OA\JsonContent(
+            required: ['error', 'code'],
+            properties: [
+                new OA\Property(property: 'error', type: 'string', example: 'Send this request as POST, or authenticate the GET with an API key or token.'),
+                new OA\Property(property: 'code', type: 'string', example: 'method_not_allowed'),
+            ]
+        )
+    )]
     public function streamMessage(
         Request $request,
         #[CurrentUser] ?User $user,
     ): Response {
+        if ($request->isMethod('GET') && $this->isUnprovenGet($request, $user)) {
+            return $this->json(
+                ['error' => 'Send this request as POST, or authenticate the GET with an API key or token.', 'code' => 'method_not_allowed'],
+                Response::HTTP_METHOD_NOT_ALLOWED,
+                ['Allow' => 'POST'],
+            );
+        }
+
         try {
             $turn = $this->streamRequests->resolve($request, $user);
         } catch (StreamRequestRejected $rejected) {
@@ -258,6 +278,21 @@ class StreamController extends AbstractController
         });
 
         return $response;
+    }
+
+    /**
+     * A GET starts a turn only for a caller who sent a credential with it.
+     * A browser attaches the session cookie to any image or link, so a GET
+     * carried by the cookie alone, or by a guest session id, is refused. A
+     * GET with no caller at all still gets the usual 401.
+     */
+    private function isUnprovenGet(Request $request, ?User $user): bool
+    {
+        if (!$user instanceof User) {
+            return $request->query->has('guestSession');
+        }
+
+        return !ExplicitCredential::accompanies($request, $user);
     }
 
     /**

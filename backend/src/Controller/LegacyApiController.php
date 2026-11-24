@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Exception\ApiKeyPlanRequiredException;
 use App\Repository\MessageRepository;
 use App\Repository\UserRepository;
+use App\Security\ExplicitCredential;
 use App\Service\Embedding\Exception\PremiumRequiredException;
 use App\Service\Message\InferenceRouter;
 use App\Service\Message\MessageClassifier;
@@ -54,6 +55,15 @@ class LegacyApiController extends AbstractController
     #[Route('', name: 'main', methods: ['GET', 'POST'])]
     public function main(Request $request): JsonResponse
     {
+        $caller = $this->getUser();
+        if ($request->isMethod('GET') && !ExplicitCredential::accompanies($request, $caller instanceof User ? $caller : null)) {
+            return new JsonResponse(
+                ['success' => false, 'error' => 'Send this request as POST, or authenticate the GET with an API key or token.'],
+                Response::HTTP_METHOD_NOT_ALLOWED,
+                ['Allow' => 'POST'],
+            );
+        }
+
         $action = $request->query->get('action') ?? $request->request->get('action');
 
         $this->logger->info('Legacy API call', [

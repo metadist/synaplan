@@ -108,10 +108,15 @@ final class StreamTranscriptCharacterizationTest extends WebTestCase
         $chatId = null;
         try {
             if ('guest' === $scenario['kind']) {
-                $request = Request::create('/api/v1/messages/stream', 'GET', [
-                    'guestSession' => 'guest-limit',
-                    'message' => 'Hello',
-                ]);
+                $request = Request::create(
+                    '/api/v1/messages/stream',
+                    'POST',
+                    [],
+                    [],
+                    [],
+                    ['CONTENT_TYPE' => 'application/json'],
+                    json_encode(['guestSession' => 'guest-limit', 'message' => 'Hello'], JSON_THROW_ON_ERROR),
+                );
                 $actor = null;
             } else {
                 if ('persisted' === $scenario['kind']) {

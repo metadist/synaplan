@@ -2,11 +2,15 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\User;
+use App\Tests\Trait\AuthenticatedTestTrait;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
 class StreamControllerTest extends WebTestCase
 {
+    use AuthenticatedTestTrait;
+
     private KernelBrowser $client;
 
     protected function setUp(): void
@@ -60,6 +64,68 @@ class StreamControllerTest extends WebTestCase
         );
 
         $this->assertResponseStatusCodeSame(401);
+    }
+
+    public function testCookieSessionCannotStartATurnThroughGet(): void
+    {
+        // What an <img src> in somebody else's text sends: the URL and the
+        // reader's cookie, nothing else.
+        $this->authenticateClient($this->client, $this->demoUser());
+
+        $this->client->request('GET', '/api/v1/messages/stream', [
+            'message' => 'forged-by-image',
+            'chatId' => 1,
+        ]);
+
+        $this->assertResponseStatusCodeSame(405);
+        $this->assertSame('POST', $this->client->getResponse()->headers->get('Allow'));
+    }
+
+    public function testGuestSessionCannotStartATurnThroughGet(): void
+    {
+        $this->client->request('GET', '/api/v1/messages/stream', [
+            'message' => 'forged-by-image',
+            'guestSession' => '6f1c1f0e-3b0a-4c58-9d55-0c1c7a9e2a11',
+        ]);
+
+        $this->assertResponseStatusCodeSame(405);
+    }
+
+    public function testGetWithABearerHeaderStillReachesTheResolver(): void
+    {
+        // API clients keep the GET transport. Without a message the request
+        // ends in the resolver's own answer, which proves it got that far.
+        $token = $this->authenticateClient($this->client, $this->demoUser());
+        $this->client->getCookieJar()->clear();
+
+        $this->client->request('GET', '/api/v1/messages/stream', [], [], [
+            'HTTP_AUTHORIZATION' => 'Bearer '.$token,
+        ]);
+
+        $this->assertNotSame(405, $this->client->getResponse()->getStatusCode());
+        $this->assertNotSame(401, $this->client->getResponse()->getStatusCode());
+    }
+
+    public function testGetWithAQueryTokenStillReachesTheResolver(): void
+    {
+        $token = $this->authenticateClient($this->client, $this->demoUser());
+        $this->client->getCookieJar()->clear();
+
+        $this->client->request('GET', '/api/v1/messages/stream', ['token' => $token]);
+
+        $this->assertNotSame(405, $this->client->getResponse()->getStatusCode());
+        $this->assertNotSame(401, $this->client->getResponse()->getStatusCode());
+    }
+
+    private function demoUser(): User
+    {
+        $user = $this->client->getContainer()->get('doctrine')->getRepository(User::class)
+            ->findOneBy(['mail' => 'demo@synaplan.com']);
+        if (!$user instanceof User) {
+            self::markTestSkipped('Fixture user demo@synaplan.com is required.');
+        }
+
+        return $user;
     }
 
     public function testStreamRejectsOtherMethods(): void

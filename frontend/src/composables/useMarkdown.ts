@@ -64,24 +64,36 @@ function isUnsafeLinkHref(href: string): boolean {
 }
 
 /**
- * Decides whether a Markdown image source may be rendered as a real `<img>`.
+ * Paths under our own origin that serve file bytes. An image may point at
+ * these and nowhere else.
+ */
+const IMAGE_PATH_PATTERNS: readonly RegExp[] = [
+  /^\/api\/v1\/files\/uploads\/./,
+  /^\/api\/v1\/files\/\d+\/(?:download|content|thumb)$/,
+  /^\/api\/v1\/guest\/files\/[^/]+\/\d+\/download$/,
+  /^\/api\/v1\/widget\/[^/]+\/files\/\d+\/download$/,
+  /^\/up\/./,
+]
+
+/**
+ * Decides whether an image source may be rendered as a real `<img>`.
  *
- * Chat models routinely *fabricate* image embeds: asked for "a picture of a
- * cat" a text-only model that cannot generate images will happily emit
+ * Two reasons to be strict. Chat models routinely *fabricate* image embeds:
+ * asked for "a picture of a cat" a text-only model emits
  * `![Katze](https://…/cat.jpg)` or `![Katze](sandbox:/cat.png)` pointing at a
- * URL that does not exist, which the browser then shows as a broken-image icon.
+ * URL that does not exist, which the browser shows as a broken-image icon.
+ * And the text is not always ours: a widget visitor, a shared chat or an
+ * imported document can carry `![x](/api/…)`. The browser would fetch that
+ * path with the reader's session, so an image may only point at a route that
+ * serves file bytes ({@link IMAGE_PATH_PATTERNS}), never at the API at large.
  *
- * In Synaplan, genuinely generated/uploaded images are delivered as file
- * attachments rendered by dedicated components — never as Markdown inside the
- * assistant's text. So a real image only ever lives under our own origin (the
- * `/api/v1/files/...` file API). We therefore render an `<img>` only for
- * same-origin / relative app paths and degrade everything else to the alt text,
- * so a hallucinated image becomes a readable caption instead of a broken icon.
+ * Everything else degrades to the alt text. The path is checked after URL
+ * normalisation, so `/up/../api/…` and its encoded spellings do not pass.
  *
  * This mirrors the existing conservative `link` policy (which blocks `data:`
  * fake-download links).
  */
-function isTrustedImageSrc(src: string): boolean {
+export function isTrustedImageSrc(src: string): boolean {
   // eslint-disable-next-line no-control-regex
   const normalized = src.replace(/[\s\u0000-\u001f\u007f-\u009f]/g, '')
   if (normalized === '') {
@@ -91,30 +103,30 @@ function isTrustedImageSrc(src: string): boolean {
   if (isUnsafeLinkHref(normalized)) {
     return false
   }
-  // Absolute app paths ("/api/v1/files/uploads/…"). Protocol-relative URLs
-  // ("//host/…") are treated as external and rejected. A bare filename
-  // ("cat.jpg") does not start with "/" and is rejected too — exactly the
-  // shape a hallucinating model tends to produce.
-  if (normalized.startsWith('/') && !normalized.startsWith('//')) {
-    return true
+  // An absolute app path or an absolute http(s) URL. A bare filename
+  // ("cat.jpg", "img/cat.png") is the shape a hallucinating model produces,
+  // and a protocol-relative URL ("//host/…") is external.
+  const isAppPath = normalized.startsWith('/') && !/^\/[/\\]/.test(normalized)
+  if (!isAppPath && !/^https?:\/\//i.test(normalized)) {
+    return false
   }
-  // Same-origin absolute http(s) URLs only. The explicit-scheme requirement
-  // rejects scheme-less relative refs ("cat.jpg", "img/cat.png") that would
-  // otherwise resolve to our origin yet point at nothing — a common shape of a
-  // hallucinated image. External hosts are rejected because a real Synaplan
-  // image never arrives as Markdown pointing at a third-party host.
-  if (
-    /^https?:\/\//i.test(normalized) &&
-    typeof window !== 'undefined' &&
-    window.location?.origin
-  ) {
-    try {
-      return new URL(normalized).origin === window.location.origin
-    } catch {
+  if (typeof window === 'undefined' || !window.location?.origin) {
+    return false
+  }
+  try {
+    const url = new URL(normalized, window.location.origin)
+    if (url.origin !== window.location.origin) {
       return false
     }
+    // Encoded separators and dots survive URL normalisation and are decoded
+    // by the server's router, so a path carrying them is not a file path.
+    if (/%2f|%5c|%2e|\\/i.test(url.pathname)) {
+      return false
+    }
+    return IMAGE_PATH_PATTERNS.some((pattern) => pattern.test(url.pathname))
+  } catch {
+    return false
   }
-  return false
 }
 
 // Custom renderer for marked
@@ -214,114 +226,141 @@ function createRenderer(): MarkedExtension {
   }
 }
 
-// Configure DOMPurify for safe HTML
+/**
+ * Raw HTML in the text reaches the sanitiser without passing the Markdown
+ * image renderer, so the image rule is applied here as well: an `<img>` whose
+ * source is not a file route is replaced by its alt text.
+ */
+function replaceUntrustedImage(node: Element): void {
+  if (node.nodeName !== 'IMG' || isTrustedImageSrc(node.getAttribute('src') ?? '')) {
+    return
+  }
+  const alt = node.getAttribute('alt') ?? ''
+  if (alt === '') {
+    node.remove()
+    return
+  }
+  const fallback = node.ownerDocument.createElement('span')
+  fallback.className = 'markdown-img-fallback'
+  fallback.textContent = alt
+  node.replaceWith(fallback)
+}
+
+// DOMPurify configuration for rendered Markdown
+const SANITIZE_CONFIG = {
+  // Allow mermaid and KaTeX elements
+  ADD_TAGS: [
+    'mermaid',
+    'math',
+    'mrow',
+    'mi',
+    'mo',
+    'mn',
+    'msup',
+    'msub',
+    'mfrac',
+    'semantics',
+    'annotation',
+  ],
+  // Allow additional attributes for KaTeX math rendering
+  ADD_ATTR: ['class', 'target', 'rel', 'data-*', 'aria-hidden', 'focusable', 'role', 'xmlns'],
+  // Allow standard HTML elements plus KaTeX SVG elements
+  ALLOWED_TAGS: [
+    'h1',
+    'h2',
+    'h3',
+    'h4',
+    'h5',
+    'h6',
+    'p',
+    'br',
+    'hr',
+    'strong',
+    'b',
+    'em',
+    'i',
+    'u',
+    's',
+    'del',
+    'ins',
+    'a',
+    'ul',
+    'ol',
+    'li',
+    'blockquote',
+    'pre',
+    'code',
+    'table',
+    'thead',
+    'tbody',
+    'tr',
+    'th',
+    'td',
+    'img',
+    'span',
+    'div',
+    'input', // For task list checkboxes
+    'label',
+    'sup',
+    'sub',
+    'mark', // For ==highlighted text== syntax
+    'details', // For collapsible sections
+    'summary', // For collapsible section headers
+    'dl', // Definition list
+    'dt', // Definition term
+    'dd', // Definition description
+    'section', // For footnotes section
+    // SVG elements for KaTeX
+    'svg',
+    'path',
+    'line',
+    'rect',
+    'g',
+    'use',
+    'defs',
+    'symbol',
+  ],
+  ALLOWED_ATTR: [
+    'href',
+    'src',
+    'alt',
+    'title',
+    'class',
+    'id',
+    'target',
+    'rel',
+    'type',
+    'checked',
+    'disabled',
+    'open', // For <details open>
+    'data-*',
+    'style', // Required for KaTeX math rendering (DOMPurify sanitizes CSS)
+    // SVG attributes for KaTeX
+    'viewBox',
+    'width',
+    'height',
+    'd',
+    'fill',
+    'stroke',
+    'stroke-width',
+    'transform',
+    'x',
+    'y',
+    'x1',
+    'x2',
+    'y1',
+    'y2',
+    'xlink:href',
+  ],
+}
+
 function sanitizeHtml(html: string): string {
-  return DOMPurify.sanitize(html, {
-    // Allow mermaid and KaTeX elements
-    ADD_TAGS: [
-      'mermaid',
-      'math',
-      'mrow',
-      'mi',
-      'mo',
-      'mn',
-      'msup',
-      'msub',
-      'mfrac',
-      'semantics',
-      'annotation',
-    ],
-    // Allow additional attributes for KaTeX math rendering
-    ADD_ATTR: ['class', 'target', 'rel', 'data-*', 'aria-hidden', 'focusable', 'role', 'xmlns'],
-    // Allow standard HTML elements plus KaTeX SVG elements
-    ALLOWED_TAGS: [
-      'h1',
-      'h2',
-      'h3',
-      'h4',
-      'h5',
-      'h6',
-      'p',
-      'br',
-      'hr',
-      'strong',
-      'b',
-      'em',
-      'i',
-      'u',
-      's',
-      'del',
-      'ins',
-      'a',
-      'ul',
-      'ol',
-      'li',
-      'blockquote',
-      'pre',
-      'code',
-      'table',
-      'thead',
-      'tbody',
-      'tr',
-      'th',
-      'td',
-      'img',
-      'span',
-      'div',
-      'input', // For task list checkboxes
-      'label',
-      'sup',
-      'sub',
-      'mark', // For ==highlighted text== syntax
-      'details', // For collapsible sections
-      'summary', // For collapsible section headers
-      'dl', // Definition list
-      'dt', // Definition term
-      'dd', // Definition description
-      'section', // For footnotes section
-      // SVG elements for KaTeX
-      'svg',
-      'path',
-      'line',
-      'rect',
-      'g',
-      'use',
-      'defs',
-      'symbol',
-    ],
-    ALLOWED_ATTR: [
-      'href',
-      'src',
-      'alt',
-      'title',
-      'class',
-      'id',
-      'target',
-      'rel',
-      'type',
-      'checked',
-      'disabled',
-      'open', // For <details open>
-      'data-*',
-      'style', // Required for KaTeX math rendering (DOMPurify sanitizes CSS)
-      // SVG attributes for KaTeX
-      'viewBox',
-      'width',
-      'height',
-      'd',
-      'fill',
-      'stroke',
-      'stroke-width',
-      'transform',
-      'x',
-      'y',
-      'x1',
-      'x2',
-      'y1',
-      'y2',
-      'xlink:href',
-    ],
-  })
+  DOMPurify.addHook('afterSanitizeAttributes', replaceUntrustedImage)
+  try {
+    return DOMPurify.sanitize(html, SANITIZE_CONFIG)
+  } finally {
+    DOMPurify.removeHook('afterSanitizeAttributes')
+  }
 }
 
 // Custom extension for ==marked text== (highlight) syntax
