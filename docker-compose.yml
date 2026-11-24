@@ -442,6 +442,9 @@ services:
       SIGNUP_IP_LIMIT: ${SIGNUP_IP_LIMIT:-100000}
       SIGNUP_GLOBAL_LIMIT: ${SIGNUP_GLOBAL_LIMIT:-100000}
       CHECKOUT_IP_LIMIT: ${CHECKOUT_IP_LIMIT:-100000}
+      # "Forgot password" requests per IP: same reason, the E2E suites ask
+      # from localhost. Production keeps 10 per hour.
+      PASSWORD_RESET_IP_LIMIT: ${PASSWORD_RESET_IP_LIMIT:-100000}
       # Stripe Payment Integration - loaded from backend/.env via env_file
       # (STRIPE_SECRET_KEY, STRIPE_PUBLISHABLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_*)
       # OAuth Social Login Providers (loaded from backend/.env via env_file)

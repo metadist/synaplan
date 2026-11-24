@@ -124,6 +124,9 @@ framework:
             # leaves the request so its timing cannot reveal which addresses
             # already have accounts.
             'App\Message\SendCodeSignupMessage': async_index
+            # "Forgot password" mail: same reason — the lookup and the mail
+            # run off the request so its timing cannot reveal accounts.
+            'App\Message\SendPasswordResetMessage': async_index
             # Async media jobs (Release 4.0): each message advances one render by
             # a single non-blocking step then re-dispatches itself (DelayStamp)
             # for the next poll. Short hops, never a worker pinned for minutes.
@@ -202,6 +205,7 @@ when@test:
                 # mail is sent inside the request that asked for it.
                 'App\Message\SendLoginLinkMessage': sync
                 'App\Message\SendCodeSignupMessage': sync
+                'App\Message\SendPasswordResetMessage': sync
                 # The test stack has no messenger worker; a cloud learns that
                 # a person ended their link inside the request that ended it.
                 'App\Message\NotifyIdentityRevoked': sync

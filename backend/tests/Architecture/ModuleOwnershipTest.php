@@ -183,6 +183,8 @@ final class ModuleOwnershipTest extends TestCase
             'CHECKOUT_CLAIM_IP_LIMIT',
             'EMAIL_LINK_IP_LIMIT',
             'EMAIL_LINK_ADDRESS_LIMIT',
+            'PASSWORD_RESET_IP_LIMIT',
+            'PASSWORD_RESET_ADDRESS_LIMIT',
             'CODE_SIGNUP_IP_LIMIT',
             'CODE_SIGNUP_ADDRESS_LIMIT',
             'PAID_SIGNUP_ALERT_LIMIT',

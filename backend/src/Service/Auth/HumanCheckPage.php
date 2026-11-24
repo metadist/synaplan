@@ -46,7 +46,7 @@ final readonly class HumanCheckPage
                   'ionic://localhost': 1,
                   'https://localhost': 1
                 }
-                var ACTIONS = { login: 1, register: 1, signup: 1, checkout_start: 1, code_signup: 1 }
+                var ACTIONS = { login: 1, register: 1, signup: 1, checkout_start: 1, code_signup: 1, password_reset: 1 }
                 var params = new URLSearchParams(location.search)
                 var requested = params.get('parent') || ''
                 var origins = location.ancestorOrigins

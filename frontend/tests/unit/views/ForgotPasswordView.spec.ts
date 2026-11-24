@@ -25,11 +25,19 @@ vi.mock('@/composables/useTheme', () => ({
   }),
 }))
 
+const forgotPassword = vi.fn()
+const getToken = vi.fn(async () => 'challenge-token')
+
 vi.mock('@/services/api', () => ({
-  authApi: { forgotPassword: vi.fn() },
+  authApi: { forgotPassword: (...args: unknown[]) => forgotPassword(...args) },
+}))
+
+vi.mock('@/composables/useSignupChallenge', () => ({
+  useSignupChallenge: () => ({ getToken }),
 }))
 
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
+import { ApiError } from '@/services/api/httpClient'
 
 function mountView() {
   const router = createRouter({
@@ -42,7 +50,9 @@ function mountView() {
   return mount(ForgotPasswordView, {
     global: {
       plugins: [router],
-      stubs: { Button: { template: '<button><slot /></button>' } },
+      stubs: {
+        Button: { template: '<button v-bind="$attrs"><slot /></button>', inheritAttrs: false },
+      },
     },
   })
 }
@@ -71,5 +81,52 @@ describe('ForgotPasswordView mailer hint', () => {
     expect(wrapper.get('[data-testid="text-no-mailer-command"]').text()).toBe(
       'php bin/console app:admin:reset-password you@example.com --generate'
     )
+  })
+})
+
+describe('ForgotPasswordView request', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    mailerConfigured.mockReturnValue(true)
+    forgotPassword.mockReset()
+    getToken.mockClear()
+  })
+
+  async function submit(wrapper: ReturnType<typeof mountView>) {
+    await wrapper.get('[data-testid="input-email"]').setValue('ada@example.com')
+    await wrapper.get('[data-testid="comp-forgot-form"]').trigger('submit')
+    await flushPromises()
+  }
+
+  it('sends the human-check token for the password_reset action', async () => {
+    forgotPassword.mockResolvedValue({ success: true })
+    const wrapper = mountView()
+    await submit(wrapper)
+
+    expect(getToken).toHaveBeenCalledWith('password_reset')
+    expect(forgotPassword).toHaveBeenCalledWith('ada@example.com', 'challenge-token')
+    expect(wrapper.find('[data-testid="section-email-sent"]').exists()).toBe(true)
+  })
+
+  it('says to wait when the server limits the requests', async () => {
+    forgotPassword.mockRejectedValue(new ApiError(429, 'Too many', 'PASSWORD_RESET_RATE_LIMITED'))
+    const wrapper = mountView()
+    await submit(wrapper)
+
+    expect(wrapper.find('[data-testid="section-email-sent"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="text-forgot-error"]').text()).toContain('wait a few minutes')
+  })
+
+  it('asks to try again when the human check fails, and clears it on typing', async () => {
+    forgotPassword.mockRejectedValue(new ApiError(400, 'No', 'SIGNUP_CHALLENGE_FAILED'))
+    const wrapper = mountView()
+    await submit(wrapper)
+
+    expect(wrapper.get('[data-testid="text-forgot-error"]').text()).toContain(
+      'could not confirm that you are human'
+    )
+
+    await wrapper.get('[data-testid="input-email"]').setValue('ada@example.org')
+    expect(wrapper.find('[data-testid="text-forgot-error"]').exists()).toBe(false)
   })
 })
