@@ -83,6 +83,8 @@ final readonly class WidgetService
         $widget->setOwner($owner);
         $widget->setName($name);
         $widget->setTaskPromptTopic($taskPromptTopic);
+        // A new widget always signs its visitor ids; the mark is for widgets from before signing.
+        unset($config[WidgetVisitorIdentity::KEY_VERSION], $config[WidgetVisitorIdentity::UNSIGNED_ALLOWED]);
         $sanitizedConfig = $this->sanitizeConfig($config);
         $widget->setConfig($sanitizedConfig);
         $widget->setAllowedDomains($sanitizedConfig['allowedDomains'] ?? []);
@@ -145,6 +147,10 @@ final readonly class WidgetService
     public function updateWidget(Widget $widget, array $config): void
     {
         $currentConfig = $widget->getConfig();
+        // The signing-key version only moves through WidgetVisitorIdentity::rotate()
+        // and the unsigned-id mark is only ever removed there: a saved form must
+        // not bring a replaced key back or switch signing off.
+        unset($config[WidgetVisitorIdentity::KEY_VERSION], $config[WidgetVisitorIdentity::UNSIGNED_ALLOWED]);
         $mergedConfig = array_replace($currentConfig, $config);
         $sanitizedConfig = $this->sanitizeConfig($mergedConfig);
 
@@ -249,6 +255,7 @@ final readonly class WidgetService
             : '';
         if ('' !== $externalApiUrl) {
             $initConfig['externalUserId'] = 'YOUR_USER_ID';
+            $initConfig[WidgetVisitorIdentity::SIGNATURE_FIELD] = 'SIGNATURE_FROM_YOUR_SERVER';
         }
 
         $jsonConfig = json_encode($initConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);

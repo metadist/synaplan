@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { postJsonWithBusyRetry } from './busyRetry'
 import { httpClient, getApiBaseUrl } from './httpClient'
+import { visitorPayload, type WidgetVisitorIdentity } from './widgetVisitorApi'
 import { useConfigStore } from '@/stores/config'
 import type { RagSourceRef } from '@/stores/history'
 
@@ -91,6 +92,7 @@ export interface WidgetConfig {
   // Operator-controlled display name for AI messages. null = i18n default
   // ("AI Assistant" / "KI-Assistent"); non-empty string = render verbatim.
   aiAssistantName?: string | null
+  allowUnsignedVisitorId?: boolean // server-set: widget from before visitor-id signing
   // Human-handoff (Slack) configuration. Webhook URL stays on the server —
   // only `humanHandoffEnabled` (derived) leaks to the public widget config.
   slackWebhookUrl?: string
@@ -228,7 +230,7 @@ export type WidgetStreamStatusPayload = {
 export interface SendWidgetMessageOptions {
   chatId?: number
   fileIds?: number[]
-  externalUserId?: string
+  visitor?: WidgetVisitorIdentity
   apiUrl?: string
   headers?: Record<string, string>
   onChunk?: (chunk: string) => void | Promise<void>
@@ -254,7 +256,7 @@ export async function sendWidgetMessage(
   sessionId: string,
   options: SendWidgetMessageOptions = {}
 ): Promise<SendWidgetMessageResult> {
-  const { chatId, fileIds, externalUserId, apiUrl: apiUrlOverride, headers: extraHeaders } = options
+  const { chatId, fileIds, visitor, apiUrl: apiUrlOverride, headers: extraHeaders } = options
 
   const config = useConfigStore()
   const apiUrl = apiUrlOverride ?? config.apiBaseUrl
@@ -282,9 +284,7 @@ export async function sendWidgetMessage(
     payload.files = fileIds
   }
 
-  if (externalUserId) {
-    payload.externalUserId = externalUserId
-  }
+  Object.assign(payload, visitorPayload(visitor))
 
   // Include credentials when in test/internal mode (dashboard context)
   const isDashboardMode =

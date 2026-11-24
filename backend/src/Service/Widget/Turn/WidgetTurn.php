@@ -17,6 +17,7 @@ final readonly class WidgetTurn
     /**
      * @param array<string, mixed> $config          the widget's configuration
      * @param array<mixed>         $files           the file ids the visitor sent, unchecked
+     * @param string               $externalUserId  the visitor's id as the embedding site signed it, '' without a valid signature
      * @param bool                 $heldForOperator a person runs the session (human or waiting mode), so the AI stays out
      */
     public function __construct(

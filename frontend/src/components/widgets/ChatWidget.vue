@@ -698,6 +698,7 @@ interface Props {
   fullscreenMode?: boolean
   allowFullscreen?: boolean
   externalUserId?: string
+  externalUserIdSignature?: string
   privacyPolicyUrl?: string
   disclosureCompany?: string
   sessionMode?: 'browser' | 'user'
@@ -742,7 +743,6 @@ const props = withDefaults(defineProps<Props>(), {
   hideButton: false,
   fullscreenMode: false,
   allowFullscreen: false,
-  externalUserId: undefined,
   privacyPolicyUrl: undefined,
   disclosureCompany: undefined,
   sessionMode: 'browser',
@@ -1630,7 +1630,7 @@ const sendMessage = async () => {
     const result = await sendWidgetMessage(props.widgetId, userMessage, sessionId.value, {
       chatId: chatId.value ?? undefined,
       fileIds,
-      externalUserId: props.externalUserId,
+      visitor: props,
       apiUrl: props.apiUrl,
       headers: testModeHeaders.value,
       onStatus: (payload) =>

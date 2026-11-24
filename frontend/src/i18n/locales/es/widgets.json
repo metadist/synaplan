@@ -121,7 +121,35 @@
       "proRequired": "Se requiere suscripción PRO",
       "disclosureCompany": "Nombre de la empresa en el aviso de IA",
       "disclosureCompanyHelp": "Aparece en la primera frase que ven las visitas. La frase de que es una IA se queda. Puedes añadir el nombre de la empresa. No puedes quitar la frase.",
-      "disclosureCompanyPlaceholder": "Acme"
+      "disclosureCompanyPlaceholder": "Acme",
+      "userDataIntegration": {
+        "signing": {
+          "title": "Clave de firma",
+          "help": "Tu servidor firma cada ID de usuario con esta clave, para que un visitante no pueda pasar el ID de otra persona. Guarda la clave en tu servidor y nunca la pongas en la página. Sin una firma válida el chat sigue funcionando, pero no se llama a tu API para ese visitante.",
+          "keyLabel": "Clave de firma para los ID de usuario",
+          "show": "Mostrar clave",
+          "hide": "Ocultar clave",
+          "copy": "Copiar clave",
+          "copied": "Clave de firma copiada.",
+          "rotate": "Reemplazar clave",
+          "rotateTitle": "¿Reemplazar la clave de firma?",
+          "rotateConfirm": "Las firmas creadas con la clave actual dejan de funcionar de inmediato. Después, guarda la clave nueva en tu servidor.",
+          "rotated": "Nueva clave de firma creada. Actualízala en tu servidor.",
+          "loadFailed": "No se pudo cargar la clave de firma. Solo el propietario del widget puede verla.",
+          "exampleTitle": "Cómo firmar en tu servidor",
+          "exampleHelp": "Una firma puede ser válida hasta {hours} horas. Crea una nueva en cada carga de página.",
+          "wordpress": "¿Usas el plugin de Synaplan para WordPress? Introduce el ID del widget y esta clave en los ajustes del plugin. El plugin firma entonces por ti el ID del usuario de WordPress que ha iniciado sesión."
+        },
+        "unsigned": {
+          "title": "Este widget todavía acepta IDs de usuario sin firma",
+          "text": "Se configuró antes de que existieran las firmas, así que sigue funcionando igual. Sin firma, un visitante puede pasar el ID de otra persona y obtener sus datos de tu API. Firma el ID en tu servidor como se muestra abajo, comprueba que el chat sigue reconociendo a tus usuarios y activa después la firma aquí.",
+          "action": "Exigir la firma",
+          "confirmTitle": "¿Exigir la firma ahora?",
+          "confirmText": "A partir de ahora tu API solo se llama para IDs de usuario que tu servidor haya firmado. Asegúrate de que tu sitio web ya envía la firma. No se puede volver a desactivar.",
+          "done": "La firma ya es obligatoria para este widget.",
+          "failed": "No se pudo activar la firma. Solo el propietario del widget puede hacerlo."
+        }
+      }
     },
     "title": "Widgets de Chat",
     "subtitle": "Integra widgets de chat con IA en tu sitio web",

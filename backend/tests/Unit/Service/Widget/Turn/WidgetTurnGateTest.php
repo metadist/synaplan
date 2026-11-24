@@ -14,6 +14,7 @@ use App\Service\Widget\WidgetRequestRefused;
 use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionResolver;
 use App\Service\Widget\WidgetSessionService;
+use App\Service\Widget\WidgetVisitorIdentity;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -126,6 +127,7 @@ final class WidgetTurnGateTest extends TestCase
             'files' => [3, 'x'],
             'chatId' => '12',
             'externalUserId' => '  user-1 ',
+            'externalUserIdSignature' => $this->identity()->sign($this->widget(), 'user-1', time() + 600),
         ], JSON_THROW_ON_ERROR)));
 
         self::assertSame(
@@ -133,6 +135,21 @@ final class WidgetTurnGateTest extends TestCase
             [$turn->text, $turn->files, $turn->externalUserId, $turn->heldForOperator, $turn->config],
         );
         self::assertSame([$this->session, $this->owner], [$turn->session, $turn->owner]);
+    }
+
+    public function testAVisitorIdTheEmbeddingSiteDidNotSignIsDropped(): void
+    {
+        $ids = [];
+        foreach ([null, 'not-a-signature', $this->identity()->sign($this->widget(), 'user-2', time() + 600)] as $signature) {
+            $ids[] = $this->gate()->admit('wdg_1', $this->request(json_encode(array_filter([
+                'sessionId' => 'sess',
+                'text' => 'Hi',
+                'externalUserId' => 'user-1',
+                'externalUserIdSignature' => $signature,
+            ]), JSON_THROW_ON_ERROR)))->externalUserId;
+        }
+
+        self::assertSame(['', '', ''], $ids);
     }
 
     public function testASessionAPersonRunsIsHeldForTheOperator(): void
@@ -167,7 +184,7 @@ final class WidgetTurnGateTest extends TestCase
      */
     private function gate(array $setup = []): WidgetTurnGate
     {
-        $widget = (new Widget())->setWidgetId('wdg_1')->setOwnerId(7)->setConfig($setup['config'] ?? ['messageLimit' => 3]);
+        $widget = $this->widget($setup['config'] ?? ['messageLimit' => 3]);
         $widgets = $this->createStub(WidgetService::class);
         $widgets->method('getWidgetById')->willReturnCallback(static fn (string $id): ?Widget => 'wdg_1' === $id ? $widget : null);
         $widgets->method('isWidgetActive')->willReturn($setup['active'] ?? true);
@@ -190,7 +207,20 @@ final class WidgetTurnGateTest extends TestCase
             ++$this->flushes;
         });
 
-        return new WidgetTurnGate($widgets, new WidgetDomainGuard($this->createStub(Security::class), new NullLogger()), $resolver, $sessions, $em);
+        return new WidgetTurnGate($widgets, new WidgetDomainGuard($this->createStub(Security::class), new NullLogger()), $resolver, $sessions, $em, $this->identity());
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    private function widget(array $config = ['messageLimit' => 3]): Widget
+    {
+        return (new Widget())->setWidgetId('wdg_1')->setOwnerId(7)->setConfig($config);
+    }
+
+    private function identity(): WidgetVisitorIdentity
+    {
+        return new WidgetVisitorIdentity('test-app-secret', $this->createStub(EntityManagerInterface::class), new NullLogger());
     }
 
     private function body(): string

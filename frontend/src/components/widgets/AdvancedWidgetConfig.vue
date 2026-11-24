@@ -887,13 +887,10 @@
                     <p class="text-xs txt-secondary mt-0.5 mb-2">
                       {{ $t('widgets.advancedConfig.userDataIntegration.step3Help') }}
                     </p>
-                    <pre
-                      class="px-3 py-2 rounded-lg bg-gray-900 text-green-400 text-xs font-mono whitespace-pre overflow-x-auto"
-                    >
-SynaplanWidget.init({
-  widgetId: '{{ widget.widgetId }}',
-  externalUserId: '&lt;YOUR_USER_ID&gt;'
-})</pre>
+                    <WidgetVisitorSigningGuide
+                      :widget-id="widget.widgetId"
+                      :unsigned-allowed="widget.config?.allowUnsignedVisitorId === true"
+                    />
                   </div>
                 </div>
               </div>
@@ -1896,6 +1893,7 @@ import type { AIModel, Capability } from '@/types/ai-models'
 import { DEFAULT_AI_MODEL, resolveModelIdForSave } from '@/utils/aiModelDefaults'
 import FilePicker from './FilePicker.vue'
 import WidgetSummaryPromptTab from './WidgetSummaryPromptTab.vue'
+import WidgetVisitorSigningGuide from './WidgetVisitorSigningGuide.vue'
 import { parsePromptAndRulesBlock } from '@/utils/widgetBehaviorRules'
 
 // Disable attribute inheritance since we use Teleport as root

@@ -858,6 +858,12 @@ services:
         arguments:
             $appSecret: '%env(APP_SECRET)%'
 
+    # Checks the signature an embedding site puts on a widget visitor's id.
+    # Derives each widget's signing key from APP_SECRET.
+    App\Service\Widget\WidgetVisitorIdentity:
+        arguments:
+            $appSecret: '%env(APP_SECRET)%'
+
     # Inbound Email Service (fetches emails from Gmail IMAP or Mailhog)
     App\Service\Email\InboundEmailService:
         arguments:

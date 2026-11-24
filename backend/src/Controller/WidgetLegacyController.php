@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Service\Widget\WidgetLegacyLoader;
 use App\Service\Widget\WidgetService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -18,6 +19,7 @@ class WidgetLegacyController extends AbstractController
     public function __construct(
         private WidgetService $widgetService,
         private LoggerInterface $logger,
+        private WidgetLegacyLoader $legacyLoader,
     ) {
     }
 
@@ -133,61 +135,7 @@ class WidgetLegacyController extends AbstractController
         // Build the base URL for the widget
         $apiBaseUrl = $request->getSchemeAndHttpHost();
 
-        // Get widget configuration for proper initialization
-        $config = $widget->getConfig();
-        $position = $config['position'] ?? 'bottom-right';
-        $primaryColor = $config['primaryColor'] ?? '#007bff';
-        $iconColor = $config['iconColor'] ?? '#ffffff';
-        $theme = $config['defaultTheme'] ?? 'light';
-        $autoOpen = $config['autoOpen'] ?? false;
-        $autoOpenStr = $autoOpen ? 'true' : 'false';
-        $autoMessage = $config['autoMessage'] ?? 'Hello! How can I help you today?';
-        $messageLimit = (int) ($config['messageLimit'] ?? 50);
-        $maxFileSize = (int) ($config['maxFileSize'] ?? 10);
-        $allowFileUpload = !empty($config['allowFileUpload']);
-        $fileUploadLimit = (int) ($config['fileUploadLimit'] ?? 3);
-        $allowFileUploadStr = $allowFileUpload ? 'true' : 'false';
-
-        // Escape strings for JavaScript
-        $autoMessage = addslashes($autoMessage);
-
-        // Generate JavaScript loader that initializes the modern widget
-        // This mimics the old widget.php behavior while using the new ES module widget.js
-        $javascript = <<<JS
-(function() {
-    'use strict';
-
-    // Legacy widget.php compatibility layer
-    console.log('Synaplan Widget: Loading via legacy widget.php endpoint (uid parameter is deprecated)');
-
-    // Load the modern widget as ES module
-    var script = document.createElement('script');
-    script.type = 'module';
-    script.textContent = `
-        import SynaplanWidget from '{$apiBaseUrl}/widget.js';
-        SynaplanWidget.init({
-            widgetId: '{$actualWidgetId}',
-            position: '{$position}',
-            primaryColor: '{$primaryColor}',
-            iconColor: '{$iconColor}',
-            defaultTheme: '{$theme}',
-            autoOpen: {$autoOpenStr},
-            autoMessage: '{$autoMessage}',
-            messageLimit: {$messageLimit},
-            maxFileSize: {$maxFileSize},
-            allowFileUpload: {$allowFileUploadStr},
-            fileUploadLimit: {$fileUploadLimit},
-            apiUrl: '{$apiBaseUrl}',
-            lazy: false
-        }).catch(err => {
-            console.error('Synaplan Widget: Failed to initialize', err);
-        });
-    `;
-
-    // Add script to page
-    document.head.appendChild(script);
-})();
-JS;
+        $javascript = $this->legacyLoader->script($apiBaseUrl, $widget);
 
         return new Response(
             $javascript,

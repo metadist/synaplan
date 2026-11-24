@@ -121,7 +121,35 @@
       "proRequired": "PRO aboneliği gerekli",
       "disclosureCompany": "YZ bildirimindeki şirket adı",
       "disclosureCompanyHelp": "Ziyaretçilerin ilk gördüğü cümlede yer alır. Bunun bir yapay zeka olduğunu söyleyen cümle kalır. Şirket adını ekleyebilirsiniz. Cümleyi kaldıramazsınız.",
-      "disclosureCompanyPlaceholder": "Acme"
+      "disclosureCompanyPlaceholder": "Acme",
+      "userDataIntegration": {
+        "signing": {
+          "title": "İmzalama anahtarı",
+          "help": "Sunucunuz her kullanıcı kimliğini bu anahtarla imzalar; böylece bir ziyaretçi başkasının kimliğini gönderemez. Anahtarı sunucunuzda saklayın ve asla sayfaya yazmayın. Geçerli bir imza olmadan sohbet çalışmaya devam eder, ancak bu ziyaretçi için API’niz çağrılmaz.",
+          "keyLabel": "Kullanıcı kimlikleri için imzalama anahtarı",
+          "show": "Anahtarı göster",
+          "hide": "Anahtarı gizle",
+          "copy": "Anahtarı kopyala",
+          "copied": "İmzalama anahtarı kopyalandı.",
+          "rotate": "Anahtarı değiştir",
+          "rotateTitle": "İmzalama anahtarı değiştirilsin mi?",
+          "rotateConfirm": "Mevcut anahtarla oluşturulan imzalar hemen geçersiz olur. Ardından yeni anahtarı sunucunuza kaydedin.",
+          "rotated": "Yeni imzalama anahtarı oluşturuldu. Sunucunuzda güncelleyin.",
+          "loadFailed": "İmzalama anahtarı yüklenemedi. Yalnızca widget’ın sahibi görebilir.",
+          "exampleTitle": "Sunucunuzda nasıl imzalanır",
+          "exampleHelp": "Bir imza en fazla {hours} saat geçerli olabilir. Her sayfa yüklemesinde yenisini oluşturun.",
+          "wordpress": "Synaplan WordPress eklentisini mi kullanıyorsunuz? Widget kimliğini ve bu anahtarı eklenti ayarlarına girin. Eklenti, oturum açmış WordPress kullanıcısının kimliğini sizin için imzalar."
+        },
+        "unsigned": {
+          "title": "Bu widget kullanıcı kimliklerini hâlâ imzasız kabul ediyor",
+          "text": "İmzalar gelmeden önce kurulduğu için olduğu gibi çalışmaya devam ediyor. İmza olmadan bir ziyaretçi başkasının kimliğini gönderip o kişinin verilerini API’nizden alabilir. Kimliği aşağıda gösterildiği gibi sunucunuzda imzalayın, sohbetin kullanıcılarınızı hâlâ tanıdığını kontrol edin ve ardından imzayı buradan açın.",
+          "action": "İmzayı zorunlu kıl",
+          "confirmTitle": "İmza şimdi zorunlu olsun mu?",
+          "confirmText": "Bundan sonra API’niz yalnızca sunucunuzun imzaladığı kullanıcı kimlikleri için çağrılır. Web sitenizin imzayı zaten gönderdiğinden emin olun. Bu ayar tekrar kapatılamaz.",
+          "done": "Bu widget için imza artık zorunlu.",
+          "failed": "İmza açılamadı. Bunu yalnızca widget’ın sahibi yapabilir."
+        }
+      }
     },
     "title": "Sohbet Widgetları",
     "subtitle": "AI destekli sohbet widgetlarını web sitenize yerleştirin",

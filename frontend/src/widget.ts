@@ -67,6 +67,8 @@ interface WidgetConfig {
   hideButton?: boolean
   detectTheme?: boolean
   externalUserId?: string
+  /** `<expiry>.<mac>` made on the embedding site's server; without it the id is ignored. */
+  externalUserIdSignature?: string
   privacyPolicyUrl?: string
   disclosureCompany?: string
   sessionMode?: 'browser' | 'user'
@@ -384,6 +386,14 @@ class SynaplanWidget {
     document.body.appendChild(this.button)
   }
 
+  /** Who the embedding site says the visitor is, with the signature its server made. */
+  private visitorProps(): { externalUserId?: string; externalUserIdSignature?: string } {
+    return {
+      externalUserId: this.config?.externalUserId,
+      externalUserIdSignature: this.config?.externalUserIdSignature,
+    }
+  }
+
   private async loadChat() {
     if (this.chatLoaded || this.chatLoading) return
 
@@ -506,7 +516,7 @@ class SynaplanWidget {
         hideButton: this.config!.lazy || this.config!.hideButton,
         fullscreenMode: this.config!.fullscreenMode,
         allowFullscreen: this.config!.allowFullscreen,
-        externalUserId: this.config!.externalUserId,
+        ...this.visitorProps(),
         privacyPolicyUrl: this.config!.privacyPolicyUrl,
         disclosureCompany: this.config!.disclosureCompany,
         sessionMode: this.config!.sessionMode,

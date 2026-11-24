@@ -12,6 +12,7 @@ use App\Service\Widget\WidgetRequestRefused;
 use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionResolver;
 use App\Service\Widget\WidgetSessionService;
+use App\Service\Widget\WidgetVisitorIdentity;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,7 +22,8 @@ use Symfony\Component\HttpFoundation\Response;
  * with the answer the widget shows. In order: the body, the widget and its
  * owner's limits, the embedding domain, the visitor's session, the session's
  * message limit (not for the owner's internal session) and the owner. The
- * session's first message records the visitor's country.
+ * session's first message records the visitor's country. The visitor's id
+ * is kept only when the embedding site signed it.
  */
 final readonly class WidgetTurnGate
 {
@@ -31,6 +33,7 @@ final readonly class WidgetTurnGate
         private WidgetSessionResolver $sessionResolver,
         private WidgetSessionService $sessions,
         private EntityManagerInterface $em,
+        private WidgetVisitorIdentity $visitorIdentity,
     ) {
     }
 
@@ -75,7 +78,7 @@ final readonly class WidgetTurnGate
             config: $config,
             text: (string) $data['text'],
             files: $files,
-            externalUserId: isset($data['externalUserId']) && \is_string($data['externalUserId']) ? trim($data['externalUserId']) : '',
+            externalUserId: $this->visitorIdentity->verified($widget, $data),
             heldForOperator: $heldForOperator,
         );
     }

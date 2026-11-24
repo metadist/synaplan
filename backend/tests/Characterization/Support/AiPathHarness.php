@@ -139,6 +139,7 @@ use App\Service\Widget\WidgetRealtimeBroadcaster;
 use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionResolver;
 use App\Service\Widget\WidgetSessionService;
+use App\Service\Widget\WidgetVisitorIdentity;
 use App\Tests\Support\MediaGenerationHandlerFactory;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\DBAL\Connection;
@@ -492,7 +493,7 @@ final class AiPathHarness
         $sessions->method('getOrCreateSession')->willReturn($session);
         $sessions->method('checkSessionLimit')->willReturn(['allowed' => true, 'remaining' => 10, 'retry_after' => 0, 'reason' => null]);
 
-        $turnGate = new WidgetTurnGate($widgetService, $this->createStub(WidgetDomainGuard::class), $sessionResolver, $sessions, $em);
+        $turnGate = new WidgetTurnGate($widgetService, $this->createStub(WidgetDomainGuard::class), $sessionResolver, $sessions, $em, new WidgetVisitorIdentity('characterization', $em, new NullLogger()));
         $widgetTurn = $turnGate->admit('wdg_char_1', Request::create(
             '/api/v1/widget/wdg_char_1/message',
             'POST',
