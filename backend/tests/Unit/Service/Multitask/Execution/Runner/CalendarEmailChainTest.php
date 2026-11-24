@@ -99,6 +99,9 @@ final class CalendarEmailChainTest extends TestCase
         $sentAttachments = null;
         $sentBody = null;
         $emailService = $this->createMock(InternalEmailService::class);
+        $emailService->method('withAutomaticAgentNotice')->willReturnCallback(
+            static fn (string $markdown): string => "This is an automatic email from your agent.\n\n".$markdown,
+        );
         $emailService->expects(self::once())
             ->method('sendTaskResultEmail')
             ->willReturnCallback(function (string $to, string $subject, string $markdown, array $attachments) use (&$sentAttachments, &$sentBody): void {
@@ -133,8 +136,10 @@ final class CalendarEmailChainTest extends TestCase
         self::assertStringContainsString('DTSTART:20260819T080000Z', $ics);
         self::assertStringContainsString('DTEND:20260819T090000Z', $ics);
 
-        // The email body carries the calendar node's confirmation text.
+        // The email body carries the calendar node's confirmation text,
+        // under the automatic-agent line every "Email to me" result gets.
         self::assertIsString($sentBody);
+        self::assertStringStartsWith("This is an automatic email from your agent.\n\n", $sentBody);
         self::assertStringContainsString('Marketing Strategy', $sentBody);
     }
 
