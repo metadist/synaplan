@@ -55,4 +55,48 @@ class HeicConverterTest extends TestCase
 
         $this->assertNull($this->converter->convertBlobToJpeg('not-an-image'));
     }
+
+    public function testAnSvgNamedHeicIsRefusedBeforeItIsDecoded(): void
+    {
+        $error = null;
+
+        $this->assertNull($this->converter->convertBlobToJpeg($this->svgReadingALocalFile(), $error));
+        $this->assertSame(HeicConverter::NOT_HEIC, $error);
+    }
+
+    public function testAnSvgFileNamedHeicIsNotConverted(): void
+    {
+        $source = tempnam(sys_get_temp_dir(), 'heicsvg_').'.heic';
+        $target = $source.'.jpg';
+        file_put_contents($source, $this->svgReadingALocalFile());
+
+        try {
+            $this->assertFalse($this->converter->convertFileToJpeg($source, $target));
+            $this->assertFileDoesNotExist($target);
+        } finally {
+            @unlink($source);
+            @unlink($target);
+        }
+    }
+
+    public function testAHeicContainerWithoutAPictureIsNotReadByAnotherCoder(): void
+    {
+        if (!extension_loaded('imagick')) {
+            $this->markTestSkipped('imagick is required for this test');
+        }
+
+        // Passes the container check, cannot be decoded as HEIC, and must not
+        // fall through to a coder chosen from the rest of the content.
+        $bytes = "\x00\x00\x00\x18ftypheic\x00\x00\x00\x00mif1heic".$this->svgReadingALocalFile();
+        $error = null;
+
+        $this->assertNull($this->converter->convertBlobToJpeg($bytes, $error));
+        $this->assertNotSame(HeicConverter::NOT_HEIC, $error);
+    }
+
+    private function svgReadingALocalFile(): string
+    {
+        return '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"'
+            .' width="32" height="32"><image width="32" height="32" xlink:href="'.__FILE__.'"/></svg>';
+    }
 }

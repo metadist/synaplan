@@ -30,6 +30,9 @@ final readonly class HeicConverter
      */
     private const HEIC_MIMES = ['image/heic', 'image/heif', 'image/heic-sequence', 'image/heif-sequence'];
 
+    /** Failure reason when the bytes are not a HEIC/HEIF container. */
+    public const NOT_HEIC = 'content is not a HEIC/HEIF image';
+
     public function __construct(
         private LoggerInterface $logger,
         private int $quality = 85,
@@ -57,6 +60,18 @@ final readonly class HeicConverter
     }
 
     /**
+     * What to tell the person whose upload could not be converted.
+     *
+     * @param string|null $reason the technical reason {@see convertBlobToJpeg()} gave
+     */
+    public function failureMessage(?string $reason): string
+    {
+        return self::NOT_HEIC === $reason
+            ? 'This file is named as a HEIC photo but is not one. Upload the original photo, or save it as JPEG.'
+            : 'Could not process this HEIC photo. Please convert it to JPEG and try again.';
+    }
+
+    /**
      * Transcode raw HEIC bytes to JPEG bytes.
      *
      * The bytes are staged to a temporary `.heic` file and decoded via a file
@@ -78,6 +93,13 @@ final readonly class HeicConverter
         if (!$this->isSupported()) {
             $error = 'imagick extension is not loaded';
             $this->logger->warning('HeicConverter: imagick extension unavailable, cannot convert HEIC');
+
+            return null;
+        }
+
+        if (!ImageSignature::isHeic($heicBytes)) {
+            $error = self::NOT_HEIC;
+            $this->logContentMismatch(ImageSignature::of($heicBytes), strlen($heicBytes));
 
             return null;
         }
@@ -146,6 +168,13 @@ final readonly class HeicConverter
             return false;
         }
 
+        $format = ImageSignature::ofFile($sourcePath);
+        if (ImageSignature::HEIC !== $format) {
+            $this->logContentMismatch($format, (int) @filesize($sourcePath));
+
+            return false;
+        }
+
         try {
             $imagick = $this->readHeic($sourcePath);
             $imagick->setIteratorIndex(0);
@@ -181,23 +210,23 @@ final readonly class HeicConverter
     }
 
     /**
-     * Read a HEIC file into an Imagick instance, preferring the explicit
-     * `heic:` coder and falling back to plain path-based detection.
+     * Read a HEIC file with the `heic:` coder and no other. Without the
+     * prefix ImageMagick chooses the coder from the content, and a file that
+     * is not HEIC would reach whichever coder its bytes name.
      */
     private function readHeic(string $path): \Imagick
     {
-        try {
-            $imagick = new \Imagick();
-            $imagick->readImage('heic:'.$path);
+        $imagick = new \Imagick();
+        $imagick->readImage('heic:'.$path);
 
-            return $imagick;
-        } catch (\Throwable) {
-            // Fall back to extension/magic-based detection (handles .heif and
-            // any build where the explicit coder prefix is unavailable).
-            $imagick = new \Imagick();
-            $imagick->readImage($path);
+        return $imagick;
+    }
 
-            return $imagick;
-        }
+    private function logContentMismatch(?string $found, int $bytes): void
+    {
+        $this->logger->warning('HeicConverter: file declared as HEIC holds other content, not decoded', [
+            'found' => $found ?? 'unknown',
+            'bytes' => $bytes,
+        ]);
     }
 }

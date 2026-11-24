@@ -161,6 +161,19 @@ class FileStorageServiceTest extends TestCase
         $this->assertEquals('image/jpeg', mime_content_type($this->service->getAbsolutePath($result['path'])));
     }
 
+    public function testAnSvgUploadedAsHeicIsRejected(): void
+    {
+        $testFile = tempnam(sys_get_temp_dir(), 'synaplan_test_');
+        file_put_contents($testFile, '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+            .'<image width="8" height="8" xlink:href="'.__FILE__.'"/></svg>');
+
+        $result = $this->service->storeUploadedFile(new UploadedFile($testFile, 'IMG_1234.heic', 'image/heic', null, true), 123);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('', $result['path']);
+        $this->assertStringContainsString('is not one', $result['error']);
+    }
+
     public function testFileExistsReturnsTrueForExistingFile(): void
     {
         $testFile = $this->createTestFile('exists.txt', 'content');

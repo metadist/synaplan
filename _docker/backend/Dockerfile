@@ -78,6 +78,20 @@ RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/s
     && sed -i 's|^mozilla/emSign_|!mozilla/emSign_|' /etc/ca-certificates.conf \
     && update-ca-certificates
 
+# ImageMagick picks a coder from a file's content. The coders denied here read
+# or write other files on the server (SVG, MVG and MSL include files by path,
+# TEXT and the label coders read a file as text, EPHEMERAL deletes its input,
+# FTP and VID fetch or list). The application decodes raster images only and
+# checks the content first (App\Service\File\ImageSignature); this is the
+# second line of defence for a read that misses that check. The build fails
+# if the policy file moved or a rule did not land.
+RUN policy=/etc/ImageMagick-6/policy.xml \
+    && test -f "$policy" \
+    && for coder in MVG MSL SVG SVGZ MSVG RSVG TEXT TXT LABEL CAPTION PANGO EPHEMERAL FTP VID; do \
+        sed -i "s|</policymap>|  <policy domain=\"coder\" rights=\"none\" pattern=\"${coder}\" />\n</policymap>|" "$policy" \
+        && convert -list policy | grep -qx "    pattern: ${coder}" || exit 1; \
+    done
+
 # Content credentials run in this image, not in a second container. The
 # process user is 65532 so www-data cannot read a key mounted at /certs.
 RUN apt-get update \

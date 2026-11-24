@@ -13,6 +13,7 @@ use App\Service\File\ConversationFile;
 use App\Service\File\ConversationFileCatalog;
 use App\Service\File\FileHelper;
 use App\Service\File\GeneratedImageVisionFlag;
+use App\Service\File\ImageSignature;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -248,6 +249,13 @@ final readonly class VisionAttachmentEncoder
     private function downscaleImageForVision(string $imageData): ?string
     {
         if (!extension_loaded('imagick') || !class_exists(\Imagick::class)) {
+            return null;
+        }
+
+        // Imagick decodes by content: only bytes that are a raster image get that far.
+        if (null === ImageSignature::of($imageData)) {
+            $this->logger->warning('ChatHandler: Vision attachment is not a raster image, not downscaled');
+
             return null;
         }
 

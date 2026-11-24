@@ -156,7 +156,7 @@ final readonly class FileStorageService
                         'path' => '',
                         'size' => 0,
                         'mime' => '',
-                        'error' => 'Could not process this HEIC photo. Please convert it to JPEG and try again.',
+                        'error' => $this->heicConverter->failureMessage($heicError),
                         'error_detail' => 'HEIC decode failed: '.($heicError ?? 'unknown error'),
                     ];
                 }

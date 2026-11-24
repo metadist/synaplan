@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\AI\Image;
 
+use App\Service\File\ImageSignature;
+
 /**
  * Rewrites Chat Completions image parts for upstreams that accept only inline
  * base64 PNG or JPEG (Cerebras).
@@ -87,6 +89,11 @@ final class PngJpegInlineImages
     private static function transcodeToPng(string $bytes): ?string
     {
         if (!extension_loaded('imagick') || !class_exists(\Imagick::class)) {
+            return null;
+        }
+
+        // Imagick decodes by content: only bytes that are a raster image get that far.
+        if (null === ImageSignature::of($bytes)) {
             return null;
         }
 

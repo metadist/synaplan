@@ -204,7 +204,8 @@ final class PdfRasterizer
         try {
             $imagick = new \Imagick();
             $imagick->setResolution($this->rasterizeDpi, $this->rasterizeDpi);
-            $imagick->readImage($absolutePdfPath);
+            // The explicit coder keeps a non-PDF file with a .pdf name away from other coders.
+            $imagick->readImage('pdf:'.$absolutePdfPath);
             $pages = min($pageCap, $imagick->getNumberImages());
             $imagick->setIteratorIndex(0);
 

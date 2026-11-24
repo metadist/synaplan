@@ -201,6 +201,11 @@ final readonly class DocumentGeneratorService
 
     private function convertWebpToPng(string $sourcePath): string
     {
+        // The name says WebP; Imagick would decode whatever the content says.
+        if (ImageSignature::WEBP !== ImageSignature::ofFile($sourcePath)) {
+            throw new \RuntimeException('The document image is named .webp but is not a WebP file');
+        }
+
         $temporaryPath = tempnam(sys_get_temp_dir(), 'ooxml_image_');
         if (false === $temporaryPath) {
             throw new \RuntimeException('Failed to create a temporary file for a WebP document image');
@@ -208,7 +213,7 @@ final readonly class DocumentGeneratorService
 
         try {
             if (class_exists(\Imagick::class)) {
-                $image = new \Imagick($sourcePath);
+                $image = new \Imagick('webp:'.$sourcePath);
                 $image->setImageFormat('png');
                 $image->writeImage($temporaryPath);
                 $image->clear();
