@@ -478,6 +478,99 @@ class MessageControllerTest extends WebTestCase
         }
     }
 
+    public function testMessageStatusOfAnotherUserReturns404(): void
+    {
+        $otherUser = $this->em->getRepository(User::class)->findOneBy(['mail' => 'admin@synaplan.com']);
+        if (!$otherUser) {
+            $this->markTestSkipped('Fixture user admin@synaplan.com not found.');
+        }
+
+        $trackingId = random_int(1_000_000, 2_000_000_000);
+        $ids = [];
+        foreach (['IN' => 'status-owner-question', 'OUT' => 'status-owner-private-reply'] as $direction => $text) {
+            $message = new Message();
+            $message->setUserId($otherUser->getId());
+            $message->setTrackingId($trackingId);
+            $message->setProviderIndex('test');
+            $message->setUnixTimestamp(time());
+            $message->setDateTime(date('YmdHis'));
+            $message->setMessageType('WEB');
+            $message->setFile(0);
+            $message->setTopic('general');
+            $message->setLanguage('en');
+            $message->setText($text);
+            $message->setDirection($direction);
+            $message->setStatus('complete');
+            $this->em->persist($message);
+            $this->em->flush();
+            $ids[$direction] = $message->getId();
+        }
+
+        try {
+            foreach ($ids as $messageId) {
+                $this->client->request(
+                    'GET',
+                    '/api/v1/messages/'.$messageId.'/status',
+                    [],
+                    [],
+                    ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
+                );
+
+                $this->assertResponseStatusCodeSame(Response::HTTP_NOT_FOUND);
+                $this->assertStringNotContainsString(
+                    'status-owner-private-reply',
+                    (string) $this->client->getResponse()->getContent()
+                );
+            }
+        } finally {
+            // tearDown only cleans up the demo user's messages.
+            foreach ($ids as $messageId) {
+                $leftover = $this->em->find(Message::class, $messageId);
+                if ($leftover) {
+                    $this->em->remove($leftover);
+                    $this->em->flush();
+                }
+            }
+        }
+    }
+
+    public function testMessageStatusReturnsOwnReply(): void
+    {
+        $trackingId = random_int(1_000_000, 2_000_000_000);
+        $ids = [];
+        foreach (['IN' => 'status-own-question', 'OUT' => 'status-own-reply'] as $direction => $text) {
+            $message = new Message();
+            $message->setUserId($this->user->getId());
+            $message->setTrackingId($trackingId);
+            $message->setProviderIndex('test');
+            $message->setUnixTimestamp(time());
+            $message->setDateTime(date('YmdHis'));
+            $message->setMessageType('WEB');
+            $message->setFile(0);
+            $message->setTopic('general');
+            $message->setLanguage('en');
+            $message->setText($text);
+            $message->setDirection($direction);
+            $message->setStatus('complete');
+            $this->em->persist($message);
+            $this->em->flush();
+            $ids[$direction] = $message->getId();
+        }
+
+        $this->client->request(
+            'GET',
+            '/api/v1/messages/'.$ids['IN'].'/status',
+            [],
+            [],
+            ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]
+        );
+
+        $this->assertResponseIsSuccessful();
+        $data = json_decode((string) $this->client->getResponse()->getContent(), true);
+        $this->assertSame('complete', $data['status']);
+        $this->assertSame('status-own-reply', $data['response']);
+    }
+
     public function testEnhanceWithoutAuth(): void
     {
         self::ensureKernelShutdown();

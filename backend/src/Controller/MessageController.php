@@ -942,7 +942,7 @@ class MessageController extends AbstractController
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
         }
 
-        $status = $this->enqueueService->getMessageStatus($messageId);
+        $status = $this->enqueueService->getMessageStatus($messageId, (int) $user->getId());
 
         if (!$status) {
             return $this->json(['error' => 'Message not found'], Response::HTTP_NOT_FOUND);

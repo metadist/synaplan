@@ -169,7 +169,7 @@ class MessageEnqueueServiceTest extends TestCase
             ])
             ->willReturn($responseMessage);
 
-        $result = $this->service->getMessageStatus($messageId);
+        $result = $this->service->getMessageStatus($messageId, 1);
 
         $this->assertIsArray($result);
         $this->assertEquals(123456, $result['tracking_id']);
@@ -194,7 +194,7 @@ class MessageEnqueueServiceTest extends TestCase
             ->with($messageId)
             ->willReturn(null);
 
-        $result = $this->service->getMessageStatus($messageId);
+        $result = $this->service->getMessageStatus($messageId, 1);
 
         $this->assertNull($result);
     }
@@ -218,12 +218,33 @@ class MessageEnqueueServiceTest extends TestCase
         $this->messageRepository->method('find')->willReturn($message);
         $this->messageRepository->method('findOneBy')->willReturn(null); // No response yet
 
-        $result = $this->service->getMessageStatus($messageId);
+        $result = $this->service->getMessageStatus($messageId, 3);
 
         $this->assertIsArray($result);
         $this->assertEquals('processing', $result['status']);
         $this->assertNull($result['response']);
         $this->assertNull($result['provider']);
+    }
+
+    public function testGetMessageStatusHidesAnotherAccountsMessage(): void
+    {
+        $message = $this->createStub(Message::class);
+        $message->method('getUserId')->willReturn(3);
+
+        $repository = $this->createMock(MessageRepository::class);
+        $repository->method('find')->willReturn($message);
+        $repository->expects($this->never())->method('findOneBy');
+
+        $em = $this->createStub(EntityManagerInterface::class);
+        $em->method('getRepository')->willReturn($repository);
+
+        $service = new MessageEnqueueService(
+            $em,
+            $this->createStub(MessageBusInterface::class),
+            $this->createStub(LoggerInterface::class),
+        );
+
+        $this->assertNull($service->getMessageStatus(15, 4));
     }
 
     public function testEnqueueMessageDispatchesCorrectCommand(): void

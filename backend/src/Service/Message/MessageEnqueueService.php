@@ -76,13 +76,18 @@ final readonly class MessageEnqueueService
     }
 
     /**
-     * Holt Status einer Message.
+     * Status of one of the caller's own messages, with the reply once it exists.
+     *
+     * A message of another account answers like a missing one, so the route
+     * does not confirm which ids exist.
+     *
+     * @return array<string, mixed>|null
      */
-    public function getMessageStatus(int $messageId): ?array
+    public function getMessageStatus(int $messageId, int $userId): ?array
     {
         $message = $this->em->getRepository(Message::class)->find($messageId);
 
-        if (!$message) {
+        if (!$message instanceof Message || (int) $message->getUserId() !== $userId) {
             return null;
         }
 
