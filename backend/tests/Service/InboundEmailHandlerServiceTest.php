@@ -11,9 +11,12 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Email\InboundEmailHandlerService;
 use App\Service\Email\MailHandlerLogService;
+use App\Service\Email\MailServerAccess;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\Security\EncryptionService;
+use App\Service\Security\FixtureHostResolver;
+use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -48,7 +51,7 @@ class InboundEmailHandlerServiceTest extends TestCase
             $this->aiFacade,
             $this->modelConfigService,
             $this->rateLimitService,
-            $this->encryptionService,
+            new MailServerAccess(new SsrfGuard(new FixtureHostResolver()), $this->encryptionService, $this->userRepository, $this->logger),
             $this->createMock(MailHandlerLogService::class),
             $this->logger
         );
@@ -161,7 +164,8 @@ class InboundEmailHandlerServiceTest extends TestCase
     public function testTestConnectionFailsWithInvalidCredentials(): void
     {
         $handler = new InboundEmailHandler();
-        $handler->setMailServer('invalid.example.com');
+        $handler->setUserId(1);
+        $handler->setMailServer('mailbox.invalid');
         $handler->setPort(993);
         $handler->setProtocol('IMAP');
         $handler->setSecurity('SSL/TLS');
@@ -179,45 +183,12 @@ class InboundEmailHandlerServiceTest extends TestCase
             ->with('encrypted-password')
             ->willReturn('test-password');
 
-        // Will fail to connect (expected in unit test)
+        // A name without an address is refused before any socket opens.
         $result = $this->service->testConnection($handler);
 
         $this->assertArrayHasKey('success', $result);
         $this->assertArrayHasKey('message', $result);
-        $this->assertFalse($result['success']); // Should fail with invalid server
-    }
-
-    public function testBuildServerStringWithIMAP(): void
-    {
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('buildMailboxServerString');
-        $method->setAccessible(true);
-
-        $serverString = $method->invoke($this->service, 'imap.example.com', 993, 'IMAP', 'SSL/TLS');
-
-        $this->assertEquals('{imap.example.com:993/imap/ssl}INBOX', $serverString);
-    }
-
-    public function testBuildServerStringWithPOP3(): void
-    {
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('buildMailboxServerString');
-        $method->setAccessible(true);
-
-        $serverString = $method->invoke($this->service, 'pop3.example.com', 995, 'POP3', 'SSL/TLS');
-
-        $this->assertEquals('{pop3.example.com:995/pop3/ssl}INBOX', $serverString);
-    }
-
-    public function testBuildServerStringWithSTARTTLS(): void
-    {
-        $reflection = new \ReflectionClass($this->service);
-        $method = $reflection->getMethod('buildMailboxServerString');
-        $method->setAccessible(true);
-
-        $serverString = $method->invoke($this->service, 'imap.example.com', 143, 'IMAP', 'STARTTLS');
-
-        $this->assertEquals('{imap.example.com:143/imap/tls}INBOX', $serverString);
+        $this->assertFalse($result['success']);
     }
 
     public function testGetDefaultDepartment(): void

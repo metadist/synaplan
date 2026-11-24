@@ -13,7 +13,6 @@ use App\Service\RateLimitService;
 use App\Service\SavedTask\InboundEmailFilter;
 use App\Service\SavedTask\SavedTaskConfig;
 use App\Service\SavedTask\SavedTaskRunner;
-use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\Transport;
 use Symfony\Component\Mime\Email;
@@ -36,7 +35,7 @@ final readonly class InboundEmailHandlerService
         private AiFacade $aiFacade,
         private ModelConfigService $modelConfigService,
         private RateLimitService $rateLimitService,
-        private EncryptionService $encryptionService,
+        private MailServerAccess $mailServers,
         private MailHandlerLogService $activityLog,
         private LoggerInterface $logger,
         private ?SavedTaskRepository $savedTasks = null,
@@ -47,22 +46,20 @@ final readonly class InboundEmailHandlerService
 
     /**
      * Test IMAP/POP3 connection.
+     *
+     * @return array{success: bool, message: string}
      */
     public function testConnection(InboundEmailHandler $handler): array
     {
-        return $this->runMailboxConnectionTest(
-            $handler->getMailServer(),
-            $handler->getPort(),
-            $handler->getProtocol(),
-            $handler->getSecurity(),
-            $handler->getUsername(),
-            $handler->getDecryptedPassword($this->encryptionService),
-            ['handler_id' => $handler->getId()]
-        );
+        return $this->mailboxTestResult(fn (): \IMAP\Connection => $this->mailServers->openHandler($handler));
     }
 
     /**
      * Test mailbox login using explicit credentials (no persisted handler required).
+     *
+     * @param bool $operatorNetwork true only when an administrator runs the test
+     *
+     * @return array{success: bool, message: string}
      */
     public function testMailboxCredentials(
         string $mailServer,
@@ -71,64 +68,32 @@ final readonly class InboundEmailHandlerService
         string $security,
         string $username,
         string $plainPassword,
+        bool $operatorNetwork = false,
     ): array {
-        return $this->runMailboxConnectionTest(
+        return $this->mailboxTestResult(fn (): \IMAP\Connection => $this->mailServers->open(
             $mailServer,
             $port,
             $protocol,
             $security,
             $username,
             $plainPassword,
-            []
-        );
+            $operatorNetwork,
+        ));
     }
 
     /**
-     * @param array<string, mixed> $logContext
+     * @param \Closure(): \IMAP\Connection $open
+     *
+     * @return array{success: bool, message: string}
      */
-    private function runMailboxConnectionTest(
-        string $mailServer,
-        int $port,
-        string $protocol,
-        string $security,
-        string $username,
-        string $plainPassword,
-        array $logContext,
-    ): array {
-        if (!function_exists('imap_open')) {
-            $this->logger->error('IMAP extension not available');
-
-            return [
-                'success' => false,
-                'message' => 'IMAP extension is not installed. Please install php-imap extension.',
-            ];
-        }
-
+    private function mailboxTestResult(\Closure $open): array
+    {
         try {
-            $connection = $this->connectMailbox(
-                $mailServer,
-                $port,
-                $protocol,
-                $security,
-                $username,
-                $plainPassword
-            );
+            imap_close($open());
 
-            imap_close($connection);
-
-            return [
-                'success' => true,
-                'message' => 'Connection successful',
-            ];
-        } catch (\Exception $e) {
-            $this->logger->error('IMAP connection test failed', array_merge($logContext, [
-                'error' => $e->getMessage(),
-            ]));
-
-            return [
-                'success' => false,
-                'message' => $e->getMessage(),
-            ];
+            return ['success' => true, 'message' => 'Connection successful'];
+        } catch (MailServerRejected $e) {
+            return ['success' => false, 'message' => $e->getMessage()];
         }
     }
 
@@ -426,68 +391,6 @@ final readonly class InboundEmailHandlerService
     }
 
     /**
-     * Connect to IMAP/POP3 server.
-     */
-    private function connectImap(InboundEmailHandler $handler): \IMAP\Connection
-    {
-        return $this->connectMailbox(
-            $handler->getMailServer(),
-            $handler->getPort(),
-            $handler->getProtocol(),
-            $handler->getSecurity(),
-            $handler->getUsername(),
-            $handler->getDecryptedPassword($this->encryptionService)
-        );
-    }
-
-    private function connectMailbox(
-        string $mailServer,
-        int $port,
-        string $protocol,
-        string $security,
-        string $username,
-        string $plainPassword,
-    ): \IMAP\Connection {
-        $server = $this->buildMailboxServerString($mailServer, $port, $protocol, $security);
-
-        $connection = @imap_open(
-            $server,
-            $username,
-            $plainPassword,
-            0
-        );
-
-        if (!$connection) {
-            $errors = imap_errors();
-            $alerts = imap_alerts();
-            $errorMessage = 'IMAP connection failed: '.implode(', ', $errors ?: ['Unknown error']);
-            if ($alerts) {
-                $errorMessage .= ' | Alerts: '.implode(', ', $alerts);
-            }
-            throw new \Exception($errorMessage);
-        }
-
-        return $connection;
-    }
-
-    private function buildMailboxServerString(
-        string $mailServer,
-        int $port,
-        string $protocol,
-        string $security,
-    ): string {
-        $protocolKey = strtolower($protocol);
-
-        $securityFlag = match ($security) {
-            'SSL/TLS' => 'ssl',
-            'STARTTLS' => 'tls',
-            default => 'notls',
-        };
-
-        return sprintf('{%s:%d/%s/%s}INBOX', $mailServer, $port, $protocolKey, $securityFlag);
-    }
-
-    /**
      * Route email to department using AI.
      */
     public function routeEmailToDepartment(InboundEmailHandler $handler, string $subject, string $body): ?string
@@ -690,7 +593,7 @@ final readonly class InboundEmailHandlerService
         $handlerId = (int) ($handler->getId() ?? 0);
 
         try {
-            $connection = $this->connectImap($handler);
+            $connection = $this->mailServers->openHandler($handler);
 
             // Build search criteria based on email filter
             $searchCriteria = $this->buildSearchCriteria($handler);
@@ -898,8 +801,7 @@ final readonly class InboundEmailHandlerService
         string $subject,
         string $body,
     ): string {
-        // Get SMTP credentials (decrypted)
-        $smtpConfig = $handler->getSmtpCredentials($this->encryptionService);
+        $smtpConfig = $this->mailServers->smtpCredentials($handler);
 
         if (!$smtpConfig) {
             $this->logger->warning('No SMTP credentials configured for forwarding', [

@@ -11,9 +11,11 @@ use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Service\Email\InboundEmailHandlerService;
 use App\Service\Email\MailHandlerLogService;
+use App\Service\Email\MailServerAccess;
 use App\Service\ModelConfigService;
 use App\Service\RateLimitService;
 use App\Service\Security\EncryptionService;
+use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 
@@ -34,7 +36,7 @@ final class InboundEmailDepartmentAgentTest extends TestCase
             $this->createMock(AiFacade::class),
             $this->createMock(ModelConfigService::class),
             $this->createMock(RateLimitService::class),
-            $this->createMock(EncryptionService::class),
+            new MailServerAccess(new SsrfGuard(), $this->createMock(EncryptionService::class), $this->createMock(UserRepository::class), $this->createMock(LoggerInterface::class)),
             $this->createMock(MailHandlerLogService::class),
             $this->createMock(LoggerInterface::class),
         );

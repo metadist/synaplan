@@ -272,7 +272,6 @@ class InboundEmailHandlerController extends AbstractController
 
         $passwordInput = isset($data['password']) ? (string) $data['password'] : '';
         $handlerId = isset($data['handlerId']) ? (int) $data['handlerId'] : 0;
-
         $plainPassword = null;
         if (!InboundEmailHandlerService::isMaskedPasswordPlaceholder($passwordInput)) {
             $plainPassword = $passwordInput;
@@ -304,7 +303,8 @@ class InboundEmailHandlerController extends AbstractController
                 $protocol,
                 $security,
                 $username,
-                $plainPassword
+                $plainPassword,
+                $user->isAdmin(),
             );
 
             return $this->json([

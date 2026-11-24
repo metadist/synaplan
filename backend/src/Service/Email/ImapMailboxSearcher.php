@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Service\Email;
 
 use App\Entity\InboundEmailHandler;
-use App\Service\Security\EncryptionService;
 
 /**
  * IMAP implementation of {@see MailboxSearcher}.
@@ -21,26 +20,13 @@ final readonly class ImapMailboxSearcher implements MailboxSearcher
     private const SNIPPET_CHARS = 2000;
 
     public function __construct(
-        private EncryptionService $encryptionService,
+        private MailServerAccess $mailServers,
     ) {
     }
 
     public function search(InboundEmailHandler $handler, string $query, ?string $from = null, ?string $since = null, int $limit = 10): array
     {
-        if (!function_exists('imap_open')) {
-            throw new \RuntimeException('IMAP extension is not available');
-        }
-
-        $connection = @imap_open(
-            $this->serverString($handler),
-            $handler->getUsername(),
-            $handler->getDecryptedPassword($this->encryptionService),
-            \OP_READONLY,
-        );
-        if (false === $connection) {
-            $errors = imap_errors();
-            throw new \RuntimeException('mailbox connection failed: '.implode(', ', $errors ?: ['unknown error']));
-        }
+        $connection = $this->mailServers->openHandler($handler, readOnly: true);
 
         try {
             $criteria = self::buildCriteria($query, $from, $since);
@@ -102,23 +88,6 @@ final readonly class ImapMailboxSearcher implements MailboxSearcher
         }
 
         return [] === $parts ? 'ALL' : implode(' ', $parts);
-    }
-
-    private function serverString(InboundEmailHandler $handler): string
-    {
-        $securityFlag = match ($handler->getSecurity()) {
-            'SSL/TLS' => 'ssl',
-            'STARTTLS' => 'tls',
-            default => 'notls',
-        };
-
-        return sprintf(
-            '{%s:%d/%s/%s/readonly}INBOX',
-            $handler->getMailServer(),
-            $handler->getPort(),
-            strtolower($handler->getProtocol()),
-            $securityFlag,
-        );
     }
 
     /**

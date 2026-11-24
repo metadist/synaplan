@@ -40,7 +40,7 @@
         "src/Controller/WidgetSessionController.php": 888,
         "src/Mcp/McpServerFactory.php": 1128,
         "src/Repository/MessageRepository.php": 1079,
-        "src/Service/Email/InboundEmailHandlerService.php": 1037,
+        "src/Service/Email/InboundEmailHandlerService.php": 939,
         "src/Service/Feedback/FeedbackExampleService.php": 1225,
         "src/Service/File/FileProcessor.php": 1786,
         "src/Service/File/FileUploadService.php": 1009,

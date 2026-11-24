@@ -72,6 +72,31 @@ class InboundEmailHandlerControllerTest extends WebTestCase
         $this->assertCount(1, $data['handler']['departments']);
     }
 
+    public function testConnectionPreviewRefusesAnInternalTargetWithAFixedSentence(): void
+    {
+        foreach (['169.254.169.254', 'mail.example}/novalidate-cert', 'mailbox.invalid'] as $mailServer) {
+            $this->client->request('POST', '/api/v1/inbound-email-handlers/test-connection', [], [], [
+                'CONTENT_TYPE' => 'application/json',
+                'HTTP_AUTHORIZATION' => 'Bearer '.$this->token,
+            ], json_encode([
+                'mailServer' => $mailServer,
+                'port' => 993,
+                'protocol' => 'IMAP',
+                'security' => 'SSL/TLS',
+                'username' => 'test@test.com',
+                'password' => 'test-imap-pwd',
+            ]));
+
+            $this->assertResponseIsSuccessful();
+            $data = json_decode($this->client->getResponse()->getContent(), true);
+            $this->assertFalse($data['success']);
+            $this->assertSame(
+                'This mail server address is not allowed. Use the public host name of your mail provider.',
+                $data['message'],
+            );
+        }
+    }
+
     public function testHistoricalModeRequiresProLevel(): void
     {
         // This test assumes admin@synaplan.com has PRO level
