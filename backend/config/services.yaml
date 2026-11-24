@@ -164,6 +164,9 @@ parameters:
     # One-time sign-in links: per client IP and per address, per hour.
     env(EMAIL_LINK_IP_LIMIT): '10'
     env(EMAIL_LINK_ADDRESS_LIMIT): '5'
+    # "Forgot password" mails: per client IP and per address, per hour.
+    env(PASSWORD_RESET_IP_LIMIT): '10'
+    env(PASSWORD_RESET_ADDRESS_LIMIT): '3'
     # Invitation codes without a password: per client IP and per address, per hour.
     env(CODE_SIGNUP_IP_LIMIT): '10'
     env(CODE_SIGNUP_ADDRESS_LIMIT): '5'

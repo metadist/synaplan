@@ -435,8 +435,10 @@ never throttled; only *new* accounts are.
 | New accounts installation-wide per 10 minutes | `SIGNUP_GLOBAL_LIMIT` | 20 (tripping it mails the operator) |
 | Stripe checkouts per client IP per hour | `CHECKOUT_IP_LIMIT` | 10 |
 | Paid tiers for day-old accounts per hour before an alert | `PAID_SIGNUP_ALERT_LIMIT` | 10 |
+| "Forgot password" requests per client IP per hour | `PASSWORD_RESET_IP_LIMIT` | 10 |
+| "Forgot password" requests per address per hour | `PASSWORD_RESET_ADDRESS_LIMIT` | 3 |
 | **Pause sign-up** | Admin → System configuration → Sign-in & registration (or `SIGNUP_PAUSED=true`) | off |
-| Human check | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (Cloudflare Turnstile), else `RECAPTCHA_*` | none |
+| Human check (sign-up, sign-in, "forgot password") | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` (Cloudflare Turnstile), else `RECAPTCHA_*` | none |
 | Alert inbox | `APP_ADMIN_EMAIL` (fallback `APP_SENDER_EMAIL`) | — |
 
 The per-IP windows need the real client address. Behind Cloudflare or a load

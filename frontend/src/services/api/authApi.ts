@@ -47,10 +47,10 @@ export const authApi = {
     })
   },
 
-  async forgotPassword(email: string): Promise<unknown> {
+  async forgotPassword(email: string, challengeToken = ''): Promise<unknown> {
     return httpClient('/api/v1/auth/forgot-password', {
       method: 'POST',
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, challengeToken }),
       skipAuth: true,
     })
   },

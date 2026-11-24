@@ -56,6 +56,7 @@ services:
       SIGNUP_IP_LIMIT: "100000"
       SIGNUP_GLOBAL_LIMIT: "100000"
       CHECKOUT_IP_LIMIT: "100000"
+      PASSWORD_RESET_IP_LIMIT: "100000"
       TOKEN_SECRET: "test_token_secret"
       # OIDC defaults match the Keycloak setup script (_docker/keycloak/setup.sh)
       # These work with --profile oidc; without it, Keycloak is not running but the provider shows as enabled (harmless)

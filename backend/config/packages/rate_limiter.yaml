@@ -156,6 +156,21 @@ framework:
             limit: '%env(int:EMAIL_LINK_ADDRESS_LIMIT)%'
             interval: '1 hour'
             cache_pool: 'cache.rate_limiter'
+        # "Forgot password" (PasswordResetRequest): per client IP and per
+        # address (keyed by its hash), behind the human check, so the public
+        # form cannot be used to flood someone's mailbox with reset mails.
+        # (PASSWORD_RESET_IP_LIMIT, default 10 per hour;
+        # PASSWORD_RESET_ADDRESS_LIMIT, default 3 per hour).
+        password_reset_ip:
+            policy: 'sliding_window'
+            limit: '%env(int:PASSWORD_RESET_IP_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
+        password_reset_address:
+            policy: 'sliding_window'
+            limit: '%env(int:PASSWORD_RESET_ADDRESS_LIMIT)%'
+            interval: '1 hour'
+            cache_pool: 'cache.rate_limiter'
         # Invitation codes without a password (CodeSignup): per client IP and
         # per address, so a valid code cannot be used to flood a mailbox.
         # (CODE_SIGNUP_IP_LIMIT, default 10 per hour; CODE_SIGNUP_ADDRESS_LIMIT,

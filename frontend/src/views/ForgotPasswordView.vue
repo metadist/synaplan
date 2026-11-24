@@ -53,8 +53,21 @@
                 class="w-full px-4 py-3 rounded-xl surface-chip txt-primary placeholder:txt-secondary focus:outline-none focus:ring-2 focus:ring-[var(--brand)] transition-colors border-0"
                 :placeholder="emailPlaceholder"
                 data-testid="input-email"
+                :aria-invalid="errorMessage !== ''"
+                :aria-describedby="errorMessage ? 'forgot-password-error' : undefined"
+                @input="errorMessage = ''"
               />
             </div>
+
+            <p
+              v-if="errorMessage"
+              id="forgot-password-error"
+              role="alert"
+              class="text-sm text-red-600 dark:text-red-400"
+              data-testid="text-forgot-error"
+            >
+              {{ errorMessage }}
+            </p>
 
             <Button
               type="submit"
@@ -174,6 +187,8 @@ import { useTheme } from '@/composables/useTheme'
 import { useBrandLogo } from '@/composables/useBrandLogo'
 import { useConfigStore } from '@/stores/config'
 import { authApi } from '@/services/api'
+import { ApiError } from '@/services/api/httpClient'
+import { useSignupChallenge } from '@/composables/useSignupChallenge'
 import Button from '@/components/Button.vue'
 import { isMailerConfigured } from '@/utils/mailerConfigured'
 
@@ -190,6 +205,7 @@ const emailPlaceholder = computed(() => {
 const email = ref('')
 const emailSent = ref(false)
 const isLoading = ref(false)
+const errorMessage = ref('')
 const mailerConfigured = computed(() => isMailerConfigured())
 
 const currentLanguage = computed(() => locale.value)
@@ -200,15 +216,27 @@ const cycleLanguage = () => {
 
 const toggleTheme = () => themeStore.cycleTheme()
 
+const { getToken: getChallengeToken } = useSignupChallenge()
+
+function resetErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 429) return t('auth.forgotPasswordRateLimited')
+    if (error.code === 'SIGNUP_CHALLENGE_FAILED') return t('auth.signupBlocked.challengeFailed')
+  }
+  return t('auth.forgotPasswordFailed')
+}
+
 const handleResetPassword = async () => {
-  if (!email.value) return
+  if (!email.value || isLoading.value) return
 
   isLoading.value = true
+  errorMessage.value = ''
   try {
-    await authApi.forgotPassword(email.value)
+    const challengeToken = await getChallengeToken('password_reset')
+    await authApi.forgotPassword(email.value, challengeToken)
     emailSent.value = true
   } catch (error) {
-    console.error('Password reset failed:', error)
+    errorMessage.value = resetErrorMessage(error)
   } finally {
     isLoading.value = false
   }

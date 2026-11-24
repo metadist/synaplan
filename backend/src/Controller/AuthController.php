@@ -901,47 +901,6 @@ class AuthController extends AbstractController
         ]);
     }
 
-    #[Route('/forgot-password', name: 'forgot_password', methods: ['POST'])]
-    #[OA\Post(path: '/api/v1/auth/forgot-password', summary: 'Email a password reset link', tags: ['Authentication'])]
-    public function forgotPassword(Request $request): JsonResponse
-    {
-        $data = json_decode($request->getContent(), true);
-        $email = $data['email'] ?? '';
-
-        if (empty($email)) {
-            return $this->json(['error' => 'Email required'], Response::HTTP_BAD_REQUEST);
-        }
-
-        $user = $this->userRepository->findOneBy(['mail' => $email]);
-
-        if (!$user || $user->isManagedExternally() || null !== AccountAccess::signIn($user)) {
-            return $this->json([
-                'success' => true,
-                'message' => 'If email exists, reset instructions sent',
-            ]);
-        }
-
-        // Generate reset token (1 hour expiry)
-        $token = $this->tokenRepository->createToken($user, 'password_reset', 3600);
-
-        try {
-            $this->internalEmailService->sendPasswordResetEmail(
-                $user->getMail(),
-                $token->getToken(),
-                $user->getLocale()
-            );
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to send reset email', ['user_id' => $user->getId()]);
-        }
-
-        $this->logger->info('Password reset requested', ['user_id' => $user->getId()]);
-
-        return $this->json([
-            'success' => true,
-            'message' => 'If email exists, reset instructions sent',
-        ]);
-    }
-
     #[Route('/reset-password', name: 'reset_password', methods: ['POST'])]
     #[OA\Post(path: '/api/v1/auth/reset-password', summary: 'Set a new password with a reset token', tags: ['Authentication'])]
     public function resetPassword(Request $request): JsonResponse

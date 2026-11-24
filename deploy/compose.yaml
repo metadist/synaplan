@@ -188,6 +188,8 @@ x-app-environment: &app-environment
   SIGNUP_IP_LIMIT: "${SIGNUP_IP_LIMIT:-5}"
   SIGNUP_GLOBAL_LIMIT: "${SIGNUP_GLOBAL_LIMIT:-20}"
   CHECKOUT_IP_LIMIT: "${CHECKOUT_IP_LIMIT:-10}"
+  PASSWORD_RESET_IP_LIMIT: "${PASSWORD_RESET_IP_LIMIT:-10}"
+  PASSWORD_RESET_ADDRESS_LIMIT: "${PASSWORD_RESET_ADDRESS_LIMIT:-3}"
   PAID_SIGNUP_ALERT_LIMIT: "${PAID_SIGNUP_ALERT_LIMIT:-10}"
   # Empty default on purpose: a set value would pin the switch and the admin
   # toggle (BCONFIG SIGNUP.PAUSED) would no longer take effect.
