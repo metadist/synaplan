@@ -109,7 +109,6 @@ final class WhatsappModule implements FeatureModuleInterface
             'api_webhooks_whatsapp',
             'api_whatsapp_assistant_*',
             'api_phone_verify_request',
-            'api_phone_verify_confirm',
             'api_phone_verify_remove',
         ];
     }

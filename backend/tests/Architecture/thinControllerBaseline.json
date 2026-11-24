@@ -53,7 +53,6 @@
         "src/Controller/MobilePurchaseController.php::MobilePurchaseController::verify": 54,
         "src/Controller/OpenAICompatibleController.php::OpenAICompatibleController::dispatchChatCompletion": 90,
         "src/Controller/OpenAICompatibleController.php::OpenAICompatibleController::handleStream": 159,
-        "src/Controller/PhoneVerificationController.php::PhoneVerificationController::confirmVerification": 80,
         "src/Controller/PhoneVerificationController.php::PhoneVerificationController::requestVerification": 139,
         "src/Controller/ProfileController.php::ProfileController::changePassword": 64,
         "src/Controller/ProfileController.php::ProfileController::deleteAccount": 67,
