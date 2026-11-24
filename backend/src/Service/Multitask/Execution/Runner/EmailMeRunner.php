@@ -113,7 +113,7 @@ final readonly class EmailMeRunner implements TaskRunner
         }
 
         try {
-            $this->deliver($userId, $address, $subject, $text, $attachments);
+            $this->deliver($userId, $address, $subject, $text, $attachments, $locale);
         } catch (\Throwable $e) {
             $this->logger->warning('EmailMeRunner: delivery failed', [
                 'user_id' => $userId,
@@ -146,8 +146,10 @@ final readonly class EmailMeRunner implements TaskRunner
      *
      * @param list<array{path: string, type: string|null}> $attachments
      */
-    private function deliver(int $userId, string $address, string $subject, string $text, array $attachments): void
+    private function deliver(int $userId, string $address, string $subject, string $text, array $attachments, string $locale): void
     {
+        $text = $this->emailService->withAutomaticAgentNotice($text, $locale);
+
         if (null !== $this->m365MailSender && $this->m365MailSender->isAvailableFor($userId)) {
             try {
                 $this->m365MailSender->sendTaskResultEmail($userId, $address, $subject, $text, $attachments);

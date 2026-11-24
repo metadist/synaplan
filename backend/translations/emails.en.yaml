@@ -33,6 +33,7 @@ email:
     subject: 'Your results from Synaplan'
     subject_named: '%name% — Your results from Synaplan'
     sent_confirmation: 'Emailed the results to %email%.'
+    automatic_notice: 'This is an automatic email from your agent.'
 
   cloud_grant:
     connected:
