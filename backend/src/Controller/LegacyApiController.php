@@ -416,7 +416,6 @@ class LegacyApiController extends AbstractController
     private function promptUpdate(Request $request): JsonResponse
     {
         $userId = $this->authenticatedUserId();
-
         if (!$userId) {
             return $this->error('User not authenticated', 401);
         }
@@ -424,12 +423,10 @@ class LegacyApiController extends AbstractController
         try {
             $payload = $this->collectLegacyPayload($request);
             $topic = $payload['topic'] ?? $payload['prompt'] ?? null;
-
             if (!$topic) {
                 return $this->error('Missing topic/prompt parameter', 400);
             }
 
-            // Get prompt with metadata
             $promptData = $this->promptService->getPromptWithMetadata($topic, $userId);
 
             if (!$promptData) {
@@ -437,8 +434,10 @@ class LegacyApiController extends AbstractController
             }
 
             $prompt = $promptData['prompt'];
+            if ($prompt->getOwnerId() !== $userId) {
+                return $this->error('Cannot modify this prompt. You can only modify your own custom prompts.', 403);
+            }
 
-            // Update metadata if provided
             $metadata = [];
             if (isset($payload['tool_files'])) {
                 $metadata['tool_files'] = (bool) $payload['tool_files'];

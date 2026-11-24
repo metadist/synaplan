@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Entity\Message;
+use App\Entity\Prompt;
 use App\Entity\User;
+use App\Repository\PromptMetaRepository;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -87,6 +89,84 @@ class LegacyApiControllerTest extends WebTestCase
 
         $client->request('GET', '/api.php?action=createApiKey');
         self::assertResponseStatusCodeSame(405);
+    }
+
+    public function testPromptUpdateRefusesAPromptOfAnotherOwner(): void
+    {
+        [$client, , $other, $token] = $this->twoAccounts();
+
+        // The shared system prompt resolves for every account; a private
+        // prompt of somebody else does not resolve at all.
+        foreach ([0 => 403, (int) $other->getId() => 404] as $ownerId => $expectedStatus) {
+            $prompt = $this->storePrompt($client, $ownerId);
+            try {
+                $this->postPromptUpdate($client, $token, $prompt->getTopic());
+
+                self::assertResponseStatusCodeSame($expectedStatus);
+                $meta = $client->getContainer()->get(PromptMetaRepository::class);
+                self::assertSame([], $meta->findByPrompt((int) $prompt->getId()));
+            } finally {
+                $this->removePrompt($client, (int) $prompt->getId());
+            }
+        }
+    }
+
+    public function testPromptUpdateWritesTheCallersOwnPrompt(): void
+    {
+        [$client, $user, , $token] = $this->twoAccounts();
+        $prompt = $this->storePrompt($client, (int) $user->getId());
+
+        try {
+            $this->postPromptUpdate($client, $token, $prompt->getTopic());
+
+            self::assertResponseIsSuccessful();
+            $meta = $client->getContainer()->get(PromptMetaRepository::class);
+            $stored = $meta->findByPromptAndKey((int) $prompt->getId(), 'tool_files');
+            self::assertNotNull($stored);
+            self::assertSame('1', $stored->getMetaValue());
+        } finally {
+            $this->removePrompt($client, (int) $prompt->getId());
+        }
+    }
+
+    private function postPromptUpdate(KernelBrowser $client, string $token, string $topic): void
+    {
+        $client->request(
+            'POST',
+            '/api.php?action=promptUpdate',
+            [],
+            [],
+            ['CONTENT_TYPE' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer '.$token],
+            (string) json_encode(['topic' => $topic, 'tool_files' => true])
+        );
+    }
+
+    private function storePrompt(KernelBrowser $client, int $ownerId): Prompt
+    {
+        $prompt = new Prompt();
+        $prompt->setOwnerId($ownerId);
+        $prompt->setLanguage('en');
+        $prompt->setTopic('legacy-'.bin2hex(random_bytes(6)));
+        $prompt->setShortDescription('Legacy API test prompt');
+        $prompt->setPrompt('You are a test prompt.');
+        $em = $client->getContainer()->get(EntityManagerInterface::class);
+        $em->persist($prompt);
+        $em->flush();
+
+        return $prompt;
+    }
+
+    private function removePrompt(KernelBrowser $client, int $promptId): void
+    {
+        $em = $client->getContainer()->get(EntityManagerInterface::class);
+        foreach ($client->getContainer()->get(PromptMetaRepository::class)->findByPrompt($promptId) as $meta) {
+            $em->remove($meta);
+        }
+        $stored = $em->find(Prompt::class, $promptId);
+        if ($stored instanceof Prompt) {
+            $em->remove($stored);
+        }
+        $em->flush();
     }
 
     public function testSendEmailIsGone(): void
