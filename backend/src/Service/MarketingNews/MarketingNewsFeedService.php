@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\MarketingNews;
 
+use App\Service\Security\GuardedHttpFetch;
+use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -24,12 +26,16 @@ final readonly class MarketingNewsFeedService
     private const MAX_IMAGE_BYTES = 10485760; // 10 MB
     private const IMAGE_PROXY_PATH = '/api/v1/news/image';
 
+    /** Redirects followed for the feed. An image is never followed: only its first host is on the allow-list. */
+    private const FEED_MAX_REDIRECTS = 3;
+
     public function __construct(
         private MarketingNewsConfig $config,
         private HttpClientInterface $httpClient,
         private CacheInterface $cache,
         private RssFeedParser $parser,
         private LoggerInterface $logger,
+        private SsrfGuard $ssrfGuard,
     ) {
     }
 
@@ -89,13 +95,13 @@ final readonly class MarketingNewsFeedService
         }
 
         try {
-            $response = $this->httpClient->request('GET', $url, [
+            $response = $this->guardedFetch()->request('GET', $url, [
                 'headers' => [
                     'Accept' => 'image/*',
                     'User-Agent' => 'Synaplan/1.0 (+https://www.synaplan.com)',
                 ],
                 'timeout' => self::FETCH_TIMEOUT_SECONDS,
-            ]);
+            ], 0);
 
             if ($response->getStatusCode() >= 400) {
                 return null;
@@ -144,13 +150,13 @@ final readonly class MarketingNewsFeedService
     private function fetchAndParse(string $feedUrl): array
     {
         try {
-            $response = $this->httpClient->request('GET', $feedUrl, [
+            $response = $this->guardedFetch()->request('GET', $feedUrl, [
                 'headers' => [
                     'Accept' => 'application/rss+xml, application/xml, text/xml, */*',
                     'User-Agent' => 'Synaplan/1.0 (+https://www.synaplan.com)',
                 ],
                 'timeout' => self::FETCH_TIMEOUT_SECONDS,
-            ]);
+            ], self::FEED_MAX_REDIRECTS);
 
             if ($response->getStatusCode() >= 400) {
                 return [];
@@ -165,5 +171,13 @@ final readonly class MarketingNewsFeedService
 
             return [];
         }
+    }
+
+    /**
+     * Every address, the first and each redirect target, has to be public.
+     */
+    private function guardedFetch(): GuardedHttpFetch
+    {
+        return new GuardedHttpFetch($this->httpClient, $this->ssrfGuard);
     }
 }

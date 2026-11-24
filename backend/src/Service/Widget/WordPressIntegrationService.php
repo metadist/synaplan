@@ -373,15 +373,19 @@ final readonly class WordPressIntegrationService
 
     private function verifyWordPressSite(string $verificationUrl, string $token): void
     {
-        if ((new SsrfGuard())->isBlockedUrl($verificationUrl) || !$this->isPlainHttpsUrl($verificationUrl)) {
+        $ssrfGuard = new SsrfGuard();
+        if ($ssrfGuard->isBlockedUrl($verificationUrl) || !$this->isPlainHttpsUrl($verificationUrl)) {
             throw new \RuntimeException('WordPress site verification failed');
         }
 
         try {
-            $response = $this->httpClient->request('POST', $verificationUrl, [
+            // Only the checked address is contacted: the connection is pinned
+            // to what the guard resolved, and a redirect is not followed.
+            $response = $this->httpClient->request('POST', $verificationUrl, $ssrfGuard->pinnedResolveOption($verificationUrl) + [
                 'body' => ['token' => $token],
                 'headers' => ['Accept' => 'application/json'],
                 'timeout' => 10,
+                'max_redirects' => 0,
             ]);
             $status = $response->getStatusCode();
             $data = $response->toArray(false);

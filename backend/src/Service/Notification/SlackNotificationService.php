@@ -296,6 +296,9 @@ final readonly class SlackNotificationService
             $response = $this->httpClient->request('POST', $webhookUrl, [
                 'json' => $payload,
                 'timeout' => self::HTTP_TIMEOUT_SECONDS,
+                // The address is checked against hooks.slack.com; a redirect
+                // would send the payload somewhere that check never saw.
+                'max_redirects' => 0,
             ]);
 
             $status = $response->getStatusCode();

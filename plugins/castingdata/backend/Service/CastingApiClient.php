@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Plugin\CastingData\Service;
 
 use App\Service\PluginDataService;
+use App\Service\Security\GuardedHttpFetch;
+use App\Service\Security\SsrfGuard;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -23,12 +25,24 @@ final readonly class CastingApiClient
 {
     private const PLUGIN_NAME = 'castingdata';
     private const TIMEOUT = 8;
+    private const MAX_REDIRECTS = 3;
 
     public function __construct(
         private HttpClientInterface $httpClient,
         private PluginDataService $pluginData,
         private LoggerInterface $logger,
+        private SsrfGuard $ssrfGuard,
     ) {
+    }
+
+    /**
+     * The API address is typed by the account owner. Every address, the
+     * first and each redirect target, has to be public, and the API key is
+     * not sent on to another origin.
+     */
+    private function guardedFetch(): GuardedHttpFetch
+    {
+        return new GuardedHttpFetch($this->httpClient, $this->ssrfGuard);
     }
 
     /**
@@ -99,14 +113,14 @@ final readonly class CastingApiClient
         $url = rtrim($config['api_url'], '/').'/api/v1/productions';
 
         try {
-            $response = $this->httpClient->request('GET', $url, [
+            $response = $this->guardedFetch()->request('GET', $url, [
                 'query' => ['limit' => 1],
                 'headers' => [
                     'Authorization' => 'Bearer '.$config['api_key'],
                     'Accept' => 'application/json',
                 ],
                 'timeout' => self::TIMEOUT,
-            ]);
+            ], self::MAX_REDIRECTS);
 
             return $response->getStatusCode() < 400;
         } catch (\Throwable $e) {
@@ -150,14 +164,14 @@ final readonly class CastingApiClient
         $url = $baseUrl.$path;
 
         try {
-            $response = $this->httpClient->request($method, $url, [
+            $response = $this->guardedFetch()->request($method, $url, [
                 'query' => $queryParams,
                 'headers' => [
                     'Authorization' => 'Bearer '.$config['api_key'],
                     'Accept' => 'application/json',
                 ],
                 'timeout' => self::TIMEOUT,
-            ]);
+            ], self::MAX_REDIRECTS);
 
             $statusCode = $response->getStatusCode();
 

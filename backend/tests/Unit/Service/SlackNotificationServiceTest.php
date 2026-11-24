@@ -274,4 +274,22 @@ final class SlackNotificationServiceTest extends TestCase
 
         return $session;
     }
+
+    public function testTheWebhookRequestDoesNotFollowRedirects(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+
+        $this->httpClient
+            ->expects($this->once())
+            ->method('request')
+            ->with(
+                'POST',
+                'https://hooks.slack.com/services/T/B/secret',
+                $this->callback(static fn (array $options): bool => 0 === ($options['max_redirects'] ?? null)),
+            )
+            ->willReturn($response);
+
+        self::assertTrue($this->service->sendTestMessage('https://hooks.slack.com/services/T/B/secret', 'Acme Support'));
+    }
 }
