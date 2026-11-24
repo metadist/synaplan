@@ -63,10 +63,16 @@ final readonly class StreamCaller
 
     /**
      * A person attaches the files they own. A widget visitor streams as the
-     * widget owner and attaches only what their own session uploaded.
+     * widget owner and attaches only what their own session uploaded. A guest
+     * shares one processing user with every other guest, so ownership proves
+     * nothing here: StreamAttachmentGate decides from the session's chat.
      */
     public function mayAttach(File $file): bool
     {
+        if (null !== $this->guestSession) {
+            return false;
+        }
+
         if (null !== $this->widgetSession) {
             return null !== $this->widgetSession->getId() && $file->getUserSessionId() === $this->widgetSession->getId();
         }

@@ -31,6 +31,7 @@ final readonly class StreamTurnPreparer
         private StreamMessageMeta $meta,
         private LoggerInterface $logger,
         private ProjectChatScope $projects,
+        private StreamAttachmentGate $attachments,
     ) {
     }
 
@@ -244,7 +245,8 @@ final readonly class StreamTurnPreparer
 
     /**
      * Files of any status (uploaded, extracted, vectorized) the caller may
-     * attach: a person's own, a widget visitor's session uploads.
+     * attach: a person's own, a widget visitor's session uploads, a guest's
+     * only from the chat of their session.
      * A persisted message is flushed and reloaded so its file collection is
      * fresh — refresh() is not reliable for collections.
      */
@@ -254,19 +256,26 @@ final readonly class StreamTurnPreparer
         $fileCount = 0;
         foreach ($turn->input->fileIds as $fileId) {
             $file = $this->em->getRepository(File::class)->find($fileId);
-            if ($file && $turn->caller->mayAttach($file)) {
-                $incoming->addFile($file);
-                $file->keepAfterChatSend($turn->incognito);
-                ++$fileCount;
-
-                $this->logger->info('StreamController: File attached to message', [
-                    'message_id' => $incoming->getId(),
+            if (!$file || !$this->attachments->allows($turn->caller, $file)) {
+                $this->logger->warning('Stream: file id is not available to the caller, not attached', [
                     'file_id' => $fileId,
-                    'file_path' => $file->getFilePath(),
-                    'file_type' => $file->getFileType(),
-                    'file_status' => $file->getStatus(),
+                    'guest' => $turn->caller->isGuest(),
+                    'widget' => $turn->caller->isWidget(),
                 ]);
+                continue;
             }
+
+            $incoming->addFile($file);
+            $file->keepAfterChatSend($turn->incognito);
+            ++$fileCount;
+
+            $this->logger->info('StreamController: File attached to message', [
+                'message_id' => $incoming->getId(),
+                'file_id' => $fileId,
+                'file_path' => $file->getFilePath(),
+                'file_type' => $file->getFileType(),
+                'file_status' => $file->getStatus(),
+            ]);
         }
 
         if (0 === $fileCount) {

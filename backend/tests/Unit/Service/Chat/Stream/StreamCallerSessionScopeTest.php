@@ -64,6 +64,13 @@ final class StreamCallerSessionScopeTest extends TestCase
         );
     }
 
+    public function testAGuestProvesNothingByOwningTheSharedProcessingUser(): void
+    {
+        $guest = new StreamCaller($this->owner(), 'en', guestSession: (new GuestSession())->setChatId(12));
+
+        self::assertFalse($guest->mayAttach($this->file(userId: self::OWNER_ID, sessionId: null)));
+    }
+
     private function owner(): User
     {
         $owner = $this->createStub(User::class);

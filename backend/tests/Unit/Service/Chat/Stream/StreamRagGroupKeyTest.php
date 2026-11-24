@@ -8,7 +8,9 @@ use App\Entity\Chat;
 use App\Entity\Project;
 use App\Entity\User;
 use App\Entity\WidgetSession;
+use App\Repository\MessageRepository;
 use App\Repository\ProjectRepository;
+use App\Service\Chat\Stream\StreamAttachmentGate;
 use App\Service\Chat\Stream\StreamCaller;
 use App\Service\Chat\Stream\StreamMessageMeta;
 use App\Service\Chat\Stream\StreamTurnOptions;
@@ -105,6 +107,7 @@ final class StreamRagGroupKeyTest extends TestCase
             new StreamMessageMeta(new NullLogger()),
             new NullLogger(),
             new ProjectChatScope($config, $repo),
+            new StreamAttachmentGate($this->createStub(MessageRepository::class)),
         );
 
         $state = new StreamTurnState($turn, new PerfTimer(), ['id' => null, 'name' => null, 'provider' => null]);
