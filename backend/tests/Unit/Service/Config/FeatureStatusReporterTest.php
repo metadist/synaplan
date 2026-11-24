@@ -166,6 +166,31 @@ final class FeatureStatusReporterTest extends TestCase
         self::assertFalse($feature['enabled']);
     }
 
+    public function testARecoveredQdrantIsReportedHealthy(): void
+    {
+        $client = $this->createStub(QdrantClientInterface::class);
+        $client->method('refreshHealth')->willReturn(true);
+        $client->method('getHealthDetails')->willReturn([
+            'version' => '1.15.0',
+            'qdrant' => ['collections_count' => 2],
+        ]);
+        $memory = $this->createStub(UserMemoryService::class);
+        $memory->method('isAvailable')->willReturn(false);
+        $memory->method('getQdrantClient')->willReturn($client);
+
+        $reporter = $this->bareReporter($memory);
+        $this->setEnv('QDRANT_URL', 'http://qdrant:6333');
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $feature = $reporter->build($user)['features']['memory-service'];
+
+        self::assertTrue($feature['enabled']);
+        self::assertSame('healthy', $feature['status']);
+        self::assertSame('Qdrant is connected and ready', $feature['message']);
+        self::assertFalse($feature['setup_required']);
+        self::assertSame('1.15.0', $feature['version']);
+    }
+
     private function bareReporter(?UserMemoryService $memory = null): FeatureStatusReporter
     {
         $this->setEnv('APP_ENV', 'test');

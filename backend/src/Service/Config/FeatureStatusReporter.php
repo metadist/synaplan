@@ -363,6 +363,12 @@ final class FeatureStatusReporter
         $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
         $configured = !empty($qdrantUrl) && 'http://' !== $qdrantUrl && 'https://' !== $qdrantUrl;
         $available = $this->memoryService->isAvailable();
+        $client = null;
+        // A cached outage must not hide a Qdrant that answers the fresh probe.
+        if ($configured && !$available) {
+            $client = $this->memoryService->getQdrantClient();
+            $available = $client->refreshHealth();
+        }
         $message = '';
         $warnings = [];
         $version = 'unknown';
@@ -370,7 +376,7 @@ final class FeatureStatusReporter
 
         if ($available) {
             try {
-                $healthDetails = $this->memoryService->getQdrantClient()->getHealthDetails();
+                $healthDetails = ($client ?? $this->memoryService->getQdrantClient())->getHealthDetails();
                 $version = $healthDetails['version'] ?? 'unknown';
                 $stats = $healthDetails['qdrant'] ?? [];
                 $message = 'Qdrant is connected and ready';
@@ -381,9 +387,8 @@ final class FeatureStatusReporter
         } elseif (!$configured) {
             $message = 'Qdrant URL not configured';
         } else {
-            $client = $this->memoryService->getQdrantClient();
-            $client->refreshHealth();
-            $message = $client->unavailableReason() ?? 'Qdrant not reachable at configured URL';
+            $message = ($client ?? $this->memoryService->getQdrantClient())->unavailableReason()
+                ?? 'Qdrant not reachable at configured URL';
         }
 
         return [

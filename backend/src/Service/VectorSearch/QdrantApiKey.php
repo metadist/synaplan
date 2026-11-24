@@ -93,7 +93,7 @@ final readonly class QdrantApiKey
     {
         $detail = trim($body);
         $key = $this->normalized();
-        if (strlen($key) >= 8) {
+        if ('' !== $key) {
             $detail = str_replace($key, '[redacted]', $detail);
         }
         if (strlen($detail) > 180) {

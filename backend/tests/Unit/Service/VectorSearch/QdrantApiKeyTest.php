@@ -40,6 +40,9 @@ final class QdrantApiKeyTest extends TestCase
         self::assertStringContainsString('HTTP 403', $forbidden);
         self::assertStringNotContainsString('qdrant-test-key-not-for-logs', $forbidden);
         self::assertStringContainsString('[redacted]', $forbidden);
+        $short = (string) (new QdrantApiKey('zz'))->failureMessage(403, 'proxy echoed zz');
+        self::assertStringNotContainsString('zz', $short);
+        self::assertStringContainsString('[redacted]', $short);
         self::assertNull($key->failureMessage(500));
         self::assertSame($key->failureMessage(401), $key->messageForProbe(QdrantApiKey::PROBE_UNAUTHORIZED));
         self::assertNull($key->messageForProbe(QdrantApiKey::PROBE_DOWN));
