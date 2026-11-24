@@ -64,6 +64,9 @@
         <env name="SIGNUP_GLOBAL_LIMIT" value="100000" force="true" />
         <env name="CHECKOUT_IP_LIMIT" value="100000" force="true" />
         <env name="PAID_SIGNUP_ALERT_LIMIT" value="100000" force="true" />
+        <!-- PasswordResetControllerTest counts up to the shipped limits; the dev stack's raised limit must not win. -->
+        <env name="PASSWORD_RESET_IP_LIMIT" value="10" force="true" />
+        <env name="PASSWORD_RESET_ADDRESS_LIMIT" value="3" force="true" />
         <env name="TURNSTILE_SECRET_KEY" value="" force="true" />
         <env name="TURNSTILE_SITE_KEY" value="" force="true" />
         <env name="SIGNUP_PAUSED" value="" force="true" />
