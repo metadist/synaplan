@@ -368,6 +368,22 @@ final readonly class InternalEmailService
     }
 
     /**
+     * One line above an "Email to me" result, in the account language.
+     * Approval, expiry and digest mail stay unmarked: those are not an agent result.
+     */
+    public function withAutomaticAgentNotice(string $markdown, ?string $locale): string
+    {
+        $notice = $this->translator->trans(
+            'email.task_result.automatic_notice',
+            [],
+            'emails',
+            (null !== $locale && '' !== trim($locale)) ? $locale : 'en',
+        );
+
+        return $notice."\n\n".$markdown;
+    }
+
+    /**
      * Which tool is waiting, and where to decide. The request body is never included.
      */
     public function sendApprovalRequestEmail(string $to, string $toolName, string $inboxUrl): void

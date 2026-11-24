@@ -232,6 +232,22 @@ class InternalEmailServiceTest extends TestCase
         self::assertNotNull($captured);
         self::assertCount(0, $captured->getAttachments());
         self::assertStringNotContainsString('cid:generated-image', (string) $captured->getHtmlBody());
+        self::assertStringNotContainsString('automatic_notice', (string) $captured->getTextBody());
+    }
+
+    public function testAutomaticAgentNoticeSitsAboveTheResult(): void
+    {
+        $captured = null;
+        $service = $this->taskResultService($captured);
+        $service->sendTaskResultEmail(
+            'owner@example.com',
+            'Your results',
+            $service->withAutomaticAgentNotice('Just the poem.', 'de'),
+        );
+
+        self::assertNotNull($captured);
+        self::assertStringStartsWith("email.task_result.automatic_notice\n\nJust the poem.", (string) $captured->getTextBody());
+        self::assertStringContainsString('email.task_result.automatic_notice', (string) $captured->getHtmlBody());
     }
 
     public function testTaskResultEmailSkipsMissingFiles(): void

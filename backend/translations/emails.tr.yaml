@@ -33,6 +33,7 @@ email:
     subject: 'Synaplan sonuçlarınız'
     subject_named: '%name% — Synaplan sonuçlarınız'
     sent_confirmation: 'Sonuçlar %email% adresine e-postayla gönderildi.'
+    automatic_notice: 'Bu, ajanınızın otomatik bir e-postasıdır.'
 
   cloud_grant:
     connected:

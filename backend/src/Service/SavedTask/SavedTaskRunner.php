@@ -580,7 +580,11 @@ final readonly class SavedTaskRunner
         }
 
         try {
-            $this->mail->sendTaskResultEmail($address, $task->getName(), $content);
+            $this->mail->sendTaskResultEmail(
+                $address,
+                $task->getName(),
+                $this->mail->withAutomaticAgentNotice($content, $user->getLocale()),
+            );
         } catch (\Throwable $e) {
             $this->logger->warning('SavedTaskRunner: result mail failed', [
                 'task_id' => $task->getId(),

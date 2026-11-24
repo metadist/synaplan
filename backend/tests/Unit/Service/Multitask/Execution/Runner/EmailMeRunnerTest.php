@@ -41,6 +41,9 @@ final class EmailMeRunnerTest extends TestCase
         $this->uploadDir = sys_get_temp_dir().'/emailme_test_'.uniqid();
         mkdir($this->uploadDir.'/1/000', 0777, true);
         $this->emailService = $this->createMock(InternalEmailService::class);
+        $this->emailService->method('withAutomaticAgentNotice')->willReturnCallback(
+            static fn (string $markdown): string => "This is an automatic email from your agent.\n\n".$markdown,
+        );
     }
 
     protected function tearDown(): void
@@ -142,7 +145,7 @@ final class EmailMeRunnerTest extends TestCase
             ->with(
                 'alice@example.com',
                 'Your Synaplan results',
-                'THE POEM',
+                "This is an automatic email from your agent.\n\nTHE POEM",
                 [
                     ['path' => realpath($mp3), 'type' => 'audio'],
                     ['path' => realpath($png), 'type' => 'image'],
@@ -172,7 +175,7 @@ final class EmailMeRunnerTest extends TestCase
 
         $this->emailService->expects(self::once())
             ->method('sendTaskResultEmail')
-            ->with('alice@example.com', 'MIME walk result', 'THE POEM', []);
+            ->with('alice@example.com', 'MIME walk result', "This is an automatic email from your agent.\n\nTHE POEM", []);
 
         $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text'], [
             'subject' => 'MIME walk result',
@@ -189,7 +192,7 @@ final class EmailMeRunnerTest extends TestCase
 
         $this->emailService->expects(self::once())
             ->method('sendTaskResultEmail')
-            ->with('alice@example.com', 'Daily digest — Your Synaplan results', 'THE POEM', []);
+            ->with('alice@example.com', 'Daily digest — Your Synaplan results', "This is an automatic email from your agent.\n\nTHE POEM", []);
 
         $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text']);
         $result = $this->runner($this->user())->run($node, $ctx);
@@ -204,7 +207,7 @@ final class EmailMeRunnerTest extends TestCase
 
         $this->emailService->expects(self::once())
             ->method('sendTaskResultEmail')
-            ->with('alice@example.com', 'MIME walk result extra', 'THE POEM', []);
+            ->with('alice@example.com', 'MIME walk result extra', "This is an automatic email from your agent.\n\nTHE POEM", []);
 
         $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text'], [
             'subject' => "MIME walk result\r\n extra",
@@ -221,7 +224,7 @@ final class EmailMeRunnerTest extends TestCase
 
         $this->emailService->expects(self::once())
             ->method('sendTaskResultEmail')
-            ->with('alice@example.com', 'Daily digest — Your Synaplan results', 'THE POEM', []);
+            ->with('alice@example.com', 'Daily digest — Your Synaplan results', "This is an automatic email from your agent.\n\nTHE POEM", []);
 
         $node = new TaskNode('n4', Capability::EmailMe, ['n1'], ['text' => '$n1.text']);
         $result = $this->runner($this->user())->run($node, $ctx);
