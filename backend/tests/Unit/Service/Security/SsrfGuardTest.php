@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Security;
 
+use App\Service\Security\BlockedAddressException;
+use App\Service\Security\HostResolver;
 use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -106,12 +108,58 @@ final class SsrfGuardTest extends TestCase
         self::assertSame([], $this->guard->pinnedIps('localhost'));
     }
 
-    public function testPinnedResolveOptionLeavesLiteralIpsAndUnusableHostsAlone(): void
+    public function testPinnedResolveOptionLeavesLiteralIpsAlone(): void
     {
         self::assertSame([], $this->guard->pinnedResolveOption('https://8.8.8.8/page'));
         self::assertSame([], $this->guard->pinnedResolveOption('https://[2001:4860:4860::8888]/page'));
-        self::assertSame([], $this->guard->pinnedResolveOption('https://localhost/page'));
         self::assertSame([], $this->guard->pinnedResolveOption('not a url'));
+    }
+
+    #[DataProvider('namesWithoutAPublicAddress')]
+    public function testPinnedResolveOptionRefusesANameItCannotPin(string $url): void
+    {
+        $this->expectException(BlockedAddressException::class);
+
+        $this->guard->pinnedResolveOption($url);
+    }
+
+    /** @return iterable<string, array{string}> */
+    public static function namesWithoutAPublicAddress(): iterable
+    {
+        yield 'resolves to loopback' => ['https://localhost/page'];
+        yield 'does not resolve' => ['https://no-such-host.invalid/page'];
+    }
+
+    public function testANameThatStopsResolvingAfterTheCheckIsNotSentUnpinned(): void
+    {
+        $resolver = new class implements HostResolver {
+            private int $lookups = 0;
+
+            public function addresses(string $host): array
+            {
+                return 1 === ++$this->lookups ? ['93.184.216.34'] : [];
+            }
+        };
+        $guard = new SsrfGuard($resolver);
+
+        self::assertFalse($guard->isBlockedUrl('https://rebind.example/page'));
+        $this->expectException(BlockedAddressException::class);
+        $guard->pinnedResolveOption('https://rebind.example/page');
+    }
+
+    public function testThePinCoversTheHostAsWrittenAndAsTheClientSendsIt(): void
+    {
+        $guard = new SsrfGuard(new class implements HostResolver {
+            public function addresses(string $host): array
+            {
+                return ['93.184.216.34'];
+            }
+        });
+
+        self::assertSame(
+            ['resolve' => ['Bücher.Example' => '93.184.216.34', 'xn--bcher-kva.example' => '93.184.216.34']],
+            $guard->pinnedResolveOption('https://Bücher.Example/page'),
+        );
     }
 
     /**
@@ -221,7 +269,6 @@ final class SsrfGuardTest extends TestCase
         self::assertTrue($this->guard->isBlockedHost('no-such-host.invalid', allowOperatorNetwork: true));
         self::assertTrue($this->guard->isBlockedUrl('https://no-such-host.invalid/page'));
         self::assertSame([], $this->guard->pinnedIps('no-such-host.invalid'));
-        self::assertSame([], $this->guard->pinnedResolveOption('https://no-such-host.invalid/page'));
     }
 
     public function testNat64LiteralFollowsTheEmbeddedIpv4Address(): void

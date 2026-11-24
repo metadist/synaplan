@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Research\Run\Source;
 
 use App\Service\Research\Run\Source\GuardedDocumentDownload;
+use App\Service\Security\BlockedAddressException;
 use App\Service\Security\SsrfGuard;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\Exception\TimeoutException;
@@ -253,6 +254,20 @@ final class GuardedDocumentDownloadTest extends TestCase
         $result = $download->fetch('https://example.com/report.pdf', 'pdf');
 
         self::assertSame('timeout', $result->reason);
+    }
+
+    public function testANameTheGuardCannotPinIsNotRequested(): void
+    {
+        $guard = $this->createMock(SsrfGuard::class);
+        $guard->method('isBlockedUrl')->willReturn(false);
+        $guard->method('pinnedResolveOption')->willThrowException(new BlockedAddressException());
+        $client = new MockHttpClient(static function (): never {
+            self::fail('No request may be sent without a pinned address.');
+        });
+
+        $result = (new GuardedDocumentDownload($client, $guard))->fetch('https://rebind.example/file.pdf', 'pdf');
+
+        self::assertSame('blocked_address', $result->reason);
     }
 
     private function download(HttpClientInterface $client, bool $blocked): GuardedDocumentDownload

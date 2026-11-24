@@ -164,10 +164,16 @@ final readonly class SsrfGuard
      * HTTP client `resolve` option that connects a hostname to the public
      * address this guard accepted. Without it the client resolves the name a
      * second time, and a rebinding DNS answer could point it somewhere
-     * private. A literal IP needs no pin. A name without a public answer
-     * gets none either; {@see isBlockedUrl} has already refused it.
+     * private. A literal IP needs no pin.
+     *
+     * A name without a public answer at this moment is refused: sending the
+     * request unpinned would leave the choice of address to the next lookup.
+     * The pin is set for the host as written and for the form the HTTP client
+     * turns it into, so neither spelling is resolved again.
      *
      * @return array{resolve?: array<string, string>}
+     *
+     * @throws BlockedAddressException when the name has no public address
      */
     public function pinnedResolveOption(string $url): array
     {
@@ -176,8 +182,11 @@ final readonly class SsrfGuard
             return [];
         }
         $pinned = $this->pinnedIps($host);
+        if ([] === $pinned) {
+            throw new BlockedAddressException();
+        }
 
-        return [] === $pinned ? [] : ['resolve' => [$host => $pinned[0]]];
+        return ['resolve' => [$host => $pinned[0], $this->canonicalHost($host) => $pinned[0]]];
     }
 
     /**

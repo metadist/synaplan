@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Research\Run\Source;
 
+use App\Service\Security\BlockedAddressException;
 use App\Service\Security\SsrfGuard;
 use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\HttpClient\Exception\TimeoutException;
@@ -54,6 +55,8 @@ final readonly class GuardedDocumentDownload implements DocumentFetcher
             try {
                 $response = $this->request($current, $remaining);
                 $status = $response->getStatusCode();
+            } catch (BlockedAddressException) {
+                return DownloadedDocument::blocked('blocked_address');
             } catch (TimeoutException) {
                 return DownloadedDocument::blocked('timeout');
             } catch (TransportExceptionInterface) {
