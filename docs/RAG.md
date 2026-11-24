@@ -121,6 +121,8 @@ RAG_DEFAULT_LIMIT=10
 
 # Optional Qdrant URL (started automatically by docker-compose.yml)
 QDRANT_URL=http://qdrant:6333
+# Same value as QDRANT__SERVICE__API_KEY when Qdrant requires authentication.
+QDRANT_API_KEY=
 ```
 
 ### HTTP API Endpoints

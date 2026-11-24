@@ -186,6 +186,7 @@ export const configApi = {
 const MemoryServiceCheckSchema = z.object({
   available: z.boolean(),
   configured: z.boolean(),
+  error: z.string().optional(),
 })
 
 export type MemoryServiceCheck = z.infer<typeof MemoryServiceCheckSchema>

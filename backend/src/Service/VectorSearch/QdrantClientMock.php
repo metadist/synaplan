@@ -305,6 +305,11 @@ final class QdrantClientMock implements QdrantClientInterface
         return false;
     }
 
+    public function unavailableReason(): ?string
+    {
+        return null;
+    }
+
     public function getCollectionInfo(): array
     {
         return ['status' => 'mock', 'points_count' => 0, 'vectors_count' => 0];

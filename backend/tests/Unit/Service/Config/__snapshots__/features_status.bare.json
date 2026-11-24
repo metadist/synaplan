@@ -126,6 +126,11 @@
                     "set": false,
                     "hint": "Internal Docker service URL",
                     "example": "http://qdrant:6333"
+                },
+                "QDRANT_API_KEY": {
+                    "required": false,
+                    "set": false,
+                    "hint": "Optional. Sent as the api-key header when Qdrant requires authentication"
                 }
             }
         },

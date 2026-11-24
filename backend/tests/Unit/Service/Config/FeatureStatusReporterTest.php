@@ -147,7 +147,26 @@ final class FeatureStatusReporterTest extends TestCase
         $this->assertSame(1, $features['ollama']['models_available']);
     }
 
-    private function bareReporter(): FeatureStatusReporter
+    public function testARejectedQdrantKeyIsNotReportedAsUnreachable(): void
+    {
+        $client = $this->createStub(QdrantClientInterface::class);
+        $client->method('refreshHealth')->willReturn(false);
+        $client->method('unavailableReason')->willReturn('Qdrant rejected the API key. Check that QDRANT_API_KEY matches the key configured on Qdrant.');
+        $memory = $this->createStub(UserMemoryService::class);
+        $memory->method('isAvailable')->willReturn(false);
+        $memory->method('getQdrantClient')->willReturn($client);
+
+        $reporter = $this->bareReporter($memory);
+        $this->setEnv('QDRANT_URL', 'http://qdrant:6333');
+        $user = $this->createStub(User::class);
+        $user->method('getId')->willReturn(7);
+        $feature = $reporter->build($user)['features']['memory-service'];
+
+        self::assertSame('Qdrant rejected the API key. Check that QDRANT_API_KEY matches the key configured on Qdrant.', $feature['message']);
+        self::assertFalse($feature['enabled']);
+    }
+
+    private function bareReporter(?UserMemoryService $memory = null): FeatureStatusReporter
     {
         $this->setEnv('APP_ENV', 'test');
         $this->setEnv('BRAVE_SEARCH_API_KEY', '');
@@ -160,6 +179,7 @@ final class FeatureStatusReporterTest extends TestCase
         $this->setEnv('DOCLING_BASE_URL', '');
         $this->setEnv('OFFICE_CONVERT_URL', 'disabled');
         $this->setEnv('QDRANT_URL', '');
+        $this->setEnv('QDRANT_API_KEY', '');
         $this->setEnv('REDIS_DSN', '');
         $this->setEnv('REALTIME_ENABLED', 'false');
         $this->setEnv('REALTIME_API_URL', '');
@@ -185,8 +205,10 @@ final class FeatureStatusReporterTest extends TestCase
         $whisper->method('isAvailable')->willReturn(false);
         $whisper->method('getAvailableModels')->willReturn([]);
 
-        $memory = $this->createStub(UserMemoryService::class);
-        $memory->method('isAvailable')->willReturn(false);
+        if (null === $memory) {
+            $memory = $this->createStub(UserMemoryService::class);
+            $memory->method('isAvailable')->willReturn(false);
+        }
 
         $redis = $this->createStub(RedisService::class);
         $redis->method('ping')->willReturn(false);
@@ -212,6 +234,7 @@ final class FeatureStatusReporterTest extends TestCase
         $this->setEnv('DOCLING_BASE_URL', ' http://docling:5001/ ');
         $this->setEnv('OFFICE_CONVERT_URL', ' http://collabora:9980 ');
         $this->setEnv('QDRANT_URL', 'http://qdrant:6333');
+        $this->setEnv('QDRANT_API_KEY', '');
         $this->setEnv('REDIS_DSN', 'redis://user:pass@redis:6379');
         $this->setEnv('REALTIME_ENABLED', 'true');
         $this->setEnv('REALTIME_API_URL', 'http://centrifugo:8000/api/');

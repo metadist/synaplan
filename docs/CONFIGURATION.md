@@ -814,7 +814,7 @@ See [Email Integration Guide](EMAIL.md) for full setup.
 Qdrant is included in `docker-compose.yml` and starts automatically with Synaplan.
 It powers AI memories (user profiling) and RAG document vector search.
 
-Qdrant runs as an internal Docker service — no configuration needed beyond the default `QDRANT_URL=http://qdrant:6333` in `backend/.env`.
+Qdrant runs as an internal Docker service. The default `QDRANT_URL=http://qdrant:6333` in `backend/.env` is enough when Qdrant has no authentication. Set `QDRANT_API_KEY` to the same value as `QDRANT__SERVICE__API_KEY` on the Qdrant process (required for Qdrant Cloud). The key is sent as the `api-key` header. Leave it empty and no credential is sent.
 
 The documents collection gets a full-text index on each chunk's text the first time it is used. Knowledge search on Qdrant then matches keywords and meaning, with the same owner scopes. A MariaDB vector store stays meaning-only; the vector storage screen says so.
 

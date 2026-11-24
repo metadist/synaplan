@@ -44,6 +44,7 @@
         <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />
         <!-- Qdrant (defaults for testing — empty = disabled) -->
         <env name="QDRANT_URL" value="" force="true" />
+        <env name="QDRANT_API_KEY" value="" force="true" />
         <!-- Compose wires the compute sidecar and pins the feature on; CI has neither.
              Empty FEATURE_* means "not pinned", so BCONFIG decides as in CI. -->
         <env name="COMPUTE_URL" value="" force="true" />

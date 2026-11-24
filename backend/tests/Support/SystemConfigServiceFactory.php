@@ -60,6 +60,7 @@ final class SystemConfigServiceFactory
      *     layeredConfigResolver?: ?LayeredConfigResolver,
      *     computeClient?: ?ComputeClient,
      *     chatArtifactsConfig?: ?ChatArtifactsConfig,
+     *     http?: \Symfony\Contracts\HttpClient\HttpClientInterface,
      * } $doubles
      */
     public static function build(array $doubles): SystemConfigService
@@ -93,7 +94,7 @@ final class SystemConfigServiceFactory
                 $doubles['layeredConfigResolver'] ?? null,
             ),
             env: $env,
-            http: new \Symfony\Component\HttpClient\MockHttpClient(),
+            http: $doubles['http'] ?? new \Symfony\Component\HttpClient\MockHttpClient(),
             logger: $logger,
             defaultTtsUrl: self::TTS_URL,
         );

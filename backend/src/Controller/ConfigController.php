@@ -71,6 +71,12 @@ final class ConfigController extends AbstractController
             properties: [
                 new OA\Property(property: 'available', type: 'boolean', example: true),
                 new OA\Property(property: 'configured', type: 'boolean', example: true),
+                new OA\Property(
+                    property: 'error',
+                    type: 'string',
+                    example: 'Qdrant rejected the API key. Check that QDRANT_API_KEY matches the key configured on Qdrant.',
+                    description: 'Present when Qdrant is configured but rejected the API key (missing or wrong). Omitted when the service is up, or simply unreachable.',
+                ),
             ]
         )
     )]

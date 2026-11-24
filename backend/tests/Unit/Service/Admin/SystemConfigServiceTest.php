@@ -25,6 +25,8 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\ServiceLocator;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 /**
  * Focused tests for SystemConfigService's database-backed config writes —
@@ -540,6 +542,60 @@ final class SystemConfigServiceTest extends TestCase
         self::assertSame('processing', $schema['fields']['DOCLING_BASE_URL']['tab']);
         self::assertSame('url', $schema['fields']['DOCLING_BASE_URL']['type']);
         self::assertSame('docling', $schema['fields']['DOCLING_TIMEOUT_MS']['section']);
+    }
+
+    public function testQdrantApiKeyIsMaskedAndNeverReturned(): void
+    {
+        $this->configRepository->method('getValue')->willReturn(null);
+        $_ENV['QDRANT_API_KEY'] = 'super-secret-qdrant-key';
+        $_SERVER['QDRANT_API_KEY'] = 'super-secret-qdrant-key';
+
+        try {
+            $values = $this->service->getValues(null, ['QDRANT_API_KEY']);
+            $schema = $this->service->getSchema();
+
+            self::assertSame('password', $schema['fields']['QDRANT_API_KEY']['type']);
+            self::assertTrue($schema['fields']['QDRANT_API_KEY']['sensitive']);
+            self::assertTrue($values['QDRANT_API_KEY']['isMasked']);
+            self::assertTrue($values['QDRANT_API_KEY']['isSet']);
+            self::assertSame('••••••••', $values['QDRANT_API_KEY']['value']);
+            self::assertStringNotContainsString('super-secret-qdrant-key', (string) json_encode($values));
+        } finally {
+            unset($_ENV['QDRANT_API_KEY'], $_SERVER['QDRANT_API_KEY']);
+        }
+    }
+
+    public function testQdrantConnectionTestSendsTheApiKeyAndNamesARejection(): void
+    {
+        $seen = [];
+        $http = new MockHttpClient(function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen[] = [$url, $options['headers'] ?? []];
+            if (str_ends_with($url, '/healthz')) {
+                return new MockResponse('healthz check passed', ['http_code' => 200]);
+            }
+
+            return new MockResponse('Invalid API key or JWT', ['http_code' => 401]);
+        });
+        $service = SystemConfigServiceFactory::build([
+            'configRepository' => $this->configRepository,
+            'http' => $http,
+        ]);
+        $_ENV['QDRANT_URL'] = 'http://qdrant:6333';
+        $_ENV['QDRANT_API_KEY'] = 'super-secret-qdrant-key';
+
+        try {
+            $result = $service->testConnection('qdrant');
+        } finally {
+            unset($_ENV['QDRANT_URL'], $_ENV['QDRANT_API_KEY']);
+        }
+
+        self::assertFalse($result['success']);
+        self::assertStringContainsString('rejected the API key', $result['message']);
+        self::assertStringNotContainsString('super-secret-qdrant-key', $result['message']);
+        self::assertCount(2, $seen);
+        $flat = (string) json_encode($seen);
+        self::assertStringContainsString('api-key', $flat);
+        self::assertStringContainsString('super-secret-qdrant-key', $flat);
     }
 
     public function testDoclingConnectionTestFailsWhenUrlIsEmpty(): void

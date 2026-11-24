@@ -56,6 +56,7 @@ x-app-environment: &app-environment
   REALTIME_API_URL: ""
   REALTIME_PUBLIC_WS_URL: ""
   QDRANT_URL: ""
+  QDRANT_API_KEY: "${QDRANT_API_KEY:-}"
   TIKA_BASE_URL: http://tika:9998
   SYNAPLAN_TTS_URL: ""
   OLLAMA_BASE_URL: ""

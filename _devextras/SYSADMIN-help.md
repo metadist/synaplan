@@ -262,6 +262,7 @@ QDRANT_URL: http://qdrant:6333
 | Variable                      | Purpose                                                        |
 | ----------------------------- | -------------------------------------------------------------- |
 | `QDRANT_URL`                  | Qdrant REST API URL ([http://qdrant:6333](http://qdrant:6333)) |
+| `QDRANT_API_KEY`              | Optional API key, sent as the `api-key` header. Empty when Qdrant has no authentication. |
 | `QDRANT_MEMORIES_COLLECTION`  | Collection name (default: user_memories)                       |
 | `QDRANT_DOCUMENTS_COLLECTION` | Collection name (default: user_documents)                      |
 | `QDRANT_DIGESTS_COLLECTION`   | Collection name (default: user_message_digests)                |

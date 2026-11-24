@@ -39,7 +39,7 @@ final class QdrantClientDirectTest extends TestCase
      * @param array<string, callable():MockResponse>                                  $routes Map of path-suffix => responder callback
      * @param list<array{method: string, path: string, query: string, body: ?string}> $calls
      */
-    private function buildClient(array $routes, array &$calls = [], ?LoggerInterface $logger = null): QdrantClientDirect
+    private function buildClient(array $routes, array &$calls = [], ?LoggerInterface $logger = null, string $apiKey = ''): QdrantClientDirect
     {
         $factory = function (string $method, string $url, array $options) use ($routes, &$calls): MockResponse {
             $path = (string) (parse_url($url, \PHP_URL_PATH) ?? '');
@@ -60,6 +60,7 @@ final class QdrantClientDirectTest extends TestCase
             httpClient: new MockHttpClient($factory),
             qdrantUrl: self::QDRANT_URL,
             logger: $logger ?? new NullLogger(),
+            qdrantApiKey: $apiKey,
         );
     }
 
@@ -591,6 +592,7 @@ final class QdrantClientDirectTest extends TestCase
     {
         $client = $this->buildClient([
             '/healthz' => fn () => new MockResponse('', ['http_code' => 200]),
+            '/collections' => fn () => new MockResponse('{"result":{"collections":[]}}', ['http_code' => 200]),
         ]);
 
         $this->assertTrue($client->healthCheck());
@@ -683,7 +685,9 @@ final class QdrantClientDirectTest extends TestCase
         $this->assertFalse($client->isAvailable());
         $this->assertTrue($client->refreshHealth());
         $this->assertTrue($client->isAvailable(), 'the fresh result replaces the cached negative');
-        $this->assertSame(2, $attempts);
+        // First probe is healthz 503. The fresh probe is healthz 200 and then
+        // /collections, because healthz stays open when Qdrant requires a key.
+        $this->assertSame(3, $attempts);
     }
 
     public function testCollectionNameGettersExposeConfiguredNames(): void
@@ -883,6 +887,119 @@ final class QdrantClientDirectTest extends TestCase
 
         $this->assertSame([], $client->scrollMemories(1));
         $this->assertSame([['notice', 'Memories not yet created']], $logger->records);
+    }
+
+    public function testTheApiKeyIsSentOnMemoryWritesAndDocumentSearch(): void
+    {
+        $key = 'qdrant-test-key-not-for-logs';
+        $headers = [];
+        $client = $this->recordingClient($headers, $key, static fn (): MockResponse => new MockResponse(
+            (string) json_encode(['result' => ['points' => [], 'status' => 'green']]),
+            ['http_code' => 200],
+        ));
+
+        $client->searchDocuments([0.1], 7);
+        $client->upsertMemory('mem_1_1', [0.1], ['user_id' => 1]);
+
+        self::assertNotEmpty($headers);
+        foreach ($headers as $sent) {
+            self::assertSame($key, self::headerValue($sent, 'api-key'), 'every Qdrant request must carry the api-key header');
+        }
+    }
+
+    public function testAnEmptyApiKeyLeavesRequestsUnchanged(): void
+    {
+        $headers = [];
+        $client = $this->recordingClient($headers, '', static function (string $path): MockResponse {
+            if (str_ends_with($path, '/healthz') || '/collections' === $path) {
+                return new MockResponse('{"result":{"collections":[]}}', ['http_code' => 200]);
+            }
+
+            return new MockResponse('unexpected '.$path, ['http_code' => 500]);
+        });
+
+        self::assertTrue($client->healthCheck());
+        self::assertNull($client->unavailableReason());
+        self::assertNotEmpty($headers);
+        foreach ($headers as $sent) {
+            self::assertNull(self::headerValue($sent, 'api-key'));
+        }
+    }
+
+    public function testAWrongApiKeyIsAClearErrorAndTheKeyIsNotInTheMessage(): void
+    {
+        $key = 'qdrant-test-key-not-for-logs';
+        $headers = [];
+        $client = $this->recordingClient($headers, $key, static function (string $path): MockResponse {
+            if (str_ends_with($path, '/healthz')) {
+                return new MockResponse('healthz check passed', ['http_code' => 200]);
+            }
+
+            return new MockResponse('Invalid API key or JWT '.$path, ['http_code' => 401]);
+        });
+
+        self::assertFalse($client->healthCheck());
+        $reason = $client->unavailableReason();
+        self::assertIsString($reason);
+        self::assertStringContainsString('rejected the API key', $reason);
+        self::assertStringNotContainsString($key, $reason);
+        self::assertSame($key, self::headerValue($headers[0], 'api-key'));
+    }
+
+    public function testAMissingApiKeyAgainstAProtectedQdrantNamesTheSetting(): void
+    {
+        $headers = [];
+        $client = $this->recordingClient($headers, '', static function (string $path): MockResponse {
+            if (str_ends_with($path, '/healthz')) {
+                return new MockResponse('healthz check passed', ['http_code' => 200]);
+            }
+
+            return new MockResponse('Must provide an API key or an Authorization bearer token', ['http_code' => 401]);
+        });
+
+        self::assertFalse($client->healthCheck());
+        self::assertStringContainsString('Set QDRANT_API_KEY', (string) $client->unavailableReason());
+        self::assertNull(self::headerValue($headers[0], 'api-key'));
+    }
+
+    /**
+     * @param list<mixed>                   $headers
+     * @param callable(string):MockResponse $response
+     */
+    private function recordingClient(array &$headers, string $apiKey, callable $response): QdrantClientDirect
+    {
+        return new QdrantClientDirect(
+            httpClient: new MockHttpClient(function (string $method, string $url, array $options) use (&$headers, $response): MockResponse {
+                $headers[] = $options['headers'] ?? [];
+
+                return $response((string) (parse_url($url, \PHP_URL_PATH) ?? ''));
+            }),
+            qdrantUrl: self::QDRANT_URL,
+            logger: new NullLogger(),
+            qdrantApiKey: $apiKey,
+        );
+    }
+
+    private static function headerValue(mixed $headers, string $name): ?string
+    {
+        if (!is_array($headers)) {
+            return null;
+        }
+
+        $needle = strtolower($name);
+        foreach ($headers as $key => $value) {
+            if (is_string($key) && strtolower($key) === $needle) {
+                return is_array($value) ? (string) ($value[0] ?? '') : (string) $value;
+            }
+            if (is_int($key) && is_string($value)) {
+                $parts = explode(':', $value, 2);
+                if (2 === count($parts) && strtolower(trim($parts[0])) === $needle) {
+                    return trim($parts[1]);
+                }
+            }
+        }
+
+        return null;
     }
 }
 

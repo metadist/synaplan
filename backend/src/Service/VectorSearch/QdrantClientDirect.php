@@ -9,7 +9,6 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
-use Symfony\Contracts\HttpClient\Exception\TimeoutExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -33,9 +32,11 @@ final class QdrantClientDirect implements QdrantClientInterface
     /** Idle budget for healthz; must not trip on a busy but healthy Qdrant. */
     private const HEALTH_PROBE_TIMEOUT_SECONDS = 2.0;
 
-    private const PROBE_OK = 'ok';
-    private const PROBE_DOWN = 'down';
-    private const PROBE_TIMEOUT = 'timeout';
+    private const PROBE_OK = QdrantApiKey::PROBE_OK;
+    private const PROBE_DOWN = QdrantApiKey::PROBE_DOWN;
+    private const PROBE_TIMEOUT = QdrantApiKey::PROBE_TIMEOUT;
+    private const PROBE_UNAUTHORIZED = QdrantApiKey::PROBE_UNAUTHORIZED;
+    private const PROBE_FORBIDDEN = QdrantApiKey::PROBE_FORBIDDEN;
     private const DEFAULT_VECTOR_DIM = 1024;
     private const DEFAULT_MEMORIES_COLLECTION = 'user_memories';
     private const DEFAULT_DOCUMENTS_COLLECTION = 'user_documents';
@@ -47,6 +48,8 @@ final class QdrantClientDirect implements QdrantClientInterface
 
     /** @var array<string, bool> tracks which collections have been verified/created */
     private array $ensuredCollections = [];
+
+    private readonly QdrantRest $rest;
 
     private readonly string $memoriesCollection;
     private readonly string $documentsCollection;
@@ -64,7 +67,9 @@ final class QdrantClientDirect implements QdrantClientInterface
         private readonly int $vectorDimension = self::DEFAULT_VECTOR_DIM,
         ?string $digestsCollection = null,
         ?string $routingAnchorsCollection = null,
+        string $qdrantApiKey = '',
     ) {
+        $this->rest = new QdrantRest($httpClient, $qdrantUrl, new QdrantApiKey($qdrantApiKey));
         $this->memoriesCollection = (null !== $memoriesCollection && '' !== $memoriesCollection)
             ? $memoriesCollection
             : self::DEFAULT_MEMORIES_COLLECTION;
@@ -1317,31 +1322,55 @@ final class QdrantClientDirect implements QdrantClientInterface
 
     public function healthCheck(): bool
     {
+        return self::PROBE_OK === $this->cachedProbeOutcome();
+    }
+
+    public function unavailableReason(): ?string
+    {
+        return $this->rest->apiKey()->messageForProbe($this->cachedProbeOutcome());
+    }
+
+    private function cachedProbeOutcome(): string
+    {
         if (!$this->isConfigured()) {
-            return false;
+            return self::PROBE_DOWN;
         }
 
         if (null === $this->cache) {
-            return self::PROBE_OK === $this->probeHealth();
+            return $this->probeHealth();
         }
 
         try {
-            return (bool) $this->cache->get($this->healthCacheKey(), function (ItemInterface $item): bool {
-                $outcome = $this->probeHealth();
-
-                $item->expiresAfter(match ($outcome) {
+            $outcome = $this->cache->get($this->healthCacheKey(), function (ItemInterface $item): string {
+                $probed = $this->probeHealth();
+                $item->expiresAfter(match ($probed) {
                     self::PROBE_OK => self::HEALTH_CACHE_TTL_OK,
                     self::PROBE_TIMEOUT => self::HEALTH_CACHE_TTL_TIMEOUT,
                     default => self::HEALTH_CACHE_TTL_FAIL,
                 });
 
-                return self::PROBE_OK === $outcome;
+                return $probed;
             });
         } catch (\Throwable $e) {
             $this->logger->warning('Qdrant health check cache failed', ['error' => $e->getMessage()]);
 
-            return self::PROBE_OK === $this->probeHealth();
+            return $this->probeHealth();
         }
+
+        return $this->normalizeCachedOutcome($outcome);
+    }
+
+    private function normalizeCachedOutcome(mixed $outcome): string
+    {
+        if (true === $outcome || self::PROBE_OK === $outcome) {
+            return self::PROBE_OK;
+        }
+
+        if (is_string($outcome) && in_array($outcome, [self::PROBE_DOWN, self::PROBE_TIMEOUT, self::PROBE_UNAUTHORIZED, self::PROBE_FORBIDDEN], true)) {
+            return $outcome;
+        }
+
+        return self::PROBE_DOWN;
     }
 
     public function refreshHealth(): bool
@@ -1361,7 +1390,13 @@ final class QdrantClientDirect implements QdrantClientInterface
 
     private function healthCacheKey(): string
     {
-        return 'qdrant.health.'.sha1($this->qdrantUrl);
+        $material = $this->qdrantUrl;
+        $discriminator = $this->rest->apiKey()->cacheDiscriminator();
+        if ('' !== $discriminator) {
+            $material .= "\0".$discriminator;
+        }
+
+        return 'qdrant.health.'.sha1($material);
     }
 
     public function getHealthDetails(): array
@@ -1371,12 +1406,8 @@ final class QdrantClientDirect implements QdrantClientInterface
         }
 
         try {
-            $response = $this->httpClient->request('GET', "{$this->qdrantUrl}/healthz", [
-                'headers' => $this->getHeaders(),
-                'timeout' => 3,
-            ]);
-
-            $healthy = 200 === $response->getStatusCode();
+            $health = $this->rest->exchange('GET', '/healthz', timeout: 3.0);
+            $healthy = 200 === $health['status'];
 
             $collectionsResponse = $this->qdrantRequest('GET', '/collections');
             $collections = $collectionsResponse['result']['collections'] ?? [];
@@ -1384,7 +1415,7 @@ final class QdrantClientDirect implements QdrantClientInterface
             return [
                 'status' => $healthy ? 'healthy' : 'error',
                 'service' => 'qdrant-direct',
-                'version' => $response->getHeaders(false)['x-qdrant-version'][0] ?? 'unknown',
+                'version' => $health['headers']['x-qdrant-version'][0] ?? 'unknown',
                 'qdrant' => [
                     'status' => $healthy ? 'connected' : 'error',
                     'collections_count' => count($collections),
@@ -1926,24 +1957,7 @@ final class QdrantClientDirect implements QdrantClientInterface
      */
     private function probeHealth(): string
     {
-        try {
-            // Idle timeout only: `max_duration` surfaces as a plain transport
-            // error and would be cached as a full outage.
-            $response = $this->httpClient->request('GET', "{$this->qdrantUrl}/healthz", [
-                'headers' => $this->getHeaders(),
-                'timeout' => self::HEALTH_PROBE_TIMEOUT_SECONDS,
-            ]);
-
-            return 200 === $response->getStatusCode() ? self::PROBE_OK : self::PROBE_DOWN;
-        } catch (TimeoutExceptionInterface $e) {
-            $this->logger->warning('Qdrant health check timed out', ['error' => $e->getMessage()]);
-
-            return self::PROBE_TIMEOUT;
-        } catch (\Throwable $e) {
-            $this->logger->warning('Qdrant health check failed', ['error' => $e->getMessage()]);
-
-            return self::PROBE_DOWN;
-        }
+        return $this->rest->probe(self::HEALTH_PROBE_TIMEOUT_SECONDS, $this->logger);
     }
 
     private function isConfigured(): bool
@@ -1952,49 +1966,12 @@ final class QdrantClientDirect implements QdrantClientInterface
     }
 
     /**
-     * @return array<string, string>
-     */
-    private function getHeaders(): array
-    {
-        return ['Content-Type' => 'application/json'];
-    }
-
-    /**
-     * Send a request to the Qdrant REST API and return the decoded response.
+     * @param array<string, mixed>|null $body
      *
-     * All failure modes (transport errors, non-2xx responses, non-JSON bodies)
-     * are normalised to \RuntimeException so callers can use a single catch
-     * clause to surface outages as 503 instead of leaking mixed exception
-     * types (e.g. \JsonException, which extends \Exception directly and would
-     * otherwise bypass `catch (\RuntimeException $e)` blocks upstream).
-     *
-     * @throws \RuntimeException on network errors, non-2xx responses, or
-     *                           malformed JSON in the response body
+     * @return array<array-key, mixed>
      */
     private function qdrantRequest(string $method, string $path, ?array $body = null): array
     {
-        $options = ['headers' => $this->getHeaders()];
-
-        if (null !== $body) {
-            $options['json'] = $body;
-        }
-
-        $response = $this->httpClient->request($method, "{$this->qdrantUrl}{$path}", $options);
-
-        $statusCode = $response->getStatusCode();
-        if ($statusCode < 200 || $statusCode >= 300) {
-            throw new \RuntimeException("Qdrant request failed [{$method} {$path}]: HTTP {$statusCode} — {$response->getContent(false)}");
-        }
-
-        $content = $response->getContent();
-        if ('' === $content) {
-            return [];
-        }
-
-        try {
-            return json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new \RuntimeException("Qdrant returned a non-JSON response body [{$method} {$path}]: {$e->getMessage()}", 0, $e);
-        }
+        return $this->rest->request($method, $path, $body);
     }
 }

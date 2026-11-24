@@ -206,56 +206,7 @@ final class FeatureStatusReporter
             absentMessage: 'Optional. Set OFFICE_CONVERT_URL and start the office Compose profile',
         );
 
-        // Qdrant - User memories with vector search
-        $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
-        $memoryServiceAvailable = $this->memoryService->isAvailable();
-
-        // Build status message and get service info
-        $memoryMessage = '';
-        $memoryWarnings = [];
-        $memoryVersion = 'unknown';
-        $memoryStats = [];
-
-        if ($memoryServiceAvailable) {
-            try {
-                $healthDetails = $this->memoryService->getQdrantClient()->getHealthDetails();
-                $memoryVersion = $healthDetails['version'] ?? 'unknown';
-                $memoryStats = $healthDetails['qdrant'] ?? [];
-
-                $memoryMessage = 'Qdrant is connected and ready';
-            } catch (\Throwable $e) {
-                $memoryMessage = 'Qdrant available but health check failed';
-                $memoryWarnings[] = $e->getMessage();
-            }
-        } else {
-            if (empty($qdrantUrl) || 'http://' === $qdrantUrl || 'https://' === $qdrantUrl) {
-                $memoryMessage = 'Qdrant URL not configured';
-            } else {
-                $memoryMessage = 'Qdrant not reachable at configured URL';
-            }
-        }
-
-        $features['memory-service'] = [
-            'id' => 'memory-service',
-            'category' => 'Processing Services',
-            'name' => 'Qdrant Vector Database',
-            'enabled' => $memoryServiceAvailable,
-            'status' => $memoryServiceAvailable ? 'healthy' : 'unhealthy',
-            'message' => $memoryMessage,
-            'warnings' => $memoryWarnings,
-            'setup_required' => !$memoryServiceAvailable,
-            'url' => $qdrantUrl ?: 'not configured',
-            'version' => $memoryVersion,
-            'stats' => $memoryStats,
-            'env_vars' => [
-                'QDRANT_URL' => [
-                    'required' => true,
-                    'set' => !empty($qdrantUrl) && 'http://' !== $qdrantUrl && 'https://' !== $qdrantUrl,
-                    'hint' => 'Internal Docker service URL',
-                    'example' => 'http://qdrant:6333',
-                ],
-            ],
-        ];
+        $features['memory-service'] = $this->memoryServiceFeature();
 
         // ========== Infrastructure Services ==========
 
@@ -402,6 +353,65 @@ final class FeatureStatusReporter
         }
 
         return $counts;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function memoryServiceFeature(): array
+    {
+        $qdrantUrl = $_ENV['QDRANT_URL'] ?? '';
+        $configured = !empty($qdrantUrl) && 'http://' !== $qdrantUrl && 'https://' !== $qdrantUrl;
+        $available = $this->memoryService->isAvailable();
+        $message = '';
+        $warnings = [];
+        $version = 'unknown';
+        $stats = [];
+
+        if ($available) {
+            try {
+                $healthDetails = $this->memoryService->getQdrantClient()->getHealthDetails();
+                $version = $healthDetails['version'] ?? 'unknown';
+                $stats = $healthDetails['qdrant'] ?? [];
+                $message = 'Qdrant is connected and ready';
+            } catch (\Throwable $e) {
+                $message = 'Qdrant available but health check failed';
+                $warnings[] = $e->getMessage();
+            }
+        } elseif (!$configured) {
+            $message = 'Qdrant URL not configured';
+        } else {
+            $client = $this->memoryService->getQdrantClient();
+            $client->refreshHealth();
+            $message = $client->unavailableReason() ?? 'Qdrant not reachable at configured URL';
+        }
+
+        return [
+            'id' => 'memory-service',
+            'category' => 'Processing Services',
+            'name' => 'Qdrant Vector Database',
+            'enabled' => $available,
+            'status' => $available ? 'healthy' : 'unhealthy',
+            'message' => $message,
+            'warnings' => $warnings,
+            'setup_required' => !$available,
+            'url' => $qdrantUrl ?: 'not configured',
+            'version' => $version,
+            'stats' => $stats,
+            'env_vars' => [
+                'QDRANT_URL' => [
+                    'required' => true,
+                    'set' => $configured,
+                    'hint' => 'Internal Docker service URL',
+                    'example' => 'http://qdrant:6333',
+                ],
+                'QDRANT_API_KEY' => [
+                    'required' => false,
+                    'set' => '' !== trim((string) ($_ENV['QDRANT_API_KEY'] ?? '')),
+                    'hint' => 'Optional. Sent as the api-key header when Qdrant requires authentication',
+                ],
+            ],
+        ];
     }
 
     /**
