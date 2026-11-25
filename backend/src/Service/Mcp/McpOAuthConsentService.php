@@ -6,10 +6,10 @@ namespace App\Service\Mcp;
 
 use App\Entity\McpServerConfig;
 use App\Repository\McpServerConfigRepository;
+use App\Service\OAuth\BrowserBoundState;
 use App\Service\OAuth\OAuthClient;
 use App\Service\OAuth\OAuthException;
 use App\Service\OAuth\OAuthProviderConfig;
-use App\Service\OAuth\OAuthStateService;
 use App\Service\Security\EncryptionService;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
@@ -19,7 +19,8 @@ use Psr\Log\LoggerInterface;
  *
  * Mirrors {@see \App\Service\OAuth\OAuthConsentService}: the PKCE verifier
  * stays on the server, and the signed state carries `owner_id` + `server_id`
- * so the callback does not need the SameSite=Strict auth cookie.
+ * so the callback does not need the SameSite=Strict auth cookie, and only the
+ * browser that started the sign-in can finish it.
  */
 final readonly class McpOAuthConsentService
 {
@@ -40,7 +41,7 @@ final readonly class McpOAuthConsentService
         private McpOAuthDiscovery $discovery,
         private McpOAuthRegistration $registration,
         private OAuthClient $oauth,
-        private OAuthStateService $state,
+        private BrowserBoundState $state,
         private McpServerConfigRepository $servers,
         private EncryptionService $encryption,
         private CacheItemPoolInterface $cache,
@@ -226,7 +227,7 @@ final readonly class McpOAuthConsentService
             return self::DEFAULT_RETURN;
         }
 
-        $payload = $this->state->validateState($stateToken, self::PROVIDER);
+        $payload = $this->state->peek($stateToken, self::PROVIDER);
         $path = is_array($payload) && is_string($payload['return_to'] ?? null) ? $payload['return_to'] : '';
 
         return in_array($path, self::ALLOWED_RETURN_TO, true) ? $path : self::DEFAULT_RETURN;

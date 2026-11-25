@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { Icon } from '@iconify/vue'
 import { useNotification } from '@/composables/useNotification'
+import { openConsent } from '@/services/api/connectorConsent'
 import { connectionsApi, type ConnectionItem } from '@/services/api/connectionsApi'
 import { dropboxApi } from '@/services/api/dropboxApi'
 import { m365Api } from '@/services/api/m365Api'
@@ -106,7 +107,7 @@ const onRegistryRemoved = (id: string) => {
 const connectM365 = async () => {
   m365Connecting.value = true
   try {
-    window.location.href = await m365Api.authorizeUrl()
+    m365Connecting.value = await openConsent(await m365Api.authorizeUrl())
   } catch {
     showError(t('config.connections.providers.m365.startFailed'))
     m365Connecting.value = false
@@ -116,7 +117,7 @@ const connectM365 = async () => {
 const connectDropbox = async () => {
   dropboxConnecting.value = true
   try {
-    window.location.href = await dropboxApi.authorizeUrl()
+    dropboxConnecting.value = await openConsent(await dropboxApi.authorizeUrl())
   } catch {
     showError(t('config.connections.providers.dropbox.startFailed'))
     dropboxConnecting.value = false

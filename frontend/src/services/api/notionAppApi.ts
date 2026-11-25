@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { httpClient } from './httpClient'
+import { consentStartParams } from './connectorConsent'
 import {
   DeleteApiAppsNotionWatchesDeleteResponseSchema,
   GetApiAppsNotionAccountResponseSchema,
@@ -48,6 +49,7 @@ export const notionAppApi = {
   async connect(): Promise<string> {
     const data = await httpClient('/api/v1/apps/notion/connect', {
       method: 'POST',
+      params: consentStartParams(),
       schema: PostApiAppsNotionConnectResponseSchema,
     })
     return data.authorize_url

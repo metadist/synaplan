@@ -24,7 +24,8 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
  *
  * `/callback` is public: the provider redirects the browser cross-site and the
  * SameSite=Strict auth cookie is not sent. The HMAC-signed state identifies
- * the owner. `/start` and `/disconnect` stay authenticated.
+ * the owner, and a cookie set by `/start` ties it to the browser that began
+ * the sign-in. `/start` and `/disconnect` stay authenticated.
  */
 #[Route('/api/v1/mcp-servers', name: 'api_mcp_servers_oauth_')]
 #[OA\Tag(name: 'MCP Servers')]
@@ -48,10 +49,10 @@ final class McpOAuthController extends AbstractController
     #[OA\Post(
         path: '/api/v1/mcp-servers/{id}/oauth/start',
         summary: 'Begin the MCP OAuth sign-in for a saved server',
-        description: 'Discovers the remote authorization server, registers this Synaplan install if needed, and returns the consent URL the browser must be sent to.',
+        description: 'Discovers the remote authorization server, registers this Synaplan install if needed, and returns the consent URL the browser must be sent to. The response sets a short-lived cookie; only the browser that holds it can finish the sign-in.',
         security: [['Bearer' => []]],
         tags: ['MCP Servers'],
-        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer'))],
+        parameters: [new OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'integer')), new OA\Parameter(name: 'native', in: 'query', required: false, description: 'Set to 1 by the native app, which keeps no cookies: the state is then bound to the signed-in account instead of a cookie', schema: new OA\Schema(type: 'string', enum: ['1']))],
         requestBody: new OA\RequestBody(
             required: false,
             content: new OA\JsonContent(properties: [
@@ -127,7 +128,7 @@ final class McpOAuthController extends AbstractController
     #[OA\Get(
         path: '/api/v1/mcp-servers/oauth/callback',
         summary: 'OAuth provider redirects the browser here after consent',
-        description: 'Public by design: the request arrives cross-site, so no auth cookie is present. The signed state identifies the user. Always answers with a redirect back to Manage → Connections → MCP Servers.',
+        description: 'Public by design: the request arrives cross-site, so no auth cookie is present. The signed state identifies the user. It also has to come from the browser that started the flow: the start sets a short-lived cookie the state is tied to. Always answers with a redirect back to Manage → Connections → MCP Servers. A state started by the native app (`native=1`) is bound to the account instead: the browser is sent on to the app, and the app repeats this request with its token and `Accept: application/json`.',
         tags: ['MCP Servers'],
         parameters: [
             new OA\Parameter(name: 'code', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
@@ -137,6 +138,14 @@ final class McpOAuthController extends AbstractController
         ],
         responses: [
             new OA\Response(response: 302, description: 'Redirect to /channels/mcp with connected={id} or oauth_error={reason}'),
+            new OA\Response(
+                response: 200,
+                description: 'Native app only (Accept: application/json with its Bearer token): the same result as a path for the app router',
+                content: new OA\JsonContent(
+                    required: ['redirect'],
+                    properties: [new OA\Property(property: 'redirect', type: 'string', example: '/channels/mcp?connected=12')]
+                )
+            ),
         ]
     )]
     public function callback(Request $request): Response

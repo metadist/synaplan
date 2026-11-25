@@ -5,6 +5,7 @@
  * challenge that expire), so it is fetched at click time, never cached.
  */
 import { httpClient } from './httpClient'
+import { consentStartParams } from './connectorConsent'
 import {
   GetApiConnectionsM365StartResponseSchema,
   GetApiConnectionsM365StatusResponseSchema,
@@ -30,6 +31,7 @@ export const m365Api = {
 
   async authorizeUrl(): Promise<string> {
     const data = await httpClient('/api/v1/connections/m365/start', {
+      params: consentStartParams(),
       schema: GetApiConnectionsM365StartResponseSchema,
     })
     return data.authorize_url

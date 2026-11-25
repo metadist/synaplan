@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useNotification } from '@/composables/useNotification'
 import { useMcpSignInTarget } from '@/composables/useMcpSignInTarget'
 import { mcpSignInErrorKey } from '@/components/config/mcpSignInError'
+import { openConsent } from '@/services/api/connectorConsent'
 import { mcpServersApi, type McpServer } from '@/services/api/mcpServersApi'
 
 /**
@@ -38,7 +39,9 @@ export function useMcpSignInStart(reload: () => Promise<void>) {
       const url = await mcpServersApi.startOAuth(server.id)
       const decision = await decide(url, server)
       if (decision === 'go') {
-        window.location.assign(url)
+        if (!(await openConsent(url))) {
+          connectingId.value = null
+        }
       } else {
         if (decision === 'refuse') {
           fail('unknown')

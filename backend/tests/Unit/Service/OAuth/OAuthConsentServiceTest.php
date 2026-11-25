@@ -12,9 +12,9 @@ use App\Service\OAuth\OAuthException;
 use App\Service\OAuth\OAuthProviderConfig;
 use App\Service\OAuth\OAuthProviderRegistry;
 use App\Service\OAuth\OAuthProviderSource;
-use App\Service\OAuth\OAuthStateService;
 use App\Service\OAuth\OAuthTokenSet;
 use App\Service\OAuth\OAuthTokenStore;
+use App\Tests\Support\ConsentBrowser;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
@@ -25,13 +25,13 @@ final class OAuthConsentServiceTest extends TestCase
 {
     private ArrayAdapter $cache;
     private InMemoryCredentialVault $vault;
-    private OAuthStateService $state;
+    private ConsentBrowser $browser;
 
     protected function setUp(): void
     {
         $this->cache = new ArrayAdapter();
         $this->vault = new InMemoryCredentialVault();
-        $this->state = new OAuthStateService(new NullLogger(), 'test-app-secret');
+        $this->browser = new ConsentBrowser('test-app-secret');
     }
 
     public function testConsentRoundTripStoresTokensOnANewConnection(): void
@@ -108,7 +108,7 @@ final class OAuthConsentServiceTest extends TestCase
     public function testStateFromAnotherProviderIsRejected(): void
     {
         $service = $this->service([]);
-        $foreign = $this->state->generateState('dropbox', ['owner_id' => 42, 'pkce_nonce' => 'abc']);
+        $foreign = $this->browser->generateState('dropbox', ['owner_id' => 42, 'pkce_nonce' => 'abc']);
 
         $this->expectException(OAuthException::class);
         $service->completeConsent(Connection::TYPE_M365, 'code', $foreign);
@@ -121,10 +121,59 @@ final class OAuthConsentServiceTest extends TestCase
     public function testStateWithoutAStoredVerifierIsRejected(): void
     {
         $service = $this->service([]);
-        $forged = $this->state->generateState(Connection::TYPE_M365, ['owner_id' => 42, 'pkce_nonce' => 'never-issued']);
+        $forged = $this->browser->generateState(Connection::TYPE_M365, ['owner_id' => 42, 'pkce_nonce' => 'never-issued']);
 
         $this->expectException(OAuthException::class);
         $service->completeConsent(Connection::TYPE_M365, 'code', $forged);
+    }
+
+    /**
+     * The consent URL can be handed to anyone. Their consent must not land on
+     * the account that started the flow.
+     */
+    public function testCallbackFromAnotherBrowserIsRefusedAndCreatesNothing(): void
+    {
+        $service = $this->service([
+            new MockResponse(json_encode(['access_token' => 'at', 'refresh_token' => 'rt', 'expires_in' => 3_600]), ['http_code' => 200]),
+        ]);
+        $state = $this->stateFromUrl($service->authorizationUrl(42, Connection::TYPE_M365));
+
+        $this->browser->switchBrowser();
+
+        try {
+            $service->completeConsent(Connection::TYPE_M365, 'the-victims-code', $state);
+            self::fail('A callback without the starting browser\'s cookie was accepted.');
+        } catch (OAuthException) {
+            self::assertSame([], $this->vault->stored);
+        }
+    }
+
+    /**
+     * The cookie of one flow does not unlock the state of another.
+     */
+    public function testCookieFromAnotherStartDoesNotMatch(): void
+    {
+        $service = $this->service([]);
+        $attackers = $this->stateFromUrl($service->authorizationUrl(42, Connection::TYPE_M365));
+
+        $victim = new ConsentBrowser('test-app-secret');
+        $victim->generateState(Connection::TYPE_M365, ['owner_id' => 7, 'pkce_nonce' => 'x']);
+        $victimsService = $this->service([], null, $victim);
+
+        $this->expectException(OAuthException::class);
+        $victimsService->completeConsent(Connection::TYPE_M365, 'code', $attackers);
+    }
+
+    /**
+     * A signed state that carries no browser at all is never enough.
+     */
+    public function testStateWithoutABrowserIsRejected(): void
+    {
+        $service = $this->service([]);
+        $unbound = $this->browser->foreignState(Connection::TYPE_M365, ['owner_id' => 42, 'pkce_nonce' => 'abc']);
+
+        $this->expectException(OAuthException::class);
+        $service->completeConsent(Connection::TYPE_M365, 'code', $unbound);
     }
 
     private function stateFromUrl(string $url): string
@@ -138,7 +187,7 @@ final class OAuthConsentServiceTest extends TestCase
     /**
      * @param list<MockResponse> $responses
      */
-    private function service(array $responses, ?Connection $existing = null): OAuthConsentService
+    private function service(array $responses, ?Connection $existing = null, ?ConsentBrowser $browser = null): OAuthConsentService
     {
         $factory = function (string $method, string $url, array $options) use (&$responses): MockResponse {
             return array_shift($responses) ?? new MockResponse('{}', ['http_code' => 200]);
@@ -151,7 +200,7 @@ final class OAuthConsentServiceTest extends TestCase
             new OAuthClient(new MockHttpClient($factory), new NullLogger()),
             new OAuthProviderRegistry([$this->source()]),
             new OAuthTokenStore($this->vault, $connections),
-            $this->state,
+            ($browser ?? $this->browser)->state,
             $connections,
             $this->cache,
             new NullLogger(),

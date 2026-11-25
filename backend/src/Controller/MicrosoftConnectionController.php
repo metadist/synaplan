@@ -79,9 +79,10 @@ final class MicrosoftConnectionController extends AbstractController
     #[OA\Get(
         path: '/api/v1/connections/m365/start',
         summary: 'Begin the Microsoft 365 consent flow',
-        description: 'Returns the Microsoft sign-in URL the browser must be sent to. The URL is single-use: it carries a signed state and a PKCE challenge that expire after 10 minutes.',
+        description: 'Returns the Microsoft sign-in URL the browser must be sent to. The URL is single-use: it carries a signed state and a PKCE challenge that expire after 10 minutes. The response sets a short-lived cookie; only the browser that holds it can finish the sign-in.',
         security: [['Bearer' => []]],
         tags: ['Connections'],
+        parameters: [new OA\Parameter(name: 'native', in: 'query', required: false, description: 'Set to 1 by the native app, which keeps no cookies: the state is then bound to the signed-in account instead of a cookie', schema: new OA\Schema(type: 'string', enum: ['1']))],
         responses: [
             new OA\Response(
                 response: 200,
@@ -118,7 +119,7 @@ final class MicrosoftConnectionController extends AbstractController
     #[OA\Get(
         path: '/api/v1/connections/m365/callback',
         summary: 'Microsoft redirects the browser here after consent',
-        description: 'Public by design: the request arrives cross-site from Microsoft, so no auth cookie is present. The signed state identifies the user. Always answers with a redirect back to the Connections page carrying a result flag.',
+        description: 'Public by design: the request arrives cross-site from Microsoft, so no auth cookie is present. The signed state identifies the user. It also has to come from the browser that started the flow: the start sets a short-lived cookie the state is tied to. Always answers with a redirect back to the Connections page carrying a result flag. A state started by the native app (`native=1`) is bound to the account instead: the browser is sent on to the app, and the app repeats this request with its token and `Accept: application/json`.',
         tags: ['Connections'],
         parameters: [
             new OA\Parameter(name: 'code', in: 'query', required: false, schema: new OA\Schema(type: 'string')),
@@ -127,6 +128,14 @@ final class MicrosoftConnectionController extends AbstractController
         ],
         responses: [
             new OA\Response(response: 302, description: 'Redirect to the Connections page with m365=connected or m365=error'),
+            new OA\Response(
+                response: 200,
+                description: 'Native app only (Accept: application/json with its Bearer token): the same result as a path for the app router',
+                content: new OA\JsonContent(
+                    required: ['redirect'],
+                    properties: [new OA\Property(property: 'redirect', type: 'string', example: '/channels/connections?m365=connected')]
+                )
+            ),
         ]
     )]
     public function callback(Request $request): Response

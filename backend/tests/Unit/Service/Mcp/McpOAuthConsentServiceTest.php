@@ -12,11 +12,12 @@ use App\Service\Mcp\McpOAuthConsentService;
 use App\Service\Mcp\McpOAuthDiscovery;
 use App\Service\Mcp\McpOAuthDiscoveryResult;
 use App\Service\Mcp\McpOAuthException;
+use App\Service\Mcp\McpOAuthFailure;
 use App\Service\Mcp\McpOAuthRegistration;
 use App\Service\Mcp\McpOAuthState;
 use App\Service\OAuth\OAuthClient;
-use App\Service\OAuth\OAuthStateService;
 use App\Service\Security\EncryptionService;
+use App\Tests\Support\ConsentBrowser;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -46,7 +47,7 @@ final class McpOAuthConsentServiceTest extends TestCase
 
     public function testStartKeepsOnlyWhitelistedReturnPaths(): void
     {
-        $state = new OAuthStateService(new NullLogger(), 'app-secret');
+        $state = new ConsentBrowser();
         $repo = $this->storingRepository();
         $service = $this->service(
             new EncryptionService('test-secret', new NullLogger()),
@@ -57,14 +58,14 @@ final class McpOAuthConsentServiceTest extends TestCase
 
         $allowed = $service->start($this->server(), 7, '/apps/notion');
         parse_str((string) parse_url($allowed, PHP_URL_QUERY), $allowedQuery);
-        $payload = $state->validateState((string) $allowedQuery['state'], McpOAuthConsentService::PROVIDER);
+        $payload = $state->readState((string) $allowedQuery['state'], McpOAuthConsentService::PROVIDER);
         self::assertIsArray($payload);
         self::assertSame('/apps/notion', $payload['return_to']);
         self::assertSame('/apps/notion', $service->returnPath((string) $allowedQuery['state']));
 
         $rejected = $service->start($this->server(), 7, 'https://evil.example/phish');
         parse_str((string) parse_url($rejected, PHP_URL_QUERY), $rejectedQuery);
-        $rejectedPayload = $state->validateState((string) $rejectedQuery['state'], McpOAuthConsentService::PROVIDER);
+        $rejectedPayload = $state->readState((string) $rejectedQuery['state'], McpOAuthConsentService::PROVIDER);
         self::assertIsArray($rejectedPayload);
         self::assertArrayNotHasKey('return_to', $rejectedPayload);
         self::assertSame('/channels/mcp', $service->returnPath((string) $rejectedQuery['state']));
@@ -88,7 +89,7 @@ final class McpOAuthConsentServiceTest extends TestCase
     {
         $encryption = new EncryptionService('test-secret', new NullLogger());
         $cache = new ArrayAdapter();
-        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $stateService = new ConsentBrowser();
         $server = $this->server();
         $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
         $server->setDecryptedOAuthState(new McpOAuthState(
@@ -137,11 +138,51 @@ final class McpOAuthConsentServiceTest extends TestCase
         self::assertSame(McpOAuthState::STATUS_CONNECTED, $stored->status);
     }
 
+    /**
+     * The sign-in URL can be handed to anyone; their consent must not land on
+     * the server of the account that started it.
+     */
+    public function testCompleteFromAnotherBrowserIsRefusedBeforeAnyExchange(): void
+    {
+        $encryption = new EncryptionService('test-secret', new NullLogger());
+        $cache = new ArrayAdapter();
+        $browser = new ConsentBrowser();
+        $server = $this->server();
+        $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+
+        $repo = $this->storingRepository();
+        $repo->method('findByIdAndUser')->willReturn($server);
+        $repo->expects(self::never())->method('storeOAuthStateAt');
+
+        $service = $this->service($encryption, $repo, $this->tokenClient([]), cache: $cache, state: $browser);
+
+        $nonce = bin2hex(random_bytes(16));
+        $key = 'mcp_oauth_pkce_'.hash('sha256', $nonce);
+        $item = $cache->getItem($key);
+        $item->set(['verifier' => 'v', 'owner_id' => 7, 'server_id' => 42, 'server_url' => 'https://mcp.notion.com/mcp']);
+        $cache->save($item);
+        $signed = $browser->generateState(McpOAuthConsentService::PROVIDER, [
+            'owner_id' => 7,
+            'server_id' => 42,
+            'pkce_nonce' => $nonce,
+        ]);
+
+        $browser->switchBrowser();
+
+        try {
+            $service->complete('the-victims-code', $signed);
+            self::fail('A callback without the starting browser\'s cookie was accepted.');
+        } catch (McpOAuthException $e) {
+            self::assertSame(McpOAuthFailure::Expired, $e->reason);
+            self::assertTrue($cache->getItem($key)->isHit(), 'the owner can still finish their own sign-in');
+        }
+    }
+
     public function testStartRemembersTheAddressForTheCallback(): void
     {
         $encryption = new EncryptionService('test-secret', new NullLogger());
         $cache = new ArrayAdapter();
-        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $stateService = new ConsentBrowser();
         $server = $this->server();
 
         $service = $this->service(
@@ -155,7 +196,7 @@ final class McpOAuthConsentServiceTest extends TestCase
         $url = $service->start($server, 7);
 
         parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
-        $payload = $stateService->validateState((string) $query['state'], McpOAuthConsentService::PROVIDER);
+        $payload = $stateService->readState((string) $query['state'], McpOAuthConsentService::PROVIDER);
         self::assertIsArray($payload);
         $item = $cache->getItem('mcp_oauth_pkce_'.hash('sha256', (string) $payload['pkce_nonce']));
         self::assertTrue($item->isHit());
@@ -166,7 +207,7 @@ final class McpOAuthConsentServiceTest extends TestCase
     {
         $encryption = new EncryptionService('test-secret', new NullLogger());
         $cache = new ArrayAdapter();
-        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $stateService = new ConsentBrowser();
         $server = $this->server();
         $server->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
         $server->setUrl('https://mcp.other.example/mcp');
@@ -342,7 +383,7 @@ final class McpOAuthConsentServiceTest extends TestCase
         ?EncryptionService $encryption = null,
     ): array {
         $cache = new ArrayAdapter();
-        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $stateService = new ConsentBrowser();
         $repo->method('findByIdAndUser')->willReturn($server);
 
         $service = $this->service(
@@ -375,7 +416,7 @@ final class McpOAuthConsentServiceTest extends TestCase
     {
         $encryption = new EncryptionService('test-secret', new NullLogger());
         $cache = new ArrayAdapter();
-        $stateService = new OAuthStateService(new NullLogger(), 'app-secret');
+        $stateService = new ConsentBrowser();
 
         $service = $this->service(
             $encryption,
@@ -403,7 +444,7 @@ final class McpOAuthConsentServiceTest extends TestCase
         OAuthClient $oauth,
         bool $oauthEnabled = true,
         ?ArrayAdapter $cache = null,
-        ?OAuthStateService $state = null,
+        ?ConsentBrowser $state = null,
         bool $clientEnabled = true,
         ?McpOAuthRegistration $registration = null,
     ): McpOAuthConsentService {
@@ -437,7 +478,7 @@ final class McpOAuthConsentServiceTest extends TestCase
             $discovery,
             $registration,
             $oauth,
-            $state ?? new OAuthStateService(new NullLogger(), 'app-secret'),
+            ($state ?? new ConsentBrowser())->state,
             $repo,
             $encryption,
             $cache ?? new ArrayAdapter(),

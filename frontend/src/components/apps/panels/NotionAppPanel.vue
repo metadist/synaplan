@@ -159,6 +159,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useDialog } from '@/composables/useDialog'
 import { useNotification } from '@/composables/useNotification'
+import { openConsent } from '@/services/api/connectorConsent'
 import { mcpServersApi } from '@/services/api/mcpServersApi'
 import { userFacingError } from '@/utils/userFacingError'
 import TabNav, { type TabNavItem } from '@/components/TabNav.vue'
@@ -258,7 +259,7 @@ const load = async () => {
 const connect = async () => {
   connecting.value = true
   try {
-    window.location.assign(await notionAppApi.connect())
+    connecting.value = await openConsent(await notionAppApi.connect())
   } catch (err) {
     error(userFacingError(err, t('apps.notion.connectFailed')))
     connecting.value = false

@@ -1240,6 +1240,10 @@ services:
             $frontendUrl: '%env(FRONTEND_URL)%'
             $nativeDeepLinkScheme: '%env(NATIVE_DEEPLINK_SCHEME)%'
 
+    App\EventSubscriber\NativeConsentReturnSubscriber:
+        arguments:
+            $nativeDeepLinkScheme: '%env(NATIVE_DEEPLINK_SCHEME)%'
+
     # Single source of truth for the auth cookie flags. `Secure` follows the
     # scheme of APP_URL, so a deployment that is legitimately HTTP-only (an
     # umbrelOS-style LAN appliance) keeps its session instead of having the

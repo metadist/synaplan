@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { httpClient } from './httpClient'
+import { consentStartParams } from './connectorConsent'
 import {
   GetApiMcpServersListResponseSchema,
   PostApiMcpServersCreateResponseSchema,
@@ -154,6 +155,7 @@ export const mcpServersApi = {
   async startOAuth(id: number): Promise<string> {
     const data = await httpClient(`/api/v1/mcp-servers/${id}/oauth/start`, {
       method: 'POST',
+      params: consentStartParams(),
       schema: StartOAuthResponseSchema,
     })
     if (!data.authorize_url) {

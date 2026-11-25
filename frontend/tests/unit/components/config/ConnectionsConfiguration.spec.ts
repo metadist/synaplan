@@ -35,6 +35,8 @@ const {
   route: { query: {} as Record<string, string> },
 }))
 
+const mockOpenConsent = vi.hoisted(() => vi.fn())
+vi.mock('@/services/api/connectorConsent', () => ({ openConsent: mockOpenConsent }))
 vi.mock('@/services/api/connectionsApi', () => ({
   connectionsApi: { list: mockList, test: mockTest, update: mockUpdate, remove: mockRemove },
 }))
@@ -104,7 +106,7 @@ describe('ConnectionsConfiguration', () => {
     mockDropboxStatus.mockResolvedValue({ available: false, redirectUri: '' })
     isAdmin.value = false
     route.query = {}
-    Object.defineProperty(window, 'location', { value: { href: '' }, writable: true })
+    mockOpenConsent.mockResolvedValue(true)
   })
 
   it('shows only the provider of its app page, even with an empty list', async () => {
@@ -151,7 +153,7 @@ describe('ConnectionsConfiguration', () => {
     await wrapper.get('[data-testid="btn-connect-m365"]').trigger('click')
     await flushPromises()
 
-    expect(window.location.href).toBe('https://login.microsoftonline.com/authorize')
+    expect(mockOpenConsent).toHaveBeenCalledWith('https://login.microsoftonline.com/authorize')
   })
 
   it('reports the tester’s own reason instead of a generic failure', async () => {
@@ -306,7 +308,7 @@ describe('ConnectionsConfiguration', () => {
     await wrapper.get('[data-testid="btn-connect-dropbox"]').trigger('click')
     await flushPromises()
 
-    expect(window.location.href).toBe('https://www.dropbox.com/oauth2/authorize')
+    expect(mockOpenConsent).toHaveBeenCalledWith('https://www.dropbox.com/oauth2/authorize')
   })
 
   it('shows the connected Dropbox account on the provider card', async () => {

@@ -167,7 +167,8 @@ security:
         # Outbound connector consent: the provider redirects the browser here
         # cross-site, where the SameSite=Strict auth cookie is not sent. The
         # HMAC-signed OAuth state identifies the user instead; /start (which
-        # mints that state) stays authenticated.
+        # mints that state) stays authenticated and sets the SameSite=Lax
+        # cookie that ties the state to the browser that began the flow.
         - { path: ^/api/v1/connections/m365/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/connections/dropbox/callback, roles: PUBLIC_ACCESS }
         - { path: ^/api/v1/mcp-servers/oauth/callback, roles: PUBLIC_ACCESS }

@@ -123,6 +123,7 @@ final class NotionAppController extends AbstractController
         description: 'Creates the connection if needed and returns the Notion consent URL. The browser is sent back to /apps/notion.',
         security: [['Bearer' => []]],
         tags: ['Notion'],
+        parameters: [new OA\Parameter(name: 'native', in: 'query', required: false, description: 'Set to 1 by the native app, which keeps no cookies: the state is then bound to the signed-in account instead of a cookie', schema: new OA\Schema(type: 'string', enum: ['1']))],
         responses: [
             new OA\Response(
                 response: 200,

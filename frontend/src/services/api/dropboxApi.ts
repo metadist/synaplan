@@ -5,6 +5,7 @@
  * challenge that expire), so it is fetched at click time, never cached.
  */
 import { httpClient } from './httpClient'
+import { consentStartParams } from './connectorConsent'
 import {
   GetApiConnectionsDropboxStartResponseSchema,
   GetApiConnectionsDropboxStatusResponseSchema,
@@ -31,6 +32,7 @@ export const dropboxApi = {
 
   async authorizeUrl(): Promise<string> {
     const data = await httpClient('/api/v1/connections/dropbox/start', {
+      params: consentStartParams(),
       schema: GetApiConnectionsDropboxStartResponseSchema,
     })
     return data.authorize_url

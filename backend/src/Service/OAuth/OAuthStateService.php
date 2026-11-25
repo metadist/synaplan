@@ -64,11 +64,8 @@ final readonly class OAuthStateService
      */
     public function validateState(string $state, string $provider): ?array
     {
-        $payload = $this->decodeState($state);
-
-        if (!$payload) {
-            $this->logger->warning('OAuth state validation failed: invalid token format or signature');
-
+        $payload = $this->readState($state);
+        if (null === $payload) {
             return null;
         }
 
@@ -78,6 +75,25 @@ final readonly class OAuthStateService
                 'expected' => $provider,
                 'received' => $payload['provider'] ?? 'null',
             ]);
+
+            return null;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * The payload of a signed, unexpired state for whichever provider it names.
+     * For routing a callback, never for redeeming the state.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function readState(string $state): ?array
+    {
+        $payload = $this->decodeState($state);
+
+        if (!$payload) {
+            $this->logger->warning('OAuth state validation failed: invalid token format or signature');
 
             return null;
         }

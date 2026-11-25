@@ -21,9 +21,11 @@ use Psr\Log\LoggerInterface;
  *    out; the verifier waits in the cache under a hash of that nonce and is
  *    consumed exactly once.
  * 2. **The signed state carries the owner id**, so the callback does not depend
- *    on a cookie arriving. In production the auth cookie is SameSite=Strict and
- *    is NOT sent on a cross-site redirect back from Microsoft — a callback that
- *    relied on the session would work in dev and fail in production.
+ *    on the auth cookie. In production that cookie is SameSite=Strict and is
+ *    NOT sent on a cross-site redirect back from the provider.
+ * 3. **Only the browser that started the flow can finish it.** The state names
+ *    the account that receives the tokens, and a consent URL can be handed to
+ *    anyone. {@see BrowserBoundState} ties it to a cookie set at the start.
  */
 final readonly class OAuthConsentService
 {
@@ -34,7 +36,7 @@ final readonly class OAuthConsentService
         private OAuthClient $client,
         private OAuthProviderRegistry $providers,
         private OAuthTokenStore $tokens,
-        private OAuthStateService $state,
+        private BrowserBoundState $state,
         private ConnectionRepository $connections,
         private CacheItemPoolInterface $cache,
         private LoggerInterface $logger,
@@ -67,7 +69,7 @@ final readonly class OAuthConsentService
     /**
      * Validate the redirect, exchange the code and store the tokens.
      *
-     * @throws OAuthException on a bad/expired state, a replayed callback or a
+     * @throws OAuthException on a bad/expired state, another browser, a replayed callback or a
      *                        rejected exchange — never creates a connection in that case
      */
     public function completeConsent(string $providerId, string $code, string $state): Connection
