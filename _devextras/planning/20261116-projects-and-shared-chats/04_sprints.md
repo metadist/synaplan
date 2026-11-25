@@ -167,6 +167,10 @@ their limits as profile input.
   column exists since AH8a), the image generator's file-ID input and "Keep going"
   (`continueFrom`). The test for the edited picture of message 5 and the
   two compactions belong to PJ7b.
+- **Second split (2026-11-25, owner):** "Keep going" (`continueFrom`) moves
+  to PJ8, next to its button; §0 #13 stays open. The image generator's
+  file-ID input becomes **PJ7c**: the chat loop has no image tool yet, so the
+  edited picture of message 5 is tested there.
 
 ### PJ8 — run card
 
