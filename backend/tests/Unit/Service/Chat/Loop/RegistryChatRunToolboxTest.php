@@ -4,17 +4,24 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Service\Chat\Loop;
 
+use App\AI\Messages\Tools\AnalyzeImageTool;
 use App\AI\Messages\Tools\KnowledgeSearchTool;
 use App\Entity\Approval;
 use App\Entity\Chat;
 use App\Entity\User;
 use App\Repository\ApprovalRepository;
+use App\Repository\ChatFileRepository;
+use App\Repository\ChatMessageSearchRepository;
 use App\Service\Chat\Loop\ChatRunApprovals;
+use App\Service\Chat\Loop\ChatRunConversationSearch;
+use App\Service\Chat\Loop\ChatRunFileTools;
+use App\Service\Chat\Loop\ChatRunLookups;
 use App\Service\Chat\Loop\ChatRunScope;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunStep;
 use App\Service\Chat\Loop\ConnectedToolCatalog;
 use App\Service\Chat\Loop\RegistryChatRunToolbox;
+use App\Service\File\ConversationFileCatalog;
 use App\Service\MessagesGateway\MessagesGatewayConfig;
 use App\Service\Project\ProjectTurnContext;
 use App\Service\Tool\Execution\ToolInvoker;
@@ -29,6 +36,7 @@ use Symfony\Component\Clock\MockClock;
 final class RegistryChatRunToolboxTest extends TestCase
 {
     private const RUN_ID = '01JD6Q3Z8Y9X7W6V5T4S3R2Q1P';
+    private const LOOKUPS = ['conversation_search', 'list_files', 'read_document'];
 
     public function testOnlyWebToolsAndThePersonsOwnToolsAreOffered(): void
     {
@@ -36,8 +44,8 @@ final class RegistryChatRunToolboxTest extends TestCase
 
         $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope()));
 
-        self::assertSame(['web_search', ConnectedToolCatalog::NAME], $names, 'the own tools stay behind the catalog until opened');
-        self::assertSame(['web_search', 'custom_order', ConnectedToolCatalog::NAME], array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope(), ['custom_order'])));
+        self::assertSame(['web_search', ConnectedToolCatalog::NAME, ...self::LOOKUPS], $names, 'the own tools stay behind the catalog until opened');
+        self::assertSame(['web_search', 'custom_order', ConnectedToolCatalog::NAME, ...self::LOOKUPS], array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope(), ['custom_order'])));
     }
 
     public function testTheCatalogListsTheOwnToolsAndOpensOnlyThose(): void
@@ -59,12 +67,12 @@ final class RegistryChatRunToolboxTest extends TestCase
     {
         $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $this->toolbox(registry: true, own: false)->declarations($this->scope()));
 
-        self::assertSame(['web_search'], $names);
+        self::assertSame(['web_search', ...self::LOOKUPS], $names);
     }
 
     public function testNothingFromTheRegistryWhileItIsOff(): void
     {
-        self::assertSame([], $this->toolbox(registry: false)->declarations($this->scope()));
+        self::assertSame(self::LOOKUPS, array_map(static fn (array $d): string => (string) $d['function']['name'], $this->toolbox(registry: false)->declarations($this->scope())), 'the chat itself can always be looked up');
     }
 
     public function testTheProjectSourcesAreSearchedInTheFolderOfThisUnit(): void
@@ -80,7 +88,7 @@ final class RegistryChatRunToolboxTest extends TestCase
         $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($scope));
         $result = $toolbox->run($scope, $this->state(), ['id' => 'c1', 'name' => KnowledgeSearchTool::NAME, 'args' => ['query' => 'launch']]);
 
-        self::assertSame([KnowledgeSearchTool::NAME], $names);
+        self::assertSame([KnowledgeSearchTool::NAME, ...self::LOOKUPS], $names);
         self::assertSame('chunk', $result->text);
     }
 
@@ -157,7 +165,7 @@ final class RegistryChatRunToolboxTest extends TestCase
 
         $names = array_map(static fn (array $d): string => (string) $d['function']['name'], $toolbox->declarations($this->scope(), ['finish', 'update_plan', 'custom_order']));
 
-        self::assertSame(['web_search', 'custom_order', ConnectedToolCatalog::NAME], $names);
+        self::assertSame(['web_search', 'custom_order', ConnectedToolCatalog::NAME, ...self::LOOKUPS], $names);
     }
 
     /**
@@ -187,6 +195,10 @@ final class RegistryChatRunToolboxTest extends TestCase
             $knowledge,
             $this->createStub(MessagesGatewayConfig::class),
             new ChatRunApprovals($approvals ?? $this->createStub(ApprovalRepository::class), new MockClock('2026-11-20 09:00:00')),
+            new ChatRunLookups(
+                new ChatRunConversationSearch($this->createStub(ChatMessageSearchRepository::class)),
+                new ChatRunFileTools($this->createStub(ChatFileRepository::class), $this->createStub(ConversationFileCatalog::class), $this->createStub(AnalyzeImageTool::class)),
+            ),
         );
     }
 

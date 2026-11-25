@@ -107,7 +107,7 @@ final class ChatLoopTools
      *
      * @return array<string, mixed>
      */
-    private static function fn(string $name, string $description, array $properties, array $required): array
+    public static function fn(string $name, string $description, array $properties, array $required): array
     {
         return [
             'type' => 'function',

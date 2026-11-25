@@ -1,6 +1,6 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-20, `main` @ `49c2036b2` (PJ5c gemergt), PJ6 auf `feat/chat-loop-guards`. Geschrieben für einen Agenten ohne Zugriff
+Stand: 2026-11-25, `main` @ `fa202d4cf` (PJ6 gemergt), PJ7a auf `feat/chat-run-lookups`. Geschrieben für einen Agenten ohne Zugriff
 auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Planungsdateien
 geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
@@ -23,8 +23,9 @@ mit Blick auf Usability und vor allem Sicherheit.
 **Stand:** Phase 0 und A (PJ0–PJ4) sind fertig. Die Voraussetzungen für Phase B
 (AU26, AH8a, AH8b) sind gemergt. Der Owner hat PJ5 geteilt: **PJ5a** (der Lauf auf
 dem Kernel), **PJ5b** (die Übergabe im Request) und **PJ5c** (der Check vor der
-Auslieferung) sind gemergt. **PJ6** (Kostenlimit und Kreiserkennung) liegt als PR vor.
-Danach **PJ7** (Abschnitt 9).
+Auslieferung) sind gemergt, ebenso **PJ6** (Kostenlimit und Kreiserkennung). PJ7 ist
+geteilt: **PJ7a** (Chat-Suche und Dateien per ID) liegt als PR vor, danach **PJ7b**
+(Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
@@ -41,8 +42,9 @@ Danach **PJ7** (Abschnitt 9).
 | PJ5a Chat-Lauf auf dem Kernel (Flag aus) | gemergt | #3216 |
 | PJ5b Übergabe Request → Lauf, Tool-Katalog, G1 (Owner: reicht) | gemergt | #3218 |
 | PJ5c Check vor der Auslieferung (03 §3.2) | gemergt | #3221 |
-| PJ6 Kostenlimit (Anteil des Monatsbudgets, Nutzer wählt) und Kreiserkennung | PR offen | `feat/chat-loop-guards` |
-| PJ7 Notizen, Chat-Suche, Dateien per ID | **nächster Schritt**, braucht §0 #27 | — |
+| PJ6 Kostenlimit (Anteil des Monatsbudgets, Nutzer wählt) und Kreiserkennung | gemergt | #3223 |
+| PJ7a Chat-Suche und Dateien per ID (§0 #27 entschieden) | PR offen | `feat/chat-run-lookups` |
+| PJ7b Notizen, Verdichtung, `BRUNS.BNOTES`, "Weiter" | **nächster Schritt** | — |
 | PJ8–PJ28 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
@@ -268,8 +270,7 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 - **PJ5a-Grenzen:** der Lauf bietet keine Dokument-Tools, keine Skills und keinen
   Server-Code an (sie lesen ihren Kontext aus dem HTTP-Request). Gemini braucht die
   `thought_signature` der Tool-Aufrufe; sie wird im Transkript mitgeführt.
-- **Offene §0-Zeilen** (nicht selbst entscheiden): vor PJ7 #27;
-  vor PJ9 #31; vor PJ10 #20; vor PJ11 #65. PJ5 selbst hat keine offene Zeile.
+- **Offene §0-Zeilen** (nicht selbst entscheiden): vor PJ9 #31; vor PJ10 #20; vor PJ11 #65. PJ5 selbst hat keine offene Zeile.
 - **Lokale E2E:** etwa 50–53 Tests schlagen auf diesem Stack auch auf `main` fehl
   (Umgebung). Vergleich immer gegen `main`; bekannte Fälle in `docs/E2E_TESTING.md`.
 - **Veralteter Stack nach Codeänderung:** `backend worker scheduler pump` neu starten
@@ -302,18 +303,19 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **PJ6** PR abschließen (Copilot, CI), Owner mergt.
-2. **PJ7** Notizen, Chat-Suche, Dateien per ID; dazu "Weiter" (`continueFrom`) aus
-   PJ6 (braucht `BNOTES`). "Jetzt antworten" (`answer_now`) kommt mit PJ8.
+1. **PJ7a** PR abschließen (Copilot, CI), Owner mergt.
+2. **PJ7b** Notizen und Verdichtung; dazu "Weiter" (`continueFrom`) aus PJ6
+   (braucht `BNOTES`). "Jetzt antworten" (`answer_now`) kommt mit PJ8.
 3. **PJ8–PJ11** (Notizen, Chat-Suche, Dateien per ID, Rückfragekarte usw.); offene
    Zeilen siehe Abschnitt 6. `LOOP.ENABLED` bleibt 0 bis PJ6 und PJ8.
 4. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt.
 5. **Phase D (PJ20–PJ22)**, **Phase E (PJ23–PJ27)**, **PJ28** Flags an.
 
-## 9. Exakt nächster Schritt: PJ7
+## 9. Exakt nächster Schritt: PJ7b
 
-Erst wenn PJ6 gemergt ist und der Owner §0 #27 (Chat-Suche als Tool) entschieden hat.
-Brief: "PJ7" in `04_sprints.md` (Notizen, Chat-Suche, Dateien per ID) und
+Erst wenn PJ7a gemergt ist. §0 #27 ist entschieden (Owner, 2026-11-25: Chat-Suche als
+Tool, in PJ7a gebaut). Die Spalte `BRUNS.BNOTES` gibt es seit AH8a, keine Schemaänderung.
+Brief: "PJ7b" in `04_sprints.md` (Notizen, Verdichtung) und
 `03_contracts.md` §1.5. Dazu gehört "Weiter" nach einem Wrap-up (`continueFrom`,
 03 §1.3): der neue Lauf startet aus `BRUNS.BNOTES` des alten, mit neuem Limit.
 

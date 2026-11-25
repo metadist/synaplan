@@ -31,6 +31,8 @@ use App\Service\Tool\ToolSource;
  * HTTP request, document tools and server-side code are not offered: a run
  * has no request. The project's sources are searched by the loop itself, in
  * the folder resolved for this unit, and only while the chat is in it.
+ * Earlier messages and the chat's files are looked up by the loop as well
+ * ({@see ChatRunLookups}).
  */
 final readonly class RegistryChatRunToolbox implements ChatRunToolbox
 {
@@ -41,8 +43,8 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
     private const BUILTINS = [WebSearchTool::NAME, WebFetchTool::NAME];
     private const MAX_NAME_LENGTH = 64;
     /** The loop answers these itself; a registry tool of the same name would be declared twice. */
-    private const RESERVED = [KnowledgeSearchTool::NAME, ConnectedToolCatalog::NAME, ChatLoopTools::UPDATE_PLAN, ChatLoopTools::FINISH];
-    private const READS = [WebSearchTool::NAME, WebFetchTool::NAME, KnowledgeSearchTool::NAME, ConnectedToolCatalog::NAME];
+    private const RESERVED = [KnowledgeSearchTool::NAME, ConnectedToolCatalog::NAME, ChatLoopTools::UPDATE_PLAN, ChatLoopTools::FINISH, ...ChatRunLookups::NAMES];
+    private const READS = [WebSearchTool::NAME, WebFetchTool::NAME, KnowledgeSearchTool::NAME, ConnectedToolCatalog::NAME, ...ChatRunLookups::NAMES];
 
     public function __construct(
         private ToolRegistry $registry,
@@ -51,6 +53,7 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
         private KnowledgeSearchTool $knowledge,
         private MessagesGatewayConfig $gatewayConfig,
         private ChatRunApprovals $approvals,
+        private ChatRunLookups $lookups,
     ) {
     }
 
@@ -75,13 +78,16 @@ final readonly class RegistryChatRunToolbox implements ChatRunToolbox
             $out[] = self::fn(KnowledgeSearchTool::NAME, self::SOURCES_DESCRIPTION, $declaration['input_schema']);
         }
 
-        return $out;
+        return [...$out, ...$this->lookups->declarations($scope)];
     }
 
     public function run(ChatRunScope $scope, ChatRunState $state, array $call, ?int $approvalId = null): ChatToolResult
     {
         if (KnowledgeSearchTool::NAME === $call['name']) {
             return $this->sources($scope, $call['args']);
+        }
+        if ($this->lookups->handles($call['name'])) {
+            return $this->lookups->run($scope, $state, $call);
         }
         if (ConnectedToolCatalog::NAME === $call['name']) {
             $connected = array_filter($this->offered($scope), static fn (ToolDescriptor $d): bool => ToolSource::Builtin !== $d->source);
