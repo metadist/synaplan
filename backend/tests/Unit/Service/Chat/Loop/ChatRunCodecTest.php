@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Service\Chat\Loop;
 use App\Service\Chat\Loop\ChatRunCodec;
 use App\Service\Chat\Loop\ChatRunEnd;
 use App\Service\Chat\Loop\ChatRunFileTools;
+use App\Service\Chat\Loop\ChatRunNotes;
 use App\Service\Chat\Loop\ChatRunState;
 use App\Service\Chat\Loop\ChatRunStatus;
 use App\Service\Chat\Loop\ConnectedToolCatalog;
@@ -173,5 +174,36 @@ final class ChatRunCodecTest extends TestCase
         self::assertInstanceOf(ChatRunState::class, $read);
         self::assertSame([1, 2, 3, 4, 5, 6], $read->analyzed);
         self::assertCount(ChatRunFileTools::MAX_PICTURES, $read->analyzed);
+    }
+
+    public function testNotesAndTheFoldedHeadSurviveACheckpoint(): void
+    {
+        $state = new ChatRunState(self::RUN_ID, 7, 11, 5, 'anthropic', 'claude-sonnet-5-5', 'de', 'Base prompt', [['role' => 'user', 'content' => 'Q'], ['role' => 'assistant', 'content' => 'A']], 100);
+        $state->head = 1;
+        $state->window = 200_000;
+        $state->compactions = 2;
+        $state->notes = new ChatRunNotes('Find the price.', facts: [['text' => 'The hob costs 749 euros.', 'ref' => 'message 10']], files: [['id' => 4711, 'name' => 'plan.pdf', 'what' => '']], messages: [10]);
+
+        $read = (new ChatRunCodec())->decode($state->stored(4, 3, 200, 9_999));
+
+        self::assertInstanceOf(ChatRunState::class, $read);
+        self::assertSame(1, $read->head);
+        self::assertSame(200_000, $read->window);
+        self::assertSame(2, $read->compactions);
+        self::assertEquals($state->notes, $read->notes);
+    }
+
+    public function testAForgedHeadIsClampedAndForgedNotesAreChecked(): void
+    {
+        $stored = json_encode(['kind' => 'chat', 'runId' => self::RUN_ID, 'userId' => 7, 'chatId' => 11, 'status' => 'running', 'messages' => [['role' => 'user', 'content' => 'Q']], 'basePrompt' => '', 'locale' => 'en',
+            'head' => 99, 'window' => -5, 'notes' => ['goal' => 'x', 'facts' => [['text' => 'data:image/png;base64,AAAA']]]], \JSON_THROW_ON_ERROR);
+
+        $read = (new ChatRunCodec())->decode($stored);
+
+        self::assertInstanceOf(ChatRunState::class, $read);
+        self::assertSame(1, $read->head);
+        self::assertNull($read->window);
+        self::assertNotNull($read->notes);
+        self::assertStringNotContainsString('base64', $read->notes->json());
     }
 }

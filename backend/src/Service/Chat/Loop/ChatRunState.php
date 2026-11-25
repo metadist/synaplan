@@ -102,6 +102,21 @@ final class ChatRunState implements RunState
     /** @var list<int> files whose picture the vision model already looked at in this run */
     public array $analyzed = [];
 
+    /**
+     * How many messages at the start of the transcript are the conversation
+     * the run started from (the chat history and the person's question). A
+     * compaction keeps them word for word.
+     */
+    public int $head = 0;
+
+    /** The model's context window in tokens, fixed at the start; null when the catalog has none. */
+    public ?int $window = null;
+
+    /** The notes the older, folded part of the transcript became (03 §1.5); null before the first compaction. */
+    public ?ChatRunNotes $notes = null;
+
+    public int $compactions = 0;
+
     private int $expected = 1;
     private int $checkpoint = 0;
     private ?int $expiresAt = null;

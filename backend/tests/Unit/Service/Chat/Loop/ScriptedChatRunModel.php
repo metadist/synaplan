@@ -23,7 +23,7 @@ final class ScriptedChatRunModel implements ChatRunModel
     /** @var list<bool> per call, whether it had a listener */
     public array $listened = [];
 
-    /** @var list<array{messages: list<array<string, mixed>>, tools: list<array<string, mixed>>, choice: ?string}> */
+    /** @var list<array{messages: list<array<string, mixed>>, tools: list<array<string, mixed>>, choice: ?string, maxTokens: ?int}> */
     public array $calls = [];
 
     /** @var list<ChatRunReply|ChatRunModelFailed> */
@@ -34,9 +34,9 @@ final class ScriptedChatRunModel implements ChatRunModel
         $this->script = array_values($script);
     }
 
-    public function call(ChatRunState $state, array $messages, array $tools, ?string $toolChoice, ?callable $onText = null): ChatRunReply
+    public function call(ChatRunState $state, array $messages, array $tools, ?string $toolChoice, ?callable $onText = null, ?int $maxTokens = null): ChatRunReply
     {
-        $this->calls[] = ['messages' => $messages, 'tools' => $tools, 'choice' => $toolChoice];
+        $this->calls[] = ['messages' => $messages, 'tools' => $tools, 'choice' => $toolChoice, 'maxTokens' => $maxTokens];
         $this->listened[] = null !== $onText;
         $next = array_shift($this->script);
         if (null === $next) {

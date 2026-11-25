@@ -100,7 +100,7 @@ final readonly class ChatLoopTurn
                 (int) $call->scope->user->getId(),
                 (int) $call->scope->chat->getId(),
                 $message->getId(),
-                new ChatRunPrompt($model->provider, $model->modelName, $turn->language(), $call->basePrompt, $call->transcript, $this->gate->rates($model->model)),
+                new ChatRunPrompt($model->provider, $model->modelName, $turn->language(), $call->basePrompt, $call->transcript, $this->gate->rates($model->model), $model->model?->getContextWindowTokens()),
                 mb_substr($message->getText(), 0, 500),
                 'chat-turn-'.$message->getId(),
                 new ChatRunReply($preamble, ChatRunCalls::read($this->parser, $reply->toolCalls), FacadeChatRunModel::micro($reply->metadata['facade_charged_cost'] ?? null)),

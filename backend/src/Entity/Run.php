@@ -246,6 +246,12 @@ class Run
         return $this->notes;
     }
 
+    /** The run notes as JSON, written at every compaction and at the end of a chat run. */
+    public function setNotes(?string $notes): void
+    {
+        $this->notes = $notes;
+    }
+
     /**
      * @return array{done: list<string>, notDone: list<string>}|null
      */

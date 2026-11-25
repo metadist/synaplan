@@ -16,10 +16,33 @@ to them.
 | PJ5c | merged | #3221 | The check before delivery (03 §3.2), flag off. A note under the answer, nothing removed (owner). See "2026-11-20 — PJ5c" below. |
 | PJ6 | merged | #3223 | Cost limit as a share of the person's monthly budget, and circle detection, flag off. See "2026-11-20 — PJ6" below. |
 | PJ7a | merged | #3266 | Chat search and files by ID for a chat run, flag off. §0 #27 decided (owner, 2026-11-25). See "2026-11-25 — PJ7a" below. |
-| PJ7b | not started | — | Run notes, `TranscriptCompactor`, `notes.compacted`, writing `BRUNS.BNOTES` (the column exists since AH8a), editing a picture by file ID, and "Keep going" (`continueFrom`). |
+| Image cost in a run | in review | #3269 | `analyze_image` in a run adds the vision call's billed cost to the run, so the cost guard sees it. CI green; Copilot did not review (quota), the owner said to go on. |
+| PJ7b | in review | #3270 | Run notes and compaction, flag off. See "2026-11-25 — PJ7b" below. "Keep going" moved to PJ8, editing a picture by file ID to PJ7c (owner, 2026-11-25). |
+| PJ7c | not started | — | Editing a picture by file ID: the chat loop has no image tool yet. |
 | PJ8–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
 ---
+
+## 2026-11-25 — PJ7b: notes and compaction
+
+`TranscriptCompactor` and `ChatRunNotes` in `backend/src/Service/Chat/Loop/`,
+flag off.
+
+- **Due** when the prompt reaches `LOOP.COMPACT_AT_PERCENT` (70) of the
+  model's window (`getContextWindowTokens()`, fallback 32,000).
+- **Kept word for word:** the system prompt, the conversation the run started
+  from (`ChatRunState::$head`), and the last `LOOP.COMPACT_KEEP_STEPS` (4)
+  steps. Deviation from 03 §1.5: fewer steps are kept when they alone would
+  fill half the window, so the run does not compact on every step.
+- **Folding:** one call on the chat model, no tools, `max_tokens` 2,000,
+  paid by the run. JSON notes. Every field is checked and capped, and inline
+  image data is removed. The loop adds the file and message IDs it saw. A
+  failure ends in a wrap-up with `context_full` (5 languages).
+- **Stored** in `BRUNS.BNOTES` and the checkpoint. The notes go into the
+  system prompt as data. Event `notes.compacted`.
+- **Moved:** "Keep going" (`continueFrom`) to PJ8, with its button (owner,
+  2026-11-25; §0 #13 stays open). Editing a picture by file ID to PJ7c: the
+  loop has no image tool, so this is a step of its own.
 
 ## 2026-11-25 — PJ7a: chat search and files by ID
 

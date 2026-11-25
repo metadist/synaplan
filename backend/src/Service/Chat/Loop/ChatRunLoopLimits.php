@@ -7,7 +7,7 @@ namespace App\Service\Chat\Loop;
 use App\Repository\ConfigRepository;
 
 /**
- * The admin keys of the run guards (03 §1.4 and the reserve of §1.3), with
+ * The admin keys of the run guards (03 §1.4, the reserve of §1.3 and the compaction of §1.5), with
  * the defaults the owner approved. A missing or broken row uses the default.
  */
 final readonly class ChatRunLoopLimits
@@ -16,6 +16,8 @@ final readonly class ChatRunLoopLimits
     public const STALL_NO_NEW = 6;
     public const STALL_ERRORS = 5;
     public const WRAPUP_RESERVE_PERCENT = 10;
+    public const COMPACT_AT_PERCENT = 70;
+    public const COMPACT_KEEP_STEPS = 4;
 
     public function __construct(private ?ConfigRepository $config = null)
     {
@@ -43,6 +45,18 @@ final readonly class ChatRunLoopLimits
     public function reservePercent(): int
     {
         return $this->read('WRAPUP_RESERVE_PERCENT', self::WRAPUP_RESERVE_PERCENT, 1, 50);
+    }
+
+    /** The share of the model's window at which the older part of a run's transcript becomes notes (03 §1.5). */
+    public function compactAtPercent(): int
+    {
+        return $this->read('COMPACT_AT_PERCENT', self::COMPACT_AT_PERCENT, 30, 95);
+    }
+
+    /** The last steps a compaction keeps word for word. */
+    public function compactKeepSteps(): int
+    {
+        return $this->read('COMPACT_KEEP_STEPS', self::COMPACT_KEEP_STEPS, 1, 20);
     }
 
     private function read(string $setting, int $default, int $min, int $max): int

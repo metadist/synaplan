@@ -13,6 +13,7 @@ use App\Service\Chat\Loop\ChatRunCheckModel;
 use App\Service\Chat\Loop\ChatRunDelivery;
 use App\Service\Chat\Loop\ChatRunEvents;
 use App\Service\Chat\Loop\ChatRunLoopLimits;
+use App\Service\Chat\Loop\ChatRunModel;
 use App\Service\Chat\Loop\ChatRunRates;
 use App\Service\Chat\Loop\ChatRunRecords;
 use App\Service\Chat\Loop\ChatRunScope;
@@ -55,6 +56,15 @@ abstract class ChatLoopCase extends TestCase
 
     /** The model's price a new run carries; null is a model without one. */
     protected ?ChatRunRates $rates = null;
+
+    /** The model's context window a new run carries, in tokens. */
+    protected ?int $window = null;
+
+    /** @var list<int> pictures a new run has already looked at */
+    protected array $analyzed = [];
+
+    /** @var list<array{role: string, content: string}> the chat history a new run starts from, before the question */
+    protected array $history = [];
     protected User $user;
 
     /** The checking model's answers; it is asked only while {@see $checkModel} is set. */
@@ -92,6 +102,21 @@ abstract class ChatLoopCase extends TestCase
 
     protected function model(ScriptedChatRunModel $model): ScriptedChatRunModel
     {
+        $this->build($model);
+
+        return $model;
+    }
+
+    /** A model whose compaction calls answer from their own script. */
+    protected function compacting(CompactingChatRunModel $model): CompactingChatRunModel
+    {
+        $this->build($model);
+
+        return $model;
+    }
+
+    private function build(ChatRunModel $model): void
+    {
         $this->step = new ChatRunStep($this->world, $model, $this->budget, $this->tools, $this->events, new ChatRunLoopLimits());
         $records = $this->createStub(ChatRunRecords::class);
         $records->method('sync')->willReturnCallback(function (ChatRunState $state): void {
@@ -110,8 +135,6 @@ abstract class ChatLoopCase extends TestCase
         };
         $check = new ChatRunCheck($this->world, $this->budget, $picker, $this->checker, $this->events);
         $this->handler = new ChatRunUnitHandler($this->step, $check, $records, $this->delivery, new ChatRunApprovals($this->approvalRows(), $this->clock), new NullLogger());
-
-        return $model;
     }
 
     public function checkModel(): ?ResearchModelChoice
@@ -136,10 +159,13 @@ abstract class ChatLoopCase extends TestCase
             'test-model',
             'de',
             'You are a helpful assistant.',
-            [['role' => 'user', 'content' => $question]],
+            [...$this->history, ['role' => 'user', 'content' => $question]],
             $this->clock->now()->getTimestamp(),
         );
         $state->rates = $this->rates;
+        $state->window = $this->window;
+        $state->head = \count($state->messages);
+        $state->analyzed = $this->analyzed;
         $this->store->runs()->open($state);
         $this->bus->dispatch($state->runId, ChatRunStep::UNIT, 1, 0);
 

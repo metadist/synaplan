@@ -28,7 +28,10 @@ final readonly class ChatRunEvents
     public const CIRCLING = 'run.circling';
     public const WRAP_UP = 'run.wrap_up';
 
-    public const NAMES = [self::STARTED, self::STEP, self::TEXT, self::TOOL_CALL, self::TOOL_RESULT, self::PLAN, self::WAITING, self::RESUMED, self::ENDED, self::CHECKED, self::CIRCLING, self::WRAP_UP];
+    /** The older part of the transcript became notes; the card shows "Conversation summarized". */
+    public const NOTES = 'notes.compacted';
+
+    public const NAMES = [self::STARTED, self::STEP, self::TEXT, self::TOOL_CALL, self::TOOL_RESULT, self::PLAN, self::WAITING, self::RESUMED, self::ENDED, self::CHECKED, self::CIRCLING, self::WRAP_UP, self::NOTES];
 
     private RunEventLog $log;
 

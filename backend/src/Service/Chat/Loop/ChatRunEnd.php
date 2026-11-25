@@ -46,6 +46,13 @@ enum ChatRunEnd: string
             'fr' => 'Je me suis arrêté, car je tournais en rond.',
             'tr' => 'Aynı yerde döndüğüm için durdum.',
         ],
+        'context_full' => [
+            'en' => 'I stopped because the conversation got too long to keep working.',
+            'de' => 'Ich habe aufgehört, weil das Gespräch zu lang wurde, um weiterzuarbeiten.',
+            'es' => 'Me detuve porque la conversación se hizo demasiado larga para seguir trabajando.',
+            'fr' => 'Je me suis arrêté, car la conversation est devenue trop longue pour continuer.',
+            'tr' => 'Konuşma çalışmaya devam edemeyeceğim kadar uzadığı için durdum.',
+        ],
         'stopped_by_user' => [
             'en' => 'Stopped. Nothing more was done after you stopped it.',
             'de' => 'Gestoppt. Nach dem Stopp wurde nichts mehr getan.',
@@ -104,6 +111,7 @@ enum ChatRunEnd: string
     case CostLimit = 'cost_limit';
     case PayerEmpty = 'payer_empty';
     case Circling = 'circling';
+    case ContextFull = 'context_full';
     case StoppedByUser = 'stopped_by_user';
     case LoopOff = 'loop_off';
     case BudgetUsed = 'budget_used';
@@ -115,7 +123,7 @@ enum ChatRunEnd: string
     public function status(): ChatRunStatus
     {
         return match ($this) {
-            self::Answered, self::Finished, self::NoProgress, self::FinishFallback, self::Circling => ChatRunStatus::Completed,
+            self::Answered, self::Finished, self::NoProgress, self::FinishFallback, self::Circling, self::ContextFull => ChatRunStatus::Completed,
             self::StoppedByUser, self::LoopOff => ChatRunStatus::Stopped,
             self::BudgetUsed, self::CostLimit, self::PayerEmpty => ChatRunStatus::BudgetUsed,
             self::AccountGone, self::ChatGone, self::WorkerLost => ChatRunStatus::Interrupted,

@@ -13,7 +13,7 @@ namespace App\Service\Chat\Loop;
 final class ChatRunWrapUp
 {
     /** @var list<ChatRunEnd> */
-    public const REASONS = [ChatRunEnd::CostLimit, ChatRunEnd::PayerEmpty, ChatRunEnd::Circling];
+    public const REASONS = [ChatRunEnd::CostLimit, ChatRunEnd::PayerEmpty, ChatRunEnd::Circling, ChatRunEnd::ContextFull];
 
     private const OPENINGS = [
         'cost_limit' => [
@@ -37,12 +37,20 @@ final class ChatRunWrapUp
             'fr' => 'Je tournais en rond. Voici ce que j\'ai jusqu\'ici.',
             'tr' => 'Aynı yerde dönüp duruyordum. Şu ana kadar elimde olanlar şunlar.',
         ],
+        'context_full' => [
+            'en' => 'This conversation got too long for me to keep working, so here is what I have so far.',
+            'de' => 'Das Gespräch wurde zu lang, um weiterzuarbeiten. Hier ist, was ich bisher habe.',
+            'es' => 'La conversación se hizo demasiado larga para seguir trabajando. Esto es lo que tengo hasta ahora.',
+            'fr' => 'La conversation est devenue trop longue pour continuer. Voici ce que j\'ai jusqu\'ici.',
+            'tr' => 'Konuşma çalışmaya devam edemeyeceğim kadar uzadı. Şu ana kadar elimde olanlar şunlar.',
+        ],
     ];
 
     private const WHY = [
         'cost_limit' => 'the cost limit for this answer is reached',
         'payer_empty' => 'the monthly budget is almost used up',
         'circling' => 'the work was going in circles',
+        'context_full' => 'the conversation is too long to keep working',
     ];
 
     /** The stored reason, or null for anything that is not a wrap-up reason. */

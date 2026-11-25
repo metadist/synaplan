@@ -24,8 +24,9 @@ mit Blick auf Usability und vor allem Sicherheit.
 (AU26, AH8a, AH8b) sind gemergt. Der Owner hat PJ5 geteilt: **PJ5a** (der Lauf auf
 dem Kernel), **PJ5b** (die Übergabe im Request) und **PJ5c** (der Check vor der
 Auslieferung) sind gemergt, ebenso **PJ6** (Kostenlimit und Kreiserkennung). PJ7 ist
-geteilt: **PJ7a** (Chat-Suche und Dateien per ID) ist gemergt, als Nächstes kommt
-**PJ7b** (Abschnitt 9).
+geteilt: **PJ7a** (Chat-Suche und Dateien per ID) ist gemergt. **PJ7b**
+(Notizen und Verdichtung) und die Bildkosten im Lauf warten auf den Merge.
+Als Nächstes kommt **PJ7c** (Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
@@ -45,7 +46,9 @@ geteilt: **PJ7a** (Chat-Suche und Dateien per ID) ist gemergt, als Nächstes kom
 | PJ6 Kostenlimit (Anteil des Monatsbudgets, Nutzer wählt) und Kreiserkennung | gemergt | #3223 |
 | PJ7a Chat-Suche und Dateien per ID (§0 #27 entschieden) | gemergt | #3266 |
 | Vision-Aufrufe als `VISION` abgerechnet (Voraussetzung für Bildkosten im Lauf) | gemergt | #3267 |
-| PJ7b Notizen, Verdichtung, `BRUNS.BNOTES`, "Weiter" | **nächster Schritt** | — |
+| Bildkosten im Lauf (`analyze_image` zählt zum Limit) | im Review (Copilot ohne Kontingent, Owner: weiter) | #3269 |
+| PJ7b Notizen, Verdichtung, `BRUNS.BNOTES` | im Review | #3270 |
+| PJ7c Bild bearbeiten per file_id | **nächster Schritt** | — |
 | PJ8–PJ28 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
@@ -350,40 +353,33 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **Bildkosten im Lauf** (klein, Folge aus #3266 und #3267): in
-   `ChatRunFileTools::look()` `facade_charged_cost` des Vision-Aufrufs zu den Kosten
-   des Laufs addieren, damit `ChatRunCostGuard` sie sieht. `analyseStored` muss dafür
-   den Wert durchreichen. Test zuerst; `MAX_PICTURES` bleibt als zweite Grenze. Kann
-   als eigener `fix:`-PR vor PJ7b oder als erster Commit von PJ7b kommen; den Owner
-   fragen, wenn unklar.
-2. **PJ7b** Notizen und Verdichtung (`RunNotes`, `TranscriptCompactor`,
-   `notes.compacted`, `BRUNS.BNOTES` schreiben), Bild bearbeiten per file_id, dazu
-   "Weiter" (`continueFrom`) aus PJ6. "Jetzt antworten" (`answer_now`) kommt mit PJ8.
+1. **PJ7c** Bild bearbeiten per file_id (Abschnitt 9).
+2. **"Weiter"** (`continueFrom`) kommt mit PJ8, zusammen mit dem Knopf
+   (Owner, 2026-11-25; §0 #13 bleibt offen). Ebenso "Jetzt antworten".
 3. **PJ8–PJ11** (Karte für den Lauf, Stop, Rückfragekarte usw.); offene Zeilen siehe
    Abschnitt 6. `LOOP.ENABLED` bleibt 0 bis PJ8 gemergt ist.
 4. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt.
 5. **Phase D (PJ20–PJ22)**, **Phase E (PJ23–PJ27)**, **PJ28** Flags an.
 
-## 9. Exakt nächster Schritt: PJ7b
+## 9. Exakt nächster Schritt: PJ7c
 
-PJ7a ist gemergt (#3266). Vorher oder als ersten Commit Punkt 1 aus Abschnitt 8
-(Bildkosten). §0 #27 ist entschieden (Owner, 2026-11-25: Chat-Suche als
-Tool, in PJ7a gebaut). Die Spalte `BRUNS.BNOTES` gibt es seit AH8a, keine Schemaänderung.
-Brief: "PJ7b" in `04_sprints.md` (Notizen, Verdichtung) und
-`03_contracts.md` §1.5. Dazu gehört "Weiter" nach einem Wrap-up (`continueFrom`,
-03 §1.3): der neue Lauf startet aus `BRUNS.BNOTES` des alten, mit neuem Limit.
+PJ7b (#3270) und die Bildkosten (#3269) warten auf den Merge. PJ7c gibt dem
+Chat-Lauf ein Bildwerkzeug, das ein Bild per file_id bearbeitet (04 "PJ7",
+Test: das bearbeitete Bild aus Nachricht 5). Der Lauf hat heute kein
+Bildwerkzeug; Brief und Schnitt mit dem Owner klären, falls unklar.
 
-1. `git checkout main && git pull --ff-only`, neuer Branch.
-2. **Tests zuerst**, dann `RunNotes` und `TranscriptCompactor` neben dem Lauf
-   (`ChatRunStep` und `ChatRunAnswer` wachsen nicht über ihre Rolle hinaus;
-   `MessageRepository` ist im Größen-Ledger eingefroren, die Suche kommt in eine neue
-   Repository-Klasse).
-3. Die Verdichtung darf IDs nicht verlieren: Message-IDs und file_ids, die der Lauf
-   schon gesehen hat, bleiben in den Notizen, damit `conversation_search` (`around`)
-   und `read_document` danach weiter funktionieren. `ChatRunState::analyzed` überlebt
-   die Verdichtung (sonst lässt sich `MAX_PICTURES` umgehen).
-4. Gate wie immer (`make ci-local`, E2E). `LOOP.ENABLED` bleibt 0 bis PJ8.
-   Danach `STATUS.md` und diese Datei nachziehen.
+1. Nach dem Merge von #3269 und #3270: `git checkout main && git pull --ff-only`,
+   neuer Branch.
+2. **Tests zuerst.** Das Bild wird nur über `ChatFileRepository` (Person, Chat,
+   Projekt-Ordner) und `catalog->absolutePath()` geladen. Die Kosten zählen zum
+   Lauf wie bei `analyze_image`. Bilddaten kommen nie ins Transkript oder in die
+   Notizen.
+3. Gate wie immer. `LOOP.ENABLED` bleibt 0 bis PJ8.
+
+**Notizen (PJ7b) für spätere Schritte:** `TranscriptCompactor` hängt an
+`ChatRunStep` (nur `MODE_FREE`). `ChatRunState::$head` markiert das Ende des
+Startgesprächs. Die Notizen stehen in `BRUNS.BNOTES`. "Weiter" in PJ8 startet
+den neuen Lauf aus diesen Notizen.
 
 ### Worauf der nächste Agent achten soll
 
