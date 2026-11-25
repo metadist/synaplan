@@ -25,6 +25,7 @@ enum AiAction: string
     case Videos = 'VIDEOS';
     case Audios = 'AUDIOS';
     case Transcription = 'TRANSCRIPTION';
+    case Vision = 'VISION';
     case VoiceLive = 'VOICE_LIVE';
     case FileSummary = 'FILE_SUMMARY';
     case DocSummary = 'DOC_SUMMARY';

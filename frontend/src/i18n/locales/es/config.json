@@ -956,6 +956,7 @@
         "message_digest": "Memoria a largo plazo",
         "voice_live": "Conversación en vivo",
         "transcription": "Transcripción",
+        "vision": "Análisis de imágenes",
         "demo": "Demo"
       },
       "sources": {

@@ -10,14 +10,16 @@ use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\Provider\Concerns\OpenAiCompatibleStreamRequest;
 use App\AI\Stream\OpenAiChatCompletionsDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Vision\ExplainsImageFromMeteredCall;
+use App\AI\Vision\VisionReply;
 use OpenAI\Contracts\ClientContract;
 use OpenAI\Responses\Chat\CreateResponse;
 use Psr\Log\LoggerInterface;
@@ -39,9 +41,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * via {@see OpenAiCompatibleEndpointRegistry}. This mirrors how the Higgsfield
  * provider resolves per-user credentials at call time.
  */
-final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface
+final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, MeteredVisionProviderInterface
 {
     use ChatCompletionsToolSupport;
+    use ExplainsImageFromMeteredCall;
     use OpenAiCompatibleStreamRequest;
 
     /**
@@ -235,7 +238,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
 
     // ==================== VISION ====================
 
-    public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
     {
         $model = $this->requireModel($options);
         $client = $this->clientForCall($options);
@@ -267,7 +270,7 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
                 'max_tokens' => $options['max_tokens'] ?? 1000,
             ]);
 
-            return $response->choices[0]->message->content ?? '';
+            return VisionReply::fromChatCompletion($response->choices[0]->message->content ?? '', $response->usage?->toArray());
         } catch (\Throwable $e) {
             throw new ProviderException('OpenAI-compatible vision error: '.$e->getMessage(), $this->getName(), null, 0, $e);
         }

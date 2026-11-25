@@ -6,15 +6,17 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\Stream\OpenAiChatCompletionsDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Vision\ExplainsImageFromMeteredCall;
+use App\AI\Vision\VisionReply;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -35,9 +37,10 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * @see https://docs.mistral.ai/
  * @see https://docs.mistral.ai/studio-api/audio/overview
  */
-class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, VisionProviderInterface
+class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, MeteredVisionProviderInterface
 {
     use ChatCompletionsToolSupport;
+    use ExplainsImageFromMeteredCall;
     private const PROVIDER_NAME = 'mistral';
     private const TRANSCRIBE_ENDPOINT = 'https://api.mistral.ai/v1/audio/transcriptions';
     private const SPEECH_ENDPOINT = 'https://api.mistral.ai/v1/audio/speech';
@@ -251,7 +254,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
 
     // ==================== VISION (Pixtral / multimodal chat) ====================
 
-    public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
     {
         $this->assertApiKey();
 
@@ -277,7 +280,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
             $choice = is_array($responseArray['choices'][0] ?? null) ? $responseArray['choices'][0] : [];
             $message = is_array($choice['message'] ?? null) ? $choice['message'] : [];
 
-            return $this->splitMessageContent($message['content'] ?? '')['text'];
+            return VisionReply::fromChatCompletion($this->splitMessageContent($message['content'] ?? '')['text'], $responseArray['usage'] ?? null);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {

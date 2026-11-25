@@ -6,8 +6,8 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Messages\MessagesUsage;
 use App\AI\Stream\AnthropicStreamDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
@@ -17,6 +17,7 @@ use App\AI\Tool\CatalogToolUse;
 use App\AI\Tool\OpenAiToolShapes;
 use App\AI\Tool\ToolCallAccumulator;
 use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\Vision\VisionReply;
 use App\Service\Chat\ProviderTranscriptCapture;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -55,7 +56,7 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * 400 surface the mismatch, exactly as a direct API call would. The Messages
  * gateway passthrough forwards the client's tool_choice verbatim.
  */
-class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface
+class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, MeteredVisionProviderInterface
 {
     public const API_VERSION = '2023-06-01';
     public const BASE_URL = 'https://api.anthropic.com/v1';
@@ -651,9 +652,12 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
     public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
     {
-        $defaultPrompt = 'Describe what you see in this image in detail.';
+        return $this->explainImageMetered($imageUrl, $prompt, $options)->content;
+    }
 
-        return $this->analyzeImage($imageUrl, $prompt ?: $defaultPrompt, $options);
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
+    {
+        return $this->analyzeImageMetered($imageUrl, $prompt ?: 'Describe what you see in this image in detail.', $options);
     }
 
     public function extractTextFromImage(string $imageUrl): string
@@ -719,6 +723,14 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
 
     public function analyzeImage(string $imagePath, string $prompt, array $options = []): string
     {
+        return $this->analyzeImageMetered($imagePath, $prompt, $options)->content;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private function analyzeImageMetered(string $imagePath, string $prompt, array $options = []): VisionReply
+    {
         if (null === $this->resolveApiKey()) {
             throw ProviderException::missingApiKey('anthropic', 'ANTHROPIC_API_KEY');
         }
@@ -768,7 +780,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                 }
             }
 
-            return $textContent;
+            return VisionReply::fromAnthropic($textContent, $data['usage'] ?? null);
         } catch (\Exception $e) {
             $this->logger->error('Anthropic vision error', [
                 'error' => $e->getMessage(),

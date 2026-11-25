@@ -1226,6 +1226,7 @@
         "message_digest": "Mémoire à long terme",
         "voice_live": "Conversation en direct",
         "transcription": "Transcription",
+        "vision": "Analyse d'images",
         "demo": "Démo"
       },
       "sources": {

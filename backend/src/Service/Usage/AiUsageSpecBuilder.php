@@ -8,6 +8,7 @@ use App\AI\Pipeline\AiAction;
 use App\AI\Pipeline\AiCall;
 use App\AI\Pipeline\AiCallResult;
 use App\AI\Pipeline\AiCapability;
+use App\AI\Vision\VisionReply;
 use App\Repository\ModelRepository;
 use App\Service\RateLimitService;
 
@@ -349,6 +350,15 @@ final readonly class AiUsageSpecBuilder
             ]];
         }
 
+        if (AiCapability::Vision === $call->capability) {
+            if (!$value instanceof VisionReply) {
+                return null;
+            }
+            $modelId = $call->options->modelId ?? $this->resolveModelId('vision', $call->provider, $call->model);
+
+            return [AiAction::Vision->value, self::visionMetadata($call->provider, (string) $call->model, $modelId, (string) $call->payload->prompt, $value)];
+        }
+
         if (AiCapability::Transcribe === $call->capability) {
             if (!\is_array($value)) {
                 return null;
@@ -369,6 +379,26 @@ final readonly class AiUsageSpecBuilder
         }
 
         return null;
+    }
+
+    /**
+     * The `VISION` row of one vision call. The hook and
+     * {@see VisionUsageMeter} build it here, so shadow mode compares like with
+     * like. Without provider tokens the prompt and answer bytes are estimated;
+     * the picture itself is then not counted.
+     *
+     * @return array<string, mixed>
+     */
+    public static function visionMetadata(string $provider, string $model, ?int $modelId, string $prompt, VisionReply $reply): array
+    {
+        return [
+            'provider' => $provider,
+            'model' => $model,
+            'model_id' => $modelId,
+            'usage' => $reply->usage,
+            'input_text' => $prompt,
+            'response_text' => $reply->content,
+        ];
     }
 
     /**

@@ -39,6 +39,7 @@ use App\Service\Stt\TranscriptionLanguageDecider;
 use App\Service\Usage\AiChatUsageMeter;
 use App\Service\Usage\RecordedUsage;
 use App\Service\Usage\TranscriptionUsageRecorder;
+use App\Service\Usage\VisionUsageMeter;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -50,6 +51,7 @@ class AiFacade
     private ?AiCallPipeline $pipeline = null;
     private ?AiEmbeddingExecutor $embeddings = null;
     private ?AiVisionExecutor $vision = null;
+    private ?VisionUsageMeter $visionUsage = null;
 
     public function __construct(
         private ProviderRegistry $registry,
@@ -72,13 +74,14 @@ class AiFacade
     }
 
     /**
-     * Every chat is metered here. A setter keeps the constructor at its
-     * current size; tests that build the facade by hand simply do not meter.
+     * Every chat and vision call is metered here. A setter keeps the constructor
+     * at its current size; tests that build the facade by hand simply do not meter.
      */
     #[Required]
-    public function setUsageMeter(AiChatUsageMeter $usageMeter): void
+    public function setUsageMeter(AiChatUsageMeter $usageMeter, ?VisionUsageMeter $visionUsage = null): void
     {
         $this->usageMeter = $usageMeter;
+        $this->visionUsage = $visionUsage;
     }
 
     #[Required]
@@ -115,12 +118,7 @@ class AiFacade
 
     private function visionExecutor(): AiVisionExecutor
     {
-        return $this->vision ??= new AiVisionExecutor(
-            $this->registry,
-            $this->modelConfig,
-            $this->pipeline(),
-            $this->logger,
-        );
+        return $this->vision ??= new AiVisionExecutor($this->registry, $this->modelConfig, $this->pipeline(), $this->logger, $this->visionUsage);
     }
 
     /**

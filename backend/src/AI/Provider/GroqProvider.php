@@ -19,9 +19,9 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputDialect;
@@ -30,6 +30,8 @@ use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\StructuredOutput\StructuredOutputViolationDetector;
 use App\AI\Tool\ToolCallAccumulator;
 use App\AI\ToolCalling\ToolCallingCapability;
+use App\AI\Vision\ExplainsImageFromMeteredCall;
+use App\AI\Vision\VisionReply;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -42,9 +44,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://console.groq.com/docs/speech-to-text
  */
 #[AsAiProvider]
-class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, DescribesProviderInterface
+class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, MeteredVisionProviderInterface, SpeechToTextProviderInterface, DescribesProviderInterface
 {
     use ChatCompletionsToolSupport;
+    use ExplainsImageFromMeteredCall;
 
     private const BASE_URL = 'https://api.groq.com/openai/v1';
 
@@ -479,7 +482,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
 
     // ==================== VISION ====================
 
-    public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
     {
         if (null === $this->client()) {
             throw ProviderException::missingApiKey('groq', 'GROQ_API_KEY');
@@ -487,11 +490,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
 
         try {
             $model = $options['model'] ?? self::DEFAULT_VISION_MODEL;
-
-            // Build full path
             $fullPath = $this->uploadDir.'/'.ltrim($imageUrl, '/');
-
-            // Check if file exists
             if (!file_exists($fullPath)) {
                 throw new \Exception("Image file not found: {$fullPath}");
             }
@@ -533,7 +532,7 @@ class GroqProvider implements ChatProviderInterface, ToolCallingChatProviderInte
                 'max_tokens' => $options['max_tokens'] ?? 1000,
             ]);
 
-            return $response->choices[0]->message->content ?? '';
+            return VisionReply::fromChatCompletion($response->choices[0]->message->content ?? '', $response->usage?->toArray());
         } catch (\Exception $e) {
             throw new ProviderException('Groq vision error: '.$e->getMessage(), 'groq');
         }

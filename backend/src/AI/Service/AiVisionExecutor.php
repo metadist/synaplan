@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Service;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Pipeline\AiCall;
 use App\AI\Pipeline\AiCallContext;
@@ -14,12 +15,18 @@ use App\AI\Pipeline\AiCallPipeline;
 use App\AI\Pipeline\AiCallRefusedException;
 use App\AI\Pipeline\AiCallSource;
 use App\AI\Pipeline\AiCapability;
+use App\AI\Pipeline\AiUsage;
+use App\AI\Vision\VisionReply;
 use App\Service\ModelConfigService;
+use App\Service\Usage\VisionUsageMeter;
 use Psr\Log\LoggerInterface;
 
 /**
  * Vision provider candidate selection, fallback chain and pipeline execution
  * behind {@see AiFacade::analyzeImage()}.
+ *
+ * Every call that answers is metered ({@see VisionUsageMeter}); the result
+ * carries `facade_charged_cost` the same way {@see AiFacade::chat()} does.
  */
 final readonly class AiVisionExecutor
 {
@@ -28,6 +35,7 @@ final readonly class AiVisionExecutor
         private ModelConfigService $modelConfig,
         private AiCallPipeline $pipeline,
         private LoggerInterface $logger,
+        private ?VisionUsageMeter $usageMeter = null,
     ) {
     }
 
@@ -130,16 +138,29 @@ final readonly class AiVisionExecutor
             payload: AiCallPayload::vision($imagePath, $prompt),
             options: AiCallOptions::fromArray($candidateOptions),
         );
-        $response = $this->pipeline->run(
+        $reply = $this->pipeline->run(
             $call,
-            static fn (AiCall $c): mixed => $provider->explainImage((string) $c->payload->filePath, (string) $c->payload->prompt, $c->options->providerOptions),
+            static fn (AiCall $c): VisionReply => $provider instanceof MeteredVisionProviderInterface
+                ? $provider->explainImageMetered((string) $c->payload->filePath, (string) $c->payload->prompt, $c->options->providerOptions)
+                : new VisionReply($provider->explainImage((string) $c->payload->filePath, (string) $c->payload->prompt, $c->options->providerOptions)),
+            static fn (mixed $value): ?AiUsage => $value instanceof VisionReply && [] !== $value->usage ? AiUsage::fromTokenArray($value->usage) : null,
         )->value;
+        $reply = $reply instanceof VisionReply ? $reply : new VisionReply(\is_string($reply) ? $reply : '');
 
-        return [
-            'content' => $response,
+        $result = [
+            'content' => $reply->content,
             'provider' => $provider->getName(),
             'model' => $reportedModel,
+            'usage' => $reply->usage,
         ];
+        $recorded = $this->usageMeter?->record($userId, $provider->getName(), $reportedModel, $call->options->modelId, $prompt, $reply);
+        if (null !== $recorded) {
+            $result['facade_metered'] = true;
+            $result['facade_charged_cost'] = $recorded->chargedCost;
+            $result['facade_price_known'] = $recorded->priceKnown;
+        }
+
+        return $result;
     }
 
     /**

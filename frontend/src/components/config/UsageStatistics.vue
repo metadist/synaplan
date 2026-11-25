@@ -235,6 +235,7 @@
             <option value="MESSAGE_DIGEST">{{ $t('config.usage.actions.message_digest') }}</option>
             <option value="VOICE_LIVE">{{ $t('config.usage.actions.voice_live') }}</option>
             <option value="TRANSCRIPTION">{{ $t('config.usage.actions.transcription') }}</option>
+            <option value="VISION">{{ $t('config.usage.actions.vision') }}</option>
             <option value="DEMO">{{ $t('config.usage.actions.demo') }}</option>
           </select>
 

@@ -41,6 +41,23 @@ final class OpenAIVisionTest extends TestCase
         self::assertSame(['GET /v1/models/gpt-4o', 'POST /v1/chat/completions', 'GET /v1/models/gpt-5.5', 'POST /v1/responses'], $this->sdkCalls());
     }
 
+    public function testTheMeteredCallReportsTheTokensOfBothApis(): void
+    {
+        $chatAnswer = OpenAIFixtures::json(CreateResponse::fake([
+            'choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => 'A pixel.', 'function_call' => null, 'tool_calls' => []], 'logprobs' => null, 'finish_reason' => 'stop']],
+            'usage' => ['prompt_tokens' => 812, 'completion_tokens' => 7, 'total_tokens' => 819],
+        ])->toArray());
+        $vision = $this->vision($this->api([OpenAIFixtures::model('gpt-4o'), $chatAnswer, OpenAIFixtures::model('gpt-5.5'), OpenAIFixtures::response([OpenAIFixtures::message('INVOICE 42')])]));
+
+        $chat = $vision->analyzeImageMetered('photo.png', 'What is this?');
+        $responses = $vision->analyzeImageMetered('photo.png', 'Read it.', ['model' => 'gpt-5.5']);
+
+        self::assertSame('A pixel.', $chat->content);
+        self::assertSame(['prompt_tokens' => 812, 'completion_tokens' => 7, 'total_tokens' => 819], $chat->usage);
+        self::assertSame('INVOICE 42', $responses->content);
+        self::assertSame(['prompt_tokens' => 21, 'completion_tokens' => 9, 'total_tokens' => 30, 'cached_tokens' => 4], $responses->usage);
+    }
+
     public function testAMissingImageIsRefusedWithoutARequest(): void
     {
         $vision = $this->vision($this->api());

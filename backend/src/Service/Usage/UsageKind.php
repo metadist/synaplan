@@ -50,6 +50,7 @@ final class UsageKind
         'DOC_SUMMARY' => self::FILE,
         'FILE_UPLOADS' => self::FILE,
         'vision' => self::FILE,
+        'VISION' => self::FILE,
         'SORTING' => self::INTERNAL,
         'SEARCH_QUERY' => self::INTERNAL,
         'MEMORY_EXTRACTION' => self::INTERNAL,

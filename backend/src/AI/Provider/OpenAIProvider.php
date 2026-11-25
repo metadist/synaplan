@@ -19,10 +19,10 @@ use App\AI\Credential\ProviderKeyStore;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\EmbeddingProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\OpenAI\OpenAIApiClient;
 use App\AI\Provider\OpenAI\OpenAIChat;
 use App\AI\Provider\OpenAI\OpenAICurlTransport;
@@ -35,13 +35,14 @@ use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Tool\CatalogToolUse;
+use App\AI\Vision\VisionReply;
 use App\Service\Chat\ProviderTranscriptCapture;
 use OpenAI;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[AsAiProvider]
-class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, DescribesProviderInterface
+class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, ImageGenerationProviderInterface, MeteredVisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, DescribesProviderInterface
 {
     private const BASE_URL = 'https://api.openai.com/v1';
 
@@ -250,6 +251,11 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
     {
         return $this->vision->explainImage($imageUrl, $prompt, $options);
+    }
+
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
+    {
+        return $this->vision->explainImageMetered($imageUrl, $prompt, $options);
     }
 
     public function extractTextFromImage(string $imageUrl): string
