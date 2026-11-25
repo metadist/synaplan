@@ -8,13 +8,15 @@ use App\AI\Catalog\DescribesProviderInterface;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\ChatProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\Stream\OpenAiChatCompletionsDecoder;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Vision\ExplainsImageFromMeteredCall;
+use App\AI\Vision\VisionReply;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -29,9 +31,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Every subclass describes itself ({@see DescribesProviderInterface}) and
  * carries `#[AsAiProvider]`, so the catalog finds it by class alone.
  */
-abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, VisionProviderInterface, DescribesProviderInterface
+abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, MeteredVisionProviderInterface, DescribesProviderInterface
 {
     use ChatCompletionsToolSupport;
+    use ExplainsImageFromMeteredCall;
 
     protected const VISION_MAX_TOKENS = 2048;
 
@@ -226,7 +229,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
         }
     }
 
-    public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
     {
         $this->assertApiKey();
 
@@ -246,7 +249,7 @@ abstract class AbstractChatCompletionsCloudProvider implements ChatProviderInter
                 'max_tokens' => $options['max_tokens'] ?? self::VISION_MAX_TOKENS,
             ], $this->visionRequestOptions((string) $model)));
 
-            return $response->choices[0]->message->content ?? '';
+            return VisionReply::fromChatCompletion($response->choices[0]->message->content ?? '', $response->usage?->toArray());
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {

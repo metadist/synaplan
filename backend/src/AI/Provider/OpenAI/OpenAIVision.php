@@ -3,6 +3,7 @@
 namespace App\AI\Provider\OpenAI;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Vision\VisionReply;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -25,10 +26,15 @@ final class OpenAIVision
 
     public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
     {
-        // Use analyzeImage internally
-        $defaultPrompt = 'Describe what you see in this image in detail.';
+        return $this->explainImageMetered($imageUrl, $prompt, $options)->content;
+    }
 
-        return $this->analyzeImage($imageUrl, $prompt ?: $defaultPrompt, $options);
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
+    {
+        return $this->analyzeImageMetered($imageUrl, $prompt ?: 'Describe what you see in this image in detail.', $options);
     }
 
     public function extractTextFromImage(string $imageUrl): string
@@ -98,6 +104,14 @@ final class OpenAIVision
     }
 
     public function analyzeImage(string $imagePath, string $prompt, array $options = []): string
+    {
+        return $this->analyzeImageMetered($imagePath, $prompt, $options)->content;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function analyzeImageMetered(string $imagePath, string $prompt, array $options = []): VisionReply
     {
         if (null === $this->api->sdk()) {
             throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
@@ -170,7 +184,7 @@ final class OpenAIVision
 
             $response = $this->api->sdk()->chat()->create($payload);
 
-            return $response['choices'][0]['message']['content'] ?? '';
+            return VisionReply::fromChatCompletion($response['choices'][0]['message']['content'] ?? '', $response['usage'] ?? null);
         } catch (\Exception $e) {
             // Safety net: if a model we treated as chat-compatible turns out to
             // be Responses-only, retry there instead of failing the OCR.
@@ -197,7 +211,7 @@ final class OpenAIVision
      * {@see OpenAIResponses::create()}) but with a single user turn that
      * carries the prompt plus the image as an `input_image` part.
      */
-    private function analyzeImageViaResponses(string $model, string $prompt, string $dataUrl, array $options): string
+    private function analyzeImageViaResponses(string $model, string $prompt, string $dataUrl, array $options): VisionReply
     {
         try {
             // Default OCR/vision to the model's lowest reasoning tier so the
@@ -243,7 +257,7 @@ final class OpenAIVision
                 throw new ProviderException(sprintf('OpenAI vision returned no text (model=%s, status=%s%s). Reasoning-heavy models such as the "pro" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-5.5).', $model, $status, null !== $reason ? ', reason='.$reason : ''), 'openai');
             }
 
-            return $text;
+            return VisionReply::fromChatCompletion($text, OpenAIResponsesFormat::normalizeResponsesUsage($response->toArray()));
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {

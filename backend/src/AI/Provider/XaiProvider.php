@@ -10,17 +10,19 @@ use App\AI\Exception\ProviderException;
 use App\AI\Exception\ProviderFailureFactory;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\SupportsInlineReferenceImage;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Concerns\ChatCompletionsToolSupport;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\AI\Vision\ExplainsImageFromMeteredCall;
+use App\AI\Vision\VisionReply;
 use App\Service\File\FileHelper;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
@@ -48,9 +50,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * @see https://docs.x.ai/developers/model-capabilities/imagine
  * @see https://docs.x.ai/developers/model-capabilities/audio/voice
  */
-final class XaiProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, TextToSpeechProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface
+final class XaiProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, SupportsAsyncVideo, SupportsInlineReferenceImage, TextToSpeechProviderInterface, VideoGenerationProviderInterface, MeteredVisionProviderInterface
 {
     use ChatCompletionsToolSupport;
+    use ExplainsImageFromMeteredCall;
 
     private const PROVIDER_NAME = 'xai';
     private const DISPLAY_NAME = 'xAI';
@@ -388,7 +391,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
 
     // ==================== VISION ====================
 
-    public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
     {
         $this->assertApiKey();
 
@@ -408,7 +411,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
                 'max_completion_tokens' => $options['max_tokens'] ?? self::VISION_MAX_TOKENS,
             ]);
 
-            return $response->choices[0]->message->content ?? '';
+            return VisionReply::fromChatCompletion($response->choices[0]->message->content ?? '', $response->usage?->toArray());
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Throwable $e) {
@@ -418,10 +421,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
 
     public function extractTextFromImage(string $imageUrl): string
     {
-        return $this->explainImage(
-            $imageUrl,
-            'Extract all text from this image. Provide only the extracted text without any commentary.',
-        );
+        return $this->explainImage($imageUrl, 'Extract all text from this image. Provide only the extracted text without any commentary.');
     }
 
     public function compareImages(string $imageUrl1, string $imageUrl2): array

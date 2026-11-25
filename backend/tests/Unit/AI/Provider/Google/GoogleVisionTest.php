@@ -75,6 +75,22 @@ final class GoogleVisionTest extends TestCase
         self::assertEqualsWithDelta(900, (float) $request['timeout'], 0.001);
     }
 
+    public function testTheMeteredCallBillsThinkingTokensAsOutput(): void
+    {
+        $vision = new GoogleVision($this->api([self::json([
+            'candidates' => [[
+                'content' => ['parts' => [['text' => 'A chart.']]],
+                'finishReason' => 'STOP',
+            ]],
+            'usageMetadata' => ['promptTokenCount' => 270, 'candidatesTokenCount' => 4, 'thoughtsTokenCount' => 30, 'totalTokenCount' => 304],
+        ])]), new NullLogger(), $this->uploadDir);
+
+        $reply = $vision->explainImageMetered('photo.png');
+
+        self::assertSame('A chart.', $reply->content);
+        self::assertSame(['prompt_tokens' => 270, 'completion_tokens' => 34, 'total_tokens' => 304, 'cached_tokens' => 0, 'cache_creation_tokens' => 0], $reply->usage);
+    }
+
     public function testHydrogenVisionUsesGemini4OutputBudgetAndTimeout(): void
     {
         $vision = new GoogleVision($this->api([self::json([

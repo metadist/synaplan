@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\AI\Pipeline;
 
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\OpenAI\OpenAiGatewayToolCatalog;
 use App\AI\OpenAI\OpenAiGatewayToolLoop;
 use App\AI\Pipeline\AiAction;
@@ -17,7 +18,9 @@ use App\AI\Pipeline\UsageHookConfig;
 use App\AI\Pipeline\UsageHookMode;
 use App\AI\Provider\OpenAIProvider;
 use App\AI\Service\AiFacade;
+use App\AI\Service\AiVisionExecutor;
 use App\AI\Service\ProviderRegistry;
+use App\AI\Vision\VisionReply;
 use App\Entity\Model;
 use App\Entity\Subscription;
 use App\Entity\User;
@@ -51,12 +54,14 @@ use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
 use App\Service\Usage\AiChatUsageMeter;
 use App\Service\Usage\AiPipelineMeter;
+use App\Service\Usage\AiUsageSpecBuilder;
 use App\Service\Usage\CostCalculationService;
 use App\Service\Usage\FacadeMeteredChat;
 use App\Service\Usage\LegacyUsageWriter;
 use App\Service\Usage\TranscriptionUsageRecorder;
 use App\Service\Usage\TurnUsageLedger;
 use App\Service\Usage\UsageFailureLogger;
+use App\Service\Usage\VisionUsageMeter;
 use App\Service\Voice\VoiceLiveUsageService;
 use App\Tests\Characterization\Support\OpenAIFixtures;
 use App\Tests\Characterization\Support\OpenAISdkRecorder;
@@ -248,6 +253,119 @@ final class UsageHookTest extends TestCase
             self::assertCount(1, $this->buselog, sprintf('Live voice must write 1 row under mode %s.', $mode->value));
             self::assertSame(AiAction::VoiceLive->value, $this->buselog[0]['action']);
         }
+    }
+
+    public function testVisionCallWritesOneVisionRowUnderAllThreeModes(): void
+    {
+        $rowsByMode = [];
+        $chargedByMode = [];
+        foreach ([UsageHookMode::Legacy, UsageHookMode::Shadow, UsageHookMode::On] as $mode) {
+            [$rowsByMode[$mode->value], $result] = $this->runVisionCall($mode);
+            $chargedByMode[$mode->value] = $result['facade_charged_cost'] ?? null;
+            self::assertSame([], $this->mismatches, 'No shadow mismatch expected on a vision call.');
+            self::assertSame('a cat on a sofa', $result['content']);
+        }
+
+        self::assertCount(1, $rowsByMode['legacy']);
+        $row = $rowsByMode['legacy'][0];
+        self::assertSame(AiAction::Vision->value, $row['action']);
+        self::assertSame('openai', $row['provider']);
+        self::assertSame(1050, $row['tokens']);
+        self::assertSame(12, $row['model_id']);
+        self::assertGreaterThan(0.0, (float) $row['cost']);
+        self::assertSame($rowsByMode['legacy'], $rowsByMode['shadow']);
+        self::assertSame($rowsByMode['legacy'], $rowsByMode['on']);
+        self::assertIsString($chargedByMode['legacy']);
+        self::assertGreaterThan(0.0, (float) $chargedByMode['legacy']);
+        self::assertSame($chargedByMode['legacy'], $chargedByMode['shadow']);
+        self::assertSame($chargedByMode['legacy'], $chargedByMode['on']);
+    }
+
+    /**
+     * @return array{0: list<array<string, mixed>>, 1: array<string, mixed>}
+     */
+    private function runVisionCall(UsageHookMode $mode): array
+    {
+        [$facade, $limits, , $user, $modelRepo, , $meter] = $this->buildSpine(new OpenAISdkRecorder([], [self::SECRET]), $mode);
+
+        $provider = new class implements MeteredVisionProviderInterface {
+            public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
+            {
+                return VisionReply::fromChatCompletion('a cat on a sofa', ['prompt_tokens' => 1000, 'completion_tokens' => 50, 'total_tokens' => 1050]);
+            }
+
+            public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
+            {
+                return $this->explainImageMetered($imageUrl, $prompt, $options)->content;
+            }
+
+            public function extractTextFromImage(string $imageUrl): string
+            {
+                return '';
+            }
+
+            public function compareImages(string $imageUrl1, string $imageUrl2): array
+            {
+                return [];
+            }
+
+            public function getName(): string
+            {
+                return 'openai';
+            }
+
+            public function getDisplayName(): string
+            {
+                return 'OpenAI';
+            }
+
+            public function getDescription(): string
+            {
+                return '';
+            }
+
+            public function getCapabilities(): array
+            {
+                return ['vision'];
+            }
+
+            public function getDefaultModels(): array
+            {
+                return ['vision' => 'gpt-4o'];
+            }
+
+            public function getStatus(): array
+            {
+                return [];
+            }
+
+            public function isAvailable(): bool
+            {
+                return true;
+            }
+
+            public function getRequiredEnvVars(): array
+            {
+                return [];
+            }
+        };
+        $registry = $this->createStub(ProviderRegistry::class);
+        $registry->method('getVisionProvider')->willReturn($provider);
+        $registry->method('getAvailableProviders')->willReturn([]);
+        $modelConfig = $this->createStub(ModelConfigService::class);
+        $modelConfig->method('resolveVisionDefault')->willReturn(['provider' => 'openai', 'model' => 'gpt-4o', 'model_id' => null]);
+
+        $priceHistory = $this->createStub(ModelPriceHistoryRepository::class);
+        $priceHistory->method('findPriceAtTimestamp')->willReturn(null);
+        $specs = new AiUsageSpecBuilder(new CostCalculationService($modelRepo, $priceHistory, new NullLogger()), $limits, $modelRepo);
+        $userRepo = $this->createStub(UserRepository::class);
+        $userRepo->method('find')->willReturn($user);
+        $executor = new AiVisionExecutor($registry, $modelConfig, $facade->pipeline(), new NullLogger(), new VisionUsageMeter($limits, $userRepo, $specs, new NullLogger()));
+
+        $result = $executor->analyzeImage('photo.png', 'What is on the picture?', self::USER_ID);
+        $meter->reset();
+
+        return [$this->buselog, $result];
     }
 
     /**

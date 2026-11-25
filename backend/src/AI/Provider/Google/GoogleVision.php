@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Provider\Google;
 
 use App\AI\Exception\ProviderException;
+use App\AI\Vision\VisionReply;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -26,9 +27,15 @@ final class GoogleVision
 
     public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
     {
-        $defaultPrompt = 'Describe what you see in this image in detail.';
+        return $this->explainImageMetered($imageUrl, $prompt, $options)->content;
+    }
 
-        return $this->analyzeImage($imageUrl, $prompt ?: $defaultPrompt, $options);
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
+    {
+        return $this->analyzeImageMetered($imageUrl, $prompt ?: 'Describe what you see in this image in detail.', $options);
     }
 
     public function extractTextFromImage(string $imageUrl): string
@@ -106,6 +113,14 @@ final class GoogleVision
 
     public function analyzeImage(string $imagePath, string $prompt, array $options = []): string
     {
+        return $this->analyzeImageMetered($imagePath, $prompt, $options)->content;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    public function analyzeImageMetered(string $imagePath, string $prompt, array $options = []): VisionReply
+    {
         $key = $this->api->requireKey();
 
         try {
@@ -163,7 +178,9 @@ final class GoogleVision
             $data = $response->toArray();
             $this->api->checkFinishReason($data);
 
-            return self::extractText($data);
+            $usage = $data['usageMetadata'] ?? null;
+
+            return new VisionReply(self::extractText($data), \is_array($usage) ? GoogleUsage::fromMetadata($usage) : []);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {

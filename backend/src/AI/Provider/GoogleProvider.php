@@ -21,12 +21,12 @@ use App\AI\Catalog\ReasoningMatch;
 use App\AI\Credential\ProviderKeyStore;
 use App\AI\Interface\ChatProviderInterface;
 use App\AI\Interface\ImageGenerationProviderInterface;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\Interface\SupportsAsyncVideo;
 use App\AI\Interface\TextToSpeechProviderInterface;
 use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VideoGenerationProviderInterface;
-use App\AI\Interface\VisionProviderInterface;
 use App\AI\Provider\Google\GoogleApiClient;
 use App\AI\Provider\Google\GoogleChat;
 use App\AI\Provider\Google\GoogleImageGeneration;
@@ -38,6 +38,7 @@ use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Tool\CatalogToolUse;
+use App\AI\Vision\VisionReply;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -51,7 +52,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * - Gemini TTS and Gemini 3.5 Transcribe
  */
 #[AsAiProvider]
-class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, VisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo, DescribesProviderInterface
+class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, ImageGenerationProviderInterface, VideoGenerationProviderInterface, MeteredVisionProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, SupportsAsyncVideo, DescribesProviderInterface
 {
     private readonly GoogleApiClient $api;
     private readonly GoogleChat $chat;
@@ -286,6 +287,11 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string
     {
         return $this->vision->explainImage($imageUrl, $prompt, $options);
+    }
+
+    public function explainImageMetered(string $imageUrl, string $prompt = '', array $options = []): VisionReply
+    {
+        return $this->vision->explainImageMetered($imageUrl, $prompt, $options);
     }
 
     public function extractTextFromImage(string $imageUrl): string

@@ -7,9 +7,11 @@ namespace App\Tests\Unit\AI\Service;
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Exception\ProviderException;
 use App\AI\Health\ModelHealthRecorder;
+use App\AI\Interface\MeteredVisionProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\Service\AiFacade;
 use App\AI\Service\ProviderRegistry;
+use App\AI\Vision\VisionReply;
 use App\Service\Email\InternalEmailService;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Infrastructure\CircuitBreaker;
@@ -222,6 +224,25 @@ class AiFacadeAnalyzeImageTest extends TestCase
 
         $this->assertSame('openai', $result['provider']);
         $this->assertSame('gpt-4o', $result['model']);
+    }
+
+    public function testAMeteredProviderHandsItsTokensBackWithTheAnswer(): void
+    {
+        $this->modelConfig->method('resolveVisionDefault')->willReturn(['provider' => 'openai', 'model' => 'gpt-4o', 'model_id' => 7]);
+        $this->registry->method('getAvailableProviders')->willReturn([]);
+
+        $openai = $this->createMock(MeteredVisionProviderInterface::class);
+        $openai->method('getName')->willReturn('openai');
+        $openai->expects($this->never())->method('explainImage');
+        $openai->expects($this->once())->method('explainImageMetered')
+            ->willReturn(new VisionReply('a cat', ['prompt_tokens' => 900, 'completion_tokens' => 3, 'total_tokens' => 903]));
+        $this->registry->method('getVisionProvider')->willReturn($openai);
+
+        $result = $this->facade->analyzeImage('image.jpg', 'describe', 42);
+
+        $this->assertSame('a cat', $result['content']);
+        $this->assertSame(['prompt_tokens' => 900, 'completion_tokens' => 3, 'total_tokens' => 903], $result['usage']);
+        $this->assertArrayNotHasKey('facade_charged_cost', $result, 'A facade built without a vision meter does not meter.');
     }
 
     private function mockVisionProvider(string $name): VisionProviderInterface&MockObject
