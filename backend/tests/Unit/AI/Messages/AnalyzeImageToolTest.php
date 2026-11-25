@@ -93,6 +93,26 @@ final class AnalyzeImageToolTest extends TestCase
         @rmdir($uploadDir);
     }
 
+    public function testAStoredPictureReportsWhatTheCallWasBilled(): void
+    {
+        $ai = $this->createMock(AiFacade::class);
+        $ai->expects(self::exactly(3))->method('analyzeImage')->with('chat/plan.png', 'Read the text.', 5)->willReturnOnConsecutiveCalls(
+            ['content' => 'EXIT', 'provider' => 'openai', 'facade_charged_cost' => '0.004200'],
+            ['content' => '  ', 'provider' => 'openai', 'facade_charged_cost' => 0.001],
+            ['content' => 'EXIT', 'provider' => 'openai'],
+        );
+        $tool = $this->tool(available: true, ai: $ai);
+
+        $seen = $tool->analyseStored('chat/plan.png', 'Read the text.', 5, 'en');
+        $empty = $tool->analyseStored('chat/plan.png', 'Read the text.', 5, 'en');
+        $unmetered = $tool->analyseStored('chat/plan.png', 'Read the text.', 5, 'en');
+
+        self::assertSame(['text' => 'EXIT', 'isError' => false, 'summary' => 'image', 'chargedCost' => 0.0042], $seen);
+        self::assertTrue($empty['isError']);
+        self::assertSame(0.001, $empty['chargedCost'] ?? null, 'an empty answer was still billed');
+        self::assertSame(0.0, $unmetered['chargedCost'] ?? null);
+    }
+
     private function tool(
         bool $available,
         ?SsrfGuard $guard = null,

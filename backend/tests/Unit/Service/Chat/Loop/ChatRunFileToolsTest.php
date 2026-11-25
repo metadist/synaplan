@@ -147,6 +147,28 @@ final class ChatRunFileToolsTest extends TestCase
         self::assertSame([4711], $state->analyzed);
     }
 
+    public function testTheVisionCallCountsAgainstTheRunsCost(): void
+    {
+        $files = $this->createStub(ChatFileRepository::class);
+        $files->method('findInChat')->willReturnCallback(fn (int $u, int $c, ?string $g, int $id): File => $this->file($id, $id.'.png', 'chat/'.$id.'.png', 'web_upload', ''));
+        $vision = $this->createStub(AnalyzeImageTool::class);
+        $vision->method('analyseStored')->willReturnOnConsecutiveCalls(
+            ['text' => 'seen', 'isError' => false, 'summary' => 'image', 'chargedCost' => 0.0042],
+            ['text' => 'Vision model returned an empty description.', 'isError' => true, 'summary' => 'error', 'chargedCost' => 0.001],
+            ['text' => 'No vision model.', 'isError' => true, 'summary' => 'error'],
+        );
+        $tools = $this->tools($files, $vision);
+        $state = $this->state();
+        $state->costMicro = 10_000;
+
+        $tools->run($this->scope(), $state, ChatRunFileTools::ANALYZE_IMAGE, ['file_id' => 1]);
+        $failed = $tools->run($this->scope(), $state, ChatRunFileTools::ANALYZE_IMAGE, ['file_id' => 2]);
+        $tools->run($this->scope(), $state, ChatRunFileTools::ANALYZE_IMAGE, ['file_id' => 3]);
+
+        self::assertTrue($failed->failed);
+        self::assertSame(10_000 + 4_200 + 1_000, $state->costMicro, 'a billed call counts even when it failed; an unbilled one adds nothing');
+    }
+
     public function testOnlyPicturesGoToTheVisionModel(): void
     {
         $files = $this->createStub(ChatFileRepository::class);
