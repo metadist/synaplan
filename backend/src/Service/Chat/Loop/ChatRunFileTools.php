@@ -27,7 +27,7 @@ final readonly class ChatRunFileTools
     public const ANALYZE_IMAGE = 'analyze_image';
     public const NAMES = [self::LIST_FILES, self::READ_DOCUMENT, self::ANALYZE_IMAGE];
 
-    /** Pictures the vision model may look at in one run; the vision call is not part of the run's cost. */
+    /** Pictures the vision model may look at in one run; each call also counts against the run's cost limit. */
     public const MAX_PICTURES = 6;
 
     public const NOT_IN_CHAT = 'There is no file with this file_id in this chat. Use list_files to find it.';
@@ -144,6 +144,7 @@ final readonly class ChatRunFileTools
             $state->analyzed[] = $id;
         }
         $result = $this->vision->analyseStored($relative, $args['prompt'] ?? null, $state->userId, $state->locale);
+        $state->costMicro += FacadeChatRunModel::micro($result['chargedCost'] ?? null);
 
         return $result['isError']
             ? ChatToolResult::failed($result['text'])

@@ -121,8 +121,10 @@ final readonly class AnalyzeImageTool
     /**
      * Analyse a file that is already stored under the upload directory (a
      * picture of the chat, by its file ID). The file is left in place.
+     * `chargedCost` is what the vision call was billed, so a chat run can
+     * count it against its cost limit.
      *
-     * @return array{text: string, isError: bool, summary: string}
+     * @return array{text: string, isError: bool, summary: string, chargedCost?: float}
      */
     public function analyseStored(string $relativePath, mixed $prompt, int $userId, string $locale): array
     {
@@ -144,15 +146,17 @@ final readonly class AnalyzeImageTool
     }
 
     /**
-     * @return array{text: string, isError: bool, summary: string}
+     * @return array{text: string, isError: bool, summary: string, chargedCost?: float}
      */
     private function analyse(string $relativePath, string $prompt, ?int $userId, ?string $locale): array
     {
         try {
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
+            $charged = is_numeric($result['facade_charged_cost'] ?? null) ? max(0.0, (float) $result['facade_charged_cost']) : 0.0;
             $text = trim((string) ($result['content'] ?? ''));
             if ('' === $text) {
-                return $this->error('Vision model returned an empty description.');
+                // An empty answer was still billed.
+                return [...$this->error('Vision model returned an empty description.'), 'chargedCost' => $charged];
             }
 
             $this->logger->info('AnalyzeImageTool: analysis completed', [
@@ -165,6 +169,7 @@ final readonly class AnalyzeImageTool
                 'text' => $text,
                 'isError' => false,
                 'summary' => 'image',
+                'chargedCost' => $charged,
             ];
         } catch (\InvalidArgumentException $e) {
             return $this->error($e->getMessage());
