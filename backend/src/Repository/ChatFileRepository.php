@@ -103,7 +103,11 @@ final class ChatFileRepository extends ServiceEntityRepository
             ->setParameter('chatId', $chatId);
 
         if (null !== $groupKey && '' !== $groupKey) {
-            return $qb->andWhere('('.$inChat.' OR f.groupKey = :groupKey)')->setParameter('groupKey', $groupKey);
+            // A project source the cloud reported deleted, or an incognito
+            // upload, is hidden from the Files list; a run does not see it either.
+            $source = 'f.groupKey = :groupKey AND f.sourceDeletedAt IS NULL AND f.ephemeral = false';
+
+            return $qb->andWhere('('.$inChat.' OR ('.$source.'))')->setParameter('groupKey', $groupKey);
         }
 
         return $qb->andWhere('('.$inChat.')');

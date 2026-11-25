@@ -67,6 +67,18 @@ final class ChatRunLookupRepositoryTest extends KernelTestCase
         self::assertSame(2, $this->files->total(self::OWNER_ID, (int) $chat->getId(), 'project:abc'));
     }
 
+    public function testAHiddenProjectSourceIsNotPartOfTheChat(): void
+    {
+        $chat = $this->chat(self::OWNER_ID);
+        $deleted = $this->persistFile(self::OWNER_ID, 'gone.txt', null, 'project:abc')->setSourceDeletedAt(time());
+        $incognito = $this->persistFile(self::OWNER_ID, 'incognito.txt', null, 'project:abc')->setEphemeral(true);
+        $this->em->flush();
+
+        self::assertNull($this->files->findInChat(self::OWNER_ID, (int) $chat->getId(), 'project:abc', (int) $deleted->getId()));
+        self::assertNull($this->files->findInChat(self::OWNER_ID, (int) $chat->getId(), 'project:abc', (int) $incognito->getId()));
+        self::assertSame(0, $this->files->total(self::OWNER_ID, (int) $chat->getId(), 'project:abc'));
+    }
+
     public function testAFileOfAnotherChatOrPersonDoesNotResolve(): void
     {
         $chat = $this->chat(self::OWNER_ID);

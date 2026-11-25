@@ -54,6 +54,15 @@ final class ChatRunFileToolsTest extends TestCase
         $this->tools($files)->run($this->scope(), $this->state(), ChatRunFileTools::LIST_FILES, ['page' => 9]);
     }
 
+    public function testAPageSentAsAStringIsRead(): void
+    {
+        $files = $this->createMock(ChatFileRepository::class);
+        $files->method('total')->willReturn(45);
+        $files->expects(self::once())->method('page')->with(self::USER, self::CHAT, null, 40, 20)->willReturn([]);
+
+        $this->tools($files)->run($this->scope(), $this->state(), ChatRunFileTools::LIST_FILES, ['page' => '3']);
+    }
+
     public function testAChatWithoutFilesSaysSo(): void
     {
         $result = $this->tools($this->createStub(ChatFileRepository::class))->run($this->scope(), $this->state(), ChatRunFileTools::LIST_FILES, []);

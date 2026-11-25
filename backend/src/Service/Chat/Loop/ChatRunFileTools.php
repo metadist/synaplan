@@ -91,7 +91,7 @@ final readonly class ChatRunFileTools
             return ChatToolResult::text('This chat has no files.');
         }
         $pages = (int) ceil($total / self::PAGE);
-        $page = min($pages, max(1, \is_int($args['page'] ?? null) ? $args['page'] : 1));
+        $page = min($pages, max(1, self::int($args['page'] ?? null) ?? 1));
         $lines = ["Files of this chat (page {$page} of {$pages}, {$total} in all):"];
         foreach ($this->files->page($userId, $chatId, $groupKey, ($page - 1) * self::PAGE, self::PAGE) as $file) {
             $lines[] = $this->line($file);
@@ -112,7 +112,7 @@ final readonly class ChatRunFileTools
         if ('' === trim($text)) {
             return ChatToolResult::text(self::NO_TEXT);
         }
-        $offset = min(max(0, \is_int($args['offset'] ?? null) ? $args['offset'] : 0), $length);
+        $offset = min(max(0, self::int($args['offset'] ?? null) ?? 0), $length);
         $end = min($length, $offset + self::SLICE);
         $head = 'File: '.$this->name($file)."\nfile_id: ".$file->getId()."\nCharacters {$offset}–{$end} of {$length}.";
         if ($end < $length) {
@@ -166,16 +166,23 @@ final readonly class ChatRunFileTools
     /** @param array<string, mixed> $args */
     private function resolve(ChatRunScope $scope, array $args): ?File
     {
-        $fileId = $args['file_id'] ?? null;
-        if (\is_string($fileId) && ctype_digit($fileId)) {
-            $fileId = (int) $fileId;
-        }
-        if (!\is_int($fileId) || $fileId < 1) {
+        $fileId = self::int($args['file_id'] ?? null);
+        if (null === $fileId || $fileId < 1) {
             return null;
         }
         [$userId, $chatId, $groupKey] = $this->where($scope);
 
         return $this->files->findInChat($userId, $chatId, $groupKey, $fileId);
+    }
+
+    /** A model may send a number as a string; anything else that is not a whole number is null. */
+    private static function int(mixed $value): ?int
+    {
+        if (\is_string($value) && ctype_digit($value)) {
+            return (int) $value;
+        }
+
+        return \is_int($value) ? $value : null;
     }
 
     /** @return array{int, int, ?string} */
