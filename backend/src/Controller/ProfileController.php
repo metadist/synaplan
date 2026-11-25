@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Repository\UserRepository;
+use App\Service\Auth\EmailChange;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Email\EmailChatService;
 use App\Service\Iam\UserDeletionService;
@@ -31,6 +32,7 @@ class ProfileController extends AbstractController
         private LoggerInterface $logger,
         private UserRepository $userRepository,
         private UserLifecycleService $lifecycle,
+        private EmailChange $emailChange,
     ) {
     }
 
@@ -53,6 +55,7 @@ class ProfileController extends AbstractController
                     type: 'object',
                     properties: [
                         new OA\Property(property: 'email', type: 'string', example: 'user@example.com'),
+                        new OA\Property(property: 'pendingEmail', type: 'string', nullable: true, example: 'new@example.com', description: 'New sign-in email that waits for the link mailed to it, or null'),
                         new OA\Property(property: 'firstName', type: 'string', example: 'John'),
                         new OA\Property(property: 'lastName', type: 'string', example: 'Doe'),
                         new OA\Property(property: 'phone', type: 'string', example: '+49123456789'),
@@ -103,9 +106,7 @@ class ProfileController extends AbstractController
             };
 
             if ($lastLoginKey && isset($details[$lastLoginKey])) {
-                $externalAuthInfo = [
-                    'lastLogin' => $details[$lastLoginKey],
-                ];
+                $externalAuthInfo = ['lastLogin' => $details[$lastLoginKey]];
             }
         }
 
@@ -113,6 +114,7 @@ class ProfileController extends AbstractController
             'success' => true,
             'profile' => [
                 'email' => $user->getMail(),
+                'pendingEmail' => $this->emailChange->pending($user),
                 'firstName' => $details['firstName'] ?? $details['first_name'] ?? '',
                 'lastName' => $details['lastName'] ?? $details['last_name'] ?? '',
                 'phone' => $details['phone'] ?? '',
@@ -157,7 +159,7 @@ class ProfileController extends AbstractController
         required: true,
         content: new OA\JsonContent(
             properties: [
-                new OA\Property(property: 'email', type: 'string', example: 'user@example.com', description: 'Sign-in email. Unchanged values are ignored. A different address requires currentPassword and is rejected for accounts that sign in through an external provider.'),
+                new OA\Property(property: 'email', type: 'string', example: 'user@example.com', description: 'Sign-in email. Unchanged values are ignored. A different address requires currentPassword, is rejected for accounts that sign in through an external provider, and is stored only after the link mailed to it was opened.'),
                 new OA\Property(property: 'currentPassword', type: 'string', format: 'password', example: 'OldPass123!', description: 'Required only when email changes. Confirms the signed-in person owns the account.'),
                 new OA\Property(property: 'firstName', type: 'string', example: 'John'),
                 new OA\Property(property: 'lastName', type: 'string', example: 'Doe'),
@@ -189,7 +191,8 @@ class ProfileController extends AbstractController
             properties: [
                 new OA\Property(property: 'success', type: 'boolean', example: true),
                 new OA\Property(property: 'message', type: 'string', example: 'Profile updated successfully'),
-                new OA\Property(property: 'email', type: 'string', example: 'user@example.com', description: 'Sign-in email after the update'),
+                new OA\Property(property: 'email', type: 'string', example: 'user@example.com', description: 'Sign-in email after the update. A new address is not stored yet.'),
+                new OA\Property(property: 'pendingEmail', type: 'string', nullable: true, example: 'new@example.com', description: 'New sign-in email that waits for the link mailed to it, or null'),
             ]
         )
     )]
@@ -270,13 +273,6 @@ class ProfileController extends AbstractController
             }
         }
 
-        if (is_string($emailChange)) {
-            $user->setMail($emailChange);
-            // Leave emailVerified as it is. Login refuses unverified addresses,
-            // so clearing the flag here would lock the person out of the
-            // account they just proved they own with their password.
-        }
-
         $user->setUserDetails($details);
         try {
             $this->userRepository->save($user);
@@ -290,6 +286,8 @@ class ProfileController extends AbstractController
             );
         }
 
+        // A new address is stored only once the link mailed to it was opened.
+        $pendingEmail = is_string($emailChange) ? $this->emailChange->request($user, $emailChange) : $this->emailChange->pending($user);
         $this->logger->info('Profile updated', [
             'user_id' => $user->getId(),
             'email_changed' => is_string($emailChange),
@@ -299,6 +297,7 @@ class ProfileController extends AbstractController
             'success' => true,
             'message' => 'Profile updated successfully',
             'email' => $user->getMail(),
+            'pendingEmail' => $pendingEmail,
         ]);
     }
 

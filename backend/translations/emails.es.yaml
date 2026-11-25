@@ -71,6 +71,13 @@ email:
     or_copy: 'O copia este enlace en tu navegador:'
     not_you: 'Si no lo has pedido, ignora este correo; nadie puede iniciar sesión sin el enlace.'
 
+  email_change:
+    title: 'Confirma tu nuevo correo de inicio de sesión de Synaplan'
+    body: 'Usa este botón para que esta dirección sea el correo de inicio de sesión de tu cuenta de Synaplan. Funciona una vez, durante una hora. Hasta entonces sigues iniciando sesión con tu dirección actual.'
+    button: 'Confirmar nuevo correo'
+    or_copy: 'O copia este enlace en tu navegador:'
+    not_you: 'Si no lo has pedido, ignora este correo; nada cambia sin el enlace.'
+
   code_signup:
     title: 'Tu invitación a Synaplan'
     body: 'Usa este botón para continuar. Funciona una vez, durante 15 minutos. Tu cuenta se crea al abrirlo, salvo que esta dirección ya tenga una.'

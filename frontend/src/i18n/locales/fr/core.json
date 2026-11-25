@@ -48,6 +48,7 @@
     "register": "Inscription",
     "forgotPassword": "Mot de passe oublié",
     "codeSignup": "Code d'invitation",
+    "emailChange": "Confirmer l’e-mail",
     "loginLink": "Connexion",
     "resetPassword": "Réinitialiser le mot de passe",
     "changePassword": "Changer le mot de passe",

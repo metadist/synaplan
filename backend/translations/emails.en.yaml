@@ -72,6 +72,13 @@ email:
     or_copy: 'Or copy this link into your browser:'
     not_you: 'If you did not ask for this, ignore this mail; nobody can sign in without the link.'
 
+  email_change:
+    title: 'Confirm your new sign-in email for Synaplan'
+    body: 'Use this button to make this address the sign-in email of your Synaplan account. It works once, for one hour. Until then you keep signing in with your current address.'
+    button: 'Confirm new email'
+    or_copy: 'Or copy this link into your browser:'
+    not_you: 'If you did not ask for this, ignore this mail; nothing changes without the link.'
+
   code_signup:
     title: 'Your invitation to Synaplan'
     body: 'Use this button to continue. It works once, for 15 minutes. Your account is created when you open it, unless this address already has one.'

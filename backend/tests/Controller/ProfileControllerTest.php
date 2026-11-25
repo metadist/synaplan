@@ -370,7 +370,7 @@ class ProfileControllerTest extends WebTestCase
         $this->em->flush();
     }
 
-    public function testAdminCanChangeOwnSignInEmail(): void
+    public function testANewSignInEmailIsNotStoredBeforeItsLinkIsOpened(): void
     {
         $this->user->setUserLevel('ADMIN');
         $this->user->setEmailVerified(true);
@@ -384,13 +384,17 @@ class ProfileControllerTest extends WebTestCase
 
         $this->assertResponseIsSuccessful();
         $payload = json_decode($this->client->getResponse()->getContent(), true);
-        $this->assertSame('admin.new@example.com', $payload['email']);
+        $this->assertSame('profiletest@example.com', $payload['email']);
+        $this->assertSame('admin.new@example.com', $payload['pendingEmail']);
 
         $this->em->refresh($this->user);
-        $this->assertSame('admin.new@example.com', $this->user->getMail());
+        $this->assertSame('profiletest@example.com', $this->user->getMail());
         $this->assertTrue($this->user->isEmailVerified());
         $this->assertSame('Ada', $this->user->getUserDetails()['firstName']);
         $this->assertSame('ADMIN', $this->user->getUserLevel());
+
+        $this->client->request('DELETE', '/api/v1/profile/email-change', [], [], ['HTTP_AUTHORIZATION' => 'Bearer '.$this->token]);
+        $this->assertResponseIsSuccessful();
     }
 
     public function testUnchangedEmailDoesNotRequirePassword(): void

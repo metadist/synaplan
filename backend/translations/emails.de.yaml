@@ -72,6 +72,13 @@ email:
     or_copy: 'Oder kopiere diesen Link in deinen Browser:'
     not_you: 'Wenn du das nicht angefordert hast, ignoriere diese Mail; ohne den Link kann sich niemand anmelden.'
 
+  email_change:
+    title: 'Bestätige deine neue Anmelde-E-Mail für Synaplan'
+    body: 'Mit diesem Button wird diese Adresse die Anmelde-E-Mail deines Synaplan-Kontos. Er funktioniert einmal, eine Stunde lang. Bis dahin meldest du dich weiter mit deiner bisherigen Adresse an.'
+    button: 'Neue E-Mail bestätigen'
+    or_copy: 'Oder kopiere diesen Link in deinen Browser:'
+    not_you: 'Wenn du das nicht angefordert hast, ignoriere diese Mail; ohne den Link ändert sich nichts.'
+
   code_signup:
     title: 'Deine Einladung zu Synaplan'
     body: 'Mit diesem Button geht es weiter. Er funktioniert einmal, 15 Minuten lang. Dein Konto entsteht, wenn du ihn öffnest — außer diese Adresse hat schon eines.'

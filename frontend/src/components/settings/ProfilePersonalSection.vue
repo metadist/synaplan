@@ -53,6 +53,24 @@
         <p class="text-sm txt-secondary mt-1">
           {{ emailFieldHint }}
         </p>
+        <div
+          v-if="pendingEmail"
+          class="mt-3 flex flex-wrap items-center gap-3"
+          role="status"
+          data-testid="notice-email-pending"
+        >
+          <p class="text-sm txt-secondary">
+            {{ $t('profile.personalInfo.emailPending', { email: pendingEmail }) }}
+          </p>
+          <button
+            type="button"
+            class="btn-secondary px-4 py-2.5 text-sm font-medium"
+            data-testid="btn-cancel-email-change"
+            @click="cancelEmailChange"
+          >
+            {{ $t('profile.personalInfo.emailPendingCancel') }}
+          </button>
+        </div>
         <div v-if="canChangeEmail && emailChanged" class="mt-4" data-testid="field-email-password">
           <label class="block txt-primary font-medium mb-2" for="profile-email-password">
             {{ $t('profile.personalInfo.emailPasswordLabel') }}
@@ -99,6 +117,8 @@ const {
   canChangeEmail,
   emailChanged,
   emailPassword,
+  pendingEmail,
+  cancelEmailChange,
   emailFieldHint,
   emailInputClass,
 } = injectProfileSettings()

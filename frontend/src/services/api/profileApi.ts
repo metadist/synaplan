@@ -7,6 +7,7 @@ import { httpClient } from './httpClient'
 
 export interface Profile {
   email: string
+  pendingEmail?: string | null
   firstName: string
   lastName: string
   phone: string
@@ -52,7 +53,12 @@ export const profileApi = {
   async updateProfile(
     profileData: Partial<Profile>,
     currentPassword?: string
-  ): Promise<{ success?: boolean; message?: string; email?: string }> {
+  ): Promise<{
+    success?: boolean
+    message?: string
+    email?: string
+    pendingEmail?: string | null
+  }> {
     const payload: Record<string, unknown> = { ...profileData }
     if (currentPassword) {
       payload.currentPassword = currentPassword

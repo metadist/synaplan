@@ -14,6 +14,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { type UserProfile } from '@/mocks/profile'
 import { useNotification } from '@/composables/useNotification'
+import { usePendingEmailChange } from '@/composables/usePendingEmailChange'
 import { useUnsavedChanges } from '@/composables/useUnsavedChanges'
 import { setAccountTimezone } from '@/composables/useAccountTimezone'
 import { profileApi } from '@/services/api'
@@ -74,7 +75,7 @@ export function useProfileSettings() {
   const profileLoadFailed = ref(false)
   const authProvider = ref<string>('Email/Password')
   const isExternalAuth = ref(false)
-  const emailPassword = ref('')
+  const emailChange = usePendingEmailChange()
   const saveSuccessMessage = ref('')
   const externalAuthLastLogin = ref<string | null>(null)
   const showDeleteModal = ref(false)
@@ -143,6 +144,7 @@ export function useProfileSettings() {
 
       Object.assign(formData.value, response.profile)
       originalData.value = { ...formData.value }
+      emailChange.pendingEmail.value = response.profile.pendingEmail ?? null
 
       canChangePassword.value = response.profile.canChangePassword ?? true
       authProvider.value = response.profile.authProvider ?? 'Email/Password'
@@ -277,7 +279,7 @@ export function useProfileSettings() {
         error(t('profile.personalInfo.emailInvalid'))
         throw new Error('Validation failed')
       }
-      if (!emailPassword.value) {
+      if (!emailChange.emailPassword.value) {
         error(t('profile.personalInfo.emailPasswordRequired'))
         throw new Error('Validation failed')
       }
@@ -309,16 +311,13 @@ export function useProfileSettings() {
       delete profilePayload.language
       const updated = await profileApi.updateProfile(
         profilePayload,
-        changingEmail ? emailPassword.value : undefined
+        changingEmail ? emailChange.emailPassword.value : undefined
       )
       if (typeof updated?.email === 'string' && updated.email !== '') {
         formData.value.email = updated.email
       }
       if (changingEmail) {
-        emailPassword.value = ''
-        saveSuccessMessage.value = t('profile.personalInfo.emailSaved', {
-          email: formData.value.email,
-        })
+        saveSuccessMessage.value = emailChange.saved(updated?.pendingEmail, formData.value.email)
       }
       profileSaved = true
       setAccountTimezone(formData.value.timezone ?? '')
@@ -366,7 +365,7 @@ export function useProfileSettings() {
     discardChanges()
     passwordData.value = { current: '', new: '', confirm: '' }
     passwordTouchedByUser.value = false
-    emailPassword.value = ''
+    emailChange.emailPassword.value = ''
   }
 
   const handleDeleteAccount = async () => {
@@ -402,7 +401,7 @@ export function useProfileSettings() {
     profileLoadFailed,
     authProvider,
     isExternalAuth,
-    emailPassword,
+    ...emailChange,
     externalAuthLastLogin,
     showDeleteModal,
     deleteConfirmPassword,

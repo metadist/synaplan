@@ -18,6 +18,7 @@ import { resolveForcedPasswordChange, CHANGE_PASSWORD_ROUTE } from '@/router/for
 import { isGuestOnlyAuthRoute } from '@/router/guestOnlyAuth'
 import { aiLiteracyRoutes } from '@/router/aiLiteracyRoutes'
 import { codeSignupRoutes } from '@/router/codeSignupRoutes'
+import { emailChangeRoutes } from '@/router/emailChangeRoutes'
 import { loginLinkRoutes } from '@/router/loginLinkRoutes'
 import {
   ensureWizardRequired,
@@ -112,6 +113,7 @@ const router = createRouter({
     ...payFirstRoutes,
     ...codeSignupRoutes,
     ...loginLinkRoutes,
+    ...emailChangeRoutes,
     {
       path: '/forgot-password',
       name: 'forgot-password',

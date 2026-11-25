@@ -151,7 +151,6 @@
         "src/Controller/MessagesApiController.php::MessagesApiController::streamResponse": 182,
         "src/Controller/OpenAICompatibleController.php::OpenAICompatibleController::handleStream": 153,
         "src/Controller/PhoneVerificationController.php::PhoneVerificationController::requestVerification": 139,
-        "src/Controller/ProfileController.php::ProfileController::updateProfile": 104,
         "src/Controller/PromptController.php::PromptController::create": 103,
         "src/Controller/PromptController.php::PromptController::getAvailableFiles": 111,
         "src/Controller/PromptController.php::PromptController::update": 147,
