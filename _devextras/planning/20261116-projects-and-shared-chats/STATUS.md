@@ -15,7 +15,7 @@ to them.
 | PJ5b | merged | #3218 | The hand-over in the request, flag off. G1 accepted by the owner (+10.1 % cost, first token faster). See "2026-11-20 — PJ5b" below. |
 | PJ5c | merged | #3221 | The check before delivery (03 §3.2), flag off. A note under the answer, nothing removed (owner). See "2026-11-20 — PJ5c" below. |
 | PJ6 | merged | #3223 | Cost limit as a share of the person's monthly budget, and circle detection, flag off. See "2026-11-20 — PJ6" below. |
-| PJ7a | PR open | branch `feat/chat-run-lookups` | Chat search and files by ID for a chat run, flag off. §0 #27 decided (owner, 2026-11-25). See "2026-11-25 — PJ7a" below. |
+| PJ7a | merged | #3266 | Chat search and files by ID for a chat run, flag off. §0 #27 decided (owner, 2026-11-25). See "2026-11-25 — PJ7a" below. |
 | PJ7b | not started | — | Run notes, `TranscriptCompactor`, `notes.compacted`, writing `BRUNS.BNOTES` (the column exists since AH8a), editing a picture by file ID, and "Keep going" (`continueFrom`). |
 | PJ8–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 

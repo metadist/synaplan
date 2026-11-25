@@ -1,6 +1,6 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-25, `main` @ `fa202d4cf` (PJ6 gemergt), PJ7a auf `feat/chat-run-lookups`. Geschrieben für einen Agenten ohne Zugriff
+Stand: 2026-11-25, `main` @ `9f95f9139` (PJ7a #3266 und Vision-Abrechnung #3267 gemergt). Geschrieben für einen Agenten ohne Zugriff
 auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Planungsdateien
 geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
@@ -24,8 +24,8 @@ mit Blick auf Usability und vor allem Sicherheit.
 (AU26, AH8a, AH8b) sind gemergt. Der Owner hat PJ5 geteilt: **PJ5a** (der Lauf auf
 dem Kernel), **PJ5b** (die Übergabe im Request) und **PJ5c** (der Check vor der
 Auslieferung) sind gemergt, ebenso **PJ6** (Kostenlimit und Kreiserkennung). PJ7 ist
-geteilt: **PJ7a** (Chat-Suche und Dateien per ID) liegt als PR vor, danach **PJ7b**
-(Abschnitt 9).
+geteilt: **PJ7a** (Chat-Suche und Dateien per ID) ist gemergt, als Nächstes kommt
+**PJ7b** (Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
@@ -43,7 +43,8 @@ geteilt: **PJ7a** (Chat-Suche und Dateien per ID) liegt als PR vor, danach **PJ7
 | PJ5b Übergabe Request → Lauf, Tool-Katalog, G1 (Owner: reicht) | gemergt | #3218 |
 | PJ5c Check vor der Auslieferung (03 §3.2) | gemergt | #3221 |
 | PJ6 Kostenlimit (Anteil des Monatsbudgets, Nutzer wählt) und Kreiserkennung | gemergt | #3223 |
-| PJ7a Chat-Suche und Dateien per ID (§0 #27 entschieden) | PR offen | `feat/chat-run-lookups` |
+| PJ7a Chat-Suche und Dateien per ID (§0 #27 entschieden) | gemergt | #3266 |
+| Vision-Aufrufe als `VISION` abgerechnet (Voraussetzung für Bildkosten im Lauf) | gemergt | #3267 |
 | PJ7b Notizen, Verdichtung, `BRUNS.BNOTES`, "Weiter" | **nächster Schritt** | — |
 | PJ8–PJ28 | nicht begonnen | — |
 
@@ -165,6 +166,43 @@ Composer, Chat ins Projekt und heraus über das Chat-Menü, angepinnte Projekte 
   (Umgebung, siehe Abschnitt 6). Copilot konnte #3201 wegen erschöpfter Quote nicht
   reviewen; der Owner hat trotzdem gemergt.
 
+### PJ5a–PJ6 (Chat-Lauf, Flag aus)
+
+Der Chat-Lauf (`App\Service\Chat\Loop`) läuft auf dem Kernel (PJ5a), ein Tool-Turn
+wird aus dem Request übergeben und weiter gestreamt (PJ5b), ein Check prüft die
+Antwort vor der Auslieferung (PJ5c), Kostenlimit und Kreiserkennung beenden ihn mit
+einem Ergebnis (PJ6). Dateien siehe Abschnitt 4, Grenzen Abschnitt 6.
+
+### PJ7a (#3266): Chat-Suche und Dateien per ID
+
+§0 #27 (Owner, 2026-11-25): frühere Nachrichten sind über ein Tool erreichbar. Ein
+Lauf bekommt vier lesende Tools über `ChatRunLookups`; `RegistryChatRunToolbox`
+bietet sie an und verteilt die Aufrufe.
+
+- `conversation_search` (`ChatRunConversationSearch`): `query` findet Nachrichten
+  dieses Chats, die jedes Wort enthalten (höchstens 6 Wörter, 8 Treffer, neueste
+  zuerst, Ausschnitt mit Message-ID, Autor, Zeit). `around` liest eine Nachricht mit
+  drei davor und drei danach. Die eigene Frage und Antwort des Laufs
+  (`incomingMessageId`, `replyMessageId`) sind ausgenommen.
+- `list_files` (`ChatRunFileTools`): Dateien des Chats (dort erzeugt oder an eine
+  Nachricht gehängt) und Quellen des Projekts, 20 pro Seite.
+- `read_document`: Text per file_id in Teilen zu 8.000 Zeichen. Eine md/txt/csv/json
+  ohne extrahierten Text (z. B. ein generierter Research-Bericht) wird von der Platte
+  gelesen, höchstens 1 MB, nur über `catalog->absolutePath()` (Upload-Root-Prüfung).
+- `analyze_image`: das Vision-Modell sieht ein gespeichertes Bild per file_id
+  (`AnalyzeImageTool::analyseStored`); nur der Text geht ins Transkript. Nur
+  angeboten, wenn die Person ein Vision-Modell hat. Höchstens 6 verschiedene Bilder
+  pro Lauf (`ChatRunFileTools::MAX_PICTURES`, im State als `analyzed`, der Codec
+  kappt eine gefälschte Liste).
+- Queries in zwei neuen Repositories: `ChatFileRepository`,
+  `ChatMessageSearchRepository` (`MessageRepository` ist eingefroren). Eine ID wird
+  nur in diesem Chat dieser Person aufgelöst oder als Quelle des aktuellen Projekts;
+  gelöschte Projektquellen erscheinen nicht. `%` und `_` sind in der Suche wörtlich.
+- Prompt: Regel 6 in `tools:chat_loop` (`PromptCatalog`, Seeder upsertet).
+- Walk im Browser (Admin, Claude Sonnet 5.5, `LOOP.ENABLED`=1 nur im Dev-Stack):
+  Codewort per `conversation_search` gefunden, Bericht per `list_files` und
+  `read_document` gelesen, Wort auf einem generierten Bild per `analyze_image`.
+
 ## 3. Wichtige Architektur- und Designentscheidungen
 
 - **Quellen sind normale Dateien** (`BFILES`) unter dem Wissensordner des Projekts
@@ -204,7 +242,9 @@ Composer, Chat ins Projekt und heraus über das Chat-Menü, angepinnte Projekte 
   (Anteil der Person, `BCONFIG` Owner = Person, `LOOP.RUN_COST_PERCENT`),
   `ChatRunCostGuard`, `ChatRunStallDetector`, `ChatRunWrapUp`, `ChatRunLoopLimits`;
   Einstellung `ChatRunLimitController` (`/api/v1/config/chat-run-limit`) und
-  `frontend/src/components/settings/ChatRunLimitSetting.vue`.
+  `frontend/src/components/settings/ChatRunLimitSetting.vue`. Seit PJ7a:
+  `ChatRunLookups`, `ChatRunConversationSearch`, `ChatRunFileTools`,
+  `Repository/ChatFileRepository`, `Repository/ChatMessageSearchRepository`.
 - Lesen: `ChatStreamOrchestrator`, `MessageProcessor`, `TurnDispatcher`, `ChatHandler`,
   `ToolRegistry`, `PromptCatalog`, `Service/Chat/Run/*` (heutiger re-attachbarer
   Chat-Turn: `ChatRunService`, `RunStream`, `PumpChatRunner`),
@@ -265,6 +305,13 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 - **G1 knapp, vom Owner akzeptiert (2026-11-20):** Median +10,1 % Kosten gegenüber
   dem Lauf ohne Loop am selben Tag (Tool-Deklarationen und Tool-Use-Preamble des
   Providers, etwa 1.300 Token). Prompt-Caching wäre der nächste Hebel.
+- **PJ7a-Grenzen:** `analyze_image` zählt noch nicht zu den Kosten des Laufs. Seit
+  #3267 schreibt `AiFacade::analyzeImage` eine `VISION`-Zeile und gibt
+  `facade_charged_cost` zurück, aber `ChatRunFileTools::look()` reicht sie nicht an
+  `costMicro` weiter (Abschnitt 8, Punkt 1). Bis dahin begrenzt nur `MAX_PICTURES`.
+  Ein Lauf startet nur bei Providern mit `nativeToolRouting` (Anthropic, Groq);
+  Gemini bleibt auf dem klassischen Pfad, Prompts wie "vergleiche …" gehen zu
+  Deep Research. Zum Testen also ein Anthropic-Modell wählen.
 - **Warten ohne `sleep`:** der `LongWaitGateTest` verbietet neue Sleeps. Ein Leser
   wartet blockierend auf den Stream `run:…:events:wake` (`RunKeys::awaitEvent`).
 - **PJ5a-Grenzen:** der Lauf bietet keine Dokument-Tools, keine Skills und keinen
@@ -303,17 +350,24 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 
 ## 8. Offene Aufgaben, nach Reihenfolge
 
-1. **PJ7a** PR abschließen (Copilot, CI), Owner mergt.
-2. **PJ7b** Notizen und Verdichtung; dazu "Weiter" (`continueFrom`) aus PJ6
-   (braucht `BNOTES`). "Jetzt antworten" (`answer_now`) kommt mit PJ8.
-3. **PJ8–PJ11** (Notizen, Chat-Suche, Dateien per ID, Rückfragekarte usw.); offene
-   Zeilen siehe Abschnitt 6. `LOOP.ENABLED` bleibt 0 bis PJ6 und PJ8.
+1. **Bildkosten im Lauf** (klein, Folge aus #3266 und #3267): in
+   `ChatRunFileTools::look()` `facade_charged_cost` des Vision-Aufrufs zu den Kosten
+   des Laufs addieren, damit `ChatRunCostGuard` sie sieht. `analyseStored` muss dafür
+   den Wert durchreichen. Test zuerst; `MAX_PICTURES` bleibt als zweite Grenze. Kann
+   als eigener `fix:`-PR vor PJ7b oder als erster Commit von PJ7b kommen; den Owner
+   fragen, wenn unklar.
+2. **PJ7b** Notizen und Verdichtung (`RunNotes`, `TranscriptCompactor`,
+   `notes.compacted`, `BRUNS.BNOTES` schreiben), Bild bearbeiten per file_id, dazu
+   "Weiter" (`continueFrom`) aus PJ6. "Jetzt antworten" (`answer_now`) kommt mit PJ8.
+3. **PJ8–PJ11** (Karte für den Lauf, Stop, Rückfragekarte usw.); offene Zeilen siehe
+   Abschnitt 6. `LOOP.ENABLED` bleibt 0 bis PJ8 gemergt ist.
 4. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt.
 5. **Phase D (PJ20–PJ22)**, **Phase E (PJ23–PJ27)**, **PJ28** Flags an.
 
 ## 9. Exakt nächster Schritt: PJ7b
 
-Erst wenn PJ7a gemergt ist. §0 #27 ist entschieden (Owner, 2026-11-25: Chat-Suche als
+PJ7a ist gemergt (#3266). Vorher oder als ersten Commit Punkt 1 aus Abschnitt 8
+(Bildkosten). §0 #27 ist entschieden (Owner, 2026-11-25: Chat-Suche als
 Tool, in PJ7a gebaut). Die Spalte `BRUNS.BNOTES` gibt es seit AH8a, keine Schemaänderung.
 Brief: "PJ7b" in `04_sprints.md` (Notizen, Verdichtung) und
 `03_contracts.md` §1.5. Dazu gehört "Weiter" nach einem Wrap-up (`continueFrom`,
@@ -324,8 +378,33 @@ Brief: "PJ7b" in `04_sprints.md` (Notizen, Verdichtung) und
    (`ChatRunStep` und `ChatRunAnswer` wachsen nicht über ihre Rolle hinaus;
    `MessageRepository` ist im Größen-Ledger eingefroren, die Suche kommt in eine neue
    Repository-Klasse).
-3. Gate wie immer (`make ci-local`, E2E). `LOOP.ENABLED` bleibt 0 bis PJ8.
+3. Die Verdichtung darf IDs nicht verlieren: Message-IDs und file_ids, die der Lauf
+   schon gesehen hat, bleiben in den Notizen, damit `conversation_search` (`around`)
+   und `read_document` danach weiter funktionieren. `ChatRunState::analyzed` überlebt
+   die Verdichtung (sonst lässt sich `MAX_PICTURES` umgehen).
+4. Gate wie immer (`make ci-local`, E2E). `LOOP.ENABLED` bleibt 0 bis PJ8.
    Danach `STATUS.md` und diese Datei nachziehen.
+
+### Worauf der nächste Agent achten soll
+
+- **PR-Zustand vor jedem Push prüfen** (`gh pr view <n> --json state`). PJ7a wurde
+  gemergt, während noch an dem Branch gearbeitet wurde; nach dem Merge immer neuer
+  Branch von `main`.
+- **Sicherheit der Lookups:** jede neue Abfrage per ID geht über `ChatFileRepository`
+  oder `ChatMessageSearchRepository` mit Person, Chat und Projekt-Ordner. Nie eine
+  Datei oder Nachricht nur per ID laden. Integrationstest für "fremder Chat / fremde
+  Person liefert nichts" mitschreiben (`ChatRunLookupRepositoryTest` als Vorbild).
+- **Dateizugriff nur über `catalog->absolutePath()`**, nie einen Pfad aus Tool-Args
+  bauen. Bilddaten und Rohdateien kommen nie ins Transkript.
+- **Tests mit Laufdaten im Browser:** Admin aus `docs/DEVELOPMENT.md`, ein
+  Anthropic-Modell, `LOOP.ENABLED`=1 nur in der Dev-DB. Den Zustand eines Laufs zeigt
+  Redis `synaplan:dev:run:state:<uuid>` (JSON mit messages, tool_calls, analyzed).
+- **Lokale E2E:** etwa 38–53 Fehler sind Umgebung (Stripe, Mail, Gast, Notion);
+  immer gegen `main` vergleichen. `chat.spec.ts` kann unter 4 Workern flaky sein,
+  dann seriell gegenprüfen. Ein Mutagen-Konflikt in einem alten Worktree unter
+  `.worktrees/` kann Dateien im Container kurz entfernen und das Backend abstürzen
+  lassen; dann Sync prüfen, Stack neu starten.
+- **Nicht committen:** `_devextras/security-audit/` (fremd, ungetrackt).
 
 ## 10. Anforderungen und Entscheidungen des Owners
 
