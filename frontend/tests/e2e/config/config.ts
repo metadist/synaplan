@@ -11,8 +11,14 @@ export const URLS = {
   },
 } as const
 
-/** Backend URL: dev 8000, test stack/CI same as BASE_URL (8001). */
+/**
+ * Backend URL: dev 8000, test stack/CI same as BASE_URL (8001). API_URL names
+ * it outright for a dev stack on custom ports (SYNAPLAN_*_PORT in .env).
+ */
 export function getApiUrl(): string {
+  if (process.env.API_URL) {
+    return process.env.API_URL
+  }
   const baseUrl = URLS.BASE_URL
   if (baseUrl.includes('localhost:5173') || baseUrl.includes('127.0.0.1:5173')) {
     return 'http://localhost:8000'
