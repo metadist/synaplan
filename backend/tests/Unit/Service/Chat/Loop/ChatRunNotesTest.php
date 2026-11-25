@@ -139,9 +139,9 @@ final class ChatRunNotesTest extends ChatLoopCase
         self::assertSame(ChatRunWrapUp::instruction(ChatRunEnd::ContextFull), $calls[\count($calls) - 1]['messages'][\count($calls[\count($calls) - 1]['messages']) - 1]['content']);
     }
 
-    public function testNotesThatAreNotJsonOrTooLongFailTheCompaction(): void
+    public function testNotesThatAreNotJsonOrHaveNoGoalFailTheCompaction(): void
     {
-        foreach (['Here are the notes: the hob is 749.', '{"goal": "'.str_repeat('x', TranscriptCompactor::NOTES_TOKENS * 4).'"}', '{"plan": []}'] as $answer) {
+        foreach (['Here are the notes: the hob is 749.', '{"goal": "x"', '{"plan": []}'] as $answer) {
             $this->setUp();
             $this->tools->echo = true;
             $this->compacting(new CompactingChatRunModel(
@@ -154,6 +154,83 @@ final class ChatRunNotesTest extends ChatLoopCase
 
             self::assertSame(ChatRunEnd::ContextFull, $this->stored($state->runId)->end, $answer);
         }
+    }
+
+    public function testNotesInAFenceOrAfterASentenceAreRead(): void
+    {
+        foreach (["```json\n{\"goal\": \"Find the price.\"}\n```", 'Here are the notes: {"goal": "Find the price."}'] as $answer) {
+            $this->setUp();
+            $this->tools->echo = true;
+            $this->compacting(new CompactingChatRunModel(
+                new ScriptedChatRunModel(...[...$this->working('a', 14), ScriptedChatRunModel::says('Done.')]),
+                [new ChatRunReply($answer, [], 1_000)],
+            ));
+            $state = $this->open();
+
+            $this->drain(40);
+
+            $stored = $this->stored($state->runId);
+            self::assertSame(ChatRunEnd::Answered, $stored->end, $answer);
+            self::assertSame('Find the price.', $stored->notes?->goal);
+        }
+    }
+
+    public function testNotesOverTheBudgetLoseTheirOldestEntriesInsteadOfEndingTheRun(): void
+    {
+        $facts = [];
+        for ($i = 1; $i <= ChatRunNotes::MAX_FACTS; ++$i) {
+            $facts[] = ['text' => 'Fact '.$i.' '.str_repeat('x', 300)];
+        }
+        $this->tools->echo = true;
+        $this->compacting(new CompactingChatRunModel(
+            new ScriptedChatRunModel(...[...$this->working('a', 14), ScriptedChatRunModel::says('Done.')]),
+            [$this->notes(['goal' => 'Find the price.', 'facts' => $facts])],
+        ));
+        $state = $this->open();
+
+        $this->drain(40);
+
+        $stored = $this->stored($state->runId);
+        self::assertSame(ChatRunEnd::Answered, $stored->end);
+        self::assertNotNull($stored->notes);
+        self::assertLessThanOrEqual(TranscriptCompactor::NOTES_TOKENS * 4, mb_strlen($stored->notes->render()));
+        self::assertStringStartsWith('Fact '.ChatRunNotes::MAX_FACTS.' ', $stored->notes->facts[\count($stored->notes->facts) - 1]['text']);
+        self::assertStringNotContainsString('Fact 1 ', $stored->notes->render());
+    }
+
+    public function testIdsOfEarlierNotesSurviveWhenTheModelDropsThem(): void
+    {
+        $first = new ChatRunNotes('Plan the kitchen.', files: [['id' => 4711, 'name' => 'plan.pdf', 'what' => 'the floor plan']], messages: [812]);
+        $second = ChatRunNotes::read(['goal' => 'Plan the kitchen.', 'files' => [['id' => 9, 'name' => 'oven.png', 'what' => '']], 'messages' => [900]]);
+
+        self::assertNotNull($second);
+        $carried = $second->carry($first);
+
+        self::assertSame([4711, 9], array_column($carried->files, 'id'));
+        self::assertSame('the floor plan', $carried->files[0]['what']);
+        self::assertSame([812, 900], $carried->messages);
+        self::assertSame($second, $second->carry(null));
+    }
+
+    public function testALongChatHistoryDoesNotFoldOnEveryStep(): void
+    {
+        $this->tools->echo = true;
+        // Short steps: what lies between the history and the kept steps never reaches a tenth of the window.
+        $short = [];
+        for ($i = 0; $i < 6; ++$i) {
+            $short[] = new ChatRunReply('Looking.', [['id' => 'call_s'.$i, 'name' => 'web_search', 'args' => ['query' => 's'.$i]]], 1_000);
+        }
+        $model = $this->compacting(new CompactingChatRunModel(
+            new ScriptedChatRunModel(...[...$short, ScriptedChatRunModel::says('Done.')]),
+            [$this->notes(['goal' => 'x'])],
+        ));
+        $this->history = [['role' => 'user', 'content' => str_repeat('Earlier talk. ', 900)], ['role' => 'assistant', 'content' => 'Ok.']];
+        $state = $this->open();
+
+        $this->drain(40);
+
+        self::assertSame(ChatRunEnd::Answered, $this->stored($state->runId)->end);
+        self::assertSame([], $model->compactions);
     }
 
     public function testTheCompactionIsPaidByTheRun(): void
@@ -199,5 +276,4 @@ final class ChatRunNotesTest extends ChatLoopCase
     {
         return new ChatRunReply(json_encode($notes, \JSON_THROW_ON_ERROR), [], $cost);
     }
-
 }

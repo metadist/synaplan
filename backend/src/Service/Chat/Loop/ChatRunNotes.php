@@ -33,13 +33,13 @@ final readonly class ChatRunNotes
     private const REF = 80;
 
     /**
-     * @param list<array{text: string, state: string}> $plan
-     * @param list<array{text: string, ref?: string}>  $facts
-     * @param list<string>                             $decisions
-     * @param list<string>                             $open
+     * @param list<array{text: string, state: string}>         $plan
+     * @param list<array{text: string, ref?: string}>          $facts
+     * @param list<string>                                     $decisions
+     * @param list<string>                                     $open
      * @param list<array{id: int, name: string, what: string}> $files
-     * @param list<array{q: string, a: string}>        $asked
-     * @param list<int>                                $messages message IDs of this chat the run has seen
+     * @param list<array{q: string, a: string}>                $asked
+     * @param list<int>                                        $messages  message IDs of this chat the run has seen
      */
     public function __construct(
         public string $goal,
@@ -136,6 +136,52 @@ final readonly class ChatRunNotes
         }
 
         return new self($this->goal, $this->plan, $this->facts, $this->decisions, $this->open, \array_slice($known, -self::MAX_FILES), $this->asked, \array_slice($seen, -self::MAX_MESSAGES));
+    }
+
+    /**
+     * These notes plus the file and message IDs of the notes before them that
+     * the model left out: an ID the run saw stays usable after any number of
+     * compactions. The earlier ones come first, so a cap drops them first.
+     */
+    public function carry(?self $previous): self
+    {
+        if (null === $previous) {
+            return $this;
+        }
+        $files = [];
+        foreach ($previous->files as $file) {
+            if (!self::hasFile($this->files, $file['id'])) {
+                $files[] = $file;
+            }
+        }
+        $messages = array_values(array_diff($previous->messages, $this->messages));
+
+        return new self($this->goal, $this->plan, $this->facts, $this->decisions, $this->open, \array_slice([...$files, ...$this->files], -self::MAX_FILES), $this->asked, \array_slice([...$messages, ...$this->messages], -self::MAX_MESSAGES));
+    }
+
+    /**
+     * The notes cut until their rendered text fits $maxChars: the oldest entry
+     * of the longest list goes first. The goal and the plan always stay.
+     */
+    public function fit(int $maxChars): self
+    {
+        $notes = $this;
+        while (mb_strlen($notes->render()) > $maxChars) {
+            $lists = ['facts' => $notes->facts, 'decisions' => $notes->decisions, 'open' => $notes->open, 'files' => $notes->files, 'asked' => $notes->asked, 'messages' => $notes->messages];
+            $longest = null;
+            foreach ($lists as $name => $list) {
+                if ([] !== $list && (null === $longest || \count($list) > \count($lists[$longest]))) {
+                    $longest = $name;
+                }
+            }
+            if (null === $longest) {
+                return $notes;
+            }
+            $lists[$longest] = \array_slice($lists[$longest], 1);
+            $notes = new self($notes->goal, $notes->plan, $lists['facts'], $lists['decisions'], $lists['open'], $lists['files'], $lists['asked'], $lists['messages']);
+        }
+
+        return $notes;
     }
 
     /** @return array<string, mixed> */

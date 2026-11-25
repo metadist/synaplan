@@ -62,6 +62,9 @@ abstract class ChatLoopCase extends TestCase
 
     /** @var list<int> pictures a new run has already looked at */
     protected array $analyzed = [];
+
+    /** @var list<array{role: string, content: string}> the chat history a new run starts from, before the question */
+    protected array $history = [];
     protected User $user;
 
     /** The checking model's answers; it is asked only while {@see $checkModel} is set. */
@@ -156,7 +159,7 @@ abstract class ChatLoopCase extends TestCase
             'test-model',
             'de',
             'You are a helpful assistant.',
-            [['role' => 'user', 'content' => $question]],
+            [...$this->history, ['role' => 'user', 'content' => $question]],
             $this->clock->now()->getTimestamp(),
         );
         $state->rates = $this->rates;
