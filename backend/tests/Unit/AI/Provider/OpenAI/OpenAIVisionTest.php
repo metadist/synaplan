@@ -55,7 +55,7 @@ final class OpenAIVisionTest extends TestCase
         self::assertSame('A pixel.', $chat->content);
         self::assertSame(['prompt_tokens' => 812, 'completion_tokens' => 7, 'total_tokens' => 819], $chat->usage);
         self::assertSame('INVOICE 42', $responses->content);
-        self::assertSame(['prompt_tokens' => 21, 'completion_tokens' => 9, 'total_tokens' => 30], $responses->usage);
+        self::assertSame(['prompt_tokens' => 21, 'completion_tokens' => 9, 'total_tokens' => 30, 'cached_tokens' => 4], $responses->usage);
     }
 
     public function testAMissingImageIsRefusedWithoutARequest(): void
