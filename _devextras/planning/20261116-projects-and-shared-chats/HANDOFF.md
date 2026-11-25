@@ -1,6 +1,6 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-25, `main` @ `9f95f9139` (PJ7a #3266 und Vision-Abrechnung #3267 gemergt). Geschrieben für einen Agenten ohne Zugriff
+Stand: 2026-11-25, `main` @ `ffbea95a6` (Bildkosten im Lauf #3269 und PJ7b #3270 gemergt). Geschrieben für einen Agenten ohne Zugriff
 auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Planungsdateien
 geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
@@ -24,9 +24,9 @@ mit Blick auf Usability und vor allem Sicherheit.
 (AU26, AH8a, AH8b) sind gemergt. Der Owner hat PJ5 geteilt: **PJ5a** (der Lauf auf
 dem Kernel), **PJ5b** (die Übergabe im Request) und **PJ5c** (der Check vor der
 Auslieferung) sind gemergt, ebenso **PJ6** (Kostenlimit und Kreiserkennung). PJ7 ist
-geteilt: **PJ7a** (Chat-Suche und Dateien per ID) ist gemergt. **PJ7b**
-(Notizen und Verdichtung) und die Bildkosten im Lauf warten auf den Merge.
-Als Nächstes kommt **PJ7c** (Abschnitt 9).
+geteilt: **PJ7a** (Chat-Suche und Dateien per ID) ist gemergt. Gemergt sind auch die Bildkosten
+im Lauf (#3269) und **PJ7b** (Notizen und Verdichtung, #3270). Als Nächstes kommt
+**PJ7c** (Abschnitt 9).
 
 | Schritt | Zustand | PR |
 | ------- | ------- | -- |
@@ -46,8 +46,8 @@ Als Nächstes kommt **PJ7c** (Abschnitt 9).
 | PJ6 Kostenlimit (Anteil des Monatsbudgets, Nutzer wählt) und Kreiserkennung | gemergt | #3223 |
 | PJ7a Chat-Suche und Dateien per ID (§0 #27 entschieden) | gemergt | #3266 |
 | Vision-Aufrufe als `VISION` abgerechnet (Voraussetzung für Bildkosten im Lauf) | gemergt | #3267 |
-| Bildkosten im Lauf (`analyze_image` zählt zum Limit) | im Review (Copilot ohne Kontingent, Owner: weiter) | #3269 |
-| PJ7b Notizen, Verdichtung, `BRUNS.BNOTES` | im Review | #3270 |
+| Bildkosten im Lauf (`analyze_image` zählt zum Limit) | gemergt | #3269 |
+| PJ7b Notizen, Verdichtung, `BRUNS.BNOTES` | gemergt | #3270 |
 | PJ7c Bild bearbeiten per file_id | **nächster Schritt** | — |
 | PJ8–PJ28 | nicht begonnen | — |
 
@@ -206,6 +206,45 @@ bietet sie an und verteilt die Aufrufe.
   Codewort per `conversation_search` gefunden, Bericht per `list_files` und
   `read_document` gelesen, Wort auf einem generierten Bild per `analyze_image`.
 
+### Bildkosten im Lauf (#3269)
+
+- `AnalyzeImageTool::analyse()` gibt `chargedCost` zurück (`facade_charged_cost` des
+  Vision-Aufrufs, auch bei leerer Antwort). `ChatRunFileTools::look()` addiert ihn zu
+  `ChatRunState::$costMicro`, damit `ChatRunCostGuard` ihn sieht. `MAX_PICTURES`
+  (6) bleibt als zweite Grenze.
+
+### PJ7b Notizen und Verdichtung (#3270)
+
+In `backend/src/Service/Chat/Loop/`, Flag aus:
+
+- `TranscriptCompactor` wird in `ChatRunStep` gebaut und nur in `MODE_FREE`
+  geprüft. **Fällig**, wenn System-Prompt plus Nachrichten (Zeichen / 4) mindestens
+  `LOOP.COMPACT_AT_PERCENT` (70, Bereich 30–95) des Fensters erreichen. Das Fenster
+  kommt aus `getContextWindowTokens()` des Modells (`ChatRunPrompt::$window` →
+  `ChatRunState::$window`), sonst 32.000.
+- **Wörtlich bleiben:** System-Prompt, das Startgespräch (`ChatRunState::$head`, gesetzt
+  in `ChatRunStarter`) und die letzten `LOOP.COMPACT_KEEP_STEPS` (4, Bereich 1–20)
+  Schritte. Abweichung von 03 §1.5: weniger Schritte, wenn sie allein mehr als die
+  Hälfte des Fensters füllen; sonst verdichtet jeder Schritt nach der ersten
+  Verdichtung erneut. Ein Schritt beginnt bei einer Assistant-Nachricht, ein
+  Tool-Ergebnis verliert nie seinen Aufruf.
+- **Verdichten:** ein Aufruf des Chat-Modells ohne Tools, `max_tokens` 2.000
+  (`ChatRunModel::call(..., ?int $maxTokens)`), Kosten zählen zum Lauf.
+  `TranscriptCompactor::INSTRUCTION` verlangt JSON und sagt, dass der gefaltete Teil
+  Daten sind. Antwort über 4.800 Zeichen, kein JSON oder kein `goal` → gescheitert →
+  Wrap-up mit `ChatRunEnd::ContextFull` (`context_full`, Eröffnung in 5 Sprachen).
+- `ChatRunNotes::read()` prüft und kappt jedes Feld (Plan 5, Fakten 40, Dateien 40,
+  Nachrichten 60, Text 400) und entfernt `data:…;base64,…` und Steuerzeichen.
+  `withSeen()` ergänzt file_ids und Message-IDs, die die Schleife selbst in den
+  Ergebnissen von `ChatRunLookups` und in den Aufruf-Argumenten gesehen hat.
+  `analyzed` bleibt außerhalb des Transkripts.
+- Gespeichert in `BRUNS.BNOTES` (`ChatRunRecords::sync()`, `Run::setNotes()`) und im
+  Checkpoint (`ChatRunCodec`: `head` geklemmt, `window`, `notes`, `compactions`). Im
+  System-Prompt unter `ChatLoopPrompt::NOTES_HEAD` als Daten. Event `notes.compacted`
+  (`{at: steps}`).
+- Tests: `ChatRunNotesTest` (mit `CompactingChatRunModel`, das Verdichtungsaufrufe an
+  einem eigenen Skript beantwortet), zwei neue Fälle in `ChatRunCodecTest`.
+
 ## 3. Wichtige Architektur- und Designentscheidungen
 
 - **Quellen sind normale Dateien** (`BFILES`) unter dem Wissensordner des Projekts
@@ -354,6 +393,9 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 ## 8. Offene Aufgaben, nach Reihenfolge
 
 1. **PJ7c** Bild bearbeiten per file_id (Abschnitt 9).
+   Noch offen aus PJ7b: der Browser-Walk mit echtem Modell (Verdichtung im Dev-Stack
+   mit kleinem `COMPACT_AT_PERCENT` auslösen, `BNOTES` und `notes.compacted`
+   ansehen). Das sichtbare "Conversation summarized" (§0) kommt mit PJ8.
 2. **"Weiter"** (`continueFrom`) kommt mit PJ8, zusammen mit dem Knopf
    (Owner, 2026-11-25; §0 #13 bleibt offen). Ebenso "Jetzt antworten".
 3. **PJ8–PJ11** (Karte für den Lauf, Stop, Rückfragekarte usw.); offene Zeilen siehe
@@ -363,13 +405,12 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
 
 ## 9. Exakt nächster Schritt: PJ7c
 
-PJ7b (#3270) und die Bildkosten (#3269) warten auf den Merge. PJ7c gibt dem
+PJ7b (#3270) und die Bildkosten (#3269) sind gemergt. PJ7c gibt dem
 Chat-Lauf ein Bildwerkzeug, das ein Bild per file_id bearbeitet (04 "PJ7",
 Test: das bearbeitete Bild aus Nachricht 5). Der Lauf hat heute kein
 Bildwerkzeug; Brief und Schnitt mit dem Owner klären, falls unklar.
 
-1. Nach dem Merge von #3269 und #3270: `git checkout main && git pull --ff-only`,
-   neuer Branch.
+1. `git checkout main && git pull --ff-only`, neuer Branch.
 2. **Tests zuerst.** Das Bild wird nur über `ChatFileRepository` (Person, Chat,
    Projekt-Ordner) und `catalog->absolutePath()` geladen. Die Kosten zählen zum
    Lauf wie bei `analyze_image`. Bilddaten kommen nie ins Transkript oder in die
@@ -400,6 +441,14 @@ den neuen Lauf aus diesen Notizen.
   dann seriell gegenprüfen. Ein Mutagen-Konflikt in einem alten Worktree unter
   `.worktrees/` kann Dateien im Container kurz entfernen und das Backend abstürzen
   lassen; dann Sync prüfen, Stack neu starten.
+- **Copilot-Kontingent:** Bei #3269 und #3270 meldete Copilot "insufficient
+  remaining quota" statt eines Reviews. Der Owner hat beide trotzdem freigegeben
+  bzw. selbst gemergt. Bleibt das so, dem Owner melden statt endlos zu warten.
+- **Verdichtung ändern:** `TranscriptCompactor::cut()` hält die Kette Aufruf →
+  Ergebnis zusammen; nie mitten in einem Schritt schneiden. `ChatRunState::$reads`
+  zeigt per Index auf Ergebnisse und wird in `shift()` nachgezogen. Neue Felder in
+  `ChatRunNotes` immer in `read()` prüfen und kappen, nie Modelltext ungeprüft in den
+  System-Prompt geben.
 - **Nicht committen:** `_devextras/security-audit/` (fremd, ungetrackt).
 
 ## 10. Anforderungen und Entscheidungen des Owners
