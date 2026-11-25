@@ -160,6 +160,13 @@ their limits as profile input.
   `conversation_search`, file-ID input for the read and image tools, the
   `notes.compacted` event, `BRUNS.BNOTES`.
 - **Exit:** G6 and G7.
+- **Split (2026-11-25):** **PJ7a** builds `conversation_search`,
+  `list_files` and the file-ID input for `read_document` and
+  `analyze_image` (§0 #27 decided). **PJ7b** builds `RunNotes`,
+  `TranscriptCompactor`, `notes.compacted`, writing `BRUNS.BNOTES` (the
+  column exists since AH8a), the image generator's file-ID input and "Keep going"
+  (`continueFrom`). The test for the edited picture of message 5 and the
+  two compactions belong to PJ7b.
 
 ### PJ8 — run card
 

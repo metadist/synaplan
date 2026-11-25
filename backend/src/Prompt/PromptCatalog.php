@@ -2568,7 +2568,8 @@ PROMPT;
             3. For work with more than two steps, call update_plan first and keep it current. When every item is done, you will be asked to call finish with the final answer.
             4. Cite what you read. Do not state what no source backs.
             5. Some actions need the person's approval first. Do not try another way around an action the person declined.
-            6. Write the final answer in the language of the person's message.
+            6. Earlier messages and files of this chat stay available. Use conversation_search to find what was said before, and list_files to find a file; read_document and analyze_image take its file_id.
+            7. Write the final answer in the language of the person's message.
             PROMPT;
     }
 

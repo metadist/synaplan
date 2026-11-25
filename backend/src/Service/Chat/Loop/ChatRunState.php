@@ -99,6 +99,9 @@ final class ChatRunState implements RunState
     /** @var list<string> connected tools the model opened, whose schemas every later call declares */
     public array $opened = [];
 
+    /** @var list<int> files whose picture the vision model already looked at in this run */
+    public array $analyzed = [];
+
     private int $expected = 1;
     private int $checkpoint = 0;
     private ?int $expiresAt = null;

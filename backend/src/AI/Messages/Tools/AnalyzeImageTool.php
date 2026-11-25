@@ -94,13 +94,7 @@ final readonly class AnalyzeImageTool
      */
     public function execute(array $input, ?int $userId = null, ?string $locale = null): array
     {
-        $prompt = \is_string($input['prompt'] ?? null) ? trim($input['prompt']) : '';
-        if ('' === $prompt) {
-            $prompt = self::DEFAULT_PROMPT;
-        } elseif (mb_strlen($prompt) > self::MAX_PROMPT_CHARS) {
-            $prompt = mb_substr($prompt, 0, self::MAX_PROMPT_CHARS);
-        }
-
+        $prompt = self::prompt($input['prompt'] ?? null);
         if (!$this->isAvailable($userId)) {
             return $this->error('No Synaplan vision model is configured on this instance.');
         }
@@ -108,6 +102,53 @@ final readonly class AnalyzeImageTool
         $relativePath = null;
         try {
             $relativePath = $this->materialiseImage($input);
+
+            return $this->analyse($relativePath, $prompt, $userId, $locale);
+        } catch (\InvalidArgumentException $e) {
+            // Input validation copy is written for the API client — pass it
+            // through untouched.
+            return $this->error($e->getMessage());
+        } finally {
+            if (null !== $relativePath) {
+                $full = rtrim($this->uploadDir, '/').'/'.ltrim($relativePath, '/');
+                if (is_file($full)) {
+                    @unlink($full);
+                }
+            }
+        }
+    }
+
+    /**
+     * Analyse a file that is already stored under the upload directory (a
+     * picture of the chat, by its file ID). The file is left in place.
+     *
+     * @return array{text: string, isError: bool, summary: string}
+     */
+    public function analyseStored(string $relativePath, mixed $prompt, int $userId, string $locale): array
+    {
+        if (!$this->isAvailable($userId)) {
+            return $this->error('No Synaplan vision model is configured on this instance.');
+        }
+
+        return $this->analyse($relativePath, self::prompt($prompt), $userId, $locale);
+    }
+
+    private static function prompt(mixed $raw): string
+    {
+        $prompt = \is_string($raw) ? trim($raw) : '';
+        if ('' === $prompt) {
+            return self::DEFAULT_PROMPT;
+        }
+
+        return mb_strlen($prompt) > self::MAX_PROMPT_CHARS ? mb_substr($prompt, 0, self::MAX_PROMPT_CHARS) : $prompt;
+    }
+
+    /**
+     * @return array{text: string, isError: bool, summary: string}
+     */
+    private function analyse(string $relativePath, string $prompt, ?int $userId, ?string $locale): array
+    {
+        try {
             $result = $this->aiFacade->analyzeImage($relativePath, $prompt, $userId);
             $text = trim((string) ($result['content'] ?? ''));
             if ('' === $text) {
@@ -126,8 +167,6 @@ final readonly class AnalyzeImageTool
                 'summary' => 'image',
             ];
         } catch (\InvalidArgumentException $e) {
-            // Input validation copy is written for the API client — pass it
-            // through untouched.
             return $this->error($e->getMessage());
         } catch (\Throwable $e) {
             $this->logger->warning('AnalyzeImageTool: analysis failed', [
@@ -142,13 +181,6 @@ final readonly class AnalyzeImageTool
                 : 'Something went wrong while answering this request. Please try again.';
 
             return $this->error($copy);
-        } finally {
-            if (null !== $relativePath) {
-                $full = rtrim($this->uploadDir, '/').'/'.ltrim($relativePath, '/');
-                if (is_file($full)) {
-                    @unlink($full);
-                }
-            }
         }
     }
 

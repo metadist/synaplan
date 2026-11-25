@@ -36,6 +36,7 @@ final readonly class ChatRunCodec implements RunStateCodec
             'plan' => $state->plan,
             'reads' => (object) $state->reads,
             'opened' => $state->opened,
+            'analyzed' => $state->analyzed,
             'status' => $state->status->value,
             'end' => $state->end?->value,
             'waitReason' => $state->waitReason,
@@ -130,6 +131,7 @@ final readonly class ChatRunCodec implements RunStateCodec
         $state->plan = self::plan($data['plan'] ?? []);
         $state->reads = self::reads($data['reads'] ?? []);
         $state->opened = self::opened($data['opened'] ?? []);
+        $state->analyzed = self::analyzed($data['analyzed'] ?? []);
         $expiresAt = $data['expiresAt'] ?? null;
         $state->restore(
             max(1, (int) ($data['expected'] ?? 1)),
@@ -209,6 +211,21 @@ final readonly class ChatRunCodec implements RunStateCodec
         }
 
         return \array_slice($out, 0, ConnectedToolCatalog::MAX_OPEN);
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function analyzed(mixed $raw): array
+    {
+        $out = [];
+        foreach (\is_array($raw) ? $raw : [] as $id) {
+            if (\is_int($id) && $id > 0 && !\in_array($id, $out, true)) {
+                $out[] = $id;
+            }
+        }
+
+        return \array_slice($out, 0, ChatRunFileTools::MAX_PICTURES);
     }
 
     private static function positiveInt(mixed $value): bool

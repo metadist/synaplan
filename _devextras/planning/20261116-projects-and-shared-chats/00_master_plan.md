@@ -121,7 +121,7 @@ proposal and wait for a tick. **Ask** rows are ask-first by `AGENTS.md`.
 | # | Decision | Default | Agree? |
 | - | -------- | ------- | ------ |
 | 26 | It works after 100 messages. Inside a run the transcript is compacted into notes before the model's window is full. The chat shows a short line: "Conversation summarized". | As written | Yes — owner |
-| 27 | Earlier messages stay findable word for word: the loop has a tool that searches the whole chat. The summary is the map, not the only copy. | Tool | ☐ |
+| 27 | Earlier messages stay findable word for word: the loop has a tool that searches the whole chat. The summary is the map, not the only copy. | Tool | Yes — owner, 2026-11-25 |
 | 28 | Files and pictures of the chat stay usable by ID for the whole chat. "Change the picture from earlier" works after any number of messages. | As written | Yes — owner |
 
 ### Questions to the person

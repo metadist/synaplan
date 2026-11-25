@@ -14,8 +14,76 @@ to them.
 | PJ5a | merged | #3216 | A chat run on the run kernel, flag off (`LOOP.ENABLED` = 0). See 2026-11-20 below. The owner split PJ5 into PJ5a (the run) and PJ5b (the hand-over in the request). |
 | PJ5b | merged | #3218 | The hand-over in the request, flag off. G1 accepted by the owner (+10.1 % cost, first token faster). See "2026-11-20 — PJ5b" below. |
 | PJ5c | merged | #3221 | The check before delivery (03 §3.2), flag off. A note under the answer, nothing removed (owner). See "2026-11-20 — PJ5c" below. |
-| PJ6 | PR open | branch `feat/chat-loop-guards` | Cost limit as a share of the person's monthly budget, and circle detection, flag off. See "2026-11-20 — PJ6" below. |
-| PJ7–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+| PJ6 | merged | #3223 | Cost limit as a share of the person's monthly budget, and circle detection, flag off. See "2026-11-20 — PJ6" below. |
+| PJ7a | PR open | branch `feat/chat-run-lookups` | Chat search and files by ID for a chat run, flag off. §0 #27 decided (owner, 2026-11-25). See "2026-11-25 — PJ7a" below. |
+| PJ7b | not started | — | Run notes, `TranscriptCompactor`, `notes.compacted`, writing `BRUNS.BNOTES` (the column exists since AH8a), editing a picture by file ID, and "Keep going" (`continueFrom`). |
+| PJ8–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+
+---
+
+## 2026-11-25 — PJ7a: chat search and files by ID
+
+The owner decided §0 #27 (2026-11-25): earlier messages are a tool,
+`conversation_search`. PJ7 is split. PJ7a gives a run the lookups. PJ7b adds
+the run notes and compaction, written to `BRUNS.BNOTES` (the column
+exists since AH8a's migration, so no schema change), plus "Keep going". The flag stays 0.
+
+**What a run can look up** (`backend/src/Service/Chat/Loop/`, offered by
+`RegistryChatRunToolbox` through `ChatRunLookups`, all of them reads):
+
+- `conversation_search` (`ChatRunConversationSearch`): `query` finds the
+  messages of this chat that contain every word (at most 6 words, 8 hits,
+  newest first) and returns a snippet with message id, who wrote it and
+  when. `around` reads a message with three before and three after. `%` and
+  `_` are literal.
+- `list_files` (`ChatRunFileTools`): every file of the chat (made in it or
+  attached to one of its messages) and the sources of its project, 20 per
+  page, with file_id, name, kind, origin, date and a short description.
+- `read_document`: the text of one file by file_id, in parts of 8,000
+  characters with an offset.
+- `analyze_image`: the vision model looks at one stored picture by file_id;
+  only its text goes into the transcript. Offered only when the person has
+  a vision model.
+
+**Security:** a file_id or message id resolves only inside this chat of
+this person, or a source of the project the chat is in now
+(`ChatFileRepository`, `ChatMessageSearchRepository`, both new; the frozen
+`MessageRepository` does not grow). A file_id that is not a number never
+reaches the database. Image data never enters the transcript.
+
+**Known limit:** the vision call (`AiFacade::analyzeImage`) does not record
+usage, so it is not part of the run's cost. A run looks at 6 different
+pictures at most (`ChatRunFileTools::MAX_PICTURES`, kept in the run state
+as `analyzed`); looking at one again is allowed.
+
+**Prompt:** the loop prompt gains one rule: earlier messages and files stay
+available through these tools (`PromptCatalog`, reaches installs through
+the prompt seeder).
+
+- `read_document` reads a plain text file (md, txt, csv, json) without
+  extracted text from disk, at most 1 MB, through the catalog's path check
+  (a generated research report has no extracted text).
+- `conversation_search` leaves out the run's own question and reply; they
+  are in its transcript already.
+
+**Walk (dev stack, admin, 2026-11-25, chat model Claude Sonnet 5.5; a run
+needs a provider with native tool routing, Gemini stays on today's path):**
+
+- "Merk dir bitte: … Küchenbudget 4.800 Euro, Codewort Zitronenfalter", then
+  a web question asking for the code word: run 17 called `web_search` and
+  `conversation_search` ("Codewort"); the answer named message 4917, the
+  right one. The first version also returned the question itself as a hit;
+  fixed as above.
+- Chat with a research report: run 18 called `list_files` (file_id 50,
+  "made in this chat") and `read_document` (4,406 characters from disk) and
+  quoted the fines section correctly next to the web search.
+- A generated picture: run 19 called `analyze_image` with file_id 467 and
+  read "ZITRONE" off the sign; `analyzed` = [467] in the run state.
+
+**Tests:** `ChatRunFileToolsTest`, `ChatRunConversationSearchTest`, the
+codec test for `analyzed`, `RegistryChatRunToolboxTest`, and the
+integration test `ChatRunLookupRepositoryTest` (a file or message of
+another chat or person never resolves).
 
 ---
 
