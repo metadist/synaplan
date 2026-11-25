@@ -20,6 +20,7 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
         private VectorStorageConfig $config,
         private LoggerInterface $logger,
         private CloudFileIndexGuard $indexGuard,
+        private VisitorUploadFilter $visitorUploadFilter,
     ) {
     }
 
@@ -109,12 +110,14 @@ final readonly class VectorStorageFacade implements VectorStorageInterface
             'limit' => $query->limit,
         ]);
 
-        return $storage->search($query);
+        return $this->visitorUploadFilter->withoutVisitorUploads($storage->search($query));
     }
 
     public function findSimilar(int $userId, int|string $sourceChunkId, int $limit = 10, float $minScore = 0.3): array
     {
-        return $this->getActiveStorage()->findSimilar($userId, $sourceChunkId, $limit, $minScore);
+        return $this->visitorUploadFilter->withoutVisitorUploads(
+            $this->getActiveStorage()->findSimilar($userId, $sourceChunkId, $limit, $minScore),
+        );
     }
 
     public function getStats(int $userId): StorageStats

@@ -13,7 +13,6 @@ use App\Service\Branding\BrandingService;
 use App\Service\Chat\Run\ChatRunService;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
-use App\Service\File\VectorizationService;
 use App\Service\Message\StoredAdminDiagnostics;
 use App\Service\RAG\VectorSearchService;
 use App\Service\RateLimitService;
@@ -50,7 +49,6 @@ class WidgetPublicController extends AbstractController
         private RateLimitService $rateLimitService,
         private FileStorageService $storageService,
         private FileProcessor $fileProcessor,
-        private VectorizationService $vectorizationService,
         private ChatRepository $chatRepository,
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
@@ -538,8 +536,8 @@ class WidgetPublicController extends AbstractController
             if ($result['success']) {
                 $this->sessionService->incrementFileCount($widgetSession);
 
-                // Widget uploads are analysed immediately (extract + vectorize
-                // into WIDGET:<id> RAG), so bill FILE_ANALYSIS once here.
+                // Widget uploads are analysed immediately (text extraction for
+                // the visitor's own session), so bill FILE_ANALYSIS once here.
                 // recordFileAnalysisOnce dedupes on file_id if a later chat
                 // turn also analyses the same row. Authenticated /upload-file
                 // still defers billing because those files are only staged
@@ -578,8 +576,9 @@ class WidgetPublicController extends AbstractController
     }
 
     /**
-     * Process uploaded file for widget session
-     * Same workflow as FileController but for anonymous widget users.
+     * Stores a visitor's file and extracts its text. The file is bound to the
+     * visitor's session: its text reaches the model only when that session
+     * attaches it to a message, and it is not written to the vector index.
      */
     private function processWidgetFile($uploadedFile, $widget, $widgetSession): array
     {
@@ -612,7 +611,6 @@ class WidgetPublicController extends AbstractController
         $file->setFileSize($storageResult['size']);
         $file->setFileMime($storageResult['mime']);
         $file->setFileType($this->getFileTypeString($fileExtension));
-        $file->setGroupKey("WIDGET:{$widget->getWidgetId()}");
 
         $this->em->persist($file);
         $this->em->flush();
@@ -652,43 +650,6 @@ class WidgetPublicController extends AbstractController
             ];
         }
 
-        // Step 3: Vectorize (for widget owner's RAG, grouped by widget)
-        try {
-            $groupKey = "WIDGET:{$widget->getWidgetId()}";
-
-            $vectorResult = $this->vectorizationService->vectorizeAndStore(
-                $extractedText,
-                $owner->getId(), // Store under owner for quota/usage
-                $file->getId(),
-                $groupKey,
-                $this->getFileTypeCode($fileExtension)
-            );
-
-            if ($vectorResult['success']) {
-                $file->markVectorized();
-                $this->em->flush();
-
-                $result['file']['chunks_created'] = $vectorResult['chunks_created'];
-                $result['vectorized'] = true;
-            } else {
-                $this->logger->warning('Widget file vectorization failed', [
-                    'file_id' => $file->getId(),
-                    'error' => $vectorResult['error'],
-                ]);
-
-                $result['vectorized'] = false;
-                $result['vectorization_error'] = $vectorResult['error'];
-            }
-        } catch (\Throwable $e) {
-            $this->logger->error('Widget file vectorization exception', [
-                'file_id' => $file->getId(),
-                'error' => $e->getMessage(),
-            ]);
-
-            $result['vectorized'] = false;
-            $result['vectorization_error'] = $e->getMessage();
-        }
-
         return $result;
     }
 
@@ -709,21 +670,6 @@ class WidgetPublicController extends AbstractController
         ];
 
         return $typeMap[$extension] ?? 'other';
-    }
-
-    /**
-     * Get file type code for RAG vectorization (matches FileController logic).
-     */
-    private function getFileTypeCode(string $extension): int
-    {
-        return match (strtolower($extension)) {
-            'txt', 'md', 'csv', 'ocnote' => 0, // Plain text
-            'jpg', 'jpeg', 'png', 'gif', 'webp' => 1, // Image
-            'mp3', 'mp4', 'wav', 'ogg', 'm4a', 'webm' => 2, // Audio/Video
-            'pdf' => 3, // PDF
-            'docx', 'doc', 'xlsx', 'xls', 'pptx', 'ppt' => 4, // Office
-            default => 5, // Other
-        };
     }
 
     /**

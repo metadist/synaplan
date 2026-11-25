@@ -160,7 +160,6 @@
         "src/Controller/WebhookController.php::WebhookController::generic": 121,
         "src/Controller/WidgetLegacyController.php::WidgetLegacyController::legacyWidget": 167,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::history": 155,
-        "src/Controller/WidgetPublicController.php::WidgetPublicController::processWidgetFile": 110,
         "src/Controller/WidgetPublicController.php::WidgetPublicController::upload": 136,
         "src/Controller/WidgetSessionController.php::WidgetSessionController::get": 126,
         "src/MessageHandler/ExtractMemoriesCommandHandler.php::ExtractMemoriesCommandHandler::__invoke": 278,

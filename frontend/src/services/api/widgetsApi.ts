@@ -525,7 +525,6 @@ export async function uploadWidgetFile(
     filename: string
     size: number
     extracted_text_length: number
-    chunks_created?: number
   }
   remainingUploads?: number
 }> {
