@@ -45,13 +45,16 @@ ci-local: ## Unit/static CI mirror (lint, phpstan, deptrac, tests, vue-tsc). Not
 # boot-status page answers every path with 200 and an X-Synaplan-Boot header,
 # so a bare 200 is not "ready". Costs a few seconds; skip both with
 # SKIP_FRONTEND_RESTART=1 when targeting a non-dev BASE_URL (e.g. :8001 stack).
+# A dev stack on custom ports: export SYNAPLAN_FRONTEND_PORT for the wait, and
+# pass BASE_URL plus API_URL so the specs reach that frontend and backend.
 test-e2e: ## Run e2e tests headless (fast loop, dev stack :5173 or BASE_URL). HEADED=1 to watch.
 	@[ -n "$(SKIP_FRONTEND_RESTART)" ] || { \
+		port=$${SYNAPLAN_FRONTEND_PORT:-5173}; \
 		docker compose restart frontend; \
-		echo "Waiting for the Vite dev server on :5173 ..."; \
-		i=0; until headers=$$(curl -fsS -D - -o /dev/null http://localhost:5173/src/main.ts 2>/dev/null) \
+		echo "Waiting for the Vite dev server on :$$port ..."; \
+		i=0; until headers=$$(curl -fsS -D - -o /dev/null http://localhost:$$port/src/main.ts 2>/dev/null) \
 			&& ! printf '%s' "$$headers" | grep -qi '^x-synaplan-boot:'; do \
-			i=$$((i+1)); [ $$i -ge 120 ] && { echo "frontend :5173 not ready after 120s" >&2; exit 1; }; \
+			i=$$((i+1)); [ $$i -ge 120 ] && { echo "frontend :$$port not ready after 120s" >&2; exit 1; }; \
 			sleep 1; done; }
 	$(MAKE) -C frontend test-e2e
 

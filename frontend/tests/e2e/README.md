@@ -227,6 +227,7 @@ Tests use tags in their names for filtering:
 | Variable      | Default                 | Description                                                              |
 | ------------- | ----------------------- | ------------------------------------------------------------------------ |
 | `BASE_URL`    | `http://localhost:5173` | App URL to test against                                                  |
+| `API_URL`     | derived from `BASE_URL` | Backend URL, for a dev stack on custom ports (`SYNAPLAN_BACKEND_PORT`)   |
 | `E2E_WORKERS` | —                       | Override worker count (e.g. `2` in CI); default from config (4)          |
 | `AUTH_METHOD` | `password`              | `password` or `oidc` — switches the generic `login()` helper to use OIDC |
 | `AUTH_USER`   | `admin@synaplan.com`    | Password-auth email                                                      |
