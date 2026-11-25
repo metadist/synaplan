@@ -16,8 +16,8 @@ to them.
 | PJ5c | merged | #3221 | The check before delivery (03 §3.2), flag off. A note under the answer, nothing removed (owner). See "2026-11-20 — PJ5c" below. |
 | PJ6 | merged | #3223 | Cost limit as a share of the person's monthly budget, and circle detection, flag off. See "2026-11-20 — PJ6" below. |
 | PJ7a | merged | #3266 | Chat search and files by ID for a chat run, flag off. §0 #27 decided (owner, 2026-11-25). See "2026-11-25 — PJ7a" below. |
-| Image cost in a run | in review | #3269 | `analyze_image` in a run adds the vision call's billed cost to the run, so the cost guard sees it. CI green; Copilot did not review (quota), the owner said to go on. |
-| PJ7b | in review | #3270 | Run notes and compaction, flag off. See "2026-11-25 — PJ7b" below. "Keep going" moved to PJ8, editing a picture by file ID to PJ7c (owner, 2026-11-25). |
+| Image cost in a run | merged | #3269 | `analyze_image` in a run adds the vision call's billed cost to the run, so the cost guard sees it. Copilot did not review (quota); the owner approved. |
+| PJ7b | merged | #3270 | Run notes and compaction, flag off. See "2026-11-25 — PJ7b" below. "Keep going" moved to PJ8, editing a picture by file ID to PJ7c (owner, 2026-11-25). |
 | PJ7c | not started | — | Editing a picture by file ID: the chat loop has no image tool yet. |
 | PJ8–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
