@@ -8,6 +8,7 @@ use App\Entity\User;
 use App\Service\PluginDataService;
 use OpenApi\Attributes as OA;
 use Plugin\CastingData\Service\CastingApiClient;
+use Plugin\CastingData\Service\CastingApiUrlPolicy;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -36,6 +37,7 @@ final class CastingDataController extends AbstractController
         private PluginDataService $pluginData,
         private CastingApiClient $apiClient,
         private LoggerInterface $logger,
+        private CastingApiUrlPolicy $apiUrlPolicy,
     ) {
     }
 
@@ -129,7 +131,7 @@ final class CastingDataController extends AbstractController
         $apiUrl = trim($data['api_url'] ?? $existingConfig['api_url'] ?? '');
 
         if ('' !== $apiUrl) {
-            $validationError = $this->validateApiUrl($apiUrl);
+            $validationError = $this->apiUrlPolicy->problem($apiUrl);
             if (null !== $validationError) {
                 return $this->json(['error' => $validationError], Response::HTTP_BAD_REQUEST);
             }
@@ -230,46 +232,6 @@ final class CastingDataController extends AbstractController
         }
 
         return substr($key, 0, 4).'...'.str_repeat('*', 4);
-    }
-
-    /**
-     * Validate that api_url is safe (prevent SSRF).
-     *
-     * Blocks private IPs, loopback, link-local, and reserved ranges.
-     * Only HTTPS is allowed in production-like URLs.
-     */
-    private function validateApiUrl(string $url): ?string
-    {
-        $parts = parse_url($url);
-        if (false === $parts || !isset($parts['scheme'], $parts['host'])) {
-            return 'Invalid API URL format';
-        }
-
-        $scheme = strtolower($parts['scheme']);
-        if (!in_array($scheme, ['http', 'https'], true)) {
-            return 'API URL must use HTTP or HTTPS';
-        }
-
-        $host = strtolower($parts['host']);
-        if ('localhost' === $host || str_ends_with($host, '.local') || str_ends_with($host, '.internal')) {
-            return 'API URL must not point to localhost or internal hosts';
-        }
-
-        $ip = filter_var($host, FILTER_VALIDATE_IP);
-        if (false === $ip) {
-            $resolved = gethostbyname($host);
-            if ($resolved !== $host) {
-                $ip = $resolved;
-            }
-        }
-
-        if (is_string($ip) && '' !== $ip) {
-            if (false === filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
-                return 'API URL must not resolve to a private or reserved IP address';
-            }
-        }
-
-        return null;
     }
 
     /**
