@@ -32,10 +32,13 @@ final readonly class FacadeChatRunModel implements ChatRunModel
     ) {
     }
 
-    public function call(ChatRunState $state, array $messages, array $tools, ?string $toolChoice, ?callable $onText = null): ChatRunReply
+    public function call(ChatRunState $state, array $messages, array $tools, ?string $toolChoice, ?callable $onText = null, ?int $maxTokens = null): ChatRunReply
     {
         $provider = $state->provider ?? $this->models->getDefaultProvider($state->userId, 'chat');
         $options = ['provider' => $provider, 'usage_turn_id' => 'chat-run-'.$state->runId];
+        if (null !== $maxTokens) {
+            $options['max_tokens'] = $maxTokens;
+        }
         if (null !== $state->model) {
             $options['model'] = $state->model;
         }

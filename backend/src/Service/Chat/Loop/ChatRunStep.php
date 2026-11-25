@@ -13,6 +13,8 @@ use App\Service\Tool\Execution\ToolLimits;
  *
  * Before the paid call it reads the stop flag, the cost limit and circle
  * detection; a limit or a second circle turns the call into the wrap-up.
+ * A transcript near the model's window is folded into notes first, in a
+ * unit of its own ({@see TranscriptCompactor}).
  * While a limit applies, each working call is told the budget left. A
  * write that needs approval parks the run; nothing here approves it.
  */
@@ -29,6 +31,7 @@ final readonly class ChatRunStep
     private ChatRunAnswer $answers;
     private ChatRunCostGuard $cost;
     private ChatRunStallDetector $stall;
+    private TranscriptCompactor $compactor;
 
     public function __construct(
         private ChatRunWorld $world,
@@ -41,6 +44,7 @@ final readonly class ChatRunStep
         $this->answers = new ChatRunAnswer($events, ChatRunProfile::limits()->maxToolsPerTurn);
         $this->cost = new ChatRunCostGuard($budget, $limits);
         $this->stall = new ChatRunStallDetector($limits);
+        $this->compactor = new TranscriptCompactor($model, $events, $limits);
     }
 
     /**
@@ -69,6 +73,11 @@ final readonly class ChatRunStep
                 return null;
             }
             $limit = $check->limitMicro;
+            if (ChatRunState::MODE_FREE === $state->mode && $this->compactor->due($state, ChatLoopPrompt::system($state, $scope))) {
+                $claim->renew();
+
+                return $this->compact($state, $scope);
+            }
         }
         $claim->renew();
 
@@ -121,6 +130,20 @@ final readonly class ChatRunStep
         }
 
         return $check;
+    }
+
+    /**
+     * The transcript is near the window: fold the older steps into notes in
+     * this unit, and make the next call in the next one, after the guards ran
+     * again on the cost the compaction added. A failed compaction wraps up.
+     */
+    private function compact(ChatRunState $state, ChatRunScope $scope): string
+    {
+        if (!$this->compactor->compact($state, ChatLoopPrompt::system($state, $scope))) {
+            ChatRunWrapUp::begin($state, ChatRunEnd::ContextFull, $this->events);
+        }
+
+        return self::UNIT;
     }
 
     private function call(ChatRunState $state, ChatRunScope $scope, ?int $limit): ?string

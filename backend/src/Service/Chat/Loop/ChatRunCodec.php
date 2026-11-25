@@ -37,6 +37,10 @@ final readonly class ChatRunCodec implements RunStateCodec
             'reads' => (object) $state->reads,
             'opened' => $state->opened,
             'analyzed' => $state->analyzed,
+            'head' => $state->head,
+            'window' => $state->window,
+            'notes' => $state->notes?->encode(),
+            'compactions' => $state->compactions,
             'status' => $state->status->value,
             'end' => $state->end?->value,
             'waitReason' => $state->waitReason,
@@ -132,6 +136,11 @@ final readonly class ChatRunCodec implements RunStateCodec
         $state->reads = self::reads($data['reads'] ?? []);
         $state->opened = self::opened($data['opened'] ?? []);
         $state->analyzed = self::analyzed($data['analyzed'] ?? []);
+        $head = $data['head'] ?? 0;
+        $state->head = \is_int($head) ? min(max(0, $head), \count($state->messages)) : 0;
+        $state->window = self::positiveInt($data['window'] ?? null) ? (int) $data['window'] : null;
+        $state->notes = null === ($data['notes'] ?? null) ? null : ChatRunNotes::read($data['notes']);
+        $state->compactions = max(0, (int) ($data['compactions'] ?? 0));
         $expiresAt = $data['expiresAt'] ?? null;
         $state->restore(
             max(1, (int) ($data['expected'] ?? 1)),

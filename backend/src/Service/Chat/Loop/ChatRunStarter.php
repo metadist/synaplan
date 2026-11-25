@@ -87,6 +87,8 @@ final readonly class ChatRunStarter
             );
             $state->replyMessageId = $request->replyMessageId;
             $state->rates = $request->prompt->rates;
+            $state->window = $request->prompt->window;
+            $state->head = \count($request->prompt->messages);
             if (null !== $request->first) {
                 $this->answers->seed($state, $request->first);
                 $seeded = $state;

@@ -59,6 +59,9 @@ final readonly class ChatRunRecords
             $state->end?->value,
             $this->clock->now()->getTimestamp(),
         );
+        if (null !== $state->notes) {
+            $run->setNotes($state->notes->json());
+        }
         $this->runs->save($run);
     }
 

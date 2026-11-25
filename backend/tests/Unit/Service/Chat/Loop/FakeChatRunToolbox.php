@@ -21,7 +21,7 @@ final class FakeChatRunToolbox implements ChatRunToolbox
     /** @var list<array{name: string, args: array<string, mixed>, approvalId: ?int}> */
     public array $runs = [];
 
-    /** @var array<string, string> what a read tool returns, by name, instead of the default */
+    /** @var array<string, string> what a tool returns, by name, instead of the default or the echo */
     public array $results = [];
 
     /** @var list<string> tools that fail every time they run */
@@ -62,11 +62,14 @@ final class FakeChatRunToolbox implements ChatRunToolbox
         if (\in_array($call['name'], $this->fails, true)) {
             return ChatToolResult::failed('The tool failed.');
         }
+        if (isset($this->results[$call['name']])) {
+            return ChatToolResult::text($this->results[$call['name']]);
+        }
         if ($this->echo) {
             return ChatToolResult::text('result of '.$call['name'].' for '.json_encode($call['args']));
         }
 
-        return ChatToolResult::text($this->results[$call['name']] ?? 'result of '.$call['name']);
+        return ChatToolResult::text('result of '.$call['name']);
     }
 
     public function isRead(string $name): bool
