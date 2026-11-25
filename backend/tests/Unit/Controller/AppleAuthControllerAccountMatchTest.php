@@ -84,12 +84,13 @@ final class AppleAuthControllerAccountMatchTest extends TestCase
         $this->users->expects(self::once())->method('findOneBy')->with(['mail' => self::VICTIM])->willReturn($owner);
         $this->gate->expects(self::once())->method('assertAppleSignup')->with(self::SUB, self::VICTIM, self::anything(), self::anything(), true);
         $this->gate->expects(self::never())->method('createAccount');
+        // The gate marks the address verified and drops a password set before the proof.
+        $this->gate->expects(self::once())->method('finishSignIn')->with($owner, false, self::anything(), true);
 
         $response = $this->controller(['email' => self::VICTIM, 'emailVerified' => true])->native($this->nativeRequest([]));
 
         self::assertSame(Response::HTTP_OK, $response->getStatusCode());
         self::assertSame(self::SUB, $owner->getUserDetails()['apple_sub']);
-        self::assertTrue($owner->isEmailVerified());
     }
 
     public function testAReturningAppleUserIsFoundBySubjectWithoutAnyAddress(): void

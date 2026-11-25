@@ -369,11 +369,7 @@ class AppleAuthController extends AbstractController
             $user->applySignupLanguage($signupLanguage);
         }
 
-        if (!$user->isEmailVerified() && null !== $email) {
-            $user->setEmailVerified(true);
-        }
-
-        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState, null !== $email);
 
         return $user;
     }

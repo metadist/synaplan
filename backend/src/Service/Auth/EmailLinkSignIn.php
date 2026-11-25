@@ -88,8 +88,9 @@ final readonly class EmailLinkSignIn
             return null;
         }
         // Opening the link proves the mailbox, including when the address
-        // was already marked verified. Refresh tokens from before this die.
-        $this->lifecycle->markEmailVerified($user);
+        // was already marked verified. Refresh tokens from before this die,
+        // and so does a password set before the address was ever proven.
+        $this->lifecycle->claimForMailboxOwner($user);
         $this->logger->info('Signed in with an email link', ['user_id' => $user->getId()]);
 
         return $user;

@@ -162,10 +162,6 @@ class GitHubAuthController extends AbstractController
                         break;
                     }
                 }
-
-                if (!$email && !empty($emails)) {
-                    $email = $emails[0]['email'] ?? null;
-                }
             }
 
             // A new account needs the human check from the start of the flow
@@ -275,11 +271,7 @@ class GitHubAuthController extends AbstractController
             $user->applySignupLanguage($signupLanguage);
         }
 
-        if (!$user->isEmailVerified() && $email) {
-            $user->setEmailVerified(true);
-        }
-
-        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState, null !== $email && '' !== $email);
 
         return $user;
     }

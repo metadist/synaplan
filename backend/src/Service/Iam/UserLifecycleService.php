@@ -5,13 +5,11 @@ declare(strict_types=1);
 namespace App\Service\Iam;
 
 use App\Entity\User;
-use App\Repository\OAuthTokenRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupDoor;
-use App\Service\Auth\TokenService;
 use App\Service\Chat\GuestSessionService;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -39,9 +37,8 @@ final readonly class UserLifecycleService
         private LoggerInterface $logger,
         private SignupAdmission $signupAdmission,
         private UserRepository $users,
-        private TokenService $tokenService,
+        private AccessRevocation $access,
         private RegistrationConfig $registration,
-        private OAuthTokenRepository $oauthTokens,
         private LevelGrantService $levelGrants,
     ) {
     }
@@ -205,8 +202,32 @@ final readonly class UserLifecycleService
     {
         $user->recordMailboxProof();
         $this->em->flush();
-        $this->tokenService->revokeAllUserTokens($user);
-        $this->endCloudGrants($user);
+        $this->access->endSessions($user);
+    }
+
+    /**
+     * The mailbox was proven without the account's password: a provider
+     * vouched for the address, or a mailed sign-in link was opened.
+     *
+     * Anyone can open an account for an address they do not own. It stays
+     * unverified and cannot sign in, but its password would start to work the
+     * moment the real owner arrives this way. So an unverified account loses
+     * its password, its unopened mailed links and its API keys before it is
+     * marked verified. The owner can set a new password with a reset link.
+     */
+    public function claimForMailboxOwner(User $user): void
+    {
+        if (!$user->isEmailVerified() && null !== $user->getPw()) {
+            $user->setPw(null);
+            $user->setMustChangePassword(false);
+            $apiKeys = $this->access->discardUnprovenAccess($user);
+            $this->logger->warning('Unverified account claimed by the owner of its mailbox; the password set before was removed', [
+                'user_id' => $user->getId(),
+                'api_keys_removed' => $apiKeys,
+            ]);
+        }
+
+        $this->markEmailVerified($user);
     }
 
     /**
@@ -227,9 +248,6 @@ final readonly class UserLifecycleService
      */
     public function endCloudGrants(User $user): void
     {
-        $id = $user->getId();
-        if (null !== $id) {
-            $this->oauthTokens->revokeAllForUser($id);
-        }
+        $this->access->endCloudGrants($user);
     }
 }

@@ -220,16 +220,28 @@ final readonly class OAuthSignupGate
      * is inserted, admitted and given its model defaults in one transaction,
      * so a plan or invitation that fails rolls the user back with it.
      *
+     * `$emailProven` says the provider vouched for the account's address. An
+     * unverified account that someone opened with a password is then handed
+     * to the owner of the mailbox without that password.
+     *
      * @param array<string, mixed> $state
      *
      * @throws SignupBlockedException
      */
-    public function finishSignIn(User $user, bool $isNewUser, array $state = []): void
+    public function finishSignIn(User $user, bool $isNewUser, array $state = [], bool $emailProven = false): void
     {
         if (!$isNewUser && null !== AccountAccess::signIn($user)) {
             $this->em->detach($user);
 
             return;
+        }
+
+        if ($emailProven && !$user->isEmailVerified()) {
+            if (!$isNewUser && null !== $user->getPw()) {
+                $this->lifecycle->claimForMailboxOwner($user);
+            } else {
+                $user->setEmailVerified(true);
+            }
         }
 
         $this->em->persist($user);

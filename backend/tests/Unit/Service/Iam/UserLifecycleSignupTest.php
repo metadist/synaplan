@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Iam;
 
 use App\Entity\User;
-use App\Repository\OAuthTokenRepository;
 use App\Repository\UserRepository;
 use App\Service\Auth\RegistrationConfig;
 use App\Service\Auth\SignupAdmission;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupDoor;
-use App\Service\Auth\TokenService;
+use App\Service\Iam\AccessRevocation;
 use App\Service\Iam\UserLifecycleService;
 use App\Service\ModelConfigService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -53,9 +52,8 @@ final class UserLifecycleSignupTest extends TestCase
             new NullLogger(),
             $admission,
             $users,
-            $this->createStub(TokenService::class),
+            $this->createStub(AccessRevocation::class),
             $this->registration(),
-            $this->createStub(OAuthTokenRepository::class),
             $this->levelGrants(),
         );
 
@@ -73,9 +71,8 @@ final class UserLifecycleSignupTest extends TestCase
             new NullLogger(),
             $this->createMock(SignupAdmission::class),
             $this->createMock(UserRepository::class),
-            $this->createStub(TokenService::class),
+            $this->createStub(AccessRevocation::class),
             $this->registration(true),
-            $this->createStub(OAuthTokenRepository::class),
             $this->levelGrants(),
         );
 
@@ -90,9 +87,8 @@ final class UserLifecycleSignupTest extends TestCase
             new NullLogger(),
             $this->createMock(SignupAdmission::class),
             $this->createMock(UserRepository::class),
-            $this->createStub(TokenService::class),
+            $this->createStub(AccessRevocation::class),
             $this->registration(false),
-            $this->createStub(OAuthTokenRepository::class),
             $this->levelGrants(),
         );
         $this->expectException(SignupBlockedException::class);
@@ -108,9 +104,8 @@ final class UserLifecycleSignupTest extends TestCase
             new NullLogger(),
             $admission,
             $users,
-            $this->createStub(TokenService::class),
+            $this->createStub(AccessRevocation::class),
             $this->registration(),
-            $this->createStub(OAuthTokenRepository::class),
             $this->levelGrants(),
         );
     }

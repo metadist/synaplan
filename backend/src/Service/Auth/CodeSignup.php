@@ -133,7 +133,7 @@ final readonly class CodeSignup
             if ($existing->isManagedExternally()) {
                 throw new CodeSignupExternallyManaged();
             }
-            $this->lifecycle->markEmailVerified($existing);
+            $this->lifecycle->claimForMailboxOwner($existing);
 
             return new CodeSignupOutcome($existing, false);
         }

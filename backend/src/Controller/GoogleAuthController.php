@@ -180,8 +180,9 @@ class GoogleAuthController extends AbstractController
         $email = $userInfo['email'] ?? null;
         $googleId = $userInfo['id'] ?? null;
 
-        if (!$email) {
-            throw new \Exception('Email not provided by Google');
+        // An address Google has not verified proves nothing and selects no account.
+        if (!$email || true !== ($userInfo['verified_email'] ?? false)) {
+            throw new \Exception('Verified email not provided by Google');
         }
 
         $user = $this->userRepository->findOneBy(['mail' => $email]);
@@ -215,7 +216,7 @@ class GoogleAuthController extends AbstractController
         $userDetails = $user->getUserDetails() ?? [];
         $userDetails['google_id'] = $googleId;
         $userDetails['google_email'] = $email;
-        $userDetails['google_verified_email'] = $userInfo['verified_email'] ?? false;
+        $userDetails['google_verified_email'] = true;
         $userDetails['google_refresh_token'] = $refreshToken;
         $userDetails['google_last_login'] = (new \DateTime())->format('Y-m-d H:i:s');
 
@@ -234,11 +235,7 @@ class GoogleAuthController extends AbstractController
             $user->applySignupLanguage($signupLanguage);
         }
 
-        if (!$user->isEmailVerified() && ($userInfo['verified_email'] ?? false)) {
-            $user->setEmailVerified(true);
-        }
-
-        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState);
+        $this->signupGate->finishSignIn($user, $isNewUser, $admissionState, true);
 
         return $user;
     }
