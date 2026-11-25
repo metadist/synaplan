@@ -460,7 +460,7 @@
       "showLess": "Daha az göster",
       "inputs": "1 girdi alır | {count} girdi alır",
       "inputNames": "Girdiler: {names}",
-      "noHints": "Sunucu bu aracın neyi değiştirdiğini belirtmiyor.",
+      "noHints": "Sunucu bu aracın neyi değiştirdiğini belirtmiyor, bu yüzden yıkıcı sayılır.",
       "locked": {
         "group_policy": "Bir yöneticinin ilkesi bu aracı engelliyor.",
         "shared": "Sizinle paylaşıldı. Bu izinleri yalnızca sahibi değiştirebilir.",

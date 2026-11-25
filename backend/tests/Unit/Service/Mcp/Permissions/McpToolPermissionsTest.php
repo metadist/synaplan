@@ -79,7 +79,21 @@ final class McpToolPermissionsTest extends TestCase
         $server = $this->server();
 
         self::assertSame(PolicyOutcome::Approve, $this->permissions->outcomeForTool($server, ['name' => 'drop', 'annotations' => ['destructiveHint' => true]]));
-        self::assertSame(PolicyOutcome::Auto, $this->permissions->outcomeForTool($server, ['name' => 'make', 'annotations' => []]));
+        self::assertSame(PolicyOutcome::Auto, $this->permissions->outcomeForTool($server, ['name' => 'make', 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false]]));
+        self::assertSame(PolicyOutcome::Auto, $this->permissions->outcomeForTool($server, ['name' => 'find', 'annotations' => ['readOnlyHint' => true]]));
+    }
+
+    /**
+     * Most servers publish no hints. Their tools must ask, not run as writes:
+     * the server said nothing that makes them safe.
+     */
+    public function testAToolTheServerSaysNothingAboutAsksUntilTheOwnerChooses(): void
+    {
+        self::assertSame(PolicyOutcome::Approve, $this->permissions->outcomeForTool($this->server(), ['name' => 'mystery', 'annotations' => []]));
+        self::assertSame(PolicyOutcome::Approve, $this->permissions->outcomeForTool($this->server(), ['name' => 'change', 'annotations' => ['readOnlyHint' => false]]));
+
+        $chosen = $this->server('{"v":1,"tools":{"mystery":"auto"}}');
+        self::assertSame(PolicyOutcome::Auto, $this->permissions->outcomeForTool($chosen, ['name' => 'mystery', 'annotations' => []]));
     }
 
     public function testEmptyPolicyMeansAllDefaults(): void

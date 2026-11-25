@@ -52,10 +52,30 @@ final class McpClientToolSourceTest extends TestCase
 
     public function testDestructiveToolsDefaultToApproveAndWritesToAuto(): void
     {
-        $tools = $this->describe(own: [$this->tool('update', false), $this->tool('remove', false, true)]);
+        $tools = $this->describe(own: [$this->tool('update', false, false), $this->tool('remove', false, true)]);
 
         self::assertSame('auto', $tools[0]->meta[McpToolMeta::CONNECTION_OUTCOME]);
         self::assertSame('approve', $tools[1]->meta[McpToolMeta::CONNECTION_OUTCOME]);
+    }
+
+    public function testAToolWithoutHintsIsDestructiveAndAsks(): void
+    {
+        $bare = ['name' => 'mystery', 'description' => 'mystery', 'inputSchema' => ['type' => 'object'], 'annotations' => []];
+        $tools = $this->describe(own: [$bare, $this->tool('change', false)]);
+
+        foreach ($tools as $tool) {
+            self::assertSame(SideEffect::Destructive, $tool->sideEffect);
+            self::assertSame('approve', $tool->meta[McpToolMeta::CONNECTION_OUTCOME]);
+        }
+    }
+
+    /** A shared connection hands out reads; a tool nobody declared a read is not one. */
+    public function testASharedConnectionPublishesOnlyToolsDeclaredReadOnly(): void
+    {
+        $bare = ['name' => 'mystery', 'description' => 'mystery', 'inputSchema' => ['type' => 'object'], 'annotations' => []];
+        $tools = $this->describe(shared: [$this->tool('search', true), $bare, $this->tool('odd', true, true)]);
+
+        self::assertSame(['mcp:9:search'], array_map(static fn ($tool): string => $tool->name, $tools));
     }
 
     /**

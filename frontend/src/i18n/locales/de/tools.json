@@ -457,7 +457,7 @@
       "showLess": "Weniger anzeigen",
       "inputs": "Nimmt 1 Eingabe | Nimmt {count} Eingaben",
       "inputNames": "Eingaben: {names}",
-      "noHints": "Der Server gibt nicht an, was dieses Tool ändert.",
+      "noHints": "Der Server gibt nicht an, was dieses Tool ändert. Es gilt deshalb als löschend.",
       "locked": {
         "group_policy": "Die Richtlinie einer Administratorin oder eines Administrators blockiert dieses Tool.",
         "shared": "Mit dir geteilt. Nur der Besitzer kann diese Berechtigungen ändern.",

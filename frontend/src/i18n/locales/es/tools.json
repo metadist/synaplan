@@ -460,7 +460,7 @@
       "showLess": "Ver menos",
       "inputs": "Admite 1 entrada | Admite {count} entradas",
       "inputNames": "Entradas: {names}",
-      "noHints": "El servidor no indica qué cambia esta herramienta.",
+      "noHints": "El servidor no indica qué cambia esta herramienta, así que se trata como destructiva.",
       "locked": {
         "group_policy": "La política de un administrador bloquea esta herramienta.",
         "shared": "Compartida contigo. Solo su propietario puede cambiar estos permisos.",

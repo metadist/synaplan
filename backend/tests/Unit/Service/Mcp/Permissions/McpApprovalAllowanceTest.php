@@ -80,7 +80,7 @@ final class McpApprovalAllowanceTest extends TestCase
         );
         $registry = $this->createStub(McpToolRegistry::class);
         $registry->method('toolsFor')->willReturn([
-            ['name' => 'create', 'description' => '', 'inputSchema' => [], 'annotations' => ['readOnlyHint' => false]],
+            ['name' => 'create', 'description' => '', 'inputSchema' => [], 'annotations' => ['readOnlyHint' => false, 'destructiveHint' => false]],
             ['name' => 'delete', 'description' => '', 'inputSchema' => [], 'annotations' => ['destructiveHint' => true]],
         ]);
         $permissions = new McpToolPermissions();

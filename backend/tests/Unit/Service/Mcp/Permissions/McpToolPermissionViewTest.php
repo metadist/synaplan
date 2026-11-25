@@ -22,7 +22,7 @@ final class McpToolPermissionViewTest extends TestCase
         $server = $this->server('{"v":1,"tools":{"create":"approve"},"seen":["search"]}');
         $rows = $this->view()->rows($server, 7, [
             $this->tool('search', ['readOnlyHint' => true]),
-            $this->tool('create', ['readOnlyHint' => false]),
+            $this->tool('create', ['readOnlyHint' => false, 'destructiveHint' => false]),
             $this->tool('nuke', ['destructiveHint' => true]),
             $this->tool('mystery', []),
         ], false);
@@ -36,7 +36,9 @@ final class McpToolPermissionViewTest extends TestCase
         self::assertSame('destructive', $by['nuke']['category']);
         self::assertSame('approve', $by['nuke']['outcome']);
         self::assertFalse($by['mystery']['hinted']);
-        self::assertSame('write', $by['mystery']['category']);
+        self::assertSame('destructive', $by['mystery']['category']);
+        self::assertSame('approve', $by['mystery']['outcome']);
+        self::assertSame('approve', $by['mystery']['default_outcome']);
         self::assertSame(['a', 'b'], $by['search']['input_names']);
         self::assertSame(2, $by['search']['input_count']);
         self::assertNull($by['search']['locked_reason']);
@@ -59,7 +61,7 @@ final class McpToolPermissionViewTest extends TestCase
 
         $rows = $this->view($group)->rows($this->server(), 7, [
             $this->tool('search', ['readOnlyHint' => true]),
-            $this->tool('create', ['readOnlyHint' => false]),
+            $this->tool('create', ['readOnlyHint' => false, 'destructiveHint' => false]),
         ], false);
 
         self::assertNull($rows[0]['locked_reason']);

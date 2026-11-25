@@ -13,8 +13,11 @@ use App\Service\Tool\SideEffect;
  * The connection's own choice per tool: auto, approve or block.
  *
  * `outcome = override[tool] ?? default(class)`. Tools the owner never touched
- * follow the class default (read and write auto, destructive approve). A tool
- * that cannot work through a tool call is block and cannot be changed.
+ * follow the class default (read and write auto, destructive approve). The
+ * class comes from the server's hints, and a tool the server does not declare
+ * read-only or non-destructive is destructive (SideEffect::fromHints), so an
+ * unannotated server asks before any of its tools run. A tool that cannot
+ * work through a tool call is block and cannot be changed.
  *
  * Fails closed: a stored policy that cannot be read makes every tool of the
  * connection ask (approve), read tools included, because it may hide a Block.

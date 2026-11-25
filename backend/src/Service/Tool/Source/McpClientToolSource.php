@@ -77,8 +77,9 @@ final readonly class McpClientToolSource implements ToolSourceInterface
     }
 
     /**
-     * A shared connection is read-only. Mutating tools are not published,
-     * so the gate cannot treat them as an allowed write.
+     * A shared connection is read-only. Only tools the server declares
+     * read-only are published, so the gate cannot treat anything else as an
+     * allowed call.
      *
      * @param list<array{name: string, description: string, inputSchema: array<string, mixed>, annotations: array<string, mixed>}> $tools
      *
@@ -93,7 +94,7 @@ final readonly class McpClientToolSource implements ToolSourceInterface
         $descriptors = [];
         foreach ($tools as $tool) {
             $annotations = $tool['annotations'];
-            if (false === ($annotations['readOnlyHint'] ?? null) || true === ($annotations['destructiveHint'] ?? null)) {
+            if (SideEffect::Read !== McpToolPermissions::classOf($annotations) || true === ($annotations['destructiveHint'] ?? null)) {
                 continue;
             }
             $name = (string) $tool['name'];

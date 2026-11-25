@@ -228,8 +228,14 @@ Tools are grouped as **read**, **write** and **destructive**; a category's
 choice sets all its tools at once. Defaults: read and write **Auto**,
 destructive **Approve**, nothing **Block**. A change shows a toast with
 **Undo**, and a tool set away from its default has **Reset to default**. Auto on
-a destructive tool asks for a confirmation first. A tool the server does not
-declare as read-only is treated as destructive until you choose otherwise.
+a destructive tool asks for a confirmation first.
+
+The category comes from what the server declares about each tool. A tool is
+**read** only when the server marks it read-only, and **write** only when the
+server marks it as not destructive. Everything else is **destructive**,
+including every tool of a server that declares nothing: it asks first until
+you set it to Auto. Connections that existed before this rule keep the choices
+you made; tools you had left untouched on such a server now ask.
 
 - **Always allow** on an approval card sets that tool to Auto on your
   connection. It is offered for write tools only, never for destructive ones,

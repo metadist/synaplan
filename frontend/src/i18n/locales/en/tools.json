@@ -534,7 +534,7 @@
       "showLess": "Show less",
       "inputs": "Takes 1 input | Takes {count} inputs",
       "inputNames": "Inputs: {names}",
-      "noHints": "The server does not say what this tool changes.",
+      "noHints": "The server does not say what this tool changes, so it is treated as destructive.",
       "locked": {
         "group_policy": "An administrator's policy blocks this tool.",
         "shared": "Shared with you. Only the owner can change these permissions.",

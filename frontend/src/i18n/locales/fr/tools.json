@@ -534,7 +534,7 @@
       "showLess": "Afficher moins",
       "inputs": "Prend 1 entrée | Prend {count} entrées",
       "inputNames": "Entrées : {names}",
-      "noHints": "Le serveur n'indique pas ce que cet outil modifie.",
+      "noHints": "Le serveur n'indique pas ce que cet outil modifie ; il est donc traité comme destructeur.",
       "locked": {
         "group_policy": "La politique d'un administrateur bloque cet outil.",
         "shared": "Partagée avec vous. Seul son propriétaire peut modifier ces autorisations.",

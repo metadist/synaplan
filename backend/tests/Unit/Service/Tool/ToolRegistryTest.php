@@ -36,11 +36,21 @@ final class ToolRegistryTest extends TestCase
         $registry->forUser(1);
     }
 
-    public function testUnknownClassDefaultsToWrite(): void
+    /**
+     * The MCP defaults: not read-only unless declared, destructive unless
+     * declared otherwise. A server without hints must not get the write
+     * default, which runs without asking.
+     */
+    public function testAToolIsDestructiveUnlessItsServerDeclaresOtherwise(): void
     {
-        $this->assertSame(SideEffect::Write, SideEffect::fromHints(null, null));
-        $this->assertSame(SideEffect::Read, SideEffect::fromHints(true, false));
+        $this->assertSame(SideEffect::Destructive, SideEffect::fromHints(null, null));
+        $this->assertSame(SideEffect::Destructive, SideEffect::fromHints(false, null));
         $this->assertSame(SideEffect::Destructive, SideEffect::fromHints(false, true));
+        $this->assertSame(SideEffect::Destructive, SideEffect::fromHints(null, true));
+        $this->assertSame(SideEffect::Write, SideEffect::fromHints(false, false));
+        $this->assertSame(SideEffect::Write, SideEffect::fromHints(null, false));
+        $this->assertSame(SideEffect::Read, SideEffect::fromHints(true, false));
+        $this->assertSame(SideEffect::Read, SideEffect::fromHints(true, null));
     }
 
     public function testGetByCallName(): void
