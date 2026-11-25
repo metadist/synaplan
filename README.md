@@ -20,6 +20,7 @@ Build agents on your own documents and put them wherever work happens: web, What
 [![GitHub stars](https://img.shields.io/github/stars/metadist/synaplan?style=flat&logo=github)](https://github.com/metadist/synaplan/stargazers)
 [![Discord](https://img.shields.io/badge/Discord-join%20us-5865F2?logo=discord&logoColor=white)](https://discord.com/invite/kQB3eDjWfF)
 [![metadist/synaplan MCP server](https://glama.ai/mcp/servers/metadist/synaplan/badges/score.svg)](https://glama.ai/mcp/servers/metadist/synaplan)
+[![Synaplan MCP connector](https://glama.ai/mcp/connectors/io.github.metadist/synaplan/badges/score.svg)](https://glama.ai/mcp/connectors/io.github.metadist/synaplan)
 
 <sub>Self-hosting is free. The hosted version opens with a paid plan or an invitation code – ask us at <a href="mailto:team@synaplan.com">team@synaplan.com</a>.</sub>
 
