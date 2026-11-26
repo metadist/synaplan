@@ -106,11 +106,35 @@ function upgradePlugin({ sockets, request, socket, head, ref, meetingId, plugin,
   })
 }
 
-export function createApp(config, { synaplan, plugin = null, log = () => {} } = {}) {
+export function createApp(config, { synaplan, plugin = null, opentalk = null, log = () => {} } = {}) {
   const sockets = new WebSocketServer({ noServer: true })
 
   const server = createServer((request, response) => {
     const url = new URL(request.url || '/', 'http://127.0.0.1')
+    if (request.method === 'POST' && url.pathname === '/v1/init') {
+      if (!config.opentalk || typeof opentalk?.accept !== 'function') {
+        json(response, 404, { error: 'not_found' })
+        return
+      }
+      const chunks = []
+      request.on('data', (chunk) => chunks.push(chunk))
+      request.on('end', () => {
+        let body = {}
+        try {
+          body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+        } catch {
+          json(response, 400, { error: 'invalid_request', message: 'Expected a JSON body.' })
+          return
+        }
+        opentalk.accept(request.headers.authorization || '', body).then((result) => {
+          json(response, result.status, result.body)
+        }).catch((error) => {
+          log(`OpenTalk: ${error.message}`)
+          json(response, 500, { error: 'failed', message: 'Subtitles could not be started.' })
+        })
+      })
+      return
+    }
     if (request.method === 'GET' && url.pathname === '/health') {
       json(response, 200, {
         ok: true,

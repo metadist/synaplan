@@ -38,7 +38,8 @@
     "captions": "Live captions in the meeting while notes are on",
     "from": "started by {name}",
     "all_generated": "Show in Sources › Generated",
-    "share": "Give every signed-in participant a copy in their Sources › Generated (off: only the person who started gets it)"
+    "share": "Give every signed-in participant a copy in their Sources › Generated (off: only the person who started gets it)",
+    "opentalk": "OpenTalk meetings: Synaplan writes the subtitles"
   },
   "jitsi": {
     "button": "Meeting notes",

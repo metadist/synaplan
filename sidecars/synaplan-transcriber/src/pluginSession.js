@@ -69,6 +69,22 @@ export function createPluginClient({ baseUrl, secret, fetchImpl = fetch }) {
   }
 
   return {
+    /**
+     * Opens the subtitle session for one OpenTalk meeting. The plugin
+     * recognises the windows and keeps no transcript.
+     */
+    async create(room, language) {
+      const { status, body } = await call('', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ room, language: language || '' }),
+      })
+      if (status !== 201 && status !== 200) {
+        throw httpError(status, body)
+      }
+      return { ref: String(body.ref || ''), language: String(body.language || language || '') }
+    },
+
     async bind(ref, meetingId) {
       const query = new URLSearchParams({ meetingId: meetingId || '' })
       const { status, body } = await call(`/${encodeURIComponent(ref)}?${query}`)

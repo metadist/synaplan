@@ -107,6 +107,8 @@ function adminCard(base, status, onSaved) {
   share.checked = !!s.share_with_participants
   const captions = h('input', { type: 'checkbox', id: 'syn-captions' })
   captions.checked = s.captions !== false
+  const opentalk = h('input', { type: 'checkbox', id: 'syn-opentalk' })
+  opentalk.checked = !!s.opentalk_enabled
   const langs = Object.keys(LANGUAGES).map((code) => {
     const box = h('input', { type: 'checkbox', value: code, id: `syn-lang-${code}` })
     box.checked = s.languages.includes(code)
@@ -172,6 +174,11 @@ function adminCard(base, status, onSaved) {
       { class: 'inline-flex items-center gap-2 txt-primary text-sm', for: 'syn-captions' },
       [captions, h('span', { text: t('captions') })]
     ),
+    h(
+      'label',
+      { class: 'inline-flex items-center gap-2 txt-primary text-sm', for: 'syn-opentalk' },
+      [opentalk, h('span', { text: t('opentalk') })]
+    ),
     h('div', {}, [
       h('div', { class: 'txt-secondary text-sm', text: t('languages') }),
       h('div', { class: 'mt-1' }, langs),
@@ -221,6 +228,7 @@ function adminCard(base, status, onSaved) {
       enabled: enabled.checked,
       share_with_participants: share.checked,
       captions: captions.checked,
+      opentalk_enabled: opentalk.checked,
       languages: langs
         .map((l) => l.querySelector('input'))
         .filter((b) => b.checked)

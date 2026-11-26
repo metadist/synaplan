@@ -20,6 +20,9 @@ Modes (`TRANSCRIBER_MODE`):
 | `jitsi` | `GET /transcribe` WebSocket for Jitsi Videobridge |
 | `element` | Matrix sync for voice messages |
 | `opendesk` | Both. This is the openDesk default |
+| `opentalk` | `POST /v1/init` for an OpenTalk 26.3 transcription service. Subtitles only; audio is not stored |
+
+OpenTalk mode needs `OPENTALK_CONTROLLER_URL`, `OPENTALK_SERVICE_KEY` and `OPENTALK_INIT_KEY` (`id:secret`, the controller key and the transcription key), `OPENTALK_LIVEKIT_URL` when the popout token does not carry an address, and `SYNAPLAN_TRANSCRIBER_SECRET`. The image is Debian, not Alpine: the LiveKit client ships a glibc build only.
 
 `GET /health` reports which side is on. `GET /element-call` explains why live Element Call captions are not in this version: the bot would have to join as a visible participant.
 

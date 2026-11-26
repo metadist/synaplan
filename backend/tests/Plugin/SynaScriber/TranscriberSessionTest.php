@@ -240,6 +240,32 @@ final class TranscriberSessionTest extends PluginTestCase
         self::assertSame('nothing_to_save', $this->store->find(self::REF)['state'] ?? null);
     }
 
+    public function testOpenTalkSubtitlesAreRecognisedAndNotStored(): void
+    {
+        $whisper = $this->whisperAnswering(self::recognized(['text' => 'Guten Tag', 'dropped' => null]));
+        $writer = $this->createMock(TranscriptWriter::class);
+        $writer->expects(self::never())->method('write');
+        $sessions = $this->service(['opentalk_enabled' => '1'], $whisper, $writer);
+
+        $session = $sessions->beginOpenTalk('d7f813a4-b294-45f4-b560-86467c8c4be7', 'de');
+        $again = $sessions->beginOpenTalk('d7f813a4-b294-45f4-b560-86467c8c4be7', 'de');
+        self::assertSame($session['ref'], $again['ref']);
+
+        $answer = $sessions->window($session['ref'], self::window());
+        self::assertSame('Guten Tag', $answer['text']);
+        self::assertSame([], $this->store->segments($session['ref']));
+
+        $sessions->event($session['ref'], ['type' => 'finished', 'at' => 1]);
+        self::assertSame('nothing_to_save', $this->store->find($session['ref'])['state'] ?? null);
+    }
+
+    public function testOpenTalkStaysOffUntilAnAdministratorEnablesIt(): void
+    {
+        $sessions = $this->service();
+
+        self::assertFails('not_enabled', 403, fn () => $sessions->beginOpenTalk('room-1', 'de'));
+    }
+
     public function testUnknownEventsAreRefused(): void
     {
         $sessions = $this->service();

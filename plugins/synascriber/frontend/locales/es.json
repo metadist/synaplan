@@ -38,7 +38,8 @@
     "captions": "Subtítulos en directo en la reunión mientras se toman notas",
     "from": "iniciadas por {name}",
     "all_generated": "Mostrar en Fuentes › Generados",
-    "share": "Cada participante con sesión iniciada recibe una copia en Fuentes › Generados (desactivado: solo quien las inició)"
+    "share": "Cada participante con sesión iniciada recibe una copia en Fuentes › Generados (desactivado: solo quien las inició)",
+    "opentalk": "Reuniones de OpenTalk: Synaplan escribe los subtítulos"
   },
   "jitsi": {
     "button": "Notas de la reunión",
