@@ -25,13 +25,7 @@ final class MessageTurnView
 
         $visible = [];
         foreach ($rows as $row) {
-            if (true === ($row['branchInactive'] ?? false)) {
-                continue;
-            }
-            if (false === ($row['versionSelected'] ?? true)) {
-                continue;
-            }
-            if (false === ($row['editSelected'] ?? true)) {
+            if (!self::isVisible($row)) {
                 continue;
             }
             $group = $row['versionGroup'] ?? null;
@@ -46,6 +40,16 @@ final class MessageTurnView
         }
 
         return $visible;
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    public static function isVisible(array $row): bool
+    {
+        return true !== ($row['branchInactive'] ?? false)
+            && false !== ($row['versionSelected'] ?? true)
+            && false !== ($row['editSelected'] ?? true);
     }
 
     /**

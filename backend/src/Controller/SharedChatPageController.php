@@ -10,6 +10,7 @@ use App\Service\Branding\BrandingService;
 use App\Service\Chat\PastedContentText;
 use App\Service\File\OgImageService;
 use App\Service\Message\GeneratedMediaTextRenderer;
+use App\Service\Message\MessageApiFormatter;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -89,6 +90,11 @@ class SharedChatPageController extends AbstractController
             ['chatId' => $chat->getId()],
             ['unixTimestamp' => 'ASC']
         );
+
+        // Title and description come from what a reader of the shared chat
+        // sees. An edited-away question stays in the database but is not
+        // part of the shared conversation.
+        $messages = MessageApiFormatter::visible($messages);
 
         // Extract metadata for Open Graph
         $title = $this->generateTitle($chat, $messages);

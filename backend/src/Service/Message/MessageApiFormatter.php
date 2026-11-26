@@ -48,6 +48,42 @@ final readonly class MessageApiFormatter
     }
 
     /**
+     * The messages a reader sees, as entities: without superseded versions,
+     * edited-away questions and inactive branches. Same rule as
+     * {@see self::formatMany()}, for callers that need the text only.
+     *
+     * @param list<Message> $messages
+     *
+     * @return list<Message>
+     */
+    public static function visible(array $messages): array
+    {
+        return array_values(array_filter(
+            $messages,
+            static fn (Message $m): bool => MessageTurnView::isVisible([
+                'versionSelected' => self::versionSelected($m),
+                'editSelected' => self::editSelected($m),
+                'branchInactive' => self::branchInactive($m),
+            ]),
+        ));
+    }
+
+    private static function versionSelected(Message $m): bool
+    {
+        return '0' !== (string) ($m->getMeta(MessageVersionService::VERSION_SELECTED) ?? '1');
+    }
+
+    private static function editSelected(Message $m): bool
+    {
+        return '0' !== (string) ($m->getMeta(MessageVersionService::EDIT_SELECTED) ?? '1');
+    }
+
+    private static function branchInactive(Message $m): bool
+    {
+        return '1' === (string) $m->getMeta(MessageVersionService::BRANCH_INACTIVE);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function format(Message $m): array
@@ -250,11 +286,11 @@ final readonly class MessageApiFormatter
             'agentVersionId' => $this->intMeta($m, 'AGENTVERSIONID'),
             'versionGroup' => $this->intMeta($m, MessageVersionService::VERSION_GROUP),
             'versionIndex' => $this->intMeta($m, MessageVersionService::VERSION_INDEX),
-            'versionSelected' => '0' !== (string) ($m->getMeta(MessageVersionService::VERSION_SELECTED) ?? '1'),
+            'versionSelected' => self::versionSelected($m),
             'editGroup' => $this->intMeta($m, MessageVersionService::EDIT_GROUP),
             'editIndex' => $this->intMeta($m, MessageVersionService::EDIT_INDEX),
-            'editSelected' => '0' !== (string) ($m->getMeta(MessageVersionService::EDIT_SELECTED) ?? '1'),
-            'branchInactive' => '1' === (string) $m->getMeta(MessageVersionService::BRANCH_INACTIVE),
+            'editSelected' => self::editSelected($m),
+            'branchInactive' => self::branchInactive($m),
             // Generated content (images, videos, audio from AI)
             'file' => ($m->getFile() && $filePath) ? [
                 'path' => $filePath,
