@@ -72,14 +72,12 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 
 **Was am Abend des 25.11.2026 dazukam (Sitzung 2)**
 
-- SYN-23 gebaut: Draft GHSA-rmmx-x383-4p77, PR im privaten Fork, wartet auf
-  den Owner.
+- SYN-23 gebaut: Draft GHSA-rmmx-x383-4p77, PR im privaten Fork (am 26.11. gemergt).
 - SYN-24 geprüft: die SSRF ist seit 5.10.2 zu. Nur die Prüfung beim Speichern
   fehlte, die liegt als öffentlicher PR #3273 vor (kein Advisory nötig, weil
   nichts Unveröffentlichtes verraten wird).
-- SYN-25 gebaut: Draft GHSA-5vp7-6cp5-3v5g, PR im privaten Fork, wartet auf
-  den Owner.
-- Nichts davon ist gemergt. Details in 3c.
+- SYN-25 gebaut: Draft GHSA-5vp7-6cp5-3v5g, PR im privaten Fork (am 26.11. gemergt).
+- Details in 3c.
 - Das lokale Test-Setup ist umgestellt: alles läuft über `m4wt` (Abschnitt 6).
 
 **Was am 26.11.2026 dazukam (Sitzung 3)**
@@ -87,39 +85,38 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 - PR #3273 (SYN-24, Rest-Härtung) ist gemergt (`e2d267d4d`).
 - SYN-30 auf `main` nachgeprüft: war offen und braucht keine Prompt-Injection,
   der Aufrufer schreibt den Prompt selbst. Gebaut: Draft GHSA-grvv-mwcf-vhpm,
-  PR im privaten Fork, wartet auf den Owner. Details in 3c.
+  PR im privaten Fork (am 26.11. gemergt). Details in 3c.
 - SYN-07: der Fix (`e2d5123ae`, PR #3226) liegt laut `git tag --contains` seit
   `v5.9.0` in einem Release. Das Feld im Advisory ist noch nicht gefüllt.
 - Die CI auf `main` war am 26.11. rot (`composer audit` nach dem
   Sicherheits-Release von Symfony). PR #3276 (Symfony 8.1.12) ist gemergt.
 - SYN-31 mit dem Owner geklärt: alte Links laufen weiter, ohne Enddatum.
-  Gebaut: Draft GHSA-r233-vw39-4hm9, PR im privaten Fork, wartet auf den
-  Owner. Details in 3c.
+  Gebaut: Draft GHSA-r233-vw39-4hm9. Details in 3c.
+- Auf Wort des Owners gemergt (je über die Advisory-Seite): SYN-23
+  (`57fa0b5cf`), SYN-25 (`0be250b77`), SYN-30 (`1a85eaeb4`), SYN-31
+  (`aa1a57502`). Vorher lief das Gate auf dem zusammengeführten Stand:
+  `make ci-local` grün (PHPUnit 13245, Vitest 3818), Playwright `@ci` 225
+  passed / 2 skipped / 1 failed (`widget.spec.ts:159`, ein Timing-Rennen im
+  Test: die Antwort steht im Seitenabbild, der Text wird zu früh gelesen).
+  Noch in keinem Release; die vier Advisories bleiben Drafts.
+- WordPress-Plugin-PR #11 ist gemergt.
 
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
 
-0. **Vier PRs in privaten Forks mergen** (je über die Advisory-Seite, Ablauf
-   Abschnitt 5):
-   - SYN-23: https://github.com/metadist/synaplan-ghsa-rmmx-x383-4p77/pull/1.
-     Vor dem Deploy `IAP_APPLE_ENVIRONMENT` prüfen: nur `Sandbox` oder
-     `Production` (`Xcode`/`LocalTesting` wird außerhalb von dev/test
-     abgelehnt). Das lokale Gate ist dort unvollständig: Vitest und vue-tsc
-     liefen nicht durch (kein Frontend berührt).
-   - SYN-25: https://github.com/metadist/synaplan-ghsa-5vp7-6cp5-3v5g/pull/1.
-     Kein Playwright gelaufen. Folge für Admins: ein Import, dessen SQL
-     Backslashes, doppelte Anführungszeichen, Kommentare, Funktionen oder ein
-     `OR` im WHERE enthält, wird abgelehnt.
-   - SYN-30: https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1.
-     Keine Änderung in Produktion nötig, keine Daten betroffen. Die
-     PR-Beschreibung enthält eine Lese-Abfrage für Altzeilen (fährt nur der
-     Owner).
-   - SYN-31: https://github.com/metadist/synaplan-ghsa-r233-vw39-4hm9/pull/1.
-     Die Migration muss mit dem Deploy laufen (eine Zeile in `BCONFIG`, kein
-     Schema). Ohne sie antworten alte Links für nicht angemeldete Besucher
-     mit 404. Keine Daten betroffen.
-
+0. **Vor dem Deploy des nächsten Release** (die vier Fixes sind gemergt):
+   - SYN-23: `IAP_APPLE_ENVIRONMENT` prüfen: nur `Sandbox` oder `Production`
+     (`Xcode`/`LocalTesting` wird außerhalb von dev/test abgelehnt).
+   - SYN-25: Folge für Admins: ein Import, dessen SQL Backslashes, doppelte
+     Anführungszeichen, Kommentare, Funktionen oder ein `OR` im WHERE
+     enthält, wird abgelehnt.
+   - SYN-30: die Lese-Abfrage für Altzeilen steht in
+     https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1 (fährt
+     nur der Owner).
+   - SYN-31: die Migration muss mit dem Deploy laufen (eine Zeile in
+     `BCONFIG`, kein Schema). Ohne sie antworten alte Links für nicht
+     angemeldete Besucher mit 404.
 1. **SYN-14 fertig machen:** nächstes Release schneiden (enthält `fa202d4cf`),
    deployen, einmal `php bin/console app:widget:purge-visitor-upload-vectors`
    laufen lassen (`--dry-run` zählt nur). Danach (KI, auf sein Wort) in
@@ -142,7 +139,7 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
    "Signatur verlangen" klickt.
 7. **SYN-12 Einstufung:** ging als "high" (CVSS 7.1) raus, der Report sagt
    "Medium as demonstrated". Lässt sich auf der Advisory-Seite ändern.
-8. WordPress-Plugin-PR #11 reviewen und mergen.
+8. Erledigt: WordPress-Plugin-PR #11 ist gemergt.
 
 ### 3b. Erst nach Entscheidung des Owners ("Ask first" in AGENTS.md)
 
@@ -160,18 +157,17 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 
 ### 3c. Offene Findings ohne Vorentscheidung (KI, je auf Wort des Owners)
 
-Reihenfolge laut Report-Tabelle. SYN-23, 25, 30 und 31 sind gebaut und warten auf den Merge (Stand unten);
-SYN-24 ist gemergt.
+Reihenfolge laut Report-Tabelle. SYN-23, 24, 25, 30 und 31 sind gemergt (Stand unten), aber noch in keinem Release.
 **Als Nächstes: SYN-26/27, aber erst nach einem Ja des Owners** (Docker, `install.sh`).
 
-**SYN-30 (Stand 26.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
+**SYN-30 (Stand 26.11.):** gemergt (`1a85eaeb4`), noch in keinem Release.
 Draft-Advisory GHSA-grvv-mwcf-vhpm, PR https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1,
 Branch `fix/media-marker-file-path` (Commit `ec56d9ccf`). `make ci-local` grün (PHPUnit 13143, Vitest 3818),
 Playwright `@ci` 226 passed / 2 skipped. Nicht gegen ein echtes Modell geprüft.
 Offen, Owner-Entscheidung: die Datei-Routen nehmen weiter die erste Message mit passendem Pfad als Besitzer.
 Eine Prüfung dort würde auch Altzeilen abdecken, kann aber ändern, wer bestehende Links öffnen darf.
 
-**SYN-31 (Stand 26.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
+**SYN-31 (Stand 26.11.):** gemergt (`aa1a57502`), noch in keinem Release.
 Draft-Advisory GHSA-r233-vw39-4hm9, PR https://github.com/metadist/synaplan-ghsa-r233-vw39-4hm9/pull/1,
 Branch `fix/generated-media-names`. Backend-Gate grün (PHPUnit 13174); Vitest fiel im Gesamtlauf in
 `ChatWidgetSession.spec.ts` (nicht berührt) und war im Einzellauf grün (3818). Playwright `@ci` 225 passed /
@@ -181,7 +177,7 @@ Vorgabe des Owners: alte Links laufen weiter, ohne Enddatum. Dateien von vor dem
 ratbar wie bisher. Schließen lässt sich das später über `MEDIA / LEGACY_PUBLIC_NAMES_UNTIL` = `0`
 (alle alten Links enden für nicht angemeldete Besucher) oder durch Umbenennen der Altdateien.
 
-**SYN-25 (Stand 25.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
+**SYN-25 (Stand 26.11.):** gemergt (`0be250b77`), noch in keinem Release.
 Draft-Advisory GHSA-5vp7-6cp5-3v5g, PR https://github.com/metadist/synaplan-ghsa-5vp7-6cp5-3v5g/pull/1,
 Branch `fix/model-import-sql-validator`. Validator prüft auf Statement ohne String-Inhalte, Wort-Allowlist,
 WHERE mit BSERVICE/BTAG/BPROVID gegen Werte, kein OR, keine Backslashes/doppelten Anführungszeichen.
@@ -192,7 +188,7 @@ Rest-Härtung (Speicherprüfung über `SsrfGuard`) gemergt mit PR #3273 (`e2d267
 Neu: `plugins/castingdata/backend/Service/CastingApiUrlPolicy.php` (Schema http/https, keine Query, kein Fragment,
 keine Zugangsdaten in der URL, `SsrfGuard::isBlockedUrl`).
 
-**SYN-23 (Stand 25.11.):** Fix liegt als PR im privaten Fork, wartet auf Merge durch den Owner.
+**SYN-23 (Stand 26.11.):** gemergt (`57fa0b5cf`), noch in keinem Release.
 Draft-Advisory GHSA-rmmx-x383-4p77, PR https://github.com/metadist/synaplan-ghsa-rmmx-x383-4p77/pull/1,
 Branch `fix/apple-iap-entitlement` (Commit 108a075ec). Ohne Schemaänderung gelöst (Lock + Liste
 `iap_purchases` in `BPAYMENTDETAILS`). Lokal grün: Lint, PHPStan, Deptrac, PHPUnit (13065 Tests).
@@ -277,25 +273,25 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   steht unter Admin → Systemkonfiguration → Features → "Tools & approvals"
   und ist seit Migration `Version20260911090000` auf Bestandsinstallationen
   an. Kein Browser-Walk gegen einen echten MCP-Server.
-- **SYN-23** (noch nicht gemergt): Bundle-ID wird in
+- **SYN-23:** Bundle-ID wird in
   `AppleStoreKitVerifier::decodeTransaction` geprüft; `Xcode`/`LocalTesting`
   nur in dev/test. `MobilePurchaseService` nimmt einen Lock `iap-redeem-…`
   und führt die Belege in einer Liste `iap_purchases` in `BPAYMENTDETAILS`
   (`IapPurchaseHistory`), ein Beleg vor einer Erstattung wird abgelehnt. Der
   Report schlug eine eigene Tabelle vor; darauf verzichtet, um das Schema
   nicht anzufassen. Nicht gebaut: Statusabfrage bei Apple, `appAccountToken`.
-- **SYN-25** (noch nicht gemergt): `ModelSqlValidator` prüft jede Regel auf
+- **SYN-25:** `ModelSqlValidator` prüft jede Regel auf
   dem Statement mit geleerten String-Literalen. Erlaubt sind nur bekannte
   Wörter (Keywords, `BMODELS`, Spalten). Der Report schlug einen
   strukturierten Import (JSON statt SQL) vor; das hätte Endpoint und UI
   geändert und bleibt offen.
-- **SYN-30** (noch nicht gemergt): `MediaMarkerReader` liest den Marker für
+- **SYN-30:** `MediaMarkerReader` liest den Marker für
   beide Routen. Angenommen wird nur eine vorhandene Datei im eigenen
   Upload-Verzeichnis des Kontos; eine https-Adresse nur in Antworten des
   eingebauten Demo-Providers (`test`). Der Report nannte den Befund
   "Suspected" und verlangte ein echtes Modell zum Nachweis; das ist nicht
   nötig, weil der Aufrufer den Prompt selbst schreibt.
-- **SYN-31** (noch nicht gemergt): `PublicMediaName` baut alle anonym
+- **SYN-31:** `PublicMediaName` baut alle anonym
   ausgelieferten Namen mit 128 Zufallsbits. `AnonymousMediaGate` entscheidet
   allein, was die Datei-Route ohne Anmeldung ausliefert: einen Zufallsnamen
   immer, einen Namen alter Form nur, wenn die Zeit im Namen vor dem Upgrade
@@ -460,8 +456,9 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-1. Owner: die vier PRs aus 3a Punkt 0 mergen, dann Release (enthält auch
-   SYN-14 und die Rest-Härtung zu SYN-24) und der Gerätetest für SYN-19.
+1. Owner: Release schneiden (enthält SYN-14, 23, 25, 30, 31 und die
+   Rest-Härtung zu SYN-24), die Punkte aus 3a Punkt 0 beim Deploy beachten,
+   dann der Gerätetest für SYN-19.
 2. KI, auf Wort des Owners: nach dem Release GHSA-6m8j (SYN-14),
    GHSA-rmmx (SYN-23), GHSA-5vp7 (SYN-25), GHSA-grvv (SYN-30) und GHSA-r233
    (SYN-31) mit betroffenem Bereich und gepatchter Version füllen und
