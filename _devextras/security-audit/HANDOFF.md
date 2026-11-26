@@ -1,8 +1,8 @@
 # Handoff: Synaplan Security-Audit und Fixes
 
 Stand: 2026-11-25, abends. `main` @ `12578c55f`, letzter Tag `v5.10.3`.
-`REPORT.md` und die übrigen Dateien des Ordners bleiben untracked und werden
-**nie committet**; nur diese Datei liegt im Repo.
+Der Ordner `_devextras/security-audit/` liegt seit dem 26.11.2026 auf
+Entscheidung des Owners vollständig im Repo.
 
 ## 1. Worum es geht
 
@@ -80,6 +80,7 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 - SYN-25 gebaut: Draft GHSA-5vp7-6cp5-3v5g, PR im privaten Fork, wartet auf
   den Owner.
 - Nichts davon ist gemergt. Details in 3c.
+- Das lokale Test-Setup ist umgestellt: alles läuft über `m4wt` (Abschnitt 6).
 
 ## 3. Was offen ist
 
@@ -325,12 +326,26 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   Konstruktoren höchstens 10 Parameter.
 - Änderungen an Classifier/Sorter verschieben die Routing-Snapshots.
 
-**Lokales Setup**
+**Lokales Setup (Memory `m4-test-setup`, dort steht die volle Fassung)**
 
-- Das Test-Setup des Rechners steht in einer persönlichen Notiz und nicht im
-  Repo. Reine Doku- oder Review-Arbeit braucht keinen Stack.
+- Jeder Testlauf geht über `m4wt` (`m4wt --help`), ohne Sandbox. Nie mehr
+  `make ci-local`, `make test-e2e` oder `docker compose exec` direkt, und nie
+  mehr `mutagen sync pause/resume` von Hand. Der alte Ablauf mit Pause hat
+  parallelen Sitzungen die Läufe zerschossen.
+- Im Worktree zuerst `m4wt up` (eigener Stack, eigene Ports, eigene DB,
+  Test-DB geseedet, ~10 min), dann `m4wt ci`, `m4wt e2e`,
+  `m4wt run -- docker compose exec -T backend php bin/phpunit <pfad>`. Am
+  Ende `m4wt down --purge`. Höchstens zwei Worktree-Stacks; sind beide Slots
+  belegt, dem Owner sagen und keinen fremden Stack stoppen.
+- Reine Doku- oder Review-Arbeit braucht keinen Stack.
+- Der Sync ist einweg (Mac → M4). Was ein Container schreibt (Formatter,
+  Snapshots, `frontend/src/generated/`), kommt nicht zurück: lokal nachziehen.
 - Die ganze PHPUnit-Suite nur über das Gate; `bin/phpunit` ohne Pfad läuft
   ins Speicherlimit.
+- Playwright nur auf dem M4. `m4wt e2e-full` für `@whatsapp`.
+- Schneller Unit-Test ohne Stack (Wegwerf-Container):
+  `docker --context m4 run --rm --entrypoint sh -v "$PWD/backend:/var/www/backend" -v "$PWD/plugins:/plugins:ro" -v synaplan_backend_vendor:/var/www/backend/vendor:ro --tmpfs /var/www/backend/var -w /var/www/backend ghcr.io/metadist/synaplan:latest -c 'php vendor/bin/phpunit --no-configuration --bootstrap tests/bootstrap.php <pfad>'`.
+  Das ist Diagnose, nicht das Gate.
 - PHPUnit-Tests für Kanäle brauchen die Modul-Env-Variablen in `setUp()`
   (Muster: `WhatsAppWebhookSignatureTest`).
 
@@ -343,16 +358,17 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   Zeile), die nur jetzt roten Specs einzeln nachlaufen lassen. Als Nachweis
   taugt am Ende nur die CI auf `main`.
 - Nach einem Branch-Wechsel liefert Vite manchmal einen alten Stand:
-  `docker compose restart frontend`, vor Browser-Walk und E2E.
+  `m4wt run -- docker compose restart frontend`, vor Browser-Walk und E2E.
 - Mehrere KIs arbeiten gleichzeitig am Projekt. Ein Timeout in einem
-  unberührten Test ist meist Last auf dem Testrechner: diese Seite einmal
+  unberührten Test ist meist Last auf dem M4: diese Seite einmal
   wiederholen. Wird ein Lauf abgebrochen, das in der PR-Beschreibung sagen
   (so bei SYN-23).
 - Bevor ein Finding gebaut wird: auf `main` nachsehen, ob es schon zu ist.
   SYN-24 war durch einen anderen Fix (GHSA-9fxp) bereits geschlossen; dann
   reicht ein öffentlicher PR für die Rest-Härtung und kein neues Advisory.
 - Ein öffentlicher PR, der ein noch nicht veröffentlichtes Finding
-  beschreibt, ist verboten (`SECURITY.md`). Das Repo ist öffentlich.
+  beschreibt, ist verboten (`SECURITY.md`). Das Repo ist öffentlich. Dieser
+  Ordner ist die vom Owner entschiedene Ausnahme.
 - Ein Branch auf altem `main` kann lokal grün sein und auf `main` rot werden.
   Immer frisch von `origin/main` abzweigen.
 - `composer audit` in der CI hängt vom Tagesstand der Advisories ab und kann
@@ -371,13 +387,19 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   nach stderr (`docker compose logs backend`).
 - "Cut Release Tag" kann an einem GitHub-Timeout in "Set up job" scheitern:
   `gh run rerun <id> --failed`.
-- Vor weiteren Commits auf einen Branch prüfen, ob dessen PR noch offen ist.
+- Vor weiteren Commits auf einen Branch prüfen, ob dessen PR noch offen ist
+  (Memory `check-pr-merged-before-push`).
 - Beim `composer update` im Container: der Composer
   im Container entfernt alle `published-time`-Felder; nur den Block des
   geänderten Pakets ins Lockfile übernehmen.
 
 **Lokaler Zustand**
 
+- Hauptkopie `~/Workspace/metadist/synaplan` gehört auch anderen Sitzungen;
+  Stand dort nicht annehmen, sondern nachsehen.
+- Worktree dieser Sitzung: `.claude/worktrees/security-audit-handoff-f758d5`.
+  Sein Stack ist abgebaut (`m4wt down --purge`). Alle drei Branches sind
+  gepusht, der Worktree kann weg.
 - Branches und Remotes:
   - `fix/apple-iap-entitlement` @ `108a075ec` → Remote `ghsa-syn23` (nur dort)
   - `fix/model-import-sql-validator` @ `99b224350` → Remote `ghsa-syn25` (nur dort)
@@ -385,6 +407,12 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   Die Branches von SYN-23 und SYN-25 nie nach `origin` pushen.
 - Ältere Fix-Branches und `ghsa-*`-Remotes veröffentlichter Advisories sind
   in `main` und können weg.
+- Dev-Datenbank der Hauptkopie: Migration `Version20261124120000` ist
+  eingetragen, zwei Test-Widgets von `admin@synaplan.com` sind verändert
+  (`wdg_270cf0af730853b7a5ca0da841bce2fb` trägt die Markierung,
+  `wdg_01a6100ee647af703513e5394ae7b64b` nicht mehr).
+- WordPress-Plugin lokal in `~/Workspace/metadist/synaplan-ai-support-chat`,
+  Branch `feat/signed-visitor-id` (gepusht).
 
 ## 7. Nächster Schritt
 
