@@ -9,6 +9,7 @@
  */
 import { marked, type MarkedExtension, type Tokens } from 'marked'
 import DOMPurify from 'dompurify'
+import { breakPlaceholdersInAttributes } from '@/utils/placeholderGuard'
 import { escapeHtml, highlightCode, preloadHighlighter, ensureHighlighter } from './useHighlight'
 import { i18n } from '@/i18n'
 
@@ -357,7 +358,7 @@ const SANITIZE_CONFIG = {
 function sanitizeHtml(html: string): string {
   DOMPurify.addHook('afterSanitizeAttributes', replaceUntrustedImage)
   try {
-    return DOMPurify.sanitize(html, SANITIZE_CONFIG)
+    return breakPlaceholdersInAttributes(DOMPurify.sanitize(html, SANITIZE_CONFIG))
   } finally {
     DOMPurify.removeHook('afterSanitizeAttributes')
   }

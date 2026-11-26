@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Telegram;
 
+use App\Service\Media\FfmpegLocalInput;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Process\Process;
 
@@ -34,7 +35,7 @@ final readonly class TelegramVoiceConverter
         @unlink($target);
         $target .= '.ogg';
 
-        $process = new Process([$this->ffmpegBinary, '-y', '-loglevel', 'error', '-i', $absolutePath, '-vn', '-c:a', 'libopus', '-b:a', '48k', $target]);
+        $process = new Process([$this->ffmpegBinary, '-y', '-loglevel', 'error', ...FfmpegLocalInput::OPTIONS, '-i', $absolutePath, '-vn', '-c:a', 'libopus', '-b:a', '48k', $target]);
         $process->setTimeout(self::TIMEOUT_SECONDS);
         try {
             $process->run();

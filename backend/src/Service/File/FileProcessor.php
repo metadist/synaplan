@@ -13,6 +13,7 @@ use App\Plug\Extraction\ExtractorRejectedException;
 use App\Plug\PlugConfigService;
 use App\Service\File\Office\OfficeConverterClient;
 use App\Service\File\Office\StructuredTextExtractor;
+use App\Service\Media\FfmpegLocalInput;
 use App\Service\Stt\SpeechFailure;
 use App\Service\Stt\WhisperService;
 use Psr\Log\LoggerInterface;
@@ -1432,7 +1433,7 @@ final readonly class FileProcessor
 
         $process = new Process([
             $this->ffmpegBinary,
-            '-i', $videoPath,
+            ...FfmpegLocalInput::OPTIONS, '-i', $videoPath,
             '-vn',          // strip video stream
             '-ar', '16000', // 16 kHz (optimal for speech recognition)
             '-ac', '1',     // mono
@@ -1733,7 +1734,7 @@ final readonly class FileProcessor
 
         $process = new Process([
             $this->ffmpegBinary,
-            '-i', $absolutePath,
+            ...FfmpegLocalInput::OPTIONS, '-i', $absolutePath,
             '-vn',                    // No video (extract audio only)
             '-ar', '16000',           // 16kHz sample rate (optimal for speech)
             '-ac', '1',               // Mono

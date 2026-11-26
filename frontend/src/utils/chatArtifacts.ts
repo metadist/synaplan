@@ -49,11 +49,15 @@ export function sanitizeSvg(source: string): string {
 
 const CSP = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">`
 
+/**
+ * The policy sits in a head of its own, in front of everything the artifact
+ * wrote, so it is in force before any of that markup is read. The parser
+ * folds the artifact's own `<html>` and `<head>` into this document. Looking
+ * for the artifact's `<head>` instead would let a `<header>` tag or a comment
+ * decide where the policy lands.
+ */
 function withCsp(html: string): string {
-  if (/<head[^>]*>/i.test(html)) {
-    return html.replace(/<head[^>]*>/i, (head) => `${head}${CSP}`)
-  }
-  return `<!DOCTYPE html><html><head>${CSP}</head><body>${html}</body></html>`
+  return `<!DOCTYPE html><html><head>${CSP}</head>${html.replace(/^\s*<!doctype[^>]*>/i, '')}`
 }
 
 export function artifactSrcDoc(artifact: ChatArtifact): string {
