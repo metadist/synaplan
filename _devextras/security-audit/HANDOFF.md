@@ -15,8 +15,8 @@ Abschnitt 5).
 
 ## 2. Was erledigt ist
 
-31 Advisories im Repo: 30 veröffentlicht, kein Draft, 1 als Duplikat
-geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 30 gehören 26 zu diesem Audit
+33 Advisories im Repo: 30 veröffentlicht, 2 Drafts (SYN-26, SYN-27, seit
+26.11.), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 30 gehören 26 zu diesem Audit
 (Tabelle unten, alle ohne CVE); vier sind ältere, davon unabhängige
 Advisories (GHSA-26f3-684h-hpjh, GHSA-2x6x-8r52-pm58, GHSA-phrw-3wm4-3xcx,
 GHSA-qqg9-qv48-j8m8).
@@ -49,6 +49,8 @@ GHSA-qqg9-qv48-j8m8).
 | SYN-25 Admin-Modell-Import, SQL-Prüfung | GHSA-5vp7-6cp5-3v5g | 5.10.4 | published 26.11. |
 | SYN-30 Medien-Marker setzt Dateipfad | GHSA-grvv-mwcf-vhpm | 5.10.4 | published 26.11. |
 | SYN-31 Generierte Medien unter ratbaren Namen | GHSA-r233-vw39-4hm9 | 5.10.4 | published 26.11. |
+| SYN-26 Compute-Sidecar schreibt über Symlink in `/out` | GHSA-q83r-q9c6-7w9h | offen | Draft, PR im Advisory-Fork |
+| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | offen | Draft, PR im Advisory-Fork |
 
 Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 #3260, normaler öffentlicher PR ohne Advisory). Offen davon siehe 3b.
@@ -166,7 +168,25 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 ### 3c. Offene Findings ohne Vorentscheidung (KI, je auf Wort des Owners)
 
 Reihenfolge laut Report-Tabelle. SYN-23, 24, 25, 30 und 31 sind in 5.10.4 erschienen (Stand unten).
-**Als Nächstes: SYN-26/27, aber erst nach einem Ja des Owners** (Docker, `install.sh`).
+**SYN-26/27 (Stand 26.11.):** mit Ja des Owners gebaut, je ein PR im privaten
+Advisory-Fork, nicht gemergt.
+
+- **SYN-27** (`metadist/synaplan-ghsa-fxch-839f-35j4`, PR 1): jeder
+  veröffentlichte Port in `docker-compose.yml`, `docker-compose-minimal.yml`
+  und `docker-compose.test.yml` ist `${SYNAPLAN_BIND:-127.0.0.1}:…`;
+  phpMyAdmin fragt nach dem Login; `install.sh` sagt im try mode, dass der
+  Stack nur lokal antwortet. Wächter: `tests/dev-compose-bind.test.mjs`.
+  Ausnahme Keycloak (Profil `oidc`): bleibt mit `SYNAPLAN_KEYCLOAK_BIND`
+  auf `0.0.0.0`, weil das Backend es über das Host-Gateway erreicht und ein
+  Loopback-Port dort unter Linux nicht ankommt. Nicht prüfbar vor dem Merge:
+  die CI auf Linux (im Fork laufen keine Actions).
+- **SYN-26** (`metadist/synaplan-ghsa-q83r-q9c6-7w9h`, PR 1):
+  `promoteWorkOutputs` legt die Kopie mit `O_CREAT|O_EXCL|O_NOFOLLOW` an
+  (`safepath.CreateFile`, `perm.Owner.CreateFile`), Mode und Owner über den
+  offenen Deskriptor. Offen und Owner-Entscheidung: der Sidecar läuft im
+  Dev-Stack weiter als uid 0 mit Docker-Socket.
+- Nach dem Merge und einem Release: Range/Patched setzen, dann
+  veröffentlichen (Abschnitt 5), jeweils nur mit Go des Owners.
 
 **SYN-30 (Stand 26.11.):** gemergt (`1a85eaeb4`), in 5.10.4, veröffentlicht.
 Advisory GHSA-grvv-mwcf-vhpm, PR https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1,
@@ -462,12 +482,13 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-1. Owner: nach dem Deploy von 5.10.4 die Punkte aus 3a Punkt 0 nachsehen
-   (`BCONFIG`-Zeile zu SYN-31, `IAP_APPLE_ENVIRONMENT`), dann der Gerätetest
-   für SYN-19.
+1. Erledigt laut Owner am 26.11.: `BCONFIG`-Zeile zu SYN-31 und
+   `IAP_APPLE_ENVIRONMENT` nach dem Deploy von 5.10.4 nachgesehen, SYN-19
+   auf einem Gerät gegangen.
 2. Erledigt am 26.11.: alle Advisories dieses Audits sind veröffentlicht.
-3. SYN-26/27: erst fragen (Docker, `install.sh`). Danach die Lows SYN-32 bis
-   43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
+3. SYN-26/27: Owner prüft und mergt die zwei Fork-PRs (im Browser auf der
+   Advisory-Seite), dann Release und Veröffentlichung. Danach die Lows
+   SYN-32 bis 43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
 4. Offene Entscheidungen: zu SYN-23 Statusabfrage über die App Store Server
    API (neue Credentials), `appAccountToken`-Bindung (Änderung in
    `synaplan-apps`), automatisches Auslaufen des IAP-Tiers; zu SYN-30 die
