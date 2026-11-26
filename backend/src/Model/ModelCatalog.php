@@ -468,6 +468,18 @@ class ModelCatalog
             'successor' => 'google:gemini-omni-1.2-flash:text2vid',
             'reason' => 'Shut down by Google on 2026-10-22. Migrate to Gemini Omni Flash.',
         ],
+
+        // --- 2026-11-26 (TrustedTokens dropped GLM-5.2) ---
+        // TrustedTokens no longer serves zai-org/GLM-5.2. GLM-5.3 (BID 331) is
+        // the same family on the same provider and key, at the same price
+        // ($1.50 / $4.50, cache $0.30), with reasoning and tools and a larger
+        // context window (1M vs 230K).
+        309 => [
+            'providerId' => 'zai-org/GLM-5.2',
+            'retiredOn' => '2026-11-26',
+            'successor' => 'trustedtokens:zai-org/GLM-5.3:chat',
+            'reason' => 'TrustedTokens no longer serves zai-org/GLM-5.2; migrate to GLM-5.3.',
+        ],
     ];
 
     /**
@@ -5201,15 +5213,18 @@ class ModelCatalog
         // Not covered by LiteLLM sync — verify manually against that endpoint.
         // GLM-5.3 / GLM-5.3-Flash / DeepSeek V4 + Chimera added 2026-08-29
         // (BIDs 331–337). Existing 309–312 prices unchanged vs the 07-27 snapshot.
-        // BID 335 retired 2026-09-08; BIDs 336 and 337 retired 2026-09-17.
-        // See ModelCatalog::RETIREMENTS[335], [336], [337].
+        // BID 335 retired 2026-09-08; BIDs 336 and 337 retired 2026-09-17;
+        // BID 309 retired 2026-11-26.
+        // See ModelCatalog::RETIREMENTS[309], [335], [336], [337].
         [
             'id' => 309,
             'service' => 'TrustedTokens',
             'name' => 'GLM 5.2',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: TrustedTokens no longer serves GLM-5.2. See
+            // ModelCatalog::RETIREMENTS[309].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'zai-org/GLM-5.2',
             'priceIn' => 1.50,
             'inUnit' => 'per1M',

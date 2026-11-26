@@ -1073,7 +1073,8 @@ class ModelCatalogTest extends TestCase
     /**
      * TrustedTokens (TNG, Germany) — chat + vision rows from
      * https://trustedtokens.eu/api/billing/models (re-verified 2026-09-17;
-     * prices unchanged from the 2026-08-29 snapshot except BIDs 335–337 retired).
+     * prices unchanged from the 2026-08-29 snapshot except BIDs 335–337 retired;
+     * BID 309 (GLM-5.2) retired 2026-11-26).
      * Provider ids keep the upstream org/name form. Prices are USD/1M.
      */
     public function testTrustedTokensModelsAreAvailableWithExpectedApiIds(): void
@@ -1104,6 +1105,11 @@ class ModelCatalogTest extends TestCase
 
         $this->assertSame(331, $glm53[0]['id']);
         $this->assertSame('zai-org/GLM-5.2', $glm[0]['providerId']);
+        $this->assertSame(309, $glm[0]['id']);
+        $this->assertSame(0, $glm[0]['active']);
+        $this->assertSame(0, $glm[0]['selectable']);
+        $this->assertTrue(ModelCatalog::isRetired(309));
+        $this->assertSame(331, ModelCatalog::successorBid(309));
         $this->assertSame('zai-org/GLM-5.3', $glm53[0]['providerId']);
         $this->assertSame('zai-org/GLM-5.3-Flash', $glm53Flash[0]['providerId']);
         $this->assertSame('zai-org/GLM-5.3-Flash', $glm53FlashVision[0]['providerId']);

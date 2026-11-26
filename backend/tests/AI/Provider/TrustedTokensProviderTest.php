@@ -42,7 +42,7 @@ class TrustedTokensProviderTest extends TestCase
     {
         $defaults = $this->makeProvider()->getDefaultModels();
 
-        $this->assertSame('zai-org/GLM-5.2', $defaults['chat']);
+        $this->assertSame('zai-org/GLM-5.3', $defaults['chat']);
         $this->assertSame('Qwen/Qwen3.6-35B-A3B-FP8', $defaults['vision']);
     }
 
@@ -83,7 +83,7 @@ class TrustedTokensProviderTest extends TestCase
 
         $this->makeProvider(apiKey: null)->chat(
             [['role' => 'user', 'content' => 'hi']],
-            ['model' => 'zai-org/GLM-5.2'],
+            ['model' => 'zai-org/GLM-5.3'],
         );
     }
 
@@ -92,7 +92,7 @@ class TrustedTokensProviderTest extends TestCase
     public function testChatOptionsMergeStructuredOutputAsJsonSchema(): void
     {
         $request = $this->buildChatOptions([], [
-            'model' => 'zai-org/GLM-5.2',
+            'model' => 'zai-org/GLM-5.3',
             'structured_output' => new StructuredOutputSchema('sort_result', ['type' => 'object']),
         ], false);
 
@@ -103,7 +103,7 @@ class TrustedTokensProviderTest extends TestCase
 
     public function testChatOptionsWithoutStructuredOutputOmitResponseFormat(): void
     {
-        $request = $this->buildChatOptions([], ['model' => 'zai-org/GLM-5.2'], false);
+        $request = $this->buildChatOptions([], ['model' => 'zai-org/GLM-5.3'], false);
 
         $this->assertArrayNotHasKey('response_format', $request);
     }
@@ -111,7 +111,7 @@ class TrustedTokensProviderTest extends TestCase
     public function testChatOptionsNeverSendA2AgentThinkingField(): void
     {
         $request = $this->buildChatOptions([], [
-            'model' => 'zai-org/GLM-5.2',
+            'model' => 'zai-org/GLM-5.3',
             'reasoning' => false,
         ], false);
 

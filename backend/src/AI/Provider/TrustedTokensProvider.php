@@ -24,7 +24,7 @@ use App\AI\StructuredOutput\StructuredOutputDialect;
  *
  * Chat and vision share the same `/v1/chat/completions` endpoint. Vision is
  * only offered by models that advertise it (Qwen3.6 and GLM-5.3-Flash);
- * GLM-5.2, GLM-5.3, Chimera and GPT OSS 120B are text-only.
+ * GLM-5.3, Chimera and GPT OSS 120B are text-only.
  *
  * @see https://trustedtokens.eu/docs/
  * @see https://api.trustedtokens.eu/v1
@@ -34,7 +34,7 @@ class TrustedTokensProvider extends AbstractChatCompletionsCloudProvider
 {
     private const PROVIDER_NAME = 'trustedtokens';
     private const BASE_URI = 'https://api.trustedtokens.eu/v1';
-    private const DEFAULT_CHAT_MODEL = 'zai-org/GLM-5.2';
+    private const DEFAULT_CHAT_MODEL = 'zai-org/GLM-5.3';
     private const DEFAULT_VISION_MODEL = 'Qwen/Qwen3.6-35B-A3B-FP8';
 
     public static function descriptor(): ProviderDescriptor
@@ -59,9 +59,9 @@ class TrustedTokensProvider extends AbstractChatCompletionsCloudProvider
                 catalogToolUse: true,
             ),
             defaults: new ProviderDefaults(bindings: [
-                'CHAT' => 'trustedtokens:zai-org/GLM-5.2:chat',
-                'TOOLS' => 'trustedtokens:zai-org/GLM-5.2:chat',
-                'ANALYZE' => 'trustedtokens:zai-org/GLM-5.2:chat',
+                'CHAT' => 'trustedtokens:zai-org/GLM-5.3:chat',
+                'TOOLS' => 'trustedtokens:zai-org/GLM-5.3:chat',
+                'ANALYZE' => 'trustedtokens:zai-org/GLM-5.3:chat',
                 'SORT' => 'trustedtokens:openai/gpt-oss-120b:chat',
                 'PLAN' => 'trustedtokens:openai/gpt-oss-120b:chat',
                 'SUMMARIZE' => 'trustedtokens:openai/gpt-oss-120b:chat',

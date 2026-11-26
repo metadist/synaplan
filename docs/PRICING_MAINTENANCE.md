@@ -218,6 +218,16 @@ TrustedTokens dropped the remaining DeepSeek V4 ids (`deepseek-ai/DeepSeek-V4-Fl
 
 Retired via the registry (`ModelCatalog::RETIREMENTS`, no migration): the catalog rows carry `active = selectable = 0` and a `RETIREMENTS` entry, and `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` on every install. No `DEFAULTMODEL` binding points at BID 336 or 337, so nothing is orphaned. Neither BID is a `ProviderDefaultsService` recommendation. The health monitor skips rows that carry `BRETIREDON`, so this also stops the incident mail for these ids.
 
+### TrustedTokens GLM-5.2 shutdown (2026-11-26)
+
+TrustedTokens no longer serves `zai-org/GLM-5.2`. GLM-5.3 is the same family on the same provider and key, at the same price ($1.50 / $4.50, cache $0.30), with reasoning and tools and a larger context window (1M vs 230k).
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 309 | GLM 5.2 | `zai-org/GLM-5.2` | `trustedtokens:zai-org/GLM-5.3:chat` (BID 331) |
+
+Retired via the registry, no migration. `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` and switches the row off on deploy. A stored binding (a user's or the platform's `DEFAULTMODEL`, a task prompt's pinned model, an "Again" pick) follows `BSUCCESSORID` to GLM-5.3, so existing chats keep working without a settings change. The TrustedTokens provider defaults (`CHAT`, `TOOLS`, `ANALYZE`) and the provider's fallback chat model moved to GLM-5.3.
+
 ### OpenAI deprecation notice (2026-10-02, shutdown 2027-04-01)
 
 OpenAI announced by email on 2026-10-02 that `gpt-5.4-nano`, `gpt-5.1` and `gpt-5.3-codex` stop being served on **2027-04-01**. Only `gpt-5.4-nano` was ever in the catalog; `gpt-5.1` and `gpt-5.3-codex` have no `BMODELS` row (the retired BIDs 193/194 are `gpt-5.3`, a different id).
@@ -343,7 +353,7 @@ German sovereign OpenAI-compatible inference (`https://api.trustedtokens.eu/v1`)
 
 | BID | Model | Catalog in/out | Official (×1e6) | Context |
 | --- | ----- | -------------- | --------------- | ------- |
-| 309 | `zai-org/GLM-5.2` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 230k |
+| 309 | `zai-org/GLM-5.2` | retired 2026-11-26 — see [TrustedTokens GLM-5.2 shutdown](#trustedtokens-glm-52-shutdown-2026-11-26) | — | — |
 | 331 | `zai-org/GLM-5.3` | $1.50 / $4.50 | $1.50 / $4.50 (cache $0.30) | 1M |
 | 332 / 333 | `zai-org/GLM-5.3-Flash` (chat + vision) | $0.15 / $0.30 | $0.15 / $0.30 (cache $0.03) | 1M |
 | 334 | `tngtech/DeepSeek-TNG-R1T2-Chimera` | $1.00 / $3.00 | $1.00 / $3.00 (cache $0.20) | 164k |

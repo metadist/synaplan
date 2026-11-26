@@ -363,7 +363,7 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
             }
         );
 
-        $model = self::model(1, 'trustedtokens', 'zai-org/GLM-5.2', 'GLM 5.2');
+        $model = self::model(1, 'trustedtokens', 'zai-org/GLM-5.3', 'GLM 5.3');
         $probe = new class implements ModelListProbeInterface {
             public ProbeResult $next;
 
@@ -383,7 +383,7 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
             }
         };
 
-        $evaluator = $this->evaluatorFor(['trustedtokens' => ['zai-org/GLM-5.2' => [$model]]], [], $probe, consecutiveFailures: 1);
+        $evaluator = $this->evaluatorFor(['trustedtokens' => ['zai-org/GLM-5.3' => [$model]]], [], $probe, consecutiveFailures: 1);
 
         $probe->next = ProbeResult::failed(FailureKind::Credential, 'Provider catalog returned HTTP 403.');
         $first = $evaluator->run();
@@ -397,7 +397,7 @@ final class ModelHealthEvaluatorQuietPeriodTest extends TestCase
 
         // Recover after a multi-day outage: an immediate relapse stays inside
         // the post-recovery quiet window instead of re-paging right away.
-        $probe->next = ProbeResult::ok(['zai-org/glm-5.2']);
+        $probe->next = ProbeResult::ok(['zai-org/glm-5.3']);
         $recovered = $evaluator->run();
         self::assertCount(1, $recovered->alertsResolved);
 

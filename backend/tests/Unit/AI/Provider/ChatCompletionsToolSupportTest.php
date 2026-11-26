@@ -113,7 +113,7 @@ final class ChatCompletionsToolSupportTest extends TestCase
         self::assertTrue($xai->supportsToolCalling('grok-4.6'));
 
         $tt = new TrustedTokensProvider(new NullLogger(), 'test-key');
-        self::assertTrue($tt->supportsToolCalling('zai-org/GLM-5.2'));
+        self::assertTrue($tt->supportsToolCalling('zai-org/GLM-5.3'));
 
         $hf = new HuggingFaceProvider(
             $this->createStub(\Symfony\Contracts\HttpClient\HttpClientInterface::class),
