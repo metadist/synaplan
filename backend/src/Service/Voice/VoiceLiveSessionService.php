@@ -52,7 +52,7 @@ final readonly class VoiceLiveSessionService
         private EntityManagerInterface $em,
         private RedisService $redis,
         private LoggerInterface $logger,
-        private string $publicWsPath,
+        private VoiceLiveSocketUrl $socketUrl,
         private VoiceLiveCompatibleEndpoint $compatible,
         private MessageApiFormatter $formatter,
     ) {
@@ -161,7 +161,7 @@ final readonly class VoiceLiveSessionService
             'sessionId' => $session->getId(),
             'chatId' => $session->getChatId(),
             'ticket' => $ticket,
-            'wsUrl' => $this->wsUrl($request, $ticket),
+            'wsUrl' => $this->socketUrl->build($request, $ticket),
             'audio' => $this->audio($provider),
             'allowedSeconds' => $this->usage->allowedSeconds($user, $model),
             'warnAtSeconds' => 60,
@@ -344,7 +344,7 @@ final readonly class VoiceLiveSessionService
             'sessionId' => $sessionId,
             'chatId' => $session->getChatId(),
             'ticket' => $ticket,
-            'wsUrl' => $this->wsUrl($request, $ticket),
+            'wsUrl' => $this->socketUrl->build($request, $ticket),
             'audio' => $this->audio(strtolower($session->getProvider())),
             'transport' => $session->getTransport(),
         ];
@@ -762,14 +762,6 @@ final readonly class VoiceLiveSessionService
     private function consentGiven(User $user): bool
     {
         return '1' === $this->config->getValue((int) $user->getId(), 'LIVE_VOICE', 'CONSENT');
-    }
-
-    private function wsUrl(Request $request, string $ticket): string
-    {
-        $scheme = $request->isSecure() ? 'wss' : 'ws';
-        $path = '/'.ltrim($this->publicWsPath, '/');
-
-        return $scheme.'://'.$request->getHttpHost().$path.'?ticket='.rawurlencode($ticket);
     }
 
     private function intOrNull(mixed $value): ?int

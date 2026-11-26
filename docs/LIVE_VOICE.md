@@ -29,6 +29,8 @@ The body may include `modelId`, `chatId`, `client` (`web`, `ios`, `android`, `ca
 
 The response carries `ticket`, `wsUrl`, `transport` (`relay` or `webrtc`), `audio` (`format`, `inRate`, `outRate`), `allowedSeconds` and `warnAtSeconds`. The ticket is a 30-second single-use JWT. It does not contain a provider key. `transport` is `relay` unless an admin has turned on the direct OpenAI connection and the chosen model is GPT-Live or GPT-Realtime. Google and xAI stay on `relay`. `client: carplay` is always `relay`: the car has no WebRTC stack.
 
+`wsUrl` is `wss://` when the request is secure, or when `APP_URL` is HTTPS on the host the request came in on. The second rule covers a TLS-terminating proxy (Cloudflare, a load balancer) that hands the request on as plain HTTP. A native client such as CarPlay opens `wsUrl` as given and refuses `ws://` on a public host.
+
 A second open conversation for the same user is `409` with `code: VOICE_BUSY`. A used-up monthly budget is `429` with `code: COST_BUDGET_EXCEEDED`, the same payload as a typed message. Provider capacity is `503` with `code: VOICE_CAPACITY`. The live service being down is `503` with `code: VOICE_UNAVAILABLE`. Missing consent is `403` with `code: VOICE_CONSENT_REQUIRED`.
 
 `POST /api/v1/voice/live/sessions/{id}/ticket` mints a fresh ticket for a CarPlay session that is still open. It does not open a second session. CarPlay uses it after a short network drop. The socket URL carries the new ticket. Any other client gets `404`, and it counts against the same start rate as a new conversation.
