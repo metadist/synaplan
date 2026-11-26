@@ -13,6 +13,11 @@ width included.
 | **Ben** | Ana's partner. Member. Has his own Synaplan account, his own Notion. | To write in Ana's chat without setting anything up; his notes stay his. |
 | **Cem** | Runs Synaplan on his own server for a small office. Uses the store app. | The same app behaviour as on the cloud, with his data on his server. |
 
+Whether phase C is built for Ana first (a household: GMX or Gmail, phone
+first) or for a team (Microsoft 365, Nextcloud, desktop first) is open
+(master plan §0 #111). The journeys below use Ana; J-PJ-15 and J-PJ-19 are
+written so that both work.
+
 ## 2. Journeys
 
 Every journey names where the thing is **found**, how it is **undone**, and
@@ -224,17 +229,21 @@ what it **must survive**.
 
 1. Ben writes in the project chat: "I'm home on Monday and will deal with
    the measurer."
-2. Under his message: "Added: Ben takes care of the measuring · Undo".
-   On the board the task "Have the kitchen measured" gets Ben and Monday;
-   the date "Measuring at home" gets "Ben is home".
+2. A few seconds after the answer, a line under it: "Added: Ben takes
+   care of the measuring · Undo". On the board the task "Have the kitchen
+   measured" gets Ben and Monday; it belongs to the date "Measuring at
+   home", which gets "Ben is home". This works whatever Ben's Chat model
+   is (§0 #96).
 3. Ana sees it in the status on top the next time it is written.
 
 - **Found:** the line under the message; the board.
 - **Undo:** "Undo" in that line, for as long as the item was not changed
   since; afterwards the item's own menu.
 - **Must survive:** a message that only mentions a date ("the shop is
-  closed on Monday" writes nothing); a time without a time zone (the
-  project's zone, said back in the line); two members writing at once.
+  closed on Monday" writes nothing); a fact ("the niche is 56 cm") goes to
+  "What I remember", not to the board; a time without a time zone (the
+  project's zone, said back in the line); two members writing at once; a
+  private chat of Ben's (the item is seen only by Ben until he shares it).
 
 ### J-PJ-14 — A forwarded mail and a date that does not fit
 
@@ -263,15 +272,17 @@ what it **must survive**.
 1. "More → Waiting on others": "Elektro Brandt: callback about the power
    line, asked on 22 Nov, no answer for 4 days". The status on top says the
    same in one sentence, with "follow up" as a link.
-2. "Follow up" opens the preview: from Ana's address, to Elektro Brandt,
-   subject "Re: Request about a power line for the kitchen", a short polite
-   text that names the date of the first mail and the deadline.
-3. She changes one word and presses "Send". The row says "Mail sent,
-   14:06"; the waiting item gets a new date to look again.
-4. Without a connected mailbox the preview says so and offers "Copy text"
-   and "Open in mail app" instead of "Send".
-5. For Ben, who is a member, the button is "Remind": he gets a push, not a
-   mail.
+2. "Follow up" opens the preview: to Elektro Brandt, subject "Re: Request
+   about a power line for the kitchen", a short polite text that names the
+   date of the first mail and the deadline.
+3. She changes one word and presses "Open in mail app". Her own mail app
+   opens with recipient, subject and text. Back in Synaplan the preview
+   asks "Did you send it?"; "Yes" makes the row say "Mail sent, 14:06" and
+   gives the waiting task a new date to look again.
+4. With a connected Microsoft 365 mailbox the preview also has "Send": the
+   mail goes out from her address and lies in her sent mails (§0 #104).
+5. For Ben, who is a member, the button is "Remind": he gets a mail, and a
+   push once the app has push (phase G).
 
 - **Found:** "Waiting on others"; the link in the status.
 - **Undo:** "Cancel" in the preview; nothing is sent before "Send".
@@ -281,11 +292,11 @@ what it **must survive**.
 
 ### J-PJ-16 — Reminders and the week
 
-1. Sunday 19:00: Ben's phone shows "Tomorrow 10:00: measuring at home". A
-   tap opens the project on the Dates tab.
+1. Sunday 19:00: Ben gets "Tomorrow 10:00: measuring at home" by mail
+   (by push from phase G). A tap opens the project on the Dates tab.
 2. Monday 08:00: Ana gets "This week in DIY kitchen": two dates, one
-   overdue task, two items waiting for her. By push when the app has it,
-   else by e-mail.
+   overdue task, two items waiting for her. By e-mail; by push once the
+   app has it.
 3. "People and settings" has three switches: before dates, weekly
    overview, overdue.
 
@@ -293,26 +304,28 @@ what it **must survive**.
 - **Undo:** the switches; a reminder is not sent for a date that was
   deleted or moved meanwhile.
 - **Must survive:** a date moved after the reminder was planned; the
-  person's time zone differs from the project's; push off on the phone
-  (e-mail instead).
+  person's time zone differs from the project's; a private item (only its
+  author is reminded); push off on the phone (e-mail instead).
 
 ### J-PJ-17 — Watching for you
 
-1. Ana: "Tell me when the Blub X7 oven is under 450 €." Under the answer:
-   "I'm watching: Blub X7 under 450 € · Undo". "Watching for you" on the
-   overview: "479 € today, 499 € a week ago, last checked 14:02, 5 shops".
-2. Another project, a different value: "Tell me when PHP 8.5.2 is out."
-   The same frame shows "8.5.1 → not yet", then "8.5.2 is out, changelog"
-   and "Make a task of it".
-3. The price falls to 439 €. Push: "Blub X7 at 439 €". The card has the
-   link to the shop. Nothing is bought.
+1. In "PHP upgrade" Ben writes: "Tell me when PHP 8.5.2 is out." Under the
+   answer: "I'm watching: PHP 8.5.2 · Undo". "Watching for you" on the
+   overview: "8.5.1 is the newest, last checked 14:02, php.net".
+2. In "DIY kitchen" Ana: "Tell me when the opening hours page of the
+   recycling centre changes." The same frame shows "unchanged since 3 Nov".
+3. 8.5.2 comes out. A line in the project chat and a mail: "PHP 8.5.2 is
+   out, changelog" with "Make a task of it".
+4. Ana: "Tell me when the oven is under 450 €." The answer says that price
+   watches are not there yet and offers to watch the shop's product page
+   for changes instead (§0 #106).
 
-- **Found:** "Watching for you" on the overview and under "More".
+- **Found:** "Watching for you" on the overview.
 - **Undo:** "Undo" under the answer; pause and stop on the card.
-- **Must survive:** a shop that blocks the check ("Could not check" with
-  the reason, no invented price); a value that does not change for weeks
-  (no model call, no cost); the creator leaves the project (the watch
-  stops).
+- **Must survive:** a source without a feed (the chat suggests a page
+  watch); a page that blocks the check ("Could not check" with the reason,
+  never an invented value); a value that does not change for weeks (no
+  model call, no cost); the creator leaves the project (the watch stops).
 
 ### J-PJ-18 — Chat and board side by side
 
@@ -332,6 +345,37 @@ what it **must survive**.
 - **Must survive:** a window narrower than both minimums (the chat keeps
   420 px, the board takes the rest or the phone layout starts at 820 px);
   keyboard only (the divider is a focusable separator with arrow keys).
+
+### J-PJ-19 — The project in my calendar
+
+1. Dates tab → "Add to my calendar". A dialog shows the private address
+   with "Copy" and "Open in calendar app" (`webcal://`), and one line: "Your
+   calendar app picks up new and moved dates by itself, usually within a
+   few hours."
+2. Ana opens it on her phone; her calendar subscribes. "Measuring at home"
+   is there on Monday at 10.
+3. Ben moves the measuring to Tuesday in the chat. Ana's calendar shows
+   Tuesday after its next refresh.
+
+- **Found:** Dates tab; the date card's menu.
+- **Undo:** remove the subscription in the calendar app; "Renew address"
+  in the same dialog makes the old one stop working at once.
+- **Must survive:** a proposed date (not in the calendar until added); a
+  private item of Ben's (not in Ana's feed); a repeating date; Google's
+  slow refresh (the dialog says it).
+
+### J-PJ-20 — A PDF and a model without the loop
+
+1. Ana's Chat model is Gemini, which does not run on the loop. She drops
+   "Offer B.pdf" into the project chat: "Is this cheaper than A?"
+2. The answer comes as today. A few seconds later "To confirm · 2" shows
+   the offer's price as a cost and its delivery date, from the file.
+3. She adds both.
+
+- **Found:** "To confirm" on the overview.
+- **Undo:** "Ignore" on a proposal; an added item like any item.
+- **Must survive:** a scanned PDF without text (nothing proposed, no
+  error); a local Ollama model as Chat model; the loop switched off.
 
 ## 3. Wireframes
 
@@ -371,7 +415,7 @@ The wireframes below are its skeleton.
       │             │  ✓ Read the floor plan, compared  ┃
       │             │    5 shops · 48 s                 ┃ ┌ To confirm · 2 ─ from the mail of … ┐
       │             │  Yes, it fits. 479 € today …      ┃ │ Delivery of the worktop  [Add][Doesn't work] ✕
-      │             │  👁 I'm watching: under 450 € ·   ┃ │ Deposit 30 %             [Add][Doesn't work] ✕
+      │             │  👁 I'm watching: product page ·  ┃ │ Deposit 30 %             [Add][Doesn't work] ✕
       │             │    Undo                           ┃ └─────────────────────────────────────┘
       │             │ ┌───────────────────────────────┐ ┃ ┌ Tasks ──────────┐ ┌ Dates ──────────┐
       │             │ │ Write in the project …        │ ┃ │ ☐ Measure  Ben  │ │ Mon 30 Measuring│
@@ -381,10 +425,13 @@ The wireframes below are its skeleton.
 
 - `[▣]` in the chat header hides the board; in the board header it hides
   the chat. A hidden chat leaves a chat button on the board's left edge.
-- "More" opens: Costs · Watching for you · Decisions · Waiting on others ·
-  What I remember · Chats · People and settings.
-- "Show more" under the overview cards opens Decisions, Waiting on others
-  and What I remember.
+- "More" opens: Chats · What I remember · People and settings (§0 #102).
+- Costs, Decisions, Waiting on others and Watching for you are cards on
+  the overview; "All" on a card opens its full list inside the board.
+  "Show more" under the overview cards opens Decisions and Waiting on
+  others.
+- Tasks and Dates have a quick-add line on top: "Add a task …", "Add a
+  date …" (§0 #100).
 
 **New project** (laptop): the chat only, full width, a readable column, the
 project name and "Just created" above it, the question card as the first
@@ -495,15 +542,16 @@ Folded when done: `Worked 24 min · 31 sources · 6 files read  ▾`.
  └─────────────────────────────────────────────────────────┘
 ```
 
-Without a connected mailbox: "From: no mailbox connected", and the buttons
-are "Copy text", "Open in mail app", "Cancel".
+Every preview has "Copy text" and "Open in mail app"; after either one it
+asks "Did you send it?" (§0 #104). "Send" is there only with a connected
+Microsoft 365 mailbox; without one the "From" line reads "your mail app".
 
 ### 3.8b Watching for you
 
 ```
  Watching for you
-  👁 Blub X7 oven under 450 €          479 €  ▁▂▂▁  last checked 14:02 · 5 shops
-  👁 Extractor hood, classifieds       2 new  last checked 13:40
+  👁 PHP 8.5.2                         8.5.1  last checked 14:02 · php.net
+  👁 Recycling centre opening hours    unchanged since 3 Nov  last checked 13:40
                                                             [⋯ change · pause · stop]
 ```
 
@@ -593,6 +641,15 @@ are identical in every locale.
 | Copy text | Text kopieren | Copiar texto | Copier le texte | Metni kopyala |
 | Open in mail app | Im Mail-Programm öffnen | Abrir en la app de correo | Ouvrir dans l'application de messagerie | E-posta uygulamasında aç |
 | Mail sent, {time} | Mail gesendet, {time} | Correo enviado, {time} | E-mail envoyé, {time} | E-posta gönderildi, {time} |
+| Did you send it? | Hast du sie gesendet? | ¿La has enviado? | L'avez-vous envoyé ? | Gönderdin mi? |
+| Add a task … | Aufgabe hinzufügen … | Añadir una tarea… | Ajouter une tâche… | Görev ekle… |
+| Add a date … | Termin hinzufügen … | Añadir una cita… | Ajouter un rendez-vous… | Randevu ekle… |
+| Add to my calendar | In meinen Kalender | Añadir a mi calendario | Ajouter à mon agenda | Takvimime ekle |
+| Open in calendar app | In der Kalender-App öffnen | Abrir en la app de calendario | Ouvrir dans l'application d'agenda | Takvim uygulamasında aç |
+| Renew address | Adresse erneuern | Renovar dirección | Renouveler l'adresse | Adresi yenile |
+| Your calendar app picks up new and moved dates by itself, usually within a few hours. | Deine Kalender-App holt neue und verschobene Termine selbst ab, meist innerhalb weniger Stunden. | Tu app de calendario recoge sola las citas nuevas y cambiadas, normalmente en pocas horas. | Votre application d'agenda récupère seule les rendez-vous nouveaux ou déplacés, en général en quelques heures. | Takvim uygulaman yeni ve taşınan randevuları kendisi alır, genellikle birkaç saat içinde. |
+| Show to everyone | Für alle sichtbar machen | Mostrar a todos | Rendre visible à tous | Herkese göster |
+| Only you see this | Nur du siehst das | Solo tú ves esto | Vous seul le voyez | Bunu yalnızca sen görüyorsun |
 | Added: {what} | Eingetragen: {what} | Añadido: {what} | Ajouté : {what} | Eklendi: {what} |
 | Undo | Rückgängig | Deshacer | Annuler | Geri al |
 | As of today, {time}. {done} of {total} steps done. | Stand heute, {time} Uhr. {done} von {total} Schritten sind erledigt. | Hoy a las {time}. {done} de {total} pasos hechos. | Aujourd'hui, {time}. {done} étapes sur {total} terminées. | Bugün {time} itibarıyla. {total} adımdan {done} tamamlandı. |
@@ -640,6 +697,9 @@ budget, summarized, watching for you, what I remember, to confirm.
 | To confirm | card absent | — | "Could not add" + retry; the proposal stays | absent |
 | Mail preview | — | "Writing the mail…" | "Not sent" + reason (mailbox expired, address missing) + the copy path | buttons absent |
 | Watching for you | card absent | — | the row says "Could not check" + reason | absent |
+| Quick-add line | placeholder "Add a task …" / "Add a date …" | the line shows "Adding…" | the text stays in the line + "Could not add" + retry | absent |
+| Calendar subscription | — | — | "Could not create the address" + retry | "Add to my calendar" absent |
+| "Added · Undo" line | absent when nothing was added | — (arrives after the answer) | nothing shown; the board is unchanged | absent |
 | Notifications (settings) | — | — | "Notifications are off for Synaplan on this phone" + how to turn on | section absent; in the browser always absent |
 
 ## 6. Exit bullets

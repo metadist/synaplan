@@ -182,6 +182,18 @@ device table is `BDESKTOPDEVICES`.
 - **Project UI on `main`:** `components/projects/` (`AddSourceDialog`,
   `ProjectChatsTab`, `ProjectSourcesTab`, `ProjectsSidebarSection`, …) from
   PJ4; the board replaces the tabs.
+- **Which turns reach the loop** (checked 2026-11-26 for the review,
+  `Service/Chat/Loop/ChatLoopGate.php`): only a plain turn of a signed-in
+  person in their own chat whose Chat model calls tools while streaming.
+  Incognito, guests, the widget, agents, Saved Tasks, "Again", "Continue",
+  turns with files and document replies keep today's path; Gemini has no
+  native tool routing in a run (`STATUS.md`, PJ7a walk). Board tools inside
+  the loop would therefore miss every dropped file and every person on such
+  a model; hence extraction after the answer (§0 #96).
+- **Extraction after a turn exists:** `Service/Memory/MemoryExtractionService.php`
+  runs after the answer on the person's memory model
+  (`ModelConfigService::getMemoryModelConfig()`); the board extraction
+  joins that call (§0 #98, #109).
 
 ## 2. What others do
 
@@ -295,6 +307,14 @@ Chosen: a relay with ID-only pushes (§0 #59, #60). The contract is in
   <https://github.com/Laith0003/ux-skill/wiki/Anti-AI-slop-ban-list>. The
   board uses the house tokens, plain words and few cards; the banned-words
   list in `02` grew accordingly.
+- **Calendars subscribe to a feed.** Google Calendar, Apple Calendar and
+  Outlook all subscribe to an `.ics` address and refresh it on their own
+  (Google in hours, the others on a set interval). That covers "the
+  project's dates in my calendar" without OAuth or write access (§0 #103).
+- **Shops and classified sites resist watching.** Price pages are
+  script-rendered and behind bot protection; classified sites forbid
+  automated reads in their terms. Price watchers that work rely on feeds,
+  partner APIs or their own crawling contracts (§0 #106).
 - **Cards over a dashboard.** In the mockup sessions the owner preferred a
   board of plain cards next to the chat over a dashboard in the middle,
   with the chat smaller on the left (`mockups/project-page.html`).
@@ -305,5 +325,5 @@ Chosen: a relay with ID-only pushes (§0 #59, #60). The contract is in
 | ----- | -------- | ------- |
 | PJ2 | Is "first call in the request, the rest as units" within 10 % of today for simple turns? What does the hand-over cost in time to the next token? Does a two-hour run with three compactions keep its goal? | §0 #21, G1, G7 |
 | PJ18 | Can a hosted-MCP `fetch` be limited to chosen pages and their children reliably, or is a public integration needed? | §0 #49 |
-| PJ39 | Can a calendar be read for one hour of free/busy with the scopes a person already granted, or does it need a new consent? | §0 #88 |
+| PJ39 | Can a calendar be read for one hour of free/busy with the scopes a person already granted, or does it need a new consent? | §0 #88; moved to master plan §9 with §0 #103 |
 | PJ23 | Does the relay contract hold on real devices with a server behind NAT? What do Apple and Google require for the generic text? | §0 #59–#62, G13 |

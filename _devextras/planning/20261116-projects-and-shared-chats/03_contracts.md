@@ -330,6 +330,14 @@ adds `push_reminders`.
 | `BMAINCHATID` | bigint null | the chat the page opens (§0 #93) |
 | `BMAILKEY` | varchar(32) null, unique | the keyword of the forwarding address (§0 #91) |
 
+`BPROJECTMEMBERFEEDS` (§0 #103): `BID`, `BPROJECTID`, `BUSERID`, `BTOKEN`
+(char(43), unique, random, stored as a SHA-256 hash), `BCREATED`,
+`BLASTREADAT`. One row per member and project; "renew" replaces the token.
+
+`BPROJECTSENDERS` (§0 #105): `BID`, `BUSERID`, `BADDRESS` (varchar(254)),
+`BCONFIRMEDAT` (datetime null), `BTOKEN` (hash of the confirmation link).
+The account's own address counts as confirmed without a row.
+
 ### 2.8 `BPROJECTITEMS`
 
 | Column | Type | Meaning |
@@ -337,8 +345,12 @@ adds `push_reminders`.
 | `BID` | bigint PK | |
 | `BUUID` | char(36) unique | |
 | `BPROJECTID` | bigint, index | |
-| `BKIND` | varchar(16) | `task` \| `date` \| `decision` \| `waiting` \| `cost` |
-| `BSTATE` | varchar(16) | `proposed` \| `open` \| `done` \| `dropped` |
+| `BKIND` | varchar(16) | `task` \| `date` \| `decision` \| `cost` (§0 #97) |
+| `BSTATE` | varchar(16) | `proposed` \| `open` \| `done` \| `dropped`; a decision `open` is an open question |
+| `BPARENTID` | bigint null | the item this one belongs to (a task to its date, a cost to its decision) |
+| `BSORT` | int null | order inside a plan; null sorts by date |
+| `BVISIBILITY` | varchar(8), default `project` | `project` \| `private` (§0 #99): from a private chat until it is shared |
+| `BWAITINGSINCE` | datetime null | set when a task waits for another member or a contact; "Waiting on others" lists open tasks with it |
 | `BTITLE` | varchar(200) | |
 | `BDETAIL` | varchar(1000) null | one or two sentences; for a decision the reason |
 | `BSTARTAT`, `BENDAT` | datetime null (UTC) | a date's time; a task's due time in `BENDAT` |
@@ -348,13 +360,14 @@ adds `push_reminders`.
 | `BCONTACT` | varchar(200) null | a person outside Synaplan ("Mr Vogt, kitchen studio") |
 | `BCONTACTMAIL` | varchar(254) null | known only from a mail or typed by the person |
 | `BAMOUNT` | decimal(12,2) null | a cost; `BSTATE` `open` = planned, `done` = paid |
-| `BSOURCEKIND` | varchar(16) | `message` \| `mail` \| `file` \| `watch` \| `manual` |
+| `BESTIMATED` | tinyint, default 0 | the amount is an estimate ("about 500 €") |
+| `BSOURCEKIND` | varchar(16) | `message` \| `mail` \| `file` \| `watch` \| `manual` (quick-add, §0 #100) |
 | `BSOURCEID` | bigint null | the message, file or watch |
-| `BCALENDAREVENTID` | varchar(255) null | the event the calendar gave back, §16 |
 | `BCREATEDBY` | bigint | the member whose message or click made it |
 | `BCREATED`, `BUPDATED` | datetime | |
 
-Index on (`BPROJECTID`, `BKIND`, `BSTATE`) and (`BPROJECTID`, `BSTARTAT`).
+Index on (`BPROJECTID`, `BKIND`, `BSTATE`), (`BPROJECTID`, `BSTARTAT`) and
+(`BPARENTID`).
 `PROJECTS.MAX_ITEMS` (1000) per project.
 
 ### 2.9 `BPROJECTITEMLOG`
@@ -369,7 +382,8 @@ list.
 | `BACTION` | varchar(16) | `created` \| `updated` \| `done` \| `dropped` \| `restored` |
 | `BBEFORE` | json null | the fields before, null on `created` |
 | `BBYUSERID` | bigint null | null when a run of the AI did it on the sender's behalf |
-| `BRUNID` | bigint null | the run, for "Undo" of everything one answer added |
+| `BMESSAGEID` | bigint null | the answer whose extraction made the change, for "Undo" of everything one answer added (§0 #96) |
+| `BRUNID` | bigint null | the run, when `project_plan` made it |
 | `BCREATED` | datetime | |
 
 ### 2.10 `BPROJECTREMINDERS`
@@ -383,7 +397,7 @@ list.
 | `BKIND` | varchar(16) | `before` \| `weekly` \| `overdue` \| `followup` |
 | `BDUEAT` | datetime (UTC), index | |
 | `BSENTAT` | datetime null | set once; a row is sent at most once |
-| `BCHANNEL` | varchar(8) null | `push` \| `mail`, set when sent |
+| `BCHANNEL` | varchar(8) null | `push` \| `mail`, set when sent; `mail` only until phase G |
 
 Rows are recomputed when their item changes; a sent row is never touched.
 
@@ -414,8 +428,8 @@ Rows are recomputed when their item changes; a sent row is never touched.
 | `BPROJECTID` | bigint | |
 | `BUSERID` | bigint | creator; pays and gets the reports |
 | `BTITLE` | varchar(200) | what is watched, one sentence |
-| `BVALUEKIND` | varchar(16) | `number` \| `version` \| `entries` \| `yesno` \| `page` |
-| `BCONDITION` | json | e.g. `{"below": 450, "currency": "EUR"}`, `{"newerThan": "8.5.1"}` |
+| `BVALUEKIND` | varchar(16) | `version` \| `page` in v1 (§0 #106); `number`, `entries`, `yesno` later |
+| `BCONDITION` | json | e.g. `{"newerThan": "8.5.1"}`, `{"feed": "php"}` |
 | `BSOURCES` | json | URLs or a search; at most `PROJECTS.WATCH_MAX_SOURCES` (5) |
 | `BINTERVAL` | varchar(16) | `hourly` \| `daily` \| `weekly` |
 | `BSTATE` | varchar(16) | `active` \| `paused` \| `stopped` |
@@ -442,6 +456,7 @@ Every tool is a `ToolRegistry` source and runs through `ToolInvoker`.
 | `conversation_search` | new | search the whole chat word for word; returns snippets with message ID, author, date; `around` reads the neighbours of a message |
 | `update_plan` | new | the short plan the card shows: `items[{text, state}]`. Display only; the kernel does not enforce it |
 | `ask_user` | new for chat | §3.1 |
+| `project_plan` | new, phase C | only in a project chat with `PROJECTS.BOARD_ENABLED`: writes a list of tasks and dates at once (§13). The other board changes come from the extraction after the answer, not from loop tools (§0 #96) |
 
 How a run ends (§0 #68): a turn without a work list ends when the model
 answers without a tool. A run with open `update_plan` items or ledger values
@@ -756,7 +771,7 @@ Added to the run events of the agent-handling contract.
 | `app.used` | `{userId, app}` | chip on the answer |
 | `app.denied` | `{app}` | nothing; audit only |
 
-| `project.item` | `{projectId, itemUuid, action}` | the board reloads that item; the line under the message |
+| `project.item` | `{projectId, itemUuid, action, messageId}` | the board reloads that item; the line "Added: … · Undo" under the answer `messageId`, a few seconds after it |
 | `project.status` | `{projectId}` | the status text reloads |
 | `project.watch` | `{projectId, watchUuid}` | the watch card reloads |
 
@@ -793,11 +808,16 @@ regenerated in the same PR.
 | `GET` · `POST /projects/{uuid}/items` | PJ30 | filter `kind`, `state`, `from`, `to` · `{kind, title, …}` |
 | `PATCH` · `DELETE /projects/{uuid}/items/{itemUuid}` | PJ30 | |
 | `POST /projects/{uuid}/items/{itemUuid}/accept` · `…/ignore` | PJ43 | a proposal becomes `open` · `dropped` |
-| `POST /projects/{uuid}/undo` | PJ31 | `{runId}` or `{itemUuid}`; restores from `BPROJECTITEMLOG` |
+| `POST /projects/{uuid}/undo` | PJ31 | `{messageId}`, `{runId}` or `{itemUuid}`; restores from `BPROJECTITEMLOG` |
+| `POST /projects/{uuid}/items/quick` | PJ32 | `{kind: "task" \| "date", text}`; the text goes through the extraction and lands `open`, source `manual` |
+| `POST /projects/{uuid}/items/{itemUuid}/share` | PJ20 | a private item becomes `project` (§0 #99) |
 | `GET` · `PUT /projects/{uuid}/layout` | PJ32 | `{chatWidthPercent, hidden: "none" \| "board" \| "chat"}`, per person |
 | `POST /projects/{uuid}/mails` | PJ38 | `{itemUuid, purpose}` → a draft with variants |
 | `PATCH /projects/{uuid}/mails/{mailUuid}` · `POST …/send` · `POST …/copied` · `POST …/cancel` | PJ38 | `send` is idempotent |
 | `GET` · `PUT /projects/{uuid}/reminders/settings` | PJ36 | the three switches, per person |
+| `GET /projects/{uuid}/calendar-feed` · `POST …/renew` | PJ37 | the caller's subscription address · a new one, the old answers 404 |
+| `GET /projects/feed/{token}.ics` | PJ37 | no session; the token is the only key; `text/calendar`, the open and done dates the token's member may see, `Cache-Control: private, max-age=900` |
+| `GET` · `POST /me/sender-addresses` · `DELETE …/{id}` | PJ40 | further own addresses for forwarding; `POST` mails a confirmation link |
 | `GET /projects/{uuid}/search?q=` | PJ34 | hits in all chats of the project the caller can see |
 | `GET` · `POST /projects/{uuid}/watches` · `PATCH` · `DELETE …/{watchUuid}` | PJ44 | |
 | `GET /projects/{uuid}/since` | PJ47 | changes since the caller's last visit |
@@ -825,14 +845,18 @@ existing installs ships as a migration `UPDATE`.
 | `PROJECTS` | `INSTRUCTIONS_MAX_CHARS` | 4000 | as built in PJ3 |
 | `PROJECTS` | `MEMORY_ENABLED` | 0 | project memory, after G12 |
 | `PROJECTS` | `MEMORIES_PER_TURN` / `MAX_MEMORIES` | 8 / 300 | |
-| `PROJECTS` | `BOARD_ENABLED` | 0 | items, board, status, the item tools |
+| `PROJECTS` | `BOARD_ENABLED` | 0 | items, board, status, the extraction, `project_plan` |
+| `PROJECTS` | `BOARD_ITEMS_IN_PROMPT` / `BOARD_PROMPT_MAX_TOKENS` | 40 / 2000 | the open items an answer sees (§0 #108) |
+| `PROJECTS` | `CALENDAR_FEED_ENABLED` | 0 | the calendar subscription, after G22 |
 | `PROJECTS` | `MAX_ITEMS` | 1000 | per project |
 | `PROJECTS` | `REMINDERS_ENABLED` | 0 | reminders and the weekly overview |
 | `PROJECTS` | `REMINDER_EVENING_HOUR` / `WEEKLY_DAY` / `WEEKLY_HOUR` | 19 / 1 / 8 | §15, in the person's time zone |
-| `PROJECTS` | `MAIL_ENABLED` | 0 | the mail preview and sending |
+| `PROJECTS` | `MAIL_ENABLED` | 0 | the mail preview (copy, mail app) and "Send" through Microsoft 365 |
 | `PROJECTS` | `INBOX_ENABLED` | 0 | forwarding into a project |
+| `PROJECTS` | `INBOX_ALLOW_NO_DMARC` | 0 | accept a member's mail from a domain without a DMARC record (§17) |
 | `PROJECTS` | `WATCHES_ENABLED` | 0 | |
 | `PROJECTS` | `WATCH_MAX_SOURCES` / `MAX_WATCHES` | 5 / 10 | per watch / per project |
+| `PROJECTS` | `WATCH_KINDS` | `version,page` | the kinds a watch may have (§0 #106) |
 | `PUSH` | `ENABLED` | 0 | |
 | `PUSH` | `RELAY_URL` | empty | set by the seeder to Synaplan's relay once it exists |
 | `PUSH` | `DELAY_SECONDS` | 20 | §8.4 |
@@ -847,7 +871,8 @@ if one turns out to be, it is an ask-first item.
 `project.shared`, `project.deleted`, `project.memory.deleted`,
 `push.device.added`, `push.device.removed`, `project.item.undone`,
 `project.mail.sent`, `project.mail.failed`, `project.inbox.accepted`,
-`project.inbox.refused`, `project.watch.created`, `project.watch.reported`.
+`project.inbox.refused`, `project.watch.created`, `project.watch.reported`,
+`project.feed.renewed`, `project.sender.confirmed`, `project.item.shared`.
 Tool calls keep
 `tool.executed`, with `run`, `sender_id` and, in a shared chat, the app
 owner.
@@ -855,56 +880,86 @@ owner.
 ## 13. The board (phase C)
 
 - **Module:** inside `ProjectsModule`, flag `PROJECTS.BOARD_ENABLED`. Off:
-  the project page is today's page, the tools are not offered.
-- **Kinds.** `task` (state, due, assignee), `date` (start, end, all day,
-  repetition, contact, calendar event), `decision` (title and reason),
-  `waiting` (who, since when, contact, next look), `cost` (amount, planned
-  or paid). Nothing else in v1 (§0 #80). The board's cards are fixed
-  components; the server sends data only.
-- **Loop tools** (registered in `ToolRegistry`, offered only in a chat with
-  `BPROJECTID` and the flag on):
-
-| Tool | Does | Rule |
-| ---- | ---- | ---- |
-| `project_item_add` | writes an item `open` | only from the sender's own message of this turn; the turn's message ID is the source |
-| `project_item_propose` | writes an item `proposed` | everything that comes from a mail, a file, a watch or another member's earlier message |
-| `project_item_update` | changes fields, `done`, `dropped` | `done` only when the sender said so; otherwise `project_item_done_propose` |
-| `project_item_done_propose` | marks a task "looks done" for a yes | |
-| `project_plan` | writes a list of tasks and dates at once | the first plan of a project (§0 #76) and "make a plan for …" |
-
-  The tool layer enforces the rule, not the prompt: `project_item_add`
-  refuses when the run's input is not the sender's own message (a mail run,
-  a watch run) and turns into a proposal.
-- **The line under a message.** The answer lists what it wrote: "Added:
-  {what} · Undo". One "Undo" restores everything that run wrote
-  (`BPROJECTITEMLOG.BRUNID`), as long as none of it was changed since;
-  otherwise it restores what was not changed and says so.
+  the project page is today's page, nothing is extracted, `project_plan`
+  is not offered.
+- **Kinds** (§0 #97). `task` (state, due, assignee or contact, waiting
+  since, order), `date` (start, end, all day, repetition, contact),
+  `decision` (title and reason; `open` = an open question), `cost` (amount,
+  planned or paid, estimate). An item may belong to another
+  (`BPARENTID`). "Waiting on others" is the list of open tasks with
+  `BWAITINGSINCE`. Nothing else in v1 (§0 #80). The board's cards are
+  fixed components; the server sends data only.
+- **Extraction after the answer** (§0 #96, #98, #109). When an answer in a
+  chat with `BPROJECTID` is stored, `ProjectTurnExtractionHandler` on
+  `async_ai_low` makes one call of the sender's memory model
+  (`ModelConfigService::getMemoryModelConfig()`) with structured output.
+  Input: the sender's message, the answer, the open items (at most
+  `BOARD_ITEMS_IN_PROMPT`, newest first), the project's time zone and
+  today. Output: `items[{op: add | update | done_propose, kind, …}]` and
+  `memories[…]`. The same call replaces the project part of memory
+  extraction for that turn, so a statement lands in one place: facts and
+  preferences in memory, choices and work on the board. It runs for every
+  Chat model, for turns with files, with the loop on or off. Cost counts to
+  the sender.
+- **What is written directly.** Only what the sender's own message says
+  (`add`, `update`) is written `open`; `done` only when the sender said it
+  is done, otherwise `done_propose`. Everything from the answer alone, from
+  an attached file, a forwarded mail, a watch or an earlier message of
+  another member is written `proposed`. The handler enforces this, not the
+  prompt: the source of each output item is checked against the input
+  part it cites.
+- **`project_plan`** is the only board tool of the loop: the first plan of
+  a project and "make a plan for …" write a list of tasks (with `BSORT`)
+  and dates at once. It is logged with `BRUNID`.
+- **The line under the answer.** `project.item` with the answer's
+  `messageId` paints "Added: {what} · Undo" under it, a few seconds after
+  the answer. One "Undo" restores everything that answer's extraction
+  wrote (`BPROJECTITEMLOG.BMESSAGEID`), as long as none of it was changed
+  since; otherwise it restores what was not changed and says so.
+- **Quick-add** (§0 #100). One line on top of Tasks and Dates; the text
+  goes through the same extraction (no answer, the line is the message)
+  and lands `open` with `BSOURCEKIND = manual`.
 - **Dates.** A time without a zone is in the project's zone
   (`BPROJECTS.BTIMEZONE`). The line says the zone and the repetition back
   ("Mon 30 Nov, 10:00 (Berlin)", "every Monday").
-- **Prompt.** A block `tools:project_board` in `PromptCatalog`: when to add,
-  when to propose, never to invent a date, how to name a contact; and the
-  current open items (at most 40, newest first) so the model does not add
-  a duplicate.
-- **Shared projects.** Members with `edit` can change items; `read` sees
-  them. An item from a private chat of one member is visible to all
-  members, but only the item, never the chat.
+- **Prompt of the answer.** A block `tools:project_board` in
+  `PromptCatalog` gives the chat model the open items (at most 40 and
+  `BOARD_PROMPT_MAX_TOKENS`) so it can answer "what is open?". The
+  extraction has its own prompt `tools:project_extract`: when to add, when
+  to propose, never to invent a date, how to name a contact, memory or
+  board.
+- **Private items** (§0 #99). An item from a chat that is private in a
+  shared project has `BVISIBILITY = private` and is seen only by its
+  author: board, status text, weekly overview, calendar feed and search
+  all filter on it. Sharing the chat with the project, or "Show to
+  everyone" on the item, makes it `project`.
+- **Shared projects.** Members with `edit` can change `project` items;
+  `read` sees them.
 
 ## 14. Status text and the first plan
 
-- After a change of items, a unit on `async_ai_low` waits 30 seconds for
-  further changes, then makes one call of the Chat model of the person who
-  made the last change. Input: the open items, the last three decisions,
-  the waiting items. Output: two or three sentences, no list, the time
-  words relative to today, a contact's name where it helps. Stored in
-  `BSTATUSTEXT`. The line "As of today, {time}. {done} of {total} steps
-  done." is computed, not written by the model.
+- After a change of `project` items, a unit on `async_ai_low` waits 30
+  seconds for further changes, then makes one call of the memory model of
+  the person who made the last change (§0 #109). Once each morning at
+  `WEEKLY_HOUR` in the project's zone, a project with open items gets the
+  same call, counted to the owner (§0 #95). Input: the open items, the last
+  three decisions, the waiting tasks. Output: two or three sentences, no
+  list, a contact's name where it helps. Stored in `BSTATUSTEXT`. The line
+  "As of today, {time}. {done} of {total} steps done." is computed, not
+  written by the model.
+- **No time words from the model.** The model returns dates as
+  `[[since:2026-11-22]]` and `[[on:2026-11-30T10:00]]`; the client renders
+  "for four days" and "on Monday at 10" at the moment it shows the text, so
+  the text stays true without a new call.
 - Words of the status that name an item link to it; the model returns
-  `[[item:{uuid}|words]]` and the client renders the link.
+  `[[item:{uuid}|words]]` and the client renders the link. A uuid that is
+  not an open `project` item of this project is shown as plain words.
 - **The first plan** of a new project: the first answer in a project with
   no items may use `ask_user` (PJ9) for two or three questions, then
   `project_plan`. "You decide" on all of them still makes a plan, with the
-  assumptions as decisions.
+  assumptions as decisions. Without the loop (a model without tool calls,
+  the loop off) there is no question card; the extraction adds what the
+  first messages say and the board grows from there.
 
 ## 15. Reminders and the weekly overview (phase D)
 
@@ -917,78 +972,96 @@ owner.
   the next seven days, what is overdue, what waits for them. Skipped when
   the project has no open item.
 - **Overdue:** once, the morning after a task's due day.
-- **Channel:** push when the person has a device and `push_reminders` on,
-  else e-mail through `InternalEmailService`. The push text is a fixed
-  sentence with the project's name only if the person allowed content on
-  the lock screen (§8 keeps "no content" as the default).
+- **Channel:** e-mail through `InternalEmailService` until phase G. From G
+  on: push when the person has a device and `push_reminders` on, else
+  e-mail. The push text is a fixed sentence with the project's name only
+  if the person allowed content on the lock screen (§8 keeps "no content"
+  as the default).
+- Private items (§13) go only to their author.
 
 ## 16. Mail to third persons, and the calendar (phase D)
 
 - **Draft.** `POST /projects/{uuid}/mails` makes one call of the Chat model
   with the item, its source mail if any, and the purpose; it returns the
   subject and one text per variant (`decline` and `move` for a date,
-  `followup` for a waiting item). The person edits; `PATCH` stores the
+  `followup` for a waiting task). The person edits; `PATCH` stores the
   text.
-- **Send.** Only `POST …/send` sends, only from the web client of the
-  person whose draft it is, with a CSRF token. It is idempotent on the
-  draft's UUID: a second call returns the first result. The text sent is
-  `BBODY` as stored. No tool, run, watch or command can call it.
-- **Sender.** A connected Microsoft 365 connection with `Mail.Send`:
-  `M365MailSender`. Otherwise no "Send" button: "Copy text" (marks
-  `copied`) and "Open in mail app" (`mailto:` with subject and body).
-  Gmail and other providers are a new provider (ask first, §0 #83).
+- **Copy first** (§0 #104). Every preview offers "Copy text" (marks
+  `copied`) and "Open in mail app" (`mailto:` with recipient, subject and
+  body; a body longer than 1,800 characters is copied to the clipboard
+  instead and the mail app opens with subject and recipient only). This
+  path is complete on its own: after "Copy text" or "Open in mail app" the
+  preview asks "Did you send it?" and, on yes, does what "Send" does
+  afterwards.
+- **Send** where the person has a Microsoft 365 connection with
+  `Mail.Send` (`M365MailSender`). Only `POST …/send` sends, only from the
+  web client of the person whose draft it is, with a CSRF token. It is
+  idempotent on the draft's UUID: a second call returns the first result.
+  The text sent is `BBODY` as stored. No tool, run, watch or command can
+  call it. Gmail and other providers are a new provider (ask first, §0
+  #83, #111).
 - **Recipient.** `BCONTACTMAIL` of the item, or the sender of its source
   mail. Unknown: the preview has an empty "To" field and "Send" stays off
   until it is filled.
-- **After sending:** a `decline` or `move` turns the date into a `waiting`
-  item ("Steinwerk Nord: new delivery date"); a `followup` sets the
-  waiting item's next look to three working days later.
-- **Calendar.** Confirming a date calls the destination provider of the
-  person's default calendar connection (`OutlookCalendarDestinationProvider`,
-  `CalDavDestinationProvider`) and stores the event ID in
-  `BCALENDAREVENTID`; moving or dropping the date updates or deletes that
-  event. Reading the calendar for clashes is PJ39 (spike first): Microsoft
-  365 `calendarView`, CalDAV `REPORT` with a time range, only the free/busy
-  of the hour of the new date.
+- **After sending:** a `decline` or `move` turns the date into a task that
+  waits ("Steinwerk Nord: new delivery date", `BWAITINGSINCE` now); a
+  `followup` sets the task's next look to three working days later.
+- **Calendar subscription** (§0 #103). Every member gets one address per
+  project, `GET /projects/feed/{token}.ics`. The feed holds the project's
+  `date` items in state `open` or `done` that the member may see (private
+  ones only for their author), from 90 days back on, as `VEVENT` with
+  `UID` = the item's `BUUID`, `RRULE` from `BRRULE`, `TZID` from the
+  project. A moved date changes in the person's calendar when the calendar
+  app polls next (Google: hours; Apple and Outlook: as set). The token is
+  stored hashed; "Renew" replaces it, the old address answers 404 at once.
+  Nothing writes into a calendar; nothing reads one. Writing and reading
+  for clashes are §9 of the master plan.
 
-## 17. Into the project (phase G)
+## 17. Into the project (phase H)
 
 - **Address.** `smart+{BMAILKEY}@{inbound domain}`; `BMAILKEY` is the
   project's slug plus three random characters, created on first use. The
   inbound mail channel resolves the keyword to the project before today's
   keyword handling.
-- **Who may send.** The mail's `From` must be the address of a member of
-  the project. Otherwise it is dropped and audited
-  (`project.inbox.refused`); no answer goes out (no backscatter).
+- **Who may send** (§0 #105). The envelope and header `From` must be a
+  confirmed address of a member (the account's address, or one in
+  `BPROJECTSENDERS` with `BCONFIRMEDAT`), and the receiving server's
+  `Authentication-Results` must show DMARC `pass` for that domain (SPF or
+  DKIM aligned). A domain without a DMARC record is refused unless
+  `PROJECTS.INBOX_ALLOW_NO_DMARC` (0) is set by an admin. Otherwise the mail
+  is dropped and audited (`project.inbox.refused`, with the reason); no
+  answer goes out (no backscatter).
 - **What happens.** The mail (body and attachments) is stored as files in
-  the project's folder (`BFILES`, the project's `BGROUPKEY`), then one run
-  of kind `chat` without write tools other than `project_item_propose`
-  reads it and proposes items, with `BSOURCEKIND = mail` and the sender as
-  `BCONTACTMAIL` where it fits. It counts to the member who forwarded it.
+  the project's folder (`BFILES`, the project's `BGROUPKEY`), then the
+  extraction of §13 reads it with the mail as input and no message of the
+  sender: everything it returns is `proposed`, with `BSOURCEKIND = mail`,
+  and the original sender of a forwarded mail (parsed from the forwarded
+  header block) as `BCONTACT` / `BCONTACTMAIL` where it fits. No loop runs,
+  no tool is offered. It counts to the member who forwarded it.
 - **Files.** A file added to the project (PJ42) is read the same way once,
   after indexing.
 - **Phone.** The share sheet of the app (PJ41) posts to the existing
   source endpoint with the project picked in the sheet.
 
-## 18. Watches (phase H)
+## 18. Watches (phase I)
 
-- `ProjectWatchesTickCommand` every five minutes takes due watches
-  (`BNEXTCHECKAT`), checks each in a unit on `async_ai_low`.
-- **Check by kind,** cheap first:
-  - `page`: `UrlWatchService` and `TextDiff`, no model.
-  - `version`: the source's release feed or tag list when known (PHP,
-    GitHub, Packagist, npm); a page read otherwise. No model unless the
-    value cannot be read without one.
-  - `number`: the page text through `WebFetchTool`, the number found by the
-    extractor of the previous check (a CSS path or a regex kept in
-    `BCONDITION`); the model only when the extractor fails.
-  - `entries`: a search or a listing page; new entries are those whose
-    link was not seen before.
-  - `yesno`: like `number`, the condition is a match.
-- **Report** only when the condition becomes true or the value changes in
-  a way the condition names. Push or mail to the creator, a line in the
-  project chat, the card updates. A failed check sets `BLASTERROR`; three
-  failures in a row pause the watch and say so.
+- No own tick: a watch is checked by the Saved Tasks tick
+  (`SavedTasksTickCommand`) as a task kind `project_watch`, due by
+  `BNEXTCHECKAT`, in a unit on `async_ai_low` (§0 #106).
+- **Kinds in v1,** no model on the normal path:
+  - `page`: `UrlWatchService` and `TextDiff` (the watch keeps
+    `BURLWATCHID`).
+  - `version`: a release feed or tag list (php.net releases, GitHub
+    releases or tags, Packagist, npm). A source without a feed is not
+    offered as `version`; the chat suggests `page` instead.
+- **Not in v1:** `number` (a price across shops), `entries` (new classified
+  ads), `yesno`. Shops block automated reads and load prices by script;
+  classified sites forbid scraping in their terms. A later version may add
+  them for sources with a feed or an API (master plan §9).
+- **Report** only when the value changes in a way the condition names. A
+  line in the project chat, the card updates, mail to the creator (push
+  from phase G). A failed check sets `BLASTERROR`; three failures in a row
+  pause the watch and say so.
 - **Cost.** A check without a model call is free for the person; a model
-  call counts to the creator. A watch never buys, fills a form or signs
-  in.
+  call (only to word the report) counts to the creator. A watch never buys,
+  fills a form or signs in.
