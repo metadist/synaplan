@@ -180,3 +180,27 @@ func ReadDir(root, rel string) ([]Entry, error) {
 	}
 	return out, nil
 }
+
+// CreateFile creates name directly inside root and returns it open for
+// writing. It never follows a symlink and never replaces an entry: a name
+// that already exists, including a dangling symlink, fails with an error
+// matching os.ErrExist. name is one path segment.
+func CreateFile(root, name string, mode os.FileMode) (*os.File, error) {
+	if name == "" || name == "." || name == ".." || strings.ContainsRune(name, filepath.Separator) {
+		return nil, os.ErrInvalid
+	}
+	dir, st, err := openWalk(root, "")
+	if err != nil {
+		return nil, err
+	}
+	defer dir.Close()
+	if !st.IsDir() {
+		return nil, ErrNotDir
+	}
+	flags := syscall.O_WRONLY | syscall.O_CREAT | syscall.O_EXCL | syscall.O_NOFOLLOW | syscall.O_CLOEXEC
+	fd, err := syscall.Openat(int(dir.Fd()), name, flags, uint32(mode.Perm()))
+	if err != nil {
+		return nil, &os.PathError{Op: "create", Path: filepath.Join(root, name), Err: err}
+	}
+	return os.NewFile(uintptr(fd), filepath.Join(root, name)), nil
+}

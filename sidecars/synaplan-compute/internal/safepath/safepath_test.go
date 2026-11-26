@@ -89,3 +89,63 @@ func TestOpenFileRegular(t *testing.T) {
 		t.Fatal("dot-dot must be refused")
 	}
 }
+
+func TestCreateFileNeverFollowsOrReplaces(t *testing.T) {
+	t.Parallel()
+	root := t.TempDir()
+	outside := t.TempDir()
+
+	f, err := CreateFile(root, "new.txt", 0o640)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.WriteString("ok"); err != nil {
+		t.Fatal(err)
+	}
+	_ = f.Close()
+	if b, _ := os.ReadFile(filepath.Join(root, "new.txt")); string(b) != "ok" {
+		t.Fatalf("content %q", b)
+	}
+	if _, err := CreateFile(root, "new.txt", 0o640); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("an existing file must not be replaced, got %v", err)
+	}
+
+	dangling := filepath.Join(outside, "created-through-link")
+	if err := os.Symlink(dangling, filepath.Join(root, "dangling.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateFile(root, "dangling.txt", 0o640); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("a dangling symlink must be refused, got %v", err)
+	}
+	if _, err := os.Lstat(dangling); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("nothing may be created at the link target, got %v", err)
+	}
+
+	victim := filepath.Join(outside, "victim")
+	if err := os.WriteFile(victim, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(victim, filepath.Join(root, "live.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateFile(root, "live.txt", 0o640); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("a live symlink must be refused, got %v", err)
+	}
+	if b, _ := os.ReadFile(victim); string(b) != "keep" {
+		t.Fatalf("link target was written: %q", b)
+	}
+
+	for _, name := range []string{"", ".", "..", "a/b"} {
+		if _, err := CreateFile(root, name, 0o640); !errors.Is(err, os.ErrInvalid) {
+			t.Fatalf("name %q must be refused, got %v", name, err)
+		}
+	}
+
+	linkRoot := filepath.Join(outside, "link-root")
+	if err := os.Symlink(root, linkRoot); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := CreateFile(linkRoot, "x.txt", 0o640); !errors.Is(err, ErrSymlink) {
+		t.Fatalf("a symlink root must be refused, got %v", err)
+	}
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/metadist/synaplan-compute/internal/logs"
 	"github.com/metadist/synaplan-compute/internal/names"
 	"github.com/metadist/synaplan-compute/internal/runner"
+	"github.com/metadist/synaplan-compute/internal/safepath"
 	"github.com/metadist/synaplan-compute/internal/workspace"
 	"github.com/metadist/synaplan-compute/pkg/contract"
 	"github.com/oklog/ulid/v2"
@@ -498,6 +499,11 @@ func (s *Server) execute(rec *runRec, files map[string][]byte) {
 // inputs) and non-regular entries (symlinks, dirs) are skipped. Best-effort:
 // any per-file error is ignored so it never turns a successful run into a
 // failure.
+//
+// The script controls both directories, and this code runs with the service's
+// privileges, not the sandbox's. So the source is opened without following a
+// link, and the copy is created exclusively: a name that already exists in
+// /out, including a symlink pointing anywhere else on the host, is left alone.
 func (s *Server) promoteWorkOutputs(layout runner.ScratchLayout, reserved map[string]bool) {
 	entries, err := os.ReadDir(layout.Work)
 	if err != nil {
@@ -508,16 +514,29 @@ func (s *Server) promoteWorkOutputs(layout runner.ScratchLayout, reserved map[st
 		if reserved[name] || !e.Type().IsRegular() || !names.FileName(name) {
 			continue
 		}
-		outPath := filepath.Join(layout.Out, name)
-		if _, statErr := os.Stat(outPath); statErr == nil {
-			continue
-		}
-		body, readErr := os.ReadFile(filepath.Join(layout.Work, name))
+		body, readErr := readRegular(layout.Work, name)
 		if readErr != nil {
 			continue
 		}
-		_ = s.owner.WriteFile(outPath, body)
+		createErr := s.owner.CreateFile(layout.Out, name, body)
+		if errors.Is(createErr, os.ErrExist) && isSymlink(filepath.Join(layout.Out, name)) {
+			log.Printf("run %s: %s in /out is a symlink, not promoted from /work", filepath.Base(layout.Root), name)
+		}
 	}
+}
+
+func readRegular(dir, name string) ([]byte, error) {
+	f, _, err := safepath.OpenFile(dir, name)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
+func isSymlink(path string) bool {
+	st, err := os.Lstat(path)
+	return err == nil && st.Mode()&os.ModeSymlink != 0
 }
 
 func (s *Server) sandboxUser() string {

@@ -830,3 +830,51 @@ func TestCancelledRunStillRollsBackAnOverQuotaWorkspace(t *testing.T) {
 	}
 	t.Fatal("cancelled over-quota writes must still be rolled back")
 }
+
+// A script owns /work and /out. Promotion runs with the service's privileges,
+// so a link the script leaves in /out must never decide where the bytes go.
+func TestPromotionNeverWritesThroughALinkInOut(t *testing.T) {
+	outside := t.TempDir()
+	dangling := filepath.Join(outside, "created-by-the-service")
+	victim := filepath.Join(outside, "victim")
+	if err := os.WriteFile(victim, []byte("keep"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var outHost string
+	fr := newFakeRunner()
+	fr.onCreate = func(spec runnerSpec) {
+		outHost = spec.OutHost
+		_ = os.WriteFile(filepath.Join(spec.WorkHost, "dangling.txt"), []byte("payload"), 0o644)
+		_ = os.Symlink(dangling, filepath.Join(spec.OutHost, "dangling.txt"))
+		_ = os.WriteFile(filepath.Join(spec.WorkHost, "live.txt"), []byte("payload"), 0o644)
+		_ = os.Symlink(victim, filepath.Join(spec.OutHost, "live.txt"))
+		_ = os.WriteFile(filepath.Join(spec.WorkHost, "result.txt"), []byte("result"), 0o644)
+		_ = os.WriteFile(filepath.Join(spec.WorkHost, "kept.txt"), []byte("from work"), 0o644)
+		_ = os.WriteFile(filepath.Join(spec.OutHost, "kept.txt"), []byte("from out"), 0o644)
+	}
+	_, ts := newTestServer(t, testOpts{runner: fr})
+	id := submitJSON(t, ts, validRun())
+	st := waitFor(t, ts, id, finished)
+	if st.Status != contract.StatusSucceeded {
+		t.Fatalf("%+v", st)
+	}
+
+	if _, err := os.Lstat(dangling); !os.IsNotExist(err) {
+		t.Fatalf("a file was created outside /out through the link: %v", err)
+	}
+	if b, _ := os.ReadFile(victim); string(b) != "keep" {
+		t.Fatalf("a file outside /out was overwritten: %q", b)
+	}
+	for _, name := range []string{"dangling.txt", "live.txt"} {
+		lst, err := os.Lstat(filepath.Join(outHost, name))
+		if err != nil || lst.Mode()&os.ModeSymlink == 0 {
+			t.Fatalf("%s must stay the link the script left: %v", name, err)
+		}
+	}
+	if b, _ := os.ReadFile(filepath.Join(outHost, "result.txt")); string(b) != "result" {
+		t.Fatalf("an ordinary file must still be promoted, got %q", b)
+	}
+	if b, _ := os.ReadFile(filepath.Join(outHost, "kept.txt")); string(b) != "from out" {
+		t.Fatalf("a file already in /out must win, got %q", b)
+	}
+}

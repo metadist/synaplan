@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/metadist/synaplan-compute/internal/safepath"
 )
 
 const (
@@ -80,6 +82,48 @@ func (o *Owner) WriteFile(path string, data []byte) error {
 		return err
 	}
 	return o.apply(path, fileShared, fileFallback)
+}
+
+// CreateFile writes data to a new file name inside dir, for a directory the
+// sandbox could write to. Unlike WriteFile it follows no symlink and replaces
+// nothing: when name already exists in dir, even as a dangling link, the
+// error matches os.ErrExist and no byte is written anywhere. Mode and owner
+// are set on the open descriptor, so they cannot land on another file either.
+func (o *Owner) CreateFile(dir, name string, data []byte) error {
+	mode := os.FileMode(0o640)
+	if o != nil {
+		mode = fileShared
+	}
+	f, err := safepath.CreateFile(dir, name, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		_ = os.Remove(filepath.Join(dir, name))
+		return err
+	}
+	if o != nil {
+		if err := o.applyOpen(f); err != nil {
+			_ = f.Close()
+			return err
+		}
+	}
+	return f.Close()
+}
+
+func (o *Owner) applyOpen(f *os.File) error {
+	if err := f.Chmod(fileShared); err != nil {
+		return err
+	}
+	if o.chown {
+		if err := f.Chown(o.UID, os.Getgid()); err == nil {
+			return nil
+		} else if !errors.Is(err, os.ErrPermission) {
+			return err
+		}
+	}
+	return f.Chmod(fileFallback)
 }
 
 func (o *Owner) apply(path string, shared, fallback os.FileMode) error {
