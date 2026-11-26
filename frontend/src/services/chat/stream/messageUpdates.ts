@@ -222,11 +222,9 @@ export function applyGeneratedFile(
           !part.content?.includes('__FILE_GENERATED__') &&
           !part.content?.includes('BFILEPATH')
       )
-    message.parts = [
-      { type: 'text', content: confirmation },
-      ...(inlineNote ? [{ type: 'text', content: inlineNote }] : []),
-      ...trailingNotes,
-    ]
+    const confirmationPart: Part = { type: 'text', content: confirmation }
+    const notePart: Part | null = inlineNote ? { type: 'text', content: inlineNote } : null
+    message.parts = [confirmationPart, ...(notePart ? [notePart] : []), ...trailingNotes]
   }
 }
 
