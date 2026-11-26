@@ -15,8 +15,8 @@ Abschnitt 5).
 
 ## 2. Was erledigt ist
 
-31 Advisories im Repo: 25 veröffentlicht, 5 Drafts (SYN-14, SYN-23, SYN-25,
-SYN-30, SYN-31), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 25 gehören 21 zu diesem Audit
+33 Advisories im Repo: 30 veröffentlicht, 2 Drafts (SYN-26, SYN-27, seit
+26.11.), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 30 gehören 26 zu diesem Audit
 (Tabelle unten, alle ohne CVE); vier sind ältere, davon unabhängige
 Advisories (GHSA-26f3-684h-hpjh, GHSA-2x6x-8r52-pm58, GHSA-phrw-3wm4-3xcx,
 GHSA-qqg9-qv48-j8m8).
@@ -28,7 +28,7 @@ GHSA-qqg9-qv48-j8m8).
 | SYN-03 Synaform Pfad: File read/delete | GHSA-c77r-gx6r-f4j4 | 5.10.0 | published |
 | SYN-04 Apple Sign-in per unsignierter E-Mail | GHSA-pcm8-44x4-fhq7 | 5.10.0 | published |
 | SYN-05 + SYN-06 SsrfGuard fail-open, Redirects | GHSA-6jp8-jcxm-96rx | 5.10.1 | published |
-| SYN-07 Synaform URL-Quellen SSRF | GHSA-6h69-j26q-v29m | 5.9.0 (PR #3226) | published, Feld "patched version" im Advisory noch leer |
+| SYN-07 Synaform URL-Quellen SSRF | GHSA-6h69-j26q-v29m | 5.9.0 (PR #3226) | published |
 | SYN-08 WhatsApp-Webhook ohne Signatur | GHSA-v335-3cxj-mwcm | 5.10.1 | published |
 | SYN-09 GET-Routen starten Turns | GHSA-hv6g-8mc6-9833 | 5.10.2 | published 25.11. |
 | SYN-10 Message-Status fremder Nutzer | GHSA-qh57-5q43-qr3m | 5.10.2 | published 25.11. |
@@ -44,7 +44,13 @@ GHSA-qqg9-qv48-j8m8).
 | SYN-19 OAuth-Callbacks ohne Browser-Bindung | GHSA-wfc5-m96h-36c2 | 5.10.3 | published 25.11. |
 | SYN-22 MCP-Tools ohne Hinweise (eingegrenzt) | GHSA-qgpg-cx8m-7mhf | 5.10.3 | published 25.11. |
 | SYN-44 Login-Adresse ohne Bestätigung änderbar | GHSA-qr28-f4ww-hrg9 | 5.10.3 | published 25.11. |
-| SYN-14 Besucher-Uploads im geteilten RAG-Index | GHSA-6m8j-g99j-hg44 | **noch kein Release** | **Draft**, Fix in `main` (`fa202d4cf`) |
+| SYN-14 Besucher-Uploads im geteilten RAG-Index | GHSA-6m8j-g99j-hg44 | 5.10.4 | published 26.11. |
+| SYN-23 Apple-In-App-Käufe | GHSA-rmmx-x383-4p77 | 5.10.4 | published 26.11. |
+| SYN-25 Admin-Modell-Import, SQL-Prüfung | GHSA-5vp7-6cp5-3v5g | 5.10.4 | published 26.11. |
+| SYN-30 Medien-Marker setzt Dateipfad | GHSA-grvv-mwcf-vhpm | 5.10.4 | published 26.11. |
+| SYN-31 Generierte Medien unter ratbaren Namen | GHSA-r233-vw39-4hm9 | 5.10.4 | published 26.11. |
+| SYN-26 Compute-Sidecar schreibt über Symlink in `/out` | GHSA-q83r-q9c6-7w9h | nächstes Release | Draft, gemergt 26.11. (`bda0aa748`) |
+| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | nächstes Release | Draft, gemergt 26.11. (`b4447d74f`) |
 
 Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 #3260, normaler öffentlicher PR ohne Advisory). Offen davon siehe 3b.
@@ -98,14 +104,18 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
   `make ci-local` grün (PHPUnit 13245, Vitest 3818), Playwright `@ci` 225
   passed / 2 skipped / 1 failed (`widget.spec.ts:159`, ein Timing-Rennen im
   Test: die Antwort steht im Seitenabbild, der Text wird zu früh gelesen).
-  Noch in keinem Release; die vier Advisories bleiben Drafts.
+- `v5.10.4` ist am 26.11. erschienen und enthält laut `git tag --contains`
+  alle fünf Fixes (SYN-14, 23, 25, 30, 31). Auf Wort des Owners: die fünf
+  Advisories mit `<= 5.10.3` / `5.10.4` gefüllt und veröffentlicht; in
+  GHSA-6h69 (SYN-07) `5.9.0` eingetragen. Produktion läuft laut Owner auf
+  5.10.4 (von der KI nicht geprüft).
 - WordPress-Plugin-PR #11 ist gemergt.
 
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
 
-0. **Vor dem Deploy des nächsten Release** (die vier Fixes sind gemergt):
+0. **Beim Deploy von 5.10.4** (falls noch nicht geschehen):
    - SYN-23: `IAP_APPLE_ENVIRONMENT` prüfen: nur `Sandbox` oder `Production`
      (`Xcode`/`LocalTesting` wird außerhalb von dev/test abgelehnt).
    - SYN-25: Folge für Admins: ein Import, dessen SQL Backslashes, doppelte
@@ -117,22 +127,22 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
    - SYN-31: die Migration muss mit dem Deploy laufen (eine Zeile in
      `BCONFIG`, kein Schema). Ohne sie antworten alte Links für nicht
      angemeldete Besucher mit 404.
-1. **SYN-14 fertig machen:** nächstes Release schneiden (enthält `fa202d4cf`),
-   deployen, einmal `php bin/console app:widget:purge-visitor-upload-vectors`
-   laufen lassen (`--dry-run` zählt nur). Danach (KI, auf sein Wort) in
-   GHSA-6m8j-g99j-hg44 betroffenen Bereich und gepatchte Version eintragen und
-   veröffentlichen. Der Bereich steht noch auf `<= 5.10.1`, richtig ist
-   `<= 5.10.3`.
+1. Erledigt am 26.11. (Owner): SYN-14 in Produktion bereinigt mit
+   `app:widget:purge-visitor-upload-vectors`. Der Probelauf zählte 195
+   Chunks aus 213 Besucher-Uploads; 3 Uploads ohne Widget oder Sitzung
+   blieben liegen (die Suche liefert sie nicht aus).
 2. Erledigt: CI auf `main` ist seit PR #3276 (Symfony 8.1.12) wieder grün.
 3. **SYN-19 auf einem Gerät gehen:** in der iOS-/Android-App einmal M365,
    Dropbox oder einen MCP-Server verbinden. Bisher nur Unit-Tests mit
    gemockten Capacitor-Plugins und curl gegen localhost. App-Frontend (OTA)
    und Backend müssen zusammen ausgerollt sein: Apps mit altem Bundle senden
    kein `native=1` und werden abgelehnt.
-4. **Produktion auf 5.10.3?** Nicht geprüft (kein Traffic an Produktion). Die
-   Details aller 14 Advisories sind seit dem 25.11. öffentlich.
-5. **SYN-28:** Zugangsdaten in der öffentlichen Git-Historie rotieren. Kein
-   Code-Fix; Ort und Typ stehen im Report.
+4. Erledigt: Produktion läuft laut Owner seit dem 26.11. auf 5.10.4.
+5. Erledigt am 26.11. (Owner): die Zugangsdaten aus SYN-28 sind laut Owner
+   rotiert (Turnstile-Secret des Widgets `synaplan.com`, SES-SMTP-Zugang).
+   Nicht geprüft: der Google-API-Key in der gespeicherten Doku-Seite, und ob
+   die alten Zugänge fremd benutzt wurden. Offen: Secret Scanning mit Push
+   Protection in GitHub einschalten.
 6. **SYN-21 in Produktion:** nachsehen, dass genau das eine erwartete Widget
    `allowUnsignedVisitorId` trägt (`syn21-affected-widgets.sql`, fährt nur der
    Owner), und dessen Owner informieren. Das Widget bleibt offen, bis er
@@ -157,18 +167,36 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 
 ### 3c. Offene Findings ohne Vorentscheidung (KI, je auf Wort des Owners)
 
-Reihenfolge laut Report-Tabelle. SYN-23, 24, 25, 30 und 31 sind gemergt (Stand unten), aber noch in keinem Release.
-**Als Nächstes: SYN-26/27, aber erst nach einem Ja des Owners** (Docker, `install.sh`).
+Reihenfolge laut Report-Tabelle. SYN-23, 24, 25, 30 und 31 sind in 5.10.4 erschienen (Stand unten).
+**SYN-26/27 (Stand 26.11.):** mit Ja des Owners gebaut und auf sein Wort
+gemergt (SYN-27 `b4447d74f`, SYN-26 `bda0aa748`), in keinem Release.
 
-**SYN-30 (Stand 26.11.):** gemergt (`1a85eaeb4`), noch in keinem Release.
-Draft-Advisory GHSA-grvv-mwcf-vhpm, PR https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1,
+- **SYN-27** (`metadist/synaplan-ghsa-fxch-839f-35j4`, PR 1): jeder
+  veröffentlichte Port in `docker-compose.yml`, `docker-compose-minimal.yml`
+  und `docker-compose.test.yml` ist `${SYNAPLAN_BIND:-127.0.0.1}:…`;
+  phpMyAdmin fragt nach dem Login; `install.sh` sagt im try mode, dass der
+  Stack nur lokal antwortet. Wächter: `tests/dev-compose-bind.test.mjs`.
+  Ausnahme Keycloak (Profil `oidc`): bleibt mit `SYNAPLAN_KEYCLOAK_BIND`
+  auf `0.0.0.0`, weil das Backend es über das Host-Gateway erreicht und ein
+  Loopback-Port dort unter Linux nicht ankommt. Nicht prüfbar vor dem Merge:
+  die CI auf Linux (im Fork laufen keine Actions).
+- **SYN-26** (`metadist/synaplan-ghsa-q83r-q9c6-7w9h`, PR 1):
+  `promoteWorkOutputs` legt die Kopie mit `O_CREAT|O_EXCL|O_NOFOLLOW` an
+  (`safepath.CreateFile`, `perm.Owner.CreateFile`), Mode und Owner über den
+  offenen Deskriptor. Offen und Owner-Entscheidung: der Sidecar läuft im
+  Dev-Stack weiter als uid 0 mit Docker-Socket.
+- Nach dem Merge und einem Release: Range/Patched setzen, dann
+  veröffentlichen (Abschnitt 5), jeweils nur mit Go des Owners.
+
+**SYN-30 (Stand 26.11.):** gemergt (`1a85eaeb4`), in 5.10.4, veröffentlicht.
+Advisory GHSA-grvv-mwcf-vhpm, PR https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1,
 Branch `fix/media-marker-file-path` (Commit `ec56d9ccf`). `make ci-local` grün (PHPUnit 13143, Vitest 3818),
 Playwright `@ci` 226 passed / 2 skipped. Nicht gegen ein echtes Modell geprüft.
 Offen, Owner-Entscheidung: die Datei-Routen nehmen weiter die erste Message mit passendem Pfad als Besitzer.
 Eine Prüfung dort würde auch Altzeilen abdecken, kann aber ändern, wer bestehende Links öffnen darf.
 
-**SYN-31 (Stand 26.11.):** gemergt (`aa1a57502`), noch in keinem Release.
-Draft-Advisory GHSA-r233-vw39-4hm9, PR https://github.com/metadist/synaplan-ghsa-r233-vw39-4hm9/pull/1,
+**SYN-31 (Stand 26.11.):** gemergt (`aa1a57502`), in 5.10.4, veröffentlicht.
+Advisory GHSA-r233-vw39-4hm9, PR https://github.com/metadist/synaplan-ghsa-r233-vw39-4hm9/pull/1,
 Branch `fix/generated-media-names`. Backend-Gate grün (PHPUnit 13174); Vitest fiel im Gesamtlauf in
 `ChatWidgetSession.spec.ts` (nicht berührt) und war im Einzellauf grün (3818). Playwright `@ci` 225 passed /
 2 skipped / 1 failed (`widget.spec.ts:159`, leere Antwort; die Datei allein danach 10 passed, nicht weiter untersucht).
@@ -177,19 +205,19 @@ Vorgabe des Owners: alte Links laufen weiter, ohne Enddatum. Dateien von vor dem
 ratbar wie bisher. Schließen lässt sich das später über `MEDIA / LEGACY_PUBLIC_NAMES_UNTIL` = `0`
 (alle alten Links enden für nicht angemeldete Besucher) oder durch Umbenennen der Altdateien.
 
-**SYN-25 (Stand 26.11.):** gemergt (`0be250b77`), noch in keinem Release.
-Draft-Advisory GHSA-5vp7-6cp5-3v5g, PR https://github.com/metadist/synaplan-ghsa-5vp7-6cp5-3v5g/pull/1,
+**SYN-25 (Stand 26.11.):** gemergt (`0be250b77`), in 5.10.4, veröffentlicht.
+Advisory GHSA-5vp7-6cp5-3v5g, PR https://github.com/metadist/synaplan-ghsa-5vp7-6cp5-3v5g/pull/1,
 Branch `fix/model-import-sql-validator`. Validator prüft auf Statement ohne String-Inhalte, Wort-Allowlist,
 WHERE mit BSERVICE/BTAG/BPROVID gegen Werte, kein OR, keine Backslashes/doppelten Anführungszeichen.
 `make ci-local` grün (PHPUnit 13133, Vitest 3818). Strukturierter Import statt SQL bleibt offen.
 
 **SYN-24 (erledigt 26.11.):** SSRF selbst seit 5.10.2 zu (GHSA-9fxp-p6f4-hfgf, veröffentlicht), kein eigenes Advisory.
-Rest-Härtung (Speicherprüfung über `SsrfGuard`) gemergt mit PR #3273 (`e2d267d4d`), noch in keinem Release.
+Rest-Härtung (Speicherprüfung über `SsrfGuard`) gemergt mit PR #3273 (`e2d267d4d`), in 5.10.4.
 Neu: `plugins/castingdata/backend/Service/CastingApiUrlPolicy.php` (Schema http/https, keine Query, kein Fragment,
 keine Zugangsdaten in der URL, `SsrfGuard::isBlockedUrl`).
 
-**SYN-23 (Stand 26.11.):** gemergt (`57fa0b5cf`), noch in keinem Release.
-Draft-Advisory GHSA-rmmx-x383-4p77, PR https://github.com/metadist/synaplan-ghsa-rmmx-x383-4p77/pull/1,
+**SYN-23 (Stand 26.11.):** gemergt (`57fa0b5cf`), in 5.10.4, veröffentlicht.
+Advisory GHSA-rmmx-x383-4p77, PR https://github.com/metadist/synaplan-ghsa-rmmx-x383-4p77/pull/1,
 Branch `fix/apple-iap-entitlement` (Commit 108a075ec). Ohne Schemaänderung gelöst (Lock + Liste
 `iap_purchases` in `BPAYMENTDETAILS`). Lokal grün: Lint, PHPStan, Deptrac, PHPUnit (13065 Tests).
 Vitest/vue-tsc nicht durchgelaufen (Worktree ohne generierte Schemas, kein Frontend berührt).
@@ -218,8 +246,6 @@ Das ist "Ask first". SYN-23 kam ohne Schemaänderung aus.
 - Konten, die über die entfernte Confirm-Route eine Nummer verifiziert haben,
   behalten sie. Keine Bereinigung gemacht.
 - Credits für `p-w` und `golam71` auf GHSA-6jp8-jcxm-96rx sind "pending".
-- GHSA-6h69-j26q-v29m (SYN-07): gepatchte Version `5.9.0` ist im Advisory
-  noch nicht eingetragen (Schritt 7.3).
 - GHSA-6wf3 ging mit dem Originaltext des Melders raus, GHSA-wqjm als
   "medium"; beides nicht mehr geprüft.
 - `ChatWidgetSession.spec.ts` (Vitest, "Thinking Block Filtering") ist flaky,
@@ -456,16 +482,14 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-1. Owner: Release schneiden (enthält SYN-14, 23, 25, 30, 31 und die
-   Rest-Härtung zu SYN-24), die Punkte aus 3a Punkt 0 beim Deploy beachten,
-   dann der Gerätetest für SYN-19.
-2. KI, auf Wort des Owners: nach dem Release GHSA-6m8j (SYN-14),
-   GHSA-rmmx (SYN-23), GHSA-5vp7 (SYN-25), GHSA-grvv (SYN-30) und GHSA-r233
-   (SYN-31) mit betroffenem Bereich und gepatchter Version füllen und
-   veröffentlichen. Vorher je `git tag --contains <merge-commit>`. Bei der
-   Gelegenheit in GHSA-6h69 (SYN-07) die gepatchte Version `5.9.0` eintragen.
-3. SYN-26/27: erst fragen (Docker, `install.sh`). Danach die Lows SYN-32 bis
-   43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
+1. Erledigt laut Owner am 26.11.: `BCONFIG`-Zeile zu SYN-31 und
+   `IAP_APPLE_ENVIRONMENT` nach dem Deploy von 5.10.4 nachgesehen, SYN-19
+   auf einem Gerät gegangen.
+2. Erledigt am 26.11.: alle Advisories dieses Audits sind veröffentlicht.
+3. SYN-26/27: sind in `main`. Die CI auf `main` ansehen (SYN-27 ändert die
+   Port-Bindung des Test-Stacks, der Fork hatte keine Actions). Dann
+   Release, Range `<= 5.10.4` / Patched setzen und veröffentlichen. Danach die Lows
+   SYN-32 bis 43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
 4. Offene Entscheidungen: zu SYN-23 Statusabfrage über die App Store Server
    API (neue Credentials), `appAccountToken`-Bindung (Änderung in
    `synaplan-apps`), automatisches Auslaufen des IAP-Tiers; zu SYN-30 die
