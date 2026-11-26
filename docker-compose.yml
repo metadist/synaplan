@@ -1135,7 +1135,7 @@ services:
   # No mem_limit in dev (cgroup limits break some sandboxes; see frontend-widgets).
   # Ask-first Docker change: recorded in _devextras/planning/202609_ai_plugs/02_sprint_2_docling.md
   docling:
-    image: ghcr.io/docling-project/docling-serve-cpu:v1.38.2@sha256:7a480a1604fa3b42efeddc7db9527690d9f9bc903226136013e2bfe6b1a4dfb0
+    image: ghcr.io/docling-project/docling-serve-cpu:v1.40.0@sha256:b41479e52136ae0d0d9aeb1fa68fcb49f022393b3b6472a080c3d7359c7052b6
     container_name: synaplan-docling
     depends_on:
       backend:
@@ -1368,7 +1368,7 @@ services:
   # machine can load it. aliasgroup1 is the WOPI host Collabora may call.
   # Docs: docs/DEVELOPMENT.md ("Office conversion")
   collabora:
-    image: collabora/code:26.04.6.1.1@sha256:95f29f1c0a1778999125f53f058d968fe0afb37c95e32ebfb9f3444140faebd2
+    image: collabora/code:26.04.6.2.1@sha256:a2f5d4e88addd46033d8440f7a13b82f7e6fe444bf8c6b5a3eadc789f0b5342b
     container_name: synaplan-collabora
     depends_on:
       backend:
