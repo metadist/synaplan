@@ -24,6 +24,10 @@ final class TranscriberSessionTest extends PluginTestCase
 {
     private SessionStore $store;
 
+    private ?SessionService $racingSessions = null;
+
+    private string $racingRef = '';
+
     /**
      * @param array<string, string> $settings
      */
@@ -275,20 +279,20 @@ final class TranscriberSessionTest extends PluginTestCase
 
     public function testAWindowInFlightDoesNotRestoreThePreviousLanguage(): void
     {
-        $sessions = null;
-        $ref = '';
         $whisper = $this->createStub(WhisperClient::class);
-        $whisper->method('recognize')->willReturnCallback(function (string $audio, string $language) use (&$sessions, &$ref): array {
+        $whisper->method('recognize')->willReturnCallback(function (string $audio, string $language): array {
             self::assertSame('de', $language);
-            $sessions->event($ref, ['type' => 'language', 'language' => 'en']);
+            $sessions = $this->racingSessions;
+            self::assertInstanceOf(SessionService::class, $sessions);
+            $sessions->event($this->racingRef, ['type' => 'language', 'language' => 'en']);
 
             return self::recognized(['text' => 'Hello', 'dropped' => null]);
         });
-        $sessions = $this->service(['opentalk_enabled' => '1'], $whisper);
-        $ref = $sessions->beginOpenTalk('room-1', 'de')['ref'];
+        $this->racingSessions = $this->service(['opentalk_enabled' => '1'], $whisper);
+        $this->racingRef = $this->racingSessions->beginOpenTalk('room-1', 'de')['ref'];
 
-        self::assertSame('Hello', $sessions->window($ref, self::window())['text']);
-        self::assertSame('en', $this->store->find($ref)['language'] ?? null);
+        self::assertSame('Hello', $this->racingSessions->window($this->racingRef, self::window())['text']);
+        self::assertSame('en', $this->store->find($this->racingRef)['language'] ?? null);
     }
 
     public function testOpenTalkStaysOffUntilAnAdministratorEnablesIt(): void
