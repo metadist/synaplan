@@ -666,7 +666,7 @@ services:
     networks: [internal]
 
   tika:
-    image: apache/tika:3.3.3.0@sha256:326b238b37904c94ff61fed87afe0af72e6a29fa715933b10af97b7d56f1d4cb
+    image: apache/tika:3.3.3.1@sha256:3049611264bb18cf66e6629f59818cad75ea5d46f770c504ae46537949838c67
     command: -h 0.0.0.0 -p 9998
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/9998 && printf 'GET /version HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && read -r status <&3 && [[ $$status == *'200 OK'* ]]"]
@@ -694,7 +694,7 @@ services:
   # official 8 GB self-host floor stays valid. Enable with COMPOSE_PROFILES=office
   # (or `--profile office`). No published port.
   collabora:
-    image: collabora/code:26.04.6.1.1@sha256:95f29f1c0a1778999125f53f058d968fe0afb37c95e32ebfb9f3444140faebd2
+    image: collabora/code:26.04.6.2.1@sha256:a2f5d4e88addd46033d8440f7a13b82f7e6fe444bf8c6b5a3eadc789f0b5342b
     profiles: [office]
     environment:
       extra_params: --o:ssl.enable=false --o:ssl.termination=false --o:num_prespawn_children=2

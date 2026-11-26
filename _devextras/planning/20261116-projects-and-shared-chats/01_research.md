@@ -319,6 +319,48 @@ Chosen: a relay with ID-only pushes (§0 #59, #60). The contract is in
   board of plain cards next to the chat over a dashboard in the middle,
   with the chat smaller on the left (`mockups/project-page.html`).
 
+### 2.7 Hands-on: the same project in ChatGPT and Claude (2026-11-26)
+
+One kitchen project, run the same way in both: an offer and the
+measurements as sources, an instruction ("prices always include
+delivery"), a status question, news from a phone call, a new chat asking
+for the measuring date, an oven search, a research question on water and
+power lines in a rented flat, and "remind me on 2 December".
+
+- **ChatGPT: state in every answer, none in the project.** Status comes as
+  cards and checklists inside each answer. Every answer builds a new
+  checklist (31, then 39 items); ticks persist, but the old lists go
+  stale. A new chat knew the phone call only after about ten minutes,
+  through a project chat index. The model kept "recommended" and
+  "decided" apart and said honestly what it had not saved. It ignored the
+  delivery instruction.
+- **Claude: one status document, kept by the model.** After the first
+  answer Claude asked whether to create a status document. On "yes" it
+  wrote one Markdown file into the project's context (tasks, dates,
+  decisions, a cost table) and updated the same file on the phone-call
+  news. A new chat read it at once, and the tool step was shown ("Read
+  … from the project"). It followed the delivery instruction and noticed a
+  wrong family name in the offer. This corrects §2.6: a project's state
+  can be kept, by the model, as a document; it is still no board with
+  items, owners or undo.
+- **Generated files leave the project in both.** ChatGPT's spreadsheet,
+  page and research report went to a global space; Claude's sheet and
+  research report went to a global gallery and the chat. Neither research
+  result updated the project's state.
+- **Reminders.** ChatGPT created a task at 08:00 on one click of a
+  suggestion, without asking, listed globally and bound to the chat.
+  Claude turned the sentence into a one-time task at 18:00 CET, bound to
+  the project and shown on the project page, and ran it without asking.
+  Claude's scheduled tasks can "notify only when there is something worth
+  telling", the shape a watch needs.
+- **Sharing.** ChatGPT shares a project by invite or link; Claude only in
+  team plans. Neither has a group chat in a project.
+
+Taken: update in place (§0 #112), confirm before write (#113), receipt
+only (#114), state read at turn start (#115), files stay in the project
+(#116), a reminder said back before it is added (#117), quiet watches
+(#118), one person first (#119).
+
 ## 3. Open questions the spikes answer
 
 | Spike | Question | Decides |

@@ -21,9 +21,26 @@ to them.
 | PJ7c | not started | — | Editing a picture by file ID: the chat loop has no image tool yet. |
 | Plan reshaped | merged | #3283 | board, reminders, mail, watches; phases relettered; PJ29–PJ47. See 2026-11-26 below. |
 | Plan review | open | — | §0 #96–#111: board without the loop, four kinds, calendar subscription, copy-first mail, DMARC, two watch kinds, push after sharing. See "2026-11-26 — review" below. |
+| Hands-on comparison | open | — | §0 #112–#119: update instead of append, confirm before write, receipt only, state read at turn start, files stay in the project, reminders said back, quiet watches, one person first. See "2026-11-26 — hands-on comparison" below. |
 | PJ8–PJ47 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
 ---
+
+## 2026-11-26 — hands-on comparison with ChatGPT and Claude
+
+The same kitchen project was run in ChatGPT Projects and Claude Projects
+(`01` §2.7). No code. All rows are proposals (☐); #119 changes #107 and
+needs the owner.
+
+- **What to copy from Claude:** one state the model keeps, written only
+  after a yes, updated in place, read by every new chat at once
+  (#112, #113, #115, G23).
+- **What neither does:** generated files and research results stay outside
+  the project (#116).
+- **Reminders and watches:** said back with time and zone before they are
+  added; bound to the project; quiet when nothing changed (#117, #118).
+- **Scope:** C and D for one person first; E–I wait for real use (#119).
+- `02`–`04` and the mockup are not changed yet.
 
 ## 2026-11-26 — review of the reshaped plan
 

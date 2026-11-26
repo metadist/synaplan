@@ -1387,9 +1387,10 @@ services:
         arguments:
             $secret: '%env(LIVE_VOICE_GATEWAY_SECRET)%'
 
-    App\Service\Voice\VoiceLiveSessionService:
+    App\Service\Voice\VoiceLiveSocketUrl:
         arguments:
             $publicWsPath: '%env(LIVE_VOICE_PUBLIC_WS_PATH)%'
+            $appUrl: '%env(APP_URL)%'
 
     App\Service\Voice\VoiceLiveCompatibleEndpoint:
         arguments:
