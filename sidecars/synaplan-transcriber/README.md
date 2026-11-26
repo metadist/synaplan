@@ -22,7 +22,28 @@ Modes (`TRANSCRIBER_MODE`):
 | `opendesk` | Both. This is the openDesk default |
 | `opentalk` | `POST /v1/init` for an OpenTalk 26.3 transcription service. Subtitles only; audio is not stored |
 
-OpenTalk mode needs `OPENTALK_CONTROLLER_URL`, `OPENTALK_SERVICE_KEY` and `OPENTALK_INIT_KEY` (`id:secret`, the controller key and the transcription key), `OPENTALK_LIVEKIT_URL` when the popout token does not carry an address, and `SYNAPLAN_TRANSCRIBER_SECRET`. The image is Debian, not Alpine: the LiveKit client ships a glibc build only.
+## OpenTalk
+
+Subtitles only. Audio is not stored, and no transcript is written.
+
+1. In Synaplan, turn on **OpenTalk meetings** on the synascriber plugin page and set the speech server and `transcriber_secret`.
+2. Run this process where it can reach LiveKit:
+
+```bash
+TRANSCRIBER_MODE=opentalk
+SYNAPLAN_URL=https://your-synaplan.example
+SYNAPLAN_TRANSCRIBER_SECRET=same-value-as-the-plugin
+OPENTALK_CONTROLLER_URL=https://your-opentalk-controller.example
+OPENTALK_SERVICE_KEY=controller:the-controller-secret
+OPENTALK_INIT_KEY=transcription:the-transcription-secret
+OPENTALK_LIVEKIT_URL=http://livekit:7880
+```
+
+3. In the OpenTalk controller, set `[roomserver.modules.transcription]` `url` to this process (port 8095) and `api_key` to the same id and secret as `OPENTALK_INIT_KEY`.
+
+A moderator then uses **More options → Enable subtitles**. The image is Debian, not Alpine: the LiveKit client ships a glibc build only.
+
+Full steps: [`docs/OPENTALK_MEETING_NOTES.md`](../../docs/OPENTALK_MEETING_NOTES.md).
 
 `GET /health` reports which side is on. `GET /element-call` explains why live Element Call captions are not in this version: the bot would have to join as a visible participant.
 

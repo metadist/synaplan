@@ -38,7 +38,8 @@ the installation, not to a user.
 3. Give the transcriber `SYNAPLAN_TRANSCRIBER_SECRET` = `transcriber_secret`. It
    sends it as `X-Transcriber-Secret`; the transcriber routes accept nothing
    else.
-4. Load the button in Jitsi's `head.html`:
+4. For Jitsi only, load the button in Jitsi's `head.html`. OpenTalk does not
+   use this. Its steps are in [OpenTalk](#opentalk).
 
    ```html
    <script defer src="https://<synaplan>/api/v1/plugins/synascriber/assets/jitsi/loader.js"
@@ -84,6 +85,33 @@ more than one name; the names say where it is set.
 `SYNAPLAN_API_KEY` is not one of them: the transcriber needs it only for
 the paths that act as a Synaplan user (Element voice messages, Jitsi
 captions without this plugin).
+
+## OpenTalk
+
+Live subtitles in an OpenTalk meeting. Nothing is saved.
+
+1. On the plugin page, turn on **OpenTalk meetings**. Set the speech server
+   (`stt_url`, `stt_model`, `stt_api_key`) and `transcriber_secret`.
+2. Start the transcriber with `TRANSCRIBER_MODE=opentalk`, on a host that can
+   reach OpenTalk's LiveKit. Give it `SYNAPLAN_URL`,
+   `SYNAPLAN_TRANSCRIBER_SECRET` (the same secret), `OPENTALK_CONTROLLER_URL`,
+   `OPENTALK_SERVICE_KEY` and `OPENTALK_INIT_KEY` (`id:secret`), and
+   `OPENTALK_LIVEKIT_URL`.
+3. In the OpenTalk controller:
+
+   ```toml
+   [roomserver.modules.transcription]
+   url = "https://transcriber.example:8095"
+   api_key = { id = "transcription", secret = "the-transcription-secret" }
+   ```
+
+   That id and secret are `OPENTALK_INIT_KEY`. Restart the controller.
+
+In the meeting a moderator opens **More options → Enable subtitles**, turns
+the switch on, picks a language, and saves. **Show** displays the lines.
+Turning the switch off stops them. No file is written.
+
+The same steps, written out: [docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
 
 ### Upgrading from 0.3.0
 
