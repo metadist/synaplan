@@ -98,8 +98,14 @@ SynaplanWidget.init({
 For security, widgets can be restricted to specific domains:
 
 - `example.com` - Exact match
-- `*.example.com` - All subdomains
+- `*.example.com` - `example.com` and all its subdomains
 - Empty = Allow all domains
+
+The list decides which websites may show the widget. The server reads the
+site from the `Origin` header the visitor's browser sends, which a web page
+cannot change. It is not access control: a program that is not a browser can
+send any `Origin` it likes. Do not put anything behind a widget that must stay
+secret from the public.
 
 ---
 
@@ -230,7 +236,7 @@ Widget uses Shadow DOM to isolate styles. If issues persist, check for global CS
 
 - Widget sessions are isolated from main app
 - Rate limiting prevents abuse
-- Domain whitelisting restricts usage
+- Domain whitelisting restricts which websites can embed the widget (not who can call it)
 - No user data stored in widget (unless logged in)
 
 ---

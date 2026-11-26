@@ -21,6 +21,7 @@ final readonly class WidgetDomainGuard
     public function __construct(
         private Security $security,
         private LoggerInterface $logger,
+        private WidgetOriginValidator $origins,
     ) {
     }
 
@@ -51,12 +52,12 @@ final readonly class WidgetDomainGuard
             return;
         }
 
-        $host = $this->extractHostFromRequest($request);
+        $host = $this->origins->extractHostFromRequest($request);
         if (!$host) {
             throw WidgetRequestRefused::json(['error' => 'Domain not allowed', 'reason' => 'missing_host'], Response::HTTP_FORBIDDEN);
         }
 
-        if (!$this->isHostAllowed($host, $allowedDomains)) {
+        if (!$this->origins->isHostAllowed($host, $allowedDomains)) {
             $this->logger->warning('Widget request blocked by domain whitelist', [
                 'host' => $host,
                 'allowed_domains' => $allowedDomains,
@@ -64,104 +65,5 @@ final readonly class WidgetDomainGuard
 
             throw WidgetRequestRefused::json(['error' => 'Domain not allowed', 'reason' => 'domain_not_whitelisted'], Response::HTTP_FORBIDDEN);
         }
-    }
-
-    private function extractHostFromRequest(Request $request): ?string
-    {
-        $headerHost = $request->headers->get('x-widget-host');
-        if ($headerHost) {
-            $normalized = $this->normalizeHost($headerHost);
-            if ($normalized) {
-                return $normalized;
-            }
-        }
-
-        foreach (['origin', 'referer'] as $header) {
-            $value = $request->headers->get($header);
-            if (!$value) {
-                continue;
-            }
-
-            $parts = parse_url($value);
-            if (false === $parts || !isset($parts['host'])) {
-                continue;
-            }
-
-            $host = strtolower($parts['host']);
-            if (isset($parts['port'])) {
-                $host .= ':'.$parts['port'];
-            }
-
-            if ('' !== $host) {
-                return $host;
-            }
-        }
-
-        return null;
-    }
-
-    private function normalizeHost(string $value): ?string
-    {
-        $normalized = strtolower(trim($value));
-        if ('' === $normalized) {
-            return null;
-        }
-
-        $normalized = (string) preg_replace('#^https?://#', '', $normalized);
-        $normalized = preg_replace('#^//#', '', $normalized);
-
-        if (null === $normalized) {
-            return null;
-        }
-
-        $parts = preg_split('~[/?#]~', $normalized);
-        $normalized = $parts[0] ?? '';
-
-        return '' !== $normalized ? $normalized : null;
-    }
-
-    /**
-     * @param array<mixed> $allowedDomains
-     */
-    private function isHostAllowed(string $host, array $allowedDomains): bool
-    {
-        $host = strtolower($host);
-        $hostWithoutPort = $host;
-        $hostPort = null;
-
-        if (str_contains($host, ':')) {
-            [$hostWithoutPort, $hostPort] = explode(':', $host, 2);
-        }
-
-        foreach ($allowedDomains as $domain) {
-            if (!is_string($domain) || '' === $domain) {
-                continue;
-            }
-
-            $domain = strtolower($domain);
-            $domainHost = $domain;
-            $domainPort = null;
-
-            if (str_contains($domain, ':')) {
-                [$domainHost, $domainPort] = explode(':', $domain, 2);
-            }
-
-            if (null !== $domainPort && $hostPort !== $domainPort) {
-                continue;
-            }
-
-            if ($domainHost === $host || $domainHost === $hostWithoutPort) {
-                return true;
-            }
-
-            if (str_starts_with($domainHost, '*.') && $hostWithoutPort !== $domainHost) {
-                $suffix = substr($domainHost, 2);
-                if ($suffix && str_ends_with($hostWithoutPort, $suffix)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 }

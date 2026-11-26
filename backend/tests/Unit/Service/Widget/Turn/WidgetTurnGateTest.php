@@ -207,7 +207,7 @@ final class WidgetTurnGateTest extends TestCase
             ++$this->flushes;
         });
 
-        return new WidgetTurnGate($widgets, new WidgetDomainGuard($this->createStub(Security::class), new NullLogger()), $resolver, $sessions, $em, $this->identity());
+        return new WidgetTurnGate($widgets, new WidgetDomainGuard($this->createStub(Security::class), new NullLogger(), new \App\Service\Widget\WidgetOriginValidator()), $resolver, $sessions, $em, $this->identity());
     }
 
     /**

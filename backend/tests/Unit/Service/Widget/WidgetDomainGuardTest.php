@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Service\Widget;
 
 use App\Entity\User;
 use App\Service\Widget\WidgetDomainGuard;
+use App\Service\Widget\WidgetOriginValidator;
 use App\Service\Widget\WidgetRequestRefused;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -47,7 +48,42 @@ final class WidgetDomainGuardTest extends TestCase
         yield 'wildcard' => ['*.example.com', Request::create('/', 'POST', [], [], [], ['HTTP_ORIGIN' => 'https://shop.example.com'])];
         yield 'port' => ['example.com:8080', Request::create('/', 'POST', [], [], [], ['HTTP_ORIGIN' => 'http://example.com:8080'])];
         yield 'any port' => ['example.com', Request::create('/', 'POST', [], [], [], ['HTTP_REFERER' => 'https://example.com:8443/page'])];
+        yield 'wildcard covers the domain itself' => ['*.example.com', Request::create('/', 'POST', [], [], [], ['HTTP_ORIGIN' => 'https://example.com'])];
+        yield 'origin and matching embed header' => ['shop.example.com', Request::create('/', 'POST', [], [], [], ['HTTP_ORIGIN' => 'https://shop.example.com', 'HTTP_X_WIDGET_HOST' => 'shop.example.com'])];
         yield 'embed host header' => ['shop.example.com', Request::create('/', 'POST', [], [], [], ['HTTP_X_WIDGET_HOST' => 'https://SHOP.example.com/path?q=1'])];
+    }
+
+    /**
+     * @return iterable<string, array{0: string, 1: array<string, string>}>
+     */
+    public static function refusedHosts(): iterable
+    {
+        yield 'a foreign page names an allowed host in the embed header' => ['shop.example.com', ['HTTP_ORIGIN' => 'https://evil.test', 'HTTP_X_WIDGET_HOST' => 'shop.example.com']];
+        yield 'a foreign page names an allowed host in the referer' => ['shop.example.com', ['HTTP_ORIGIN' => 'https://evil.test', 'HTTP_REFERER' => 'https://shop.example.com/']];
+        yield 'a name that only ends in the same letters' => ['*.example.com', ['HTTP_ORIGIN' => 'https://evilexample.com']];
+        yield 'the allowed name as a prefix' => ['*.example.com', ['HTTP_ORIGIN' => 'https://example.com.evil.test']];
+    }
+
+    /**
+     * @param array<string, string> $server
+     */
+    #[DataProvider('refusedHosts')]
+    public function testAHostThatOnlyClaimsToBeAllowedIsRefused(string $entry, array $server): void
+    {
+        self::assertSame(
+            [403, ['error' => 'Domain not allowed', 'reason' => 'domain_not_whitelisted']],
+            $this->refusal(['allowedDomains' => [$entry]], Request::create('/', 'POST', [], [], [], $server)),
+        );
+    }
+
+    public function testAnOpaqueOriginDoesNotFallBackToTheEmbedHeader(): void
+    {
+        $request = Request::create('/', 'POST', [], [], [], ['HTTP_ORIGIN' => 'null', 'HTTP_X_WIDGET_HOST' => 'shop.example.com']);
+
+        self::assertSame(
+            [403, ['error' => 'Domain not allowed', 'reason' => 'missing_host']],
+            $this->refusal(['allowedDomains' => ['shop.example.com']], $request),
+        );
     }
 
     #[DataProvider('allowedHosts')]
@@ -76,7 +112,7 @@ final class WidgetDomainGuardTest extends TestCase
         $security = $this->createStub(Security::class);
         $security->method('getUser')->willReturn($user);
 
-        return new WidgetDomainGuard($security, new NullLogger());
+        return new WidgetDomainGuard($security, new NullLogger(), new WidgetOriginValidator());
     }
 
     private function from(string $origin): Request

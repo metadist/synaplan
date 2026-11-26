@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Service\Widget\WidgetLegacyLoader;
+use App\Service\Widget\WidgetOriginValidator;
 use App\Service\Widget\WidgetService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +21,7 @@ class WidgetLegacyController extends AbstractController
         private WidgetService $widgetService,
         private LoggerInterface $logger,
         private WidgetLegacyLoader $legacyLoader,
+        private WidgetOriginValidator $origins,
     ) {
     }
 
@@ -96,7 +98,7 @@ class WidgetLegacyController extends AbstractController
         $allowedDomains = $config['allowedDomains'] ?? [];
 
         if (!empty($allowedDomains)) {
-            $host = $this->extractHostFromRequest($request);
+            $host = $this->origins->extractHostFromRequest($request);
 
             if (!$host) {
                 $this->logger->warning('Widget request blocked: missing host', [
@@ -146,62 +148,6 @@ class WidgetLegacyController extends AbstractController
                 'X-Widget-Id' => $actualWidgetId,
             ]
         );
-    }
-
-    /**
-     * Extract host from request (checks x-widget-host header, origin, and referer).
-     */
-    private function extractHostFromRequest(Request $request): ?string
-    {
-        // Check custom header first (set by widget.js)
-        $headerHost = $request->headers->get('x-widget-host');
-        if ($headerHost) {
-            $normalized = $this->normalizeHost($headerHost);
-            if ($normalized) {
-                return $normalized;
-            }
-        }
-
-        // Check Origin and Referer headers
-        foreach (['origin', 'referer'] as $header) {
-            $value = $request->headers->get($header);
-            if (!$value) {
-                continue;
-            }
-
-            $parts = parse_url($value);
-            if (false === $parts || !isset($parts['host'])) {
-                continue;
-            }
-
-            $host = strtolower($parts['host']);
-            if (isset($parts['port'])) {
-                $host .= ':'.$parts['port'];
-            }
-
-            if ('' !== $host) {
-                return $host;
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Normalize host (remove protocol, trailing slashes, etc.).
-     */
-    private function normalizeHost(?string $host): ?string
-    {
-        if (!$host) {
-            return null;
-        }
-
-        $host = trim($host);
-        $host = preg_replace('#^https?://#i', '', $host);
-        $host = rtrim($host, '/');
-        $host = strtolower($host);
-
-        return '' !== $host ? $host : null;
     }
 
     /**
