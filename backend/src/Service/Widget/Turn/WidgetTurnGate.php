@@ -7,6 +7,7 @@ namespace App\Service\Widget\Turn;
 use App\Entity\User;
 use App\Entity\Widget;
 use App\Entity\WidgetSession;
+use App\Service\Widget\InvalidWidgetSessionId;
 use App\Service\Widget\WidgetDomainGuard;
 use App\Service\Widget\WidgetRequestRefused;
 use App\Service\Widget\WidgetService;
@@ -63,7 +64,11 @@ final readonly class WidgetTurnGate
         $config = $widget->getConfig();
         $this->domains->check($config, $request, $widget->getOwnerId());
 
-        $session = $this->sessionResolver->resolve($request, $widget, (string) $data['sessionId']);
+        try {
+            $session = $this->sessionResolver->resolve($request, $widget, (string) $data['sessionId']);
+        } catch (InvalidWidgetSessionId $invalid) {
+            throw WidgetRequestRefused::json(['error' => $invalid->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
         $this->recordCountry($session, $request);
         $heldForOperator = in_array($session->getMode(), [WidgetSession::MODE_HUMAN, WidgetSession::MODE_WAITING], true);
 

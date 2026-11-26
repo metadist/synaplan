@@ -744,7 +744,7 @@ class WidgetSessionController extends AbstractController
             return $this->json(['error' => 'Access denied'], Response::HTTP_FORBIDDEN);
         }
 
-        if ('' === trim($sessionId)) {
+        if (!\App\Service\Widget\WidgetSessionId::isValid($sessionId)) {
             return $this->json(['error' => 'sessionId required'], Response::HTTP_BAD_REQUEST);
         }
 

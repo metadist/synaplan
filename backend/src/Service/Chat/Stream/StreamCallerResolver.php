@@ -10,6 +10,7 @@ use App\Entity\WidgetSession;
 use App\Service\Auth\ProviderDiagnosticsAccess;
 use App\Service\Chat\GuestChatConfig;
 use App\Service\Chat\GuestSessionService;
+use App\Service\Widget\InvalidWidgetSessionId;
 use App\Service\Widget\WidgetService;
 use App\Service\Widget\WidgetSessionService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -96,7 +97,11 @@ final readonly class StreamCallerResolver
         // Only the widget owner may mark a session as a test, so nobody can
         // keep their visits out of the statistics.
         $isValidatedTestMode = $this->isValidatedTestMode($request, $widget->getOwnerId());
-        $widgetSession = $this->widgetSessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
+        try {
+            $widgetSession = $this->widgetSessionService->getOrCreateSession($widgetId, $sessionId, $isValidatedTestMode);
+        } catch (InvalidWidgetSessionId $invalid) {
+            throw StreamRequestRejected::json(['error' => $invalid->getMessage()], Response::HTTP_BAD_REQUEST);
+        }
 
         $limitCheck = $this->widgetSessionService->checkSessionLimit($widgetSession);
         if (!$limitCheck['allowed']) {
@@ -116,7 +121,7 @@ final readonly class StreamCallerResolver
         $taskPrompt = $widget->getTaskPromptTopic();
         $this->logger->info('Widget request authenticated', [
             'widget_id' => $widgetId,
-            'session_id' => $sessionId,
+            'session_id' => $widgetSession->getSessionId(),
             'owner_id' => $user->getId(),
             'task_prompt' => $taskPrompt,
         ]);

@@ -156,7 +156,7 @@ final readonly class WidgetExportService
 
             foreach ($messages as $message) {
                 $row = [
-                    $session->getSessionId(),
+                    $this->sanitizeCellValue($session->getSessionId()),
                     $this->formatTimestamp($session->getCreated(), $tz),
                     $this->formatTimestamp($session->getLastMessage(), $tz),
                     $messageCount,
@@ -512,7 +512,7 @@ final readonly class WidgetExportService
             // a follow-up; not in scope for the BMESSAGECOUNT data-quality fix.
             $fileCount = $this->countFilesInMessages($this->getSessionMessages($session));
 
-            $sheet->setCellValue('A'.$row, substr($session->getSessionId(), 0, 12).'...');
+            $sheet->setCellValue('A'.$row, $this->sanitizeCellValue(substr($session->getSessionId(), 0, 12).'...'));
             $sheet->setCellValue('B'.$row, $this->formatTimestamp($session->getCreated(), $tz, 'Y-m-d H:i'));
             $sheet->setCellValue('C'.$row, $this->formatTimestamp($session->getLastMessage(), $tz, 'Y-m-d H:i'));
             $sheet->setCellValue('D'.$row, $messageCount);

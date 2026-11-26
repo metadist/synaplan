@@ -53,6 +53,8 @@ final class WidgetSessionService
      * @param string $widgetId            The widget ID
      * @param string $sessionId           The session ID (will be prefixed with 'test_' if isValidatedTestMode is true)
      * @param bool   $isValidatedTestMode Whether test mode was validated server-side (owner authenticated)
+     *
+     * @throws InvalidWidgetSessionId when a new session would get an id the widget never sends
      */
     public function getOrCreateSession(string $widgetId, string $sessionId, bool $isValidatedTestMode = false): WidgetSession
     {
@@ -66,6 +68,12 @@ final class WidgetSessionService
         $session = $this->sessionRepository->findByWidgetAndSession($widgetId, $effectiveSessionId);
 
         if (!$session) {
+            // Sessions stored by earlier releases stay reachable; only a new
+            // row has to carry an id of the known shape.
+            if (!WidgetSessionId::isValid($effectiveSessionId)) {
+                throw new InvalidWidgetSessionId();
+            }
+
             $session = new WidgetSession();
             $session->setWidgetId($widgetId);
             $session->setSessionId($effectiveSessionId);
