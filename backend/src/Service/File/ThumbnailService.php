@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\File;
 
+use App\Service\Media\FfmpegLocalInput;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -208,7 +209,7 @@ final readonly class ThumbnailService
         // -q:v: quality (1-31, lower is better)
         // -y: overwrite output without asking
         $command = sprintf(
-            'ffmpeg -ss %s -i %s -vframes 1 -q:v %d -y %s 2>&1',
+            'ffmpeg -ss %s '.FfmpegLocalInput::SHELL_OPTIONS.' -i %s -vframes 1 -q:v %d -y %s 2>&1',
             escapeshellarg($timestamp),
             escapeshellarg($inputPath),
             $quality,

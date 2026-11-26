@@ -24,6 +24,7 @@ use App\AI\Interface\SpeechToTextProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputCapability;
 use App\AI\StructuredOutput\StructuredOutputDialect;
 use App\AI\StructuredOutput\StructuredOutputTranslator;
+use App\Service\Media\FfmpegLocalInput;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
@@ -570,6 +571,7 @@ class MetaProvider extends AbstractChatCompletionsCloudProvider implements Image
             'ffmpeg',
             '-y',
             '-loglevel', 'error',
+            ...FfmpegLocalInput::OPTIONS,
             '-i', $source,
             // 16 kHz is accepted and keeps a 10-minute file under the 32 MB body cap.
             '-ar', '16000',

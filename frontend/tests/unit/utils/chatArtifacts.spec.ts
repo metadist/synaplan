@@ -34,4 +34,25 @@ describe('extractArtifacts', () => {
       'allow-same-origin'
     )
   })
+
+  it('puts the preview policy ahead of whatever the html artifact wrote', () => {
+    const tricky = [
+      '<!-- <head> --><script>fetch("https://evil.test")</script>',
+      '<header>Title</header><p>Body</p>',
+      '<!doctype html><html><head><title>t</title></head><body>hi</body></html>',
+      '<p>plain</p>',
+    ]
+
+    for (const code of tricky) {
+      const doc = artifactSrcDoc({ language: 'html', code, index: 0 })
+      const parsed = new DOMParser().parseFromString(doc, 'text/html')
+      const policy = parsed.head.querySelector('meta[http-equiv="Content-Security-Policy"]')
+
+      expect(
+        doc.startsWith('<!DOCTYPE html><html><head><meta http-equiv="Content-Security-Policy"')
+      ).toBe(true)
+      expect(policy).not.toBeNull()
+      expect(parsed.head.firstElementChild).toBe(policy)
+    }
+  })
 })

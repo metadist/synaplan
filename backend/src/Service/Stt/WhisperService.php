@@ -2,6 +2,7 @@
 
 namespace App\Service\Stt;
 
+use App\Service\Media\FfmpegLocalInput;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Process\Exception\ProcessFailedException;
@@ -363,6 +364,7 @@ readonly class WhisperService
 
         $command = [
             $this->ffmpegBinary,
+            ...FfmpegLocalInput::OPTIONS,
             '-i', $audioPath,
             '-ar', (string) self::OPTIMAL_SAMPLE_RATE,  // 16kHz sample rate
             '-ac', (string) self::OPTIMAL_CHANNELS,      // mono
