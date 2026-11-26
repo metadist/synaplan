@@ -15,8 +15,8 @@ Abschnitt 5).
 
 ## 2. Was erledigt ist
 
-30 Advisories im Repo: 25 veröffentlicht, 4 Drafts (SYN-14, SYN-23, SYN-25,
-SYN-30), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 25 gehören 21 zu diesem Audit
+31 Advisories im Repo: 25 veröffentlicht, 5 Drafts (SYN-14, SYN-23, SYN-25,
+SYN-30, SYN-31), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 25 gehören 21 zu diesem Audit
 (Tabelle unten, alle ohne CVE); vier sind ältere, davon unabhängige
 Advisories (GHSA-26f3-684h-hpjh, GHSA-2x6x-8r52-pm58, GHSA-phrw-3wm4-3xcx,
 GHSA-qqg9-qv48-j8m8).
@@ -90,16 +90,17 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
   PR im privaten Fork, wartet auf den Owner. Details in 3c.
 - SYN-07: der Fix (`e2d5123ae`, PR #3226) liegt laut `git tag --contains` seit
   `v5.9.0` in einem Release. Das Feld im Advisory ist noch nicht gefüllt.
-- Die CI auf `main` ist seit dem 26.11. rot: `composer audit` meldet 19
-  Advisories in 10 `symfony/*`-Paketen (Sicherheits-Release von Symfony am
-  selben Tag). Kein Code-Fehler, blockiert aber "All Checks Passed" für jeden
-  PR und damit das nächste Release. Siehe 3a Punkt 2.
+- Die CI auf `main` war am 26.11. rot (`composer audit` nach dem
+  Sicherheits-Release von Symfony). PR #3276 (Symfony 8.1.12) ist gemergt.
+- SYN-31 mit dem Owner geklärt: alte Links laufen weiter, ohne Enddatum.
+  Gebaut: Draft GHSA-r233-vw39-4hm9, PR im privaten Fork, wartet auf den
+  Owner. Details in 3c.
 
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
 
-0. **Drei PRs in privaten Forks mergen** (je über die Advisory-Seite, Ablauf
+0. **Vier PRs in privaten Forks mergen** (je über die Advisory-Seite, Ablauf
    Abschnitt 5):
    - SYN-23: https://github.com/metadist/synaplan-ghsa-rmmx-x383-4p77/pull/1.
      Vor dem Deploy `IAP_APPLE_ENVIRONMENT` prüfen: nur `Sandbox` oder
@@ -114,6 +115,10 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
      Keine Änderung in Produktion nötig, keine Daten betroffen. Die
      PR-Beschreibung enthält eine Lese-Abfrage für Altzeilen (fährt nur der
      Owner).
+   - SYN-31: https://github.com/metadist/synaplan-ghsa-r233-vw39-4hm9/pull/1.
+     Die Migration muss mit dem Deploy laufen (eine Zeile in `BCONFIG`, kein
+     Schema). Ohne sie antworten alte Links für nicht angemeldete Besucher
+     mit 404. Keine Daten betroffen.
 
 1. **SYN-14 fertig machen:** nächstes Release schneiden (enthält `fa202d4cf`),
    deployen, einmal `php bin/console app:widget:purge-visitor-upload-vectors`
@@ -121,11 +126,7 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
    GHSA-6m8j-g99j-hg44 betroffenen Bereich und gepatchte Version eintragen und
    veröffentlichen. Der Bereich steht noch auf `<= 5.10.1`, richtig ist
    `<= 5.10.3`.
-2. **CI auf `main` wieder grün bekommen:** `composer audit` schlägt seit dem
-   26.11. an (19 Advisories, 10 `symfony/*`-Pakete). Nötig ist ein eigener
-   öffentlicher PR, der die betroffenen Symfony-Pakete auf den Patch-Stand
-   hebt (`composer update "symfony/*"` im Container; Stolperstein zum
-   Lockfile unten beachten). Vorher gibt es kein grünes Release.
+2. Erledigt: CI auf `main` ist seit PR #3276 (Symfony 8.1.12) wieder grün.
 3. **SYN-19 auf einem Gerät gehen:** in der iOS-/Android-App einmal M365,
    Dropbox oder einen MCP-Server verbinden. Bisher nur Unit-Tests mit
    gemockten Capacitor-Plugins und curl gegen localhost. App-Frontend (OTA)
@@ -159,10 +160,9 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 
 ### 3c. Offene Findings ohne Vorentscheidung (KI, je auf Wort des Owners)
 
-Reihenfolge laut Report-Tabelle. SYN-23, 25 und 30 sind gebaut und warten auf den Merge (Stand unten);
+Reihenfolge laut Report-Tabelle. SYN-23, 25, 30 und 31 sind gebaut und warten auf den Merge (Stand unten);
 SYN-24 ist gemergt.
-**Als Nächstes: SYN-31, aber erst nach Klärung mit dem Owner** (kann bestehende öffentliche Links brechen).
-SYN-26/27 erst nach einem Ja des Owners (Docker, `install.sh`).
+**Als Nächstes: SYN-26/27, aber erst nach einem Ja des Owners** (Docker, `install.sh`).
 
 **SYN-30 (Stand 26.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
 Draft-Advisory GHSA-grvv-mwcf-vhpm, PR https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1,
@@ -170,6 +170,16 @@ Branch `fix/media-marker-file-path` (Commit `ec56d9ccf`). `make ci-local` grün 
 Playwright `@ci` 226 passed / 2 skipped. Nicht gegen ein echtes Modell geprüft.
 Offen, Owner-Entscheidung: die Datei-Routen nehmen weiter die erste Message mit passendem Pfad als Besitzer.
 Eine Prüfung dort würde auch Altzeilen abdecken, kann aber ändern, wer bestehende Links öffnen darf.
+
+**SYN-31 (Stand 26.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
+Draft-Advisory GHSA-r233-vw39-4hm9, PR https://github.com/metadist/synaplan-ghsa-r233-vw39-4hm9/pull/1,
+Branch `fix/generated-media-names`. Backend-Gate grün (PHPUnit 13174); Vitest fiel im Gesamtlauf in
+`ChatWidgetSession.spec.ts` (nicht berührt) und war im Einzellauf grün (3818). Playwright `@ci` 225 passed /
+2 skipped / 1 failed (`widget.spec.ts:159`, leere Antwort; die Datei allein danach 10 passed, nicht weiter untersucht).
+Kein Browser-Walk, kein WhatsApp-Versand gegen Meta.
+Vorgabe des Owners: alte Links laufen weiter, ohne Enddatum. Dateien von vor dem Upgrade bleiben deshalb so
+ratbar wie bisher. Schließen lässt sich das später über `MEDIA / LEGACY_PUBLIC_NAMES_UNTIL` = `0`
+(alle alten Links enden für nicht angemeldete Besucher) oder durch Umbenennen der Altdateien.
 
 **SYN-25 (Stand 25.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
 Draft-Advisory GHSA-5vp7-6cp5-3v5g, PR https://github.com/metadist/synaplan-ghsa-5vp7-6cp5-3v5g/pull/1,
@@ -285,6 +295,14 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   eingebauten Demo-Providers (`test`). Der Report nannte den Befund
   "Suspected" und verlangte ein echtes Modell zum Nachweis; das ist nicht
   nötig, weil der Aufrufer den Prompt selbst schreibt.
+- **SYN-31** (noch nicht gemergt): `PublicMediaName` baut alle anonym
+  ausgelieferten Namen mit 128 Zufallsbits. `AnonymousMediaGate` entscheidet
+  allein, was die Datei-Route ohne Anmeldung ausliefert: einen Zufallsnamen
+  immer, einen Namen alter Form nur, wenn die Zeit im Namen vor dem Upgrade
+  der Instanz liegt (`BCONFIG`-Zeile aus einer Migration, Upgrade plus ein
+  Tag für Rolling Deploys). Ohne lesbare Zeile wird kein alter Name
+  ausgeliefert. Der Report schlug signierte URLs oder ein eigenes Verzeichnis
+  vor; beides hätte die alten Links gebrochen.
 - **SYN-44:** Neue Adresse wartet in den User-Details (`pending_email`), ein
   gehashter `VerificationToken` Typ `email_change` (1 h, einmalig) geht an die
   neue Adresse; erst der Link stellt um. Kern: `Service/Auth/EmailChange.php`.
@@ -442,22 +460,17 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-1. Owner oder KI: Symfony-Pakete per öffentlichem PR auf den Patch-Stand
-   heben, damit die CI auf `main` wieder grün ist (3a Punkt 2).
-2. Owner: die drei PRs aus 3a Punkt 0 mergen, dann Release (enthält auch
+1. Owner: die vier PRs aus 3a Punkt 0 mergen, dann Release (enthält auch
    SYN-14 und die Rest-Härtung zu SYN-24) und der Gerätetest für SYN-19.
-3. KI, auf Wort des Owners: nach dem Release GHSA-6m8j (SYN-14),
-   GHSA-rmmx (SYN-23), GHSA-5vp7 (SYN-25) und GHSA-grvv (SYN-30) mit
-   betroffenem Bereich und gepatchter Version füllen und veröffentlichen.
-   Vorher je `git tag --contains <merge-commit>`. Bei der Gelegenheit in
-   GHSA-6h69 (SYN-07) die gepatchte Version `5.9.0` eintragen.
-4. SYN-31 (generierte Medien anonym unter ratbaren Namen): vor dem Bauen mit
-   dem Owner klären, ob bestehende öffentliche Links (WhatsApp, Widget)
-   brechen dürfen oder eine Übergangszeit brauchen. Zuerst das Finding im
-   Report lesen und auf aktuellem `main` nachprüfen, ob es noch offen ist.
-5. SYN-26/27: erst fragen (Docker, `install.sh`). Danach die Lows SYN-32 bis
+2. KI, auf Wort des Owners: nach dem Release GHSA-6m8j (SYN-14),
+   GHSA-rmmx (SYN-23), GHSA-5vp7 (SYN-25), GHSA-grvv (SYN-30) und GHSA-r233
+   (SYN-31) mit betroffenem Bereich und gepatchter Version füllen und
+   veröffentlichen. Vorher je `git tag --contains <merge-commit>`. Bei der
+   Gelegenheit in GHSA-6h69 (SYN-07) die gepatchte Version `5.9.0` eintragen.
+3. SYN-26/27: erst fragen (Docker, `install.sh`). Danach die Lows SYN-32 bis
    43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
-6. Offene Entscheidungen: zu SYN-23 Statusabfrage über die App Store Server
+4. Offene Entscheidungen: zu SYN-23 Statusabfrage über die App Store Server
    API (neue Credentials), `appAccountToken`-Bindung (Änderung in
    `synaplan-apps`), automatisches Auslaufen des IAP-Tiers; zu SYN-30 die
-   Besitzerprüfung in den Datei-Routen.
+   Besitzerprüfung in den Datei-Routen; zu SYN-31, ob und wann die alten
+   Namen enden.
