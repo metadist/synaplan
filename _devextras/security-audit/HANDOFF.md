@@ -49,8 +49,8 @@ GHSA-qqg9-qv48-j8m8).
 | SYN-25 Admin-Modell-Import, SQL-Prüfung | GHSA-5vp7-6cp5-3v5g | 5.10.4 | published 26.11. |
 | SYN-30 Medien-Marker setzt Dateipfad | GHSA-grvv-mwcf-vhpm | 5.10.4 | published 26.11. |
 | SYN-31 Generierte Medien unter ratbaren Namen | GHSA-r233-vw39-4hm9 | 5.10.4 | published 26.11. |
-| SYN-26 Compute-Sidecar schreibt über Symlink in `/out` | GHSA-q83r-q9c6-7w9h | offen | Draft, PR im Advisory-Fork |
-| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | offen | Draft, PR im Advisory-Fork |
+| SYN-26 Compute-Sidecar schreibt über Symlink in `/out` | GHSA-q83r-q9c6-7w9h | nächstes Release | Draft, gemergt 26.11. (`bda0aa748`) |
+| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | nächstes Release | Draft, gemergt 26.11. (`b4447d74f`) |
 
 Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 #3260, normaler öffentlicher PR ohne Advisory). Offen davon siehe 3b.
@@ -168,8 +168,8 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 ### 3c. Offene Findings ohne Vorentscheidung (KI, je auf Wort des Owners)
 
 Reihenfolge laut Report-Tabelle. SYN-23, 24, 25, 30 und 31 sind in 5.10.4 erschienen (Stand unten).
-**SYN-26/27 (Stand 26.11.):** mit Ja des Owners gebaut, je ein PR im privaten
-Advisory-Fork, nicht gemergt.
+**SYN-26/27 (Stand 26.11.):** mit Ja des Owners gebaut und auf sein Wort
+gemergt (SYN-27 `b4447d74f`, SYN-26 `bda0aa748`), in keinem Release.
 
 - **SYN-27** (`metadist/synaplan-ghsa-fxch-839f-35j4`, PR 1): jeder
   veröffentlichte Port in `docker-compose.yml`, `docker-compose-minimal.yml`
@@ -486,8 +486,9 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
    `IAP_APPLE_ENVIRONMENT` nach dem Deploy von 5.10.4 nachgesehen, SYN-19
    auf einem Gerät gegangen.
 2. Erledigt am 26.11.: alle Advisories dieses Audits sind veröffentlicht.
-3. SYN-26/27: Owner prüft und mergt die zwei Fork-PRs (im Browser auf der
-   Advisory-Seite), dann Release und Veröffentlichung. Danach die Lows
+3. SYN-26/27: sind in `main`. Die CI auf `main` ansehen (SYN-27 ändert die
+   Port-Bindung des Test-Stacks, der Fork hatte keine Actions). Dann
+   Release, Range `<= 5.10.4` / Patched setzen und veröffentlichen. Danach die Lows
    SYN-32 bis 43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
 4. Offene Entscheidungen: zu SYN-23 Statusabfrage über die App Store Server
    API (neue Credentials), `appAccountToken`-Bindung (Änderung in
