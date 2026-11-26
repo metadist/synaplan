@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Plugin\SynaScriber;
 
+use Plugin\SynaScriber\Controller\OpenTalkSessionController;
 use Plugin\SynaScriber\Controller\TranscriberController;
 use Plugin\SynaScriber\Service\SessionException;
 use Plugin\SynaScriber\Service\SessionService;
@@ -143,5 +144,20 @@ final class TranscriberControllerTest extends PluginTestCase
         $request = self::signed(Request::create('/events', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{type: connected'));
 
         self::assertSame(422, $controller->events(self::REF, $request)->getStatusCode());
+    }
+
+    public function testCreateOpenTalkSession(): void
+    {
+        $sessions = $this->createMock(SessionService::class);
+        $sessions->expects(self::once())->method('beginOpenTalk')->with('room-1', 'de')
+            ->willReturn(['ref' => self::REF, 'language' => 'de']);
+        $controller = new OpenTalkSessionController($sessions, $this->settings());
+        $controller->setContainer(new Container());
+        $request = self::signed(Request::create('/sessions', 'POST', [], [], [], ['CONTENT_TYPE' => 'application/json'], '{"room":"room-1","language":"de"}'));
+
+        $response = $controller->create($request);
+
+        self::assertSame(201, $response->getStatusCode());
+        self::assertSame(self::REF, json_decode((string) $response->getContent(), true)['ref']);
     }
 }

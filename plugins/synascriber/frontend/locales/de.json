@@ -38,7 +38,8 @@
     "captions": "Live-Untertitel in der Besprechung, solange die Mitschrift läuft",
     "from": "gestartet von {name}",
     "all_generated": "In Quellen › Erzeugt anzeigen",
-    "share": "Alle angemeldeten Teilnehmenden erhalten eine Kopie in Quellen › Erzeugt (aus: nur die Person, die gestartet hat)"
+    "share": "Alle angemeldeten Teilnehmenden erhalten eine Kopie in Quellen › Erzeugt (aus: nur die Person, die gestartet hat)",
+    "opentalk": "OpenTalk-Besprechungen: Synaplan schreibt die Untertitel"
   },
   "jitsi": {
     "button": "Mitschrift",

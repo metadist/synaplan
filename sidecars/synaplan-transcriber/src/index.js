@@ -1,5 +1,7 @@
 import { loadConfig } from './config.js'
 import { createElementBot } from './elementBot.js'
+import { createOpenTalkBridge } from './opentalk.js'
+import { connectLiveKit } from './opentalkMedia.js'
 import { createPluginClient } from './pluginSession.js'
 import { createApp } from './server.js'
 import { createSynaplanClient } from './synaplan.js'
@@ -11,7 +13,18 @@ const log = (line) => {
   process.stdout.write(`${new Date().toISOString()} ${line}\n`)
 }
 
-const server = createApp(config, { synaplan, plugin, log })
+const opentalk = config.opentalk
+  ? createOpenTalkBridge({
+    controllerUrl: config.opentalkControllerUrl,
+    serviceKey: config.opentalkServiceKey,
+    initKey: config.opentalkInitKey,
+    livekitUrl: config.opentalkLivekitUrl,
+    plugin,
+    connectLiveKit,
+    log,
+  })
+  : null
+const server = createApp(config, { synaplan, plugin, opentalk, log })
 server.listen(config.port, config.host, () => {
   log(`Meeting notes listening on ${config.host}:${config.port} (${config.mode})`)
 })
@@ -35,6 +48,9 @@ if (config.element) {
   log('Element mode is selected, but SYNAPLAN_API_KEY is not set. Voice messages stay off.')
 }
 
+if (config.opentalk) {
+  log(`OpenTalk subtitles on, controller ${config.opentalkControllerUrl}.`)
+}
 if (!config.jitsi) {
   log('Jitsi captions are off in this mode.')
 } else {

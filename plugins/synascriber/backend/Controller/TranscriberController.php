@@ -136,7 +136,8 @@ final class TranscriberController extends AbstractController
     #[OA\Post(summary: 'Transcriber lifecycle event')]
     #[OA\Parameter(name: 'X-Transcriber-Secret', in: 'header', required: true, schema: new OA\Schema(type: 'string'))]
     #[OA\RequestBody(required: true, content: new OA\JsonContent(required: ['type'], properties: [
-        new OA\Property(property: 'type', type: 'string', enum: ['connected', 'speaker-start', 'speaker-stop', 'stt-failure', 'session-end', 'finished']),
+        new OA\Property(property: 'type', type: 'string', enum: ['connected', 'speaker-start', 'speaker-stop', 'stt-failure', 'session-end', 'finished', 'language']),
+        new OA\Property(property: 'language', type: 'string', example: 'en'),
         new OA\Property(property: 'endpointId', type: 'string'),
         new OA\Property(property: 'at', type: 'integer', description: 'ms since epoch'),
         new OA\Property(property: 'detail', type: 'string'),

@@ -61,8 +61,9 @@ final readonly class WhisperClient
             throw new SessionException('not_configured', 'No speech-to-text server is set.', 503);
         }
 
+        $wav = str_starts_with($audio, 'RIFF');
         $fields = [
-            'file' => new DataPart($audio, 'window.ogg', 'audio/ogg'),
+            'file' => new DataPart($audio, $wav ? 'window.wav' : 'window.ogg', $wav ? 'audio/wav' : 'audio/ogg'),
             'model' => $this->settings->sttModel(),
             'response_format' => 'verbose_json',
             'temperature' => '0',

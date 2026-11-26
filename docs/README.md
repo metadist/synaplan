@@ -136,6 +136,7 @@ Learn how to connect external cloud storage, mailboxes, calendars, automation we
 | **4.9** | **[Live Voice (Full-Duplex Speech)](LIVE_VOICE.md)** | Running the speech-to-speech voice sidecar over WebSocket relay or OpenAI WebRTC, with factual chat delegation and media artifact cards. |
 | **4.10** | **[Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md)** | Pointing the live voice sidecar at your own OpenAI-Realtime-compatible server (vLLM-Omni / Qwen3-Omni, Azure Realtime, Qwen Cloud). |
 | **4.11** | **[openDesk Meeting Notes (Jitsi & Matrix)](OPENDESK_MEETING_NOTES.md)** | Live Jitsi meeting captions and Element voice-message transcription using the `synaplan-transcriber` sidecar. |
+| **4.12** | **[OpenTalk subtitles](OPENTALK_MEETING_NOTES.md)** | Turn on live subtitles in an OpenTalk meeting. Nothing is saved. |
 
 ---
 

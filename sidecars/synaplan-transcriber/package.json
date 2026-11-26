@@ -12,6 +12,7 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@livekit/rtc-node": "^1.2.3",
     "ws": "^8.18.3"
   }
 }

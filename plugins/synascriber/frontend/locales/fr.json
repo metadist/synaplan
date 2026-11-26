@@ -38,7 +38,8 @@
     "captions": "Sous-titres en direct dans la réunion pendant la prise de notes",
     "from": "lancées par {name}",
     "all_generated": "Afficher dans Sources › Générés",
-    "share": "Chaque participant connecté reçoit une copie dans Sources › Générés (désactivé : seule la personne qui a lancé les notes)"
+    "share": "Chaque participant connecté reçoit une copie dans Sources › Générés (désactivé : seule la personne qui a lancé les notes)",
+    "opentalk": "Réunions OpenTalk : Synaplan écrit les sous-titres"
   },
   "jitsi": {
     "button": "Notes de réunion",

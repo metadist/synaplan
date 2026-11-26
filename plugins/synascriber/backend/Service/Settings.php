@@ -32,6 +32,7 @@ final readonly class Settings
         'timezone' => 'Europe/Berlin',
         'share_with_participants' => '1',
         'captions' => '1',
+        'opentalk_enabled' => '0',
     ];
 
     private const SECRET_KEYS = ['prosody_secret', 'transcriber_secret', 'stt_api_key'];
@@ -90,6 +91,15 @@ final readonly class Settings
     public function captionsOn(): bool
     {
         return '1' === $this->get('captions');
+    }
+
+    /**
+     * OpenTalk meetings may ask this installation for subtitles. Off until
+     * an administrator turns it on; the transcriber holds OpenTalk's keys.
+     */
+    public function openTalkEnabled(): bool
+    {
+        return '1' === $this->get('opentalk_enabled');
     }
 
     public function defaultLanguage(): string
@@ -200,6 +210,7 @@ final readonly class Settings
         $view['enabled'] = $this->isEnabled();
         $view['share_with_participants'] = $this->shareWithParticipants();
         $view['captions'] = $this->captionsOn();
+        $view['opentalk_enabled'] = $this->openTalkEnabled();
         $view['languages'] = $this->languages();
 
         return $view;
@@ -216,7 +227,7 @@ final readonly class Settings
     private function normalize(string $key, mixed $value): string
     {
         return match ($key) {
-            'enabled', 'share_with_participants', 'captions' => $value ? '1' : '0',
+            'enabled', 'share_with_participants', 'captions', 'opentalk_enabled' => $value ? '1' : '0',
             'default_language' => $this->language((string) $value),
             'languages' => implode(',', array_map(fn ($l) => $this->language((string) $l), is_array($value) ? $value : explode(',', (string) $value))),
             'default_folder' => $this->sanitizeFolder((string) $value),

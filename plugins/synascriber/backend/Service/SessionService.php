@@ -98,6 +98,67 @@ final readonly class SessionService
     }
 
     /**
+     * OpenTalk asked for subtitles. The transcriber joins the meeting; this
+     * session only turns the audio windows into text. Nothing is stored,
+     * because OpenTalk's own notice does not say that a transcript is kept.
+     *
+     * A second request for a meeting that already has subtitles returns that
+     * session, so a retry does not start a second one.
+     *
+     * @return array<string, mixed>
+     */
+    public function beginOpenTalk(string $room, string $language): array
+    {
+        if (!$this->settings->openTalkEnabled()) {
+            throw new SessionException('not_enabled', 'Meeting notes for OpenTalk are turned off by the administrator.', 403);
+        }
+        if ('' === $this->settings->sttUrl() || '' === $this->settings->transcriberSecret()) {
+            throw new SessionException('not_configured', 'Meeting notes are not fully set up yet. An administrator finishes the setup on the plugin page.', 503);
+        }
+        $room = $this->room($room);
+        if ('' === $language) {
+            $language = $this->settings->defaultLanguage();
+        }
+        if (!in_array($language, $this->settings->languages(), true)) {
+            throw new SessionException('language_not_offered', sprintf('Language "%s" is not offered here.', $language), 422);
+        }
+
+        $current = $this->forRoom($room);
+        if (null !== $current && in_array($current['state'], self::ACTIVE, true)) {
+            if ('opentalk' === ($current['source'] ?? '')) {
+                return $current;
+            }
+
+            throw new SessionException('already_running', 'Meeting notes are already on in this meeting.', 409, ['session' => $current]);
+        }
+
+        $now = time();
+        $session = [
+            'ref' => rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '='),
+            'source' => 'opentalk',
+            'keep' => false,
+            'room' => $room,
+            'starterId' => 0,
+            'starterName' => '',
+            'language' => $language,
+            'folder' => $this->settings->defaultFolder(),
+            'state' => 'running',
+            'startedAt' => $now,
+            'connectedAt' => $now,
+            'originMs' => $now * 1000,
+            'checkedAt' => $now,
+            'roster' => [],
+            'attendees' => [],
+            'files' => [],
+        ];
+        $this->store->save($session);
+        $this->store->markRoom($room, $session['ref']);
+        $this->logger->info('synascriber: OpenTalk subtitles started', ['ref' => $session['ref'], 'room' => $room]);
+
+        return $session;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function stop(string $ref, User $user): array
@@ -201,15 +262,17 @@ final readonly class SessionService
         }
 
         $result = $this->whisper->recognize($window['audio'], (string) $session['language']);
-        $session['lastAudioAt'] = time();
-        if ('' !== $result['text']) {
+        // Recognition waited. A language change in that time must survive this save.
+        $fresh = $this->store->find($ref) ?? $session;
+        $fresh['lastAudioAt'] = time();
+        if ('' !== $result['text'] && false !== ($fresh['keep'] ?? true)) {
             $this->store->addSegment($ref, $segment + ['text' => $result['text']]);
-            $session['segmentCount'] = (int) ($session['segmentCount'] ?? 0) + 1;
-            $session = $this->learnSpeaker($session, $window['endpointId']);
+            $fresh['segmentCount'] = (int) ($fresh['segmentCount'] ?? 0) + 1;
+            $fresh = $this->learnSpeaker($fresh, $window['endpointId']);
         }
-        $this->store->save($session);
+        $this->store->save($fresh);
 
-        return $answer + ['text' => $result['text'], 'dropped' => $result['dropped'], 'speaker' => $this->speakerName($session, $window['endpointId'])];
+        return $answer + ['text' => $result['text'], 'dropped' => $result['dropped'], 'speaker' => $this->speakerName($fresh, $window['endpointId'])];
     }
 
     /**
@@ -268,6 +331,19 @@ final readonly class SessionService
         }
         if ('finished' === $type) {
             $this->finish($ref, (string) ($session['endReason'] ?? 'bridge_closed'));
+
+            return;
+        }
+        if ('language' === $type) {
+            $language = (string) ($event['language'] ?? '');
+            if (!in_array($language, $this->settings->languages(), true)) {
+                throw new SessionException('language_not_offered', sprintf('Language "%s" is not offered here.', $language), 422);
+            }
+            if (!in_array($session['state'], self::ACTIVE, true)) {
+                throw new SessionException('not_accepting', 'These meeting notes do not accept audio any more.', 409);
+            }
+            $session['language'] = $language;
+            $this->store->save($session);
 
             return;
         }
@@ -351,6 +427,13 @@ final readonly class SessionService
         $this->store->save($session);
 
         $segments = $this->store->segments($ref);
+        if (false === ($session['keep'] ?? true)) {
+            $this->store->deleteSegments($ref);
+            $session['segmentCount'] = count($segments);
+            $session['state'] = 'nothing_to_save';
+
+            return $this->close($session);
+        }
         if ([] === $segments) {
             $session['state'] = 'nothing_to_save';
 
@@ -495,6 +578,9 @@ final readonly class SessionService
             return $this->fail($session, 'start_timeout');
         }
         if ('running' !== $state || $now - (int) ($session['checkedAt'] ?? 0) < self::JITSI_CHECK_SECONDS) {
+            return $session;
+        }
+        if ('jitsi' !== ($session['source'] ?? 'jitsi')) {
             return $session;
         }
 

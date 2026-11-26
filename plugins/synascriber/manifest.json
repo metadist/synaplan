@@ -16,6 +16,7 @@
     {"path": "/api/v1/plugins/synascriber/jitsi/sessions", "method": "POST", "description": "Start meeting notes in a room"},
     {"path": "/api/v1/plugins/synascriber/jitsi/sessions/{ref}/stop", "method": "POST", "description": "Stop meeting notes"},
     {"path": "/api/v1/plugins/synascriber/me/sessions", "method": "GET", "description": "Meeting notes started by the signed-in person"},
+    {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions", "method": "POST", "description": "Transcriber: open a subtitle session for one OpenTalk meeting (X-Transcriber-Secret)"},
     {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}", "method": "GET", "description": "Transcriber: bind to an active session (X-Transcriber-Secret)"},
     {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}/audio", "method": "POST", "description": "Transcriber: one audio window (Ogg Opus) for one speaker"},
     {"path": "/api/v1/plugins/synascriber/public/transcriber/sessions/{ref}/preview", "method": "POST", "description": "Transcriber: live caption of the window so far, never stored"},

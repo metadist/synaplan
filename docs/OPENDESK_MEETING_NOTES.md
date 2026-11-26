@@ -1,5 +1,5 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (11/11)**  
-> **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**  
+> **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [4.12 OpenTalk subtitles →](OPENTALK_MEETING_NOTES.md)
 
 # openDesk Meeting Notes (Jitsi & Element Matrix)
 
@@ -115,8 +115,9 @@ The sentence at the end says what was saved. A destination that was configured a
 - It does not transcribe Element Call live.
 - It does not translate live, keep the audio, or record the video.
 - It does not use Nextcloud Talk. Talk is a different product.
+- OpenTalk subtitles are a separate switch. See [OpenTalk subtitles](OPENTALK_MEETING_NOTES.md).
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (11/11)**  
-> **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**  
+> **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [4.12 OpenTalk subtitles →](OPENTALK_MEETING_NOTES.md)

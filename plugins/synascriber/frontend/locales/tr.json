@@ -38,7 +38,8 @@
     "captions": "Notlar açıkken toplantıda canlı altyazı",
     "from": "{name} başlattı",
     "all_generated": "Kaynaklar › Üretilen bölümünde göster",
-    "share": "Oturum açan her katılımcı Kaynaklar › Üretilen bölümünde bir kopya alır (kapalı: yalnızca başlatan kişi)"
+    "share": "Oturum açan her katılımcı Kaynaklar › Üretilen bölümünde bir kopya alır (kapalı: yalnızca başlatan kişi)",
+    "opentalk": "OpenTalk toplantıları: altyazıları Synaplan yazar"
   },
   "jitsi": {
     "button": "Toplantı notları",

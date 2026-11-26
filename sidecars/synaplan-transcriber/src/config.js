@@ -1,8 +1,18 @@
-const MODES = new Set(['jitsi', 'element', 'opendesk'])
+const MODES = new Set(['jitsi', 'element', 'opendesk', 'opentalk'])
 const LANGUAGES = new Set(['auto', 'de', 'en', 'es', 'fr', 'tr'])
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : ''
+}
+
+/** `id:secret`, the shape OpenTalk uses for a service API key. */
+function keyPair(value) {
+  const text = clean(value)
+  const split = text.indexOf(':')
+  if (split <= 0 || split === text.length - 1) {
+    return null
+  }
+  return { id: text.slice(0, split), secret: text.slice(split + 1) }
 }
 
 function flag(value, fallback) {
@@ -21,7 +31,7 @@ function flag(value, fallback) {
 export function loadConfig(env) {
   const mode = clean(env.TRANSCRIBER_MODE || 'opendesk').toLowerCase()
   if (!MODES.has(mode)) {
-    throw new Error('TRANSCRIBER_MODE must be jitsi, element, or opendesk')
+    throw new Error('TRANSCRIBER_MODE must be jitsi, element, opendesk, or opentalk')
   }
 
   const synaplanUrl = clean(env.SYNAPLAN_URL).replace(/\/$/, '')
@@ -63,6 +73,16 @@ export function loadConfig(env) {
   }
 
   const jitsi = mode === 'jitsi' || mode === 'opendesk'
+  const opentalk = mode === 'opentalk'
+  const opentalkControllerUrl = clean(env.OPENTALK_CONTROLLER_URL).replace(/\/$/, '')
+  const opentalkServiceKey = keyPair(env.OPENTALK_SERVICE_KEY)
+  const opentalkInitKey = keyPair(env.OPENTALK_INIT_KEY)
+  if (opentalk && (opentalkControllerUrl === '' || !opentalkServiceKey || !opentalkInitKey)) {
+    throw new Error('OPENTALK_CONTROLLER_URL, OPENTALK_SERVICE_KEY and OPENTALK_INIT_KEY are required in opentalk mode')
+  }
+  if (opentalk && transcriberSecret === '') {
+    throw new Error('SYNAPLAN_TRANSCRIBER_SECRET is required in opentalk mode')
+  }
   const authToken = clean(env.TRANSCRIBER_AUTH_TOKEN)
   if (jitsi && authToken === '') {
     throw new Error('TRANSCRIBER_AUTH_TOKEN is required when Jitsi captions are on')
@@ -79,6 +99,11 @@ export function loadConfig(env) {
     host: clean(env.TRANSCRIBER_HOST || '0.0.0.0') || '0.0.0.0',
     port,
     jitsi,
+    opentalk,
+    opentalkControllerUrl,
+    opentalkServiceKey,
+    opentalkInitKey,
+    opentalkLivekitUrl: clean(env.OPENTALK_LIVEKIT_URL).replace(/\/$/, ''),
     element: elementRequested && matrixReady && apiKey !== '',
     elementRequested,
     matrixReady,
