@@ -23,6 +23,9 @@ weiterleiten und Beobachtungen ("sag mir, wenn …"). 48 Schritte PJ0–PJ47 in 
 #96–#111, alle ☐) koppelt das Board vom Loop ab (Extraktion nach der Antwort),
 macht den Kalender zum Abo, Mail zuerst per Kopieren/Mail-App, Beobachtungen nur
 für Versionen und Seiten, und schiebt Push hinter das Teilen.
+Ein Praxistest mit ChatGPT und Claude Projects (§0 #112–#119, alle ☐, `01`
+§2.7) ergänzt: aktualisieren statt anhängen, schreiben erst nach Bestätigung,
+erzeugte Dateien bleiben im Projekt, zuerst C und D für eine Person.
 
 **Auftrag des Owners:** die Schritte der Reihe nach umsetzen, nach `AGENTS.md`,
 mit Blick auf Usability und vor allem Sicherheit.
@@ -58,6 +61,7 @@ im Lauf (#3269) und **PJ7b** (Notizen und Verdichtung, #3270). Als Nächstes kom
 | PJ7c Bild bearbeiten per file_id | **nächster Schritt** | — |
 | Plan umgebaut (Board, Phasen neu) | gemergt (Doku) | #3283 |
 | Review des Plans (§0 #96–#111) | offen (Doku) | — |
+| Praxistest ChatGPT/Claude (§0 #112–#119) | offen (Doku) | — |
 | PJ8–PJ47 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
