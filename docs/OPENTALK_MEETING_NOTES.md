@@ -1,85 +1,56 @@
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**
-> **← Previous:** [4.11 Meeting notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
+> **← Previous:** [4.11 Meeting subtitles in Jitsi](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
 
-# OpenTalk subtitles
+# Meeting subtitles in OpenTalk
 
-Synaplan writes the subtitles in an OpenTalk meeting. People read the lines in the meeting. Synaplan does not keep the audio, and it does not save a transcript.
+Synaplan writes the subtitles in an OpenTalk meeting. People read the lines in the meeting. Synaplan does not save a file.
 
-This is not the Jitsi install. Jitsi meeting notes are [Meeting notes](OPENDESK_MEETING_NOTES.md). The openDesk Helm release does not start this mode. Run a second transcriber. One process cannot do both.
+You already have OpenTalk 26.3 or newer. You start Synaplan's subtitles service and you tell OpenTalk where it is. Jitsi is a different install: [Meeting subtitles in Jitsi](OPENDESK_MEETING_NOTES.md). If that service is already running, leave it alone and start a second one.
 
-You need OpenTalk 26.3 or later, the meeting-notes plugin, a speech server, and this transcriber on a host that can reach OpenTalk's LiveKit. A process on another machine can sign in and still fail to hear anyone, so the transcriber refuses to start until `OPENTALK_LIVEKIT_URL` is set.
+The same steps are on [docs.synaplan.com/meeting-notes](https://docs.synaplan.com/meeting-notes).
 
-## 1. Turn it on in Synaplan
-
-Install the plugin if it is not installed yet:
+**1. In Synaplan**, as an administrator. If Meeting notes is not in the sidebar:
 
 ```bash
 php bin/console app:plugin:install-verified-users synascriber
 ```
 
-Open the plugin page. Turn on **OpenTalk meetings**.
+Open the plugin page. Turn on **OpenTalk meetings**. Set the speech server. Invent a password and put it in **Transcriber secret**.
 
-Set the speech server the same way you would for any transcription: its address, its model, and its key. Set a transcriber secret. You will paste that same secret into the transcriber in the next step.
+**2. Start the service** on a machine that can reach OpenTalk's LiveKit. Inside Docker that address is often `http://livekit:7880`.
 
-An administrator can do this on the plugin page, or with `synascriber:settings`. Put secrets on stdin, not in the command:
+You need the controller API key OpenTalk already has. It looks like `controller:a-long-secret`. If you do not have it, ask the person who installed OpenTalk.
 
-```bash
-echo '{"opentalk_enabled": true, "stt_url": "https://api.groq.com/openai", "stt_model": "whisper-large-v3", "stt_api_key": "…", "transcriber_secret": "…"}' \
-  | php bin/console synascriber:settings
-```
-
-## 2. Start the transcriber
-
-Run `synaplan-transcriber` where it can reach OpenTalk's LiveKit server. On Docker Desktop that means the same network as LiveKit.
+Invent a second password. You paste it into OpenTalk in the next step.
 
 ```bash
-TRANSCRIBER_MODE=opentalk
-SYNAPLAN_URL=https://your-synaplan.example
-SYNAPLAN_TRANSCRIBER_SECRET=the-secret-from-step-1
-OPENTALK_CONTROLLER_URL=https://your-opentalk-controller.example
-OPENTALK_SERVICE_KEY=controller:the-controller-secret
-OPENTALK_INIT_KEY=transcription:the-transcription-secret
-OPENTALK_LIVEKIT_URL=http://livekit:7880
+docker run -d --name synaplan-opentalk \
+  -p 8095:8095 \
+  -e TRANSCRIBER_MODE=opentalk \
+  -e SYNAPLAN_URL=https://your-synaplan.example \
+  -e SYNAPLAN_TRANSCRIBER_SECRET=the-password-from-the-plugin-page \
+  -e OPENTALK_CONTROLLER_URL=https://your-opentalk.example \
+  -e OPENTALK_SERVICE_KEY=controller:the-controller-secret \
+  -e OPENTALK_INIT_KEY=transcription:password-you-invent \
+  -e OPENTALK_LIVEKIT_URL=http://livekit:7880 \
+  ghcr.io/metadist/synaplan-transcriber:latest
 ```
 
-Both keys are written `id:secret`.
+The service does not start if the LiveKit address is empty.
 
-- `OPENTALK_SERVICE_KEY` is how the transcriber calls OpenTalk.
-- `OPENTALK_INIT_KEY` is how OpenTalk calls the transcriber. The same pair is the controller's `api_key` below.
-- `OPENTALK_LIVEKIT_URL` is the media server. OpenTalk's popout token does not include that address. The process does not start without it.
-
-`GET /health` on port 8095 answers when the process is up. `opentalk` is true and `jitsi` is false. The image is Debian, not Alpine: the LiveKit client ships a glibc build only.
-
-Compose can pass the same variables into the `transcriber` profile. Set `TRANSCRIBER_MODE=opentalk` or that container stays on the older openDesk default.
-
-## 3. Point OpenTalk at the transcriber
-
-In the OpenTalk controller config:
+**3. In OpenTalk.** Add this on the controller and restart it. The address is the machine from step 2, as the controller can reach it.
 
 ```toml
 [roomserver.modules.transcription]
-url = "https://transcriber.example:8095"
-api_key = { id = "transcription", secret = "the-transcription-secret" }
+url = "https://the-subtitles-service:8095"
+api_key = { id = "transcription", secret = "password-you-invent" }
 ```
 
-The id and secret are the same pair as `OPENTALK_INIT_KEY`. Restart the controller after you save this.
+**4. In a meeting.** A moderator opens **More options → Enable subtitles**, turns the switch on, picks a language, and saves. Everyone else presses **Show**. Turning the switch off stops the lines.
 
-## Use it
-
-A moderator opens **More options → Enable subtitles**, turns on **Enable subtitles for everyone**, picks a language, and saves.
-
-People who want the lines press **Show**. Each line has the speaker's name.
-
-To stop, open the same dialog, turn the switch off, and save. The lines stop. Nothing is written down.
-
-## What this does not do
-
-- It does not save a transcript. Jitsi meeting notes do. OpenTalk subtitles do not.
-- It does not cover a breakout room.
-- It does not run when the meeting is end-to-end encrypted. OpenTalk hides the control in that case.
-- It does not share a process with Jitsi meeting notes.
+Open `http://the-service:8095/health`. The page says `"ok": true`.
 
 ---
 
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**
-> **← Previous:** [4.11 Meeting notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
+> **← Previous:** [4.11 Meeting subtitles in Jitsi](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)

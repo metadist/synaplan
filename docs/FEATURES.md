@@ -88,7 +88,7 @@ The same AI, knowledge folders, and model policies are reachable from every surf
 | **OpenAI-Compatible API (`/v1`)** | Drop-in `/v1/chat/completions`, `/v1/models`, and one-shot or multi-session streaming `/v1/audio/transcriptions` for OpenAI SDKs, Cursor, and Continue. | [OPENAI_COMPATIBLE_API.md](OPENAI_COMPATIBLE_API.md) |
 | **Anthropic Messages API (`/v1/messages`)** | Native gateway for **Claude Code** and coding clients, with server-side `web_search`, `web_fetch`, vision routing, pinned knowledge tools, and multi-provider aliases. | [ANTHROPIC_COMPATIBLE_API.md](ANTHROPIC_COMPATIBLE_API.md) |
 | **Synaplan Desktop** | Tauri desktop app (Windows, macOS, Linux) that pairs via a one-time code, receives a restricted `desktop:*` API key, and executes local Agent Skills over the frozen `protocol: 1` contract. | [DESKTOP.md](DESKTOP.md) |
-| **Live Voice & Meeting Notes** | Full-duplex speech-to-speech (`LIVE_VOICE.md`), self-hosted Realtime websockets (`LIVE_VOICE_SELF_HOSTED.md`), Jitsi meeting notes in openDesk, and OpenTalk subtitles (`OPENDESK_MEETING_NOTES.md`, `OPENTALK_MEETING_NOTES.md`). | [LIVE_VOICE.md](LIVE_VOICE.md) · [OPENDESK_MEETING_NOTES.md](OPENDESK_MEETING_NOTES.md) |
+| **Live Voice & Meeting Subtitles** | Spoken answers, plus subtitles in Jitsi and in OpenTalk. | [LIVE_VOICE.md](LIVE_VOICE.md) · [OPENDESK_MEETING_NOTES.md](OPENDESK_MEETING_NOTES.md) |
 
 ---
 

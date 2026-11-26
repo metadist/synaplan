@@ -1,5 +1,5 @@
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (1/11)**  
-> **← Previous:** [4.11 Meeting notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.2 Backend Architecture & Request Lifecycle →](ARCHITECTURE.md)
+> **← Previous:** [4.11 Meeting subtitles in Jitsi](OPENDESK_MEETING_NOTES.md) · **Next:** [5.2 Backend Architecture & Request Lifecycle →](ARCHITECTURE.md)
 
 # Local Development Workflow
 
@@ -517,4 +517,4 @@ MessagePreProcessor → MessageClassifier ─┬→ rule-based routing (user tas
 ---
 
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 5: Developer & Contributor Guide (1/11)**  
-> **← Previous:** [4.11 Meeting notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.2 Backend Architecture & Request Lifecycle →](ARCHITECTURE.md)
+> **← Previous:** [4.11 Meeting subtitles in Jitsi](OPENDESK_MEETING_NOTES.md) · **Next:** [5.2 Backend Architecture & Request Lifecycle →](ARCHITECTURE.md)

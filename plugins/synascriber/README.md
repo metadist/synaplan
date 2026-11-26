@@ -1,105 +1,32 @@
-# synascriber
+# Meeting subtitles
 
-Meeting notes for a Jitsi in openDesk, and live subtitles for OpenTalk.
-Operators start with [docs/OPENDESK_MEETING_NOTES.md](../../docs/OPENDESK_MEETING_NOTES.md).
-OpenTalk is a second transcriber and is not in the openDesk chart:
-[docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
+This plugin is Synaplan's side of subtitles for **Jitsi** and for **OpenTalk**.
+
+An administrator installs it by starting one small program and telling the meeting app where that program is. Jitsi and OpenTalk each need their own program.
+
+- Install: [docs.synaplan.com/meeting-notes](https://docs.synaplan.com/meeting-notes)
+- Jitsi, in this repository: [docs/OPENDESK_MEETING_NOTES.md](../../docs/OPENDESK_MEETING_NOTES.md)
+- OpenTalk, in this repository: [docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md)
+
+Jitsi on openDesk, with the Helm charts: add the block in the Jitsi page and apply. The **Meeting notes** button appears. You do not edit Jitsi by hand.
+
+OpenTalk: turn on **OpenTalk meetings** on this plugin's page, start a second program, and paste its address into the OpenTalk controller. A moderator then uses **More options → Enable subtitles**. Nothing is saved.
+
+## For people changing this plugin
 
 How a Jitsi meeting moves from the button to the saved file: [ARCHITECTURE.md](ARCHITECTURE.md).
 
-Jitsi's bridge streams each speaker's audio to the transcriber
-([sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/)); the
-transcriber sends short audio windows to this plugin; the plugin gets the
-text from a Whisper server and returns it as live captions. When the meeting
-stops, the plugin saves one Markdown transcript per signed-in participant in
-Sources, Generated. Audio is never stored.
-
 | Part | Where | Runs in |
 |------|-------|---------|
-| `backend/` | this plugin | Synaplan: routes under `/api/v1/plugins/synascriber` (manifest) |
-| `frontend/jitsi/loader.js` | this plugin, served as a plugin asset | each participant's browser in Jitsi: button, dialog, captions |
-| `/api/v1/plugins/synascriber/jitsi/silent` | `backend/`, public | the page Keycloak returns to after the button's sign-in; it hands the code to the Jitsi window named in the `jitsi_url` setting, and only that window may embed it |
-| `frontend/index.js` | this plugin | Synaplan's plugin page |
-| `mod_synascriber.lua` | [sidecars/synaplan-transcriber/prosody](../../sidecars/synaplan-transcriber/prosody/) | Jitsi's Prosody: switches the bridge transcription per room |
-| transcriber | [sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/) | its own pod |
+| `backend/` | this plugin | Synaplan |
+| `frontend/jitsi/loader.js` | served by Synaplan, loaded by Jitsi | the browser: button and subtitles |
+| `frontend/index.js` | this plugin | the plugin page in Synaplan |
+| `mod_synascriber.lua` | [the subtitles image](../../sidecars/synaplan-transcriber/prosody/) | Jitsi's Prosody |
+| subtitles service | [sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/) | its own container |
 
-## Setup
+Deployment for Jitsi on openDesk: [synaplan-charts](https://github.com/metadist/synaplan-charts), `technical.synaplan.synascriber`. That chart does not start the OpenTalk service.
 
-No account is involved: the settings, the sessions and the loader belong to
-the installation, not to a user.
-
-1. Install the plugin for every user: `DEFAULT_USER_PLUGINS=["synascriber"]`
-   (existing users: `php bin/console app:plugin:install-verified-users synascriber`).
-2. Write the settings. Secrets go in on stdin, never as arguments:
-
-   ```bash
-   echo '{"enabled": true, "stt_url": "http://whisper:8080", "prosody_url": "http://prosody:5280",
-          "jitsi_url": "https://meet.example", "prosody_secret": "…", "transcriber_secret": "…"}' \
-     | php bin/console synascriber:settings
-   ```
-
-   `--show` prints them (secrets only as set / not set). An administrator can
-   change the same settings on the plugin page.
-3. Give the transcriber `SYNAPLAN_TRANSCRIBER_SECRET` = `transcriber_secret`. It
-   sends it as `X-Transcriber-Secret`; the transcriber routes accept nothing
-   else.
-4. For Jitsi only, load the button in Jitsi's `head.html`. OpenTalk does not
-   use this. Its steps are in [OpenTalk](#opentalk).
-
-   ```html
-   <script defer src="https://<synaplan>/api/v1/plugins/synascriber/assets/jitsi/loader.js"
-     data-synaplan="https://<synaplan>" data-issuer="https://<keycloak>/realms/<realm>"
-     data-client-id="synascriber"></script>
-   ```
-
-   The older address with a user id (`/api/v1/user/<id>/plugins/synascriber/assets/…`)
-   still works.
-
-### Speech-to-text server
-
-`stt_url` is any server with the OpenAI transcription API
-(`POST /v1/audio/transcriptions`, `response_format=verbose_json`) and a
-`GET /health`:
-
-| Server | `stt_url` | `stt_model` | `stt_api_key` |
-|--------|-----------|-------------|---------------|
-| whisper.cpp `whisper-server`, the `stt` chart of synaplan-charts | the service | ignored (default `whisper`) | none |
-| a self-run `whisper-server` | its address; start it with `--inference-path /v1/audio/transcriptions --convert`, or `/health` is green and every transcription fails | ignored | none |
-| vLLM | the address of `vllm serve <model>` | the `--served-model-name`, or the model name | its `--api-key`, if set |
-| a cloud service | its base URL | its model name | its key |
-
-`stt_model` goes out as the `model` field, which the OpenAI API requires and
-vLLM rejects a request without. `stt_api_key` goes out as `Authorization:
-Bearer` on the transcription and the health check; it is a secret (set it
-with `synascriber:settings` or `PUT admin/settings`, the plugin page only
-shows whether it is set). vLLM's `verbose_json` carries no `no_speech_prob`,
-so the no-speech filter never triggers there and silence yields more
-invented lines than with whisper.cpp.
-
-### Secrets
-
-Three shared secrets, each between two parties. One value may appear under
-more than one name; the names say where it is set.
-
-| Secret | Held by | Set as |
-|--------|---------|--------|
-| transcriber secret | plugin ↔ transcriber | plugin setting `transcriber_secret`; transcriber env `SYNAPLAN_TRANSCRIBER_SECRET`, sent as header `X-Transcriber-Secret` |
-| Prosody secret | plugin ↔ Jitsi's Prosody module | plugin setting `prosody_secret`; Prosody env `SYNASCRIBER_SECRET` |
-| transcriber token | Jitsi's Jicofo ↔ transcriber | Jicofo's transcription `Authorization: Bearer …`; transcriber env `TRANSCRIBER_AUTH_TOKEN` |
-
-`SYNAPLAN_API_KEY` is not one of them: the transcriber needs it only for
-the paths that act as a Synaplan user (Element voice messages, Jitsi
-captions without this plugin).
-
-## OpenTalk
-
-Live subtitles in an OpenTalk meeting. Nothing is saved. The steps, including
-the second transcriber and the controller block, are in
-[docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
-
-In the meeting a moderator opens **More options → Enable subtitles**, turns
-the switch on, picks a language, and saves. **Show** displays the lines.
-Turning the switch off stops them. No file is written.
+Tests: `backend/tests/Plugin/SynaScriber/`.
 
 ### Upgrading from 0.3.0
 
@@ -114,10 +41,3 @@ plugin migrations run on every install for every user, so the file is
 idempotent and a rerun changes nothing. The owner's API key row in
 `BAPIKEYS` stays; it authorises nothing on the plugin routes any more and
 can be deleted from the API keys page.
-
-Deployment for Jitsi (Jitsi's values, the Keycloak client, the transcriber,
-the registration of the plugin): [synaplan-charts](https://github.com/metadist/synaplan-charts),
-`technical.synaplan.synascriber`. That chart does not start the OpenTalk
-transcriber.
-
-Tests: `backend/tests/Plugin/SynaScriber/`.
