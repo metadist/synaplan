@@ -425,6 +425,14 @@ final readonly class VectorSearchService
         float $minScore = 0.3,
     ): array {
         try {
+            // The source chunk becomes the query vector, so it has to be one
+            // this user may read. Otherwise the scores tell how close their
+            // own documents are to somebody else's text.
+            $source = $this->vectorStorage->findChunk($userId, $sourceChunkId);
+            if (null === $source || !$this->mayReadChunk($userId, $source)) {
+                return [];
+            }
+
             $results = $this->vectorStorage->findSimilar($userId, $sourceChunkId, $limit, $minScore);
 
             return array_map(function ($result) {
