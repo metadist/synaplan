@@ -115,6 +115,46 @@ class FileGenerationEnvelopeTest extends TestCase
         $this->assertTrue(FileGenerationEnvelope::hasSignature('{"BFILEPATH":"a.docx","BFILETEXT":'));
     }
 
+    public function testChangeNotePrefersTheSummaryFieldOverTheFileBody(): void
+    {
+        $reply = '{"BFILEPATH":"report.docx","BFILETEXT":"# Title\nBody","BSUMMARY":"Added a timeline at the top.","BEXPORT":"pdf"}';
+
+        $this->assertSame('Added a timeline at the top.', FileGenerationEnvelope::changeNote($reply));
+        $this->assertSame(
+            "__FILE_GENERATED__:report.pdf\n\nAdded a timeline at the top.",
+            FileGenerationEnvelope::storedReply('report.pdf', FileGenerationEnvelope::changeNote($reply)),
+        );
+    }
+
+    public function testChangeNoteKeepsProseBesideTheEnvelope(): void
+    {
+        $reply = "I replaced the timeline with three columns.\n\n".'{"BFILEPATH":"report.docx","BFILETEXT":"# Title"}';
+
+        $this->assertSame('I replaced the timeline with three columns.', FileGenerationEnvelope::changeNote($reply));
+    }
+
+    public function testChangeNoteDropsASummaryThatCopiesTheFileBody(): void
+    {
+        $reply = '{"BFILEPATH":"report.docx","BFILETEXT":"# Title","BSUMMARY":"# Title"}';
+
+        $this->assertSame('', FileGenerationEnvelope::changeNote($reply));
+    }
+
+    public function testChangeNoteDropsABrokenEnvelope(): void
+    {
+        $reply = 'Here is your file: {"BFILEPATH":"a.docx","BFILETEXT":"unterminated';
+
+        $this->assertSame('', FileGenerationEnvelope::changeNote($reply));
+        $this->assertSame('__FILE_GENERATED__:a.docx', FileGenerationEnvelope::storedReply('a.docx', FileGenerationEnvelope::changeNote($reply)));
+    }
+
+    public function testChangeNoteReadsTheLinesUnderAFileMarker(): void
+    {
+        $reply = "__FILE_GENERATED__:report.docx\n\nAdded a timeline at the top.";
+
+        $this->assertSame('Added a timeline at the top.', FileGenerationEnvelope::changeNote($reply));
+    }
+
     #[DataProvider('provideRequestedFormats')]
     public function testRequestedFormatDetectsNamedFormats(string $text, ?string $expected): void
     {

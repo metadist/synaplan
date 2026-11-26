@@ -28,7 +28,8 @@ final class FileGenerationSchemaTest extends TestCase
         $this->assertSame('object', $schema->schema['type']);
         $this->assertSame('string', $schema->schema['properties']['BFILEPATH']['type']);
         $this->assertSame('string', $schema->schema['properties']['BFILETEXT']['type']);
-        $this->assertSame(['BFILEPATH', 'BFILETEXT', 'BEXPORT'], $schema->schema['required']);
+        $this->assertSame('string', $schema->schema['properties']['BSUMMARY']['type']);
+        $this->assertSame(['BFILEPATH', 'BFILETEXT', 'BSUMMARY', 'BEXPORT'], $schema->schema['required']);
     }
 
     /**

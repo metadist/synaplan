@@ -92,6 +92,27 @@ final class StreamReplyPersisterTest extends TestCase
         self::assertSame($file, $reply->generatedFile);
     }
 
+    public function testADocumentTheToolLoopWroteKeepsTheChangeNote(): void
+    {
+        $file = new File();
+        $file->setUserId(7);
+        $file->setFileName('slides.pptx');
+        $files = $this->createStub(FileRepository::class);
+        $files->method('find')->willReturn($file);
+        $this->em->method('getRepository')->willReturn($files);
+
+        [$reply] = $this->persist(
+            'I replaced the timeline with three columns.',
+            'officemaker',
+            ['generated_file' => ['id' => 5]],
+        );
+
+        self::assertSame(
+            "__FILE_GENERATED__:slides.pptx\n\nI replaced the timeline with three columns.",
+            $reply->text,
+        );
+    }
+
     public function testAHandedOverTurnKeepsTheMessageTheRunAnswersIn(): void
     {
         $chat = $this->chat();

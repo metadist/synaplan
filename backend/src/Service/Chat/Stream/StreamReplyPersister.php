@@ -261,7 +261,14 @@ final readonly class StreamReplyPersister
             'filename' => $generatedFile->getFileName(),
         ]);
 
-        return ["__FILE_GENERATED__:{$generatedFile->getFileName()}", $generatedFile, $bundle];
+        return [
+            FileGenerationEnvelope::storedReply(
+                $generatedFile->getFileName(),
+                FileGenerationEnvelope::changeNote($responseText),
+            ),
+            $generatedFile,
+            $bundle,
+        ];
     }
 
     /**
@@ -336,7 +343,10 @@ final readonly class StreamReplyPersister
             $fromTools = $fromToolsId > 0 ? $this->em->getRepository(File::class)->find($fromToolsId) : null;
             if ($fromTools && $fromTools->getUserId() === $turn->caller->user->getId()) {
                 $generatedFile = $fromTools;
-                $text = "__FILE_GENERATED__:{$generatedFile->getFileName()}";
+                $text = FileGenerationEnvelope::storedReply(
+                    $generatedFile->getFileName(),
+                    FileGenerationEnvelope::changeNote($text),
+                );
             }
         }
 

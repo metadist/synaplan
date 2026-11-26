@@ -188,12 +188,15 @@ final class StructuredOutputRecoveryTest extends TestCase
     public function testSalvageHandlesTheOfficemakerEnvelope(): void
     {
         // A model that echoes the prompt's field explanations as extra keys
-        // still produced the two strings the envelope needs.
-        $generation = '{"BFILEPATH":"report.docx","BFILETEXT":"# Report","BEXPORT":"pdf","BNOTE":"done"}';
+        // still produced the file and the change note the envelope needs.
+        $generation = '{"BFILEPATH":"report.docx","BFILETEXT":"# Report","BSUMMARY":"Added a title.","BEXPORT":"pdf","BNOTE":"done"}';
 
         $salvaged = $this->recovery->salvage($generation, FileGenerationSchema::build());
 
-        self::assertSame('{"BFILEPATH":"report.docx","BFILETEXT":"# Report","BEXPORT":"pdf"}', $salvaged);
+        self::assertSame(
+            '{"BFILEPATH":"report.docx","BFILETEXT":"# Report","BSUMMARY":"Added a title.","BEXPORT":"pdf"}',
+            $salvaged,
+        );
     }
 
     // ===========================================

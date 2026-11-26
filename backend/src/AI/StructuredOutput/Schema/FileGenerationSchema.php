@@ -16,6 +16,9 @@ use App\AI\StructuredOutput\StructuredOutputSchema;
  * `{"BFILEPATH": "…", "BFILETEXT": "…"}`, so no envelope adjustment is
  * needed for OpenAI-dialect structured output or Anthropic tool-forcing.
  *
+ * `BSUMMARY` is the plain-language note of what changed. The chat shows it
+ * under the download; without the field the answer is only "file created".
+ *
  * `BEXPORT` is the one optional field: the prompt's "PDF export" section
  * (see {@see \App\Prompt\PromptCatalog}) asks for `"BEXPORT":"pdf"` when
  * the user wants a PDF, and {@see \App\Service\File\FileGenerationEnvelope}
@@ -47,9 +50,13 @@ final class FileGenerationSchema
                 'properties' => [
                     'BFILEPATH' => ['type' => 'string'],
                     'BFILETEXT' => ['type' => 'string'],
+                    'BSUMMARY' => [
+                        'type' => 'string',
+                        'description' => 'What was created or changed, in the user\'s language. Two to five sentences. Do not repeat the file body.',
+                    ],
                     'BEXPORT' => ['type' => ['string', 'null'], 'enum' => [self::EXPORT_PDF, null]],
                 ],
-                'required' => ['BFILEPATH', 'BFILETEXT', 'BEXPORT'],
+                'required' => ['BFILEPATH', 'BFILETEXT', 'BSUMMARY', 'BEXPORT'],
             ],
         );
     }

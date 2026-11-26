@@ -15,6 +15,7 @@ import { normalizeMediaUrl } from '@/utils/urlHelper'
 import { generatePartId, isMediaPartType } from '@/utils/mediaParts'
 import { isChannelSource } from '@/utils/channelSource'
 import { collapseApiToolTurn } from '@/utils/apiToolTurn'
+import { adoptGeneratedFileMarker, generatedFileParts } from '@/utils/generatedFileMarker'
 import { extractPastedBlocks } from '@/utils/pastedContent'
 import { adoptEffort, effortFields, type MessageEffort } from '@/utils/messageEffort'
 import {
@@ -163,17 +164,12 @@ export function parseContentWithThinking(
     content = collapseApiToolTurn(content)
   }
 
-  // Handle special file generation markers from backend
-  if (content.startsWith('__FILE_GENERATED__:')) {
-    const filename = content.replace('__FILE_GENERATED__:', '').trim()
-    // Return a placeholder - the actual translation will be done in the component
-    // because we need access to i18n there
-    return [
-      {
-        type: 'text',
-        content: `__FILE_GENERATED__:${filename}`,
-      },
-    ]
+  const generatedFile = generatedFileParts(content)
+  if (generatedFile) {
+    const markerPart: Part[] = [{ type: 'text', content: generatedFile.marker }]
+    return generatedFile.rest === ''
+      ? markerPart
+      : [...markerPart, ...parseContentWithThinking(generatedFile.rest, role, thinkingSeconds)]
   }
 
   if (content === '__FILE_GENERATION_FAILED__') {
@@ -713,17 +709,6 @@ function mediaUrlKey(url: string): string {
 }
 
 /**
- * True when a text part holds a document-generation result marker
- * (`__FILE_GENERATED__:<name>` or `__FILE_GENERATION_FAILED__`). These are
- * emitted by the backend for officemaker/document turns and translated to the
- * user-facing download prompt / failure notice by `MessageText`.
- */
-function isFileGenerationMarker(content: string | undefined): boolean {
-  if (!content) return false
-  return content.startsWith('__FILE_GENERATED__:') || content === '__FILE_GENERATION_FAILED__'
-}
-
-/**
  * Issue #1070: reconcile a live-streamed message with its persisted
  * version after SSE `complete`. The persisted version is authoritative
  * for files, generated media, and metadata; the streamed state stays
@@ -779,18 +764,7 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
   // structural fix from #1070): stale text/code parts (raw JSON, an empty
   // body, or an already-translated duplicate) are dropped and the marker is
   // prepended, while generated media/link parts are preserved.
-  const persistedMarker = persisted.parts.find(
-    (p) => p.type === 'text' && isFileGenerationMarker(p.content)
-  )
-  if (persistedMarker) {
-    const alreadyShown = local.parts.some(
-      (p) => p.type === 'text' && p.content === persistedMarker.content
-    )
-    if (!alreadyShown) {
-      const preserved = local.parts.filter((p) => p.type !== 'text' && p.type !== 'code')
-      local.parts = [persistedMarker, ...preserved]
-    }
-  }
+  adoptGeneratedFileMarker(local, persisted)
 
   // --- Files (attachments + generated documents) ----------------------
   if (persisted.files && persisted.files.length > 0) {

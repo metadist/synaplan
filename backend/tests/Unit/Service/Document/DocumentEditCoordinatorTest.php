@@ -143,6 +143,7 @@ final class DocumentEditCoordinatorTest extends TestCase
         );
 
         self::assertNotNull($result);
+        self::assertSame("__FILE_GENERATED__:document.docx\n\nshort summary", $result->content);
         self::assertInstanceOf(WordModel::class, $captured);
         $text = (new DocumentTextProjector())->project($captured);
         self::assertStringContainsString('Überblick', $text);

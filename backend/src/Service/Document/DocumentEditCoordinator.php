@@ -114,9 +114,14 @@ final readonly class DocumentEditCoordinator
             $rev = $this->revisions->append($file, $session->model, $summary);
             $version = $rev->getVersion();
         }
-        $content = '' !== trim($loopResult->content) ? $loopResult->content : $summary;
+        $explanation = trim($loopResult->content);
+        if ('' === $explanation || FileGenerationEnvelope::hasSignature($explanation)) {
+            $explanation = 'Document updated.' === $summary ? '' : $summary;
+        }
         if (null !== $file && !$wasExisting) {
-            $content = '__FILE_GENERATED__:'.$file->getFileName();
+            $content = FileGenerationEnvelope::storedReply($file->getFileName(), $explanation);
+        } else {
+            $content = '' !== $explanation ? $explanation : $summary;
         }
 
         return new DocumentEditResult($content, $file, $session->operations, $loopResult->usage, $version, $fidelityLossy, $loopResult->facadeMetered, $loopResult->facadeChargedCost, $loopResult->facadePriceKnown);
