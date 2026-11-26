@@ -19,10 +19,42 @@ to them.
 | Image cost in a run | merged | #3269 | `analyze_image` in a run adds the vision call's billed cost to the run, so the cost guard sees it. Copilot did not review (quota); the owner approved. |
 | PJ7b | merged | #3270 | Run notes and compaction, flag off. See "2026-11-25 — PJ7b" below. "Keep going" moved to PJ8, editing a picture by file ID to PJ7c (owner, 2026-11-25). |
 | PJ7c | not started | — | Editing a picture by file ID: the chat loop has no image tool yet. |
-| Plan reshaped | open | — | board, reminders, mail, watches; phases relettered; PJ29–PJ47. See 2026-11-26 below. |
+| Plan reshaped | merged | #3283 | board, reminders, mail, watches; phases relettered; PJ29–PJ47. See 2026-11-26 below. |
+| Plan review | open | — | §0 #96–#111: board without the loop, four kinds, calendar subscription, copy-first mail, DMARC, two watch kinds, push after sharing. See "2026-11-26 — review" below. |
 | PJ8–PJ47 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
 ---
+
+## 2026-11-26 — review of the reshaped plan
+
+A read of `00`–`04`, the mockup and the code after #3283. No code. All rows
+are proposals (☐); #97, #102, #107 and #111 change or need an owner
+decision.
+
+- **Board without the loop (#96):** `ChatLoopGate` keeps turns with files
+  and models without streaming tool calls off the loop, so board tools in
+  the loop would miss a dropped PDF and everyone on Gemini or Ollama. Items
+  are extracted after the answer on the memory model, in the call that
+  extracts project memory (#98, #109). C no longer waits for PJ11.
+- **Data (#97, #99):** kinds task, date, decision, cost; "Waiting on
+  others" is a view of tasks; `BPARENTID`, `BSORT`, `BESTIMATED`,
+  `BVISIBILITY`; items from a private chat stay private (G21).
+- **Board UI (#100–#102):** quick-add line; personal memories per chat
+  only; "More" keeps Chats, What I remember, People and settings.
+- **Acting (#103, #104):** the calendar is a subscription (`.ics` feed per
+  member), no writing into calendars (old PJ37 write and PJ39 to §9); mail
+  preview copy and mail app first, "Send" with Microsoft 365.
+- **Coming in (#105, #106):** forwarded mail needs DMARC pass and a
+  confirmed address; watches `version` and `page` only, on the Saved Tasks
+  tick.
+- **Order (#107):** C → D (no push) → E → F → G push → H into the project →
+  I watches → J rollout.
+- **Gates:** G20 (cost of a project turn), G21 (private items), G22
+  (calendar feed). Journeys J-PJ-19, J-PJ-20.
+- **Mockup:** not changed. It follows #100–#102, #106 and gets a second
+  project (#110) once the owner ticks those rows.
+- **Next step stays PJ7c.** PJ30, PJ21 and PJ31 could start in parallel to
+  B once #96 and the schema (#63) are ticked.
 
 ## 2026-11-26 — plan reshaped around the board
 

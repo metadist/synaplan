@@ -19,7 +19,10 @@ beliebig lange arbeiten darf. Seit 2026-11-26 weiß ein Projekt, wo es steht: ei
 Board (Aufgaben, Termine, Entscheidungen, Warten auf, Kosten) neben dem Chat, das die
 KI aus dem Chat pflegt; dazu Erinnerungen, Mail-Vorschau an Dritte, Mails ins Projekt
 weiterleiten und Beobachtungen ("sag mir, wenn …"). 48 Schritte PJ0–PJ47 in Phasen
-0, A–I. Mockup: `mockups/project-page.html`.
+0, A–J. Mockup: `mockups/project-page.html`. Ein Review vom selben Tag (§0
+#96–#111, alle ☐) koppelt das Board vom Loop ab (Extraktion nach der Antwort),
+macht den Kalender zum Abo, Mail zuerst per Kopieren/Mail-App, Beobachtungen nur
+für Versionen und Seiten, und schiebt Push hinter das Teilen.
 
 **Auftrag des Owners:** die Schritte der Reihe nach umsetzen, nach `AGENTS.md`,
 mit Blick auf Usability und vor allem Sicherheit.
@@ -53,7 +56,8 @@ im Lauf (#3269) und **PJ7b** (Notizen und Verdichtung, #3270). Als Nächstes kom
 | Bildkosten im Lauf (`analyze_image` zählt zum Limit) | gemergt | #3269 |
 | PJ7b Notizen, Verdichtung, `BRUNS.BNOTES` | gemergt | #3270 |
 | PJ7c Bild bearbeiten per file_id | **nächster Schritt** | — |
-| Plan umgebaut (Board, Phasen neu) | offen (Doku) | — |
+| Plan umgebaut (Board, Phasen neu) | gemergt (Doku) | #3283 |
+| Review des Plans (§0 #96–#111) | offen (Doku) | — |
 | PJ8–PJ47 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
@@ -405,15 +409,19 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
    (Owner, 2026-11-25; §0 #13 bleibt offen). Ebenso "Jetzt antworten".
 3. **PJ8–PJ11** (Karte für den Lauf, Stop, Rückfragekarte usw.); offene Zeilen siehe
    Abschnitt 6. `LOOP.ENABLED` bleibt 0 bis PJ8 gemergt ist.
-4. **Phase C — Board** (PJ29 Chat-Bereich herauslösen, PJ30 Items-API, PJ31 KI pflegt
-   das Board, PJ32 Projektseite Chat links / Board rechts, PJ33 Status und erster
-   Plan, PJ21/PJ22 Projekt-Memory, PJ34 Suche im Projekt).
-5. **Phase D — Erinnern und zurückschreiben**: Push PJ23–PJ27, dann PJ35–PJ39
-   (Erinnerungen, Wochenüberblick, Kalender-Link, Mail-Vorschau, Spike Kalender lesen).
+4. **Phase C — Board** (PJ30 Items-API, PJ21 Projekt-Memory, PJ31 Extraktion nach
+   der Antwort füllt Board und Memory, PJ29 Chat-Bereich herauslösen, PJ32
+   Projektseite Chat links / Board rechts, PJ33 Status und erster Plan, PJ22
+   Memory-Auswahl, PJ34 Suche im Projekt). Wartet nicht auf PJ11 (§0 #96); PJ30,
+   PJ21, PJ31 können neben B laufen, sobald #96 und das Schema getickt sind.
+5. **Phase D — Erinnern und zurückschreiben ohne neuen Dienst**: PJ35–PJ38
+   (Erinnerungen und Wochenüberblick per Mail, Kalender-Abo, Mail-Vorschau mit
+   Kopieren / Mail-App, Senden mit Microsoft 365).
 6. **Phase E** gemeinsame Chats (PJ12–PJ19; PJ18 und Notion in PJ19 vorgeschlagen für
-   später), **F** geteilte Projekte (PJ20, PJ47), **G** Dinge kommen ins Projekt
-   (PJ40–PJ43), **H** Beobachtungen (PJ44–PJ46), **I** Rollout (PJ28).
-   Alte Buchstaben: C→E, D→F, E→D, F→I.
+   später), **F** geteilte Projekte (PJ20, PJ47), **G** Push (PJ23–PJ27), **H** Dinge
+   kommen ins Projekt (PJ40–PJ43), **I** Beobachtungen (PJ44–PJ46, nur `version`
+   und `page`), **J** Rollout (PJ28). PJ39 ist in §9 (Später).
+   Buchstaben nach dem Review: Push aus D → G, G → H, H → I, I → J.
 
 ## 9. Exakt nächster Schritt: PJ7c
 

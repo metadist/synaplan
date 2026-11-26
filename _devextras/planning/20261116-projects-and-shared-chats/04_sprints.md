@@ -230,9 +230,14 @@ their limits as profile input.
 
 ## Phase C — the project board
 
-Starts after PJ11. PJ21 and PJ22 moved here from the old phase D (owner,
-2026-11-26). Order: PJ29 → PJ30 → PJ31 → PJ32 → PJ33, then PJ21, PJ22,
-PJ34.
+Does not wait for PJ11: the board is filled by an extraction after the
+answer, not by loop tools (§0 #96). PJ29 needs PJ8 (the run card lives in
+the chat area); PJ33's first plan needs PJ9. PJ21 and PJ22 moved here from
+the old phase D (owner, 2026-11-26); PJ21 comes before PJ31, because the
+extraction writes memory and items in one call (§0 #98). Order: PJ30 →
+PJ21 → PJ31 → PJ29 → PJ32 → PJ33 → PJ22 → PJ34. PJ30, PJ21 and PJ31 can
+start while B is still open. Before PJ32 the mockup gets a second project
+of another kind (§0 #110).
 
 ### PJ29 — a chat area that a page can embed
 
@@ -253,50 +258,66 @@ PJ34.
 ### PJ30 — project items (API)
 
 - **Goal:** `03` §2.7–§2.9 and §13 without the AI: tasks, dates,
-  decisions, waiting, costs through the API.
+  decisions and costs through the API; "Waiting on others" as a filter of
+  tasks (§0 #97).
 - **Reads:** PJ3's `Service/Project/*`, `ProjectController`,
   `docs/MIGRATIONS.md`, `docs/API_PATTERNS.md`.
-- **Tests first:** create, change, finish, drop each kind; a `read` member
-  cannot write; an item of another project is 404; a date without zone
-  takes the project's zone; `MAX_ITEMS` refuses with 422; every change
-  writes one log row; flag off → 404.
+- **Tests first:** create, change, finish, drop each kind; a task under a
+  date (`BPARENTID`) moves with it; `?waiting=1` lists open tasks with
+  `BWAITINGSINCE`; a `private` item is invisible to every other caller; a
+  `read` member cannot write; an item of another project is 404; a date
+  without zone takes the project's zone; `MAX_ITEMS` refuses with 422;
+  every change writes one log row; flag off → 404.
 - **Do:** migration (`BPROJECTITEMS`, `BPROJECTITEMLOG`, the new
   `BPROJECTS` columns); entity, repository, `ProjectItemService`,
   `ProjectItemController`; OpenAPI and Zod; flag `PROJECTS.BOARD_ENABLED`.
 - **Touches:** new `Service/Project/Item/*`; no edit to the chat path.
 - **Exit:** the tests.
 
-### PJ31 — the AI keeps the board from the chat
+### PJ31 — the board fills itself from the chat
 
-- **Goal:** J-PJ-13: what a member says in the chat becomes an item, with
-  a line under the answer and "Undo".
-- **Reads:** `ToolRegistry`, the loop of PJ5, `PromptCatalog`, PJ30.
+- **Goal:** J-PJ-13 and J-PJ-20: what a member says in a project chat
+  becomes an item, with a line under the answer and "Undo", for every Chat
+  model and with the loop on or off (§0 #96).
+- **Reads:** `Service/Memory/MemoryExtractionService.php`,
+  `ModelConfigService::getMemoryModelConfig()`, the `async_ai_low`
+  handlers, `PromptCatalog`, PJ21, PJ30.
 - **Tests first:** G14, G16 and G17 with the corpus in
   `backend/tests/Eval/ProjectBoard/` (40 messages: plain dates, relative
-  dates, repetitions, "Ben does it", a cost, a decision, chatter that must
-  add nothing); a run whose input is a mail cannot call
-  `project_item_add` (G15); "Undo" restores all items of one run; no tool
-  is offered outside a project or with the flag off.
-- **Do:** the five tools of `03` §13; `tools:project_board`; the open
-  items in the prompt; `POST /projects/{uuid}/undo`; the `project.item`
-  event.
-- **Exit:** G14, G16, G17.
+  dates, repetitions, "Ben does it", a cost, a decision, a fact that
+  belongs in memory, chatter that must add nothing), run on the seeded
+  memory model and on one Ollama model; a statement lands in memory or on
+  the board, never in both (§0 #98); everything from an attached file or
+  from the answer alone is `proposed` (G15); "Undo" restores all items of
+  one answer; a turn with a file and a turn with the loop off still
+  extract; nothing runs outside a project or with the flag off; G20 on the
+  same corpus.
+- **Do:** `ProjectTurnExtractionHandler` and its structured output (`03`
+  §13); `tools:project_extract` and `tools:project_board`; the project part
+  of memory extraction moves into the same call; `POST
+  /projects/{uuid}/undo`; the `project.item` event with `messageId`;
+  `project_plan` as the one loop tool.
+- **Exit:** G14–G17, G20.
 
 ### PJ32 — project page with chat and board side by side
 
 - **Goal:** J-PJ-12 (the page part) and J-PJ-18; the mockup
   `mockups/project-page.html` as product.
-- **Reads:** the mockup, `02` §3.2, PJ4's `ProjectView.vue`, PJ29's
-  `ChatArea`, `style.css` tokens, UX contract §4.
+- **Reads:** the mockup and its second project (§0 #110), `02` §3.2, PJ4's
+  `ProjectView.vue`, PJ29's `ChatArea`, `style.css` tokens, UX contract §4.
 - **Tests first:** Vitest for each card's empty, filled and loading state;
   Playwright `@ci`: open a project, write a task in the chat, see it on
   the board, drag the divider, hide the board, reload and keep the layout;
   phone width lands in the chat with a "Board" tab.
 - **Do:** chat left, board right, divider 25–70 %, "Hide board" and "Hide
-  chat"; the cards Overview, Tasks, Dates, Files (sources inside), Costs,
-  Decisions, Waiting on others, More; the main chat (§0 #93); a new
-  project shows the chat only; `GET /projects/{uuid}/board` and the
-  layout endpoint. Cards are fixed components, each under 300 lines.
+  chat"; tabs Overview, Tasks, Dates, Files (sources inside); on Overview
+  the cards To confirm, Tasks, Dates, Costs, Decisions, Waiting on others
+  (and Watching once phase I is there), each with "All" that opens its
+  list inside the board; "More" with Chats, What I remember, People and
+  settings only (§0 #102); the quick-add line on Tasks and Dates (§0 #100);
+  the main chat (§0 #93); a new project shows the chat only; `GET
+  /projects/{uuid}/board` and the layout endpoint. Cards are fixed
+  components, each under 300 lines.
 - **Touches:** `views/ProjectView.vue`, new `components/projects/board/*`;
   the old tabs become the "More" menu.
 - **User-flow:** J-PJ-12, J-PJ-18, both themes, phone width.
@@ -307,11 +328,16 @@ PJ34.
 - **Goal:** `03` §14; J-PJ-12 complete.
 - **Reads:** PJ9 (`ask_user`), PJ31, `async_ai_low` handlers.
 - **Tests first:** ten changes within 30 seconds make one status call; the
-  computed line counts right; a status names no item that does not exist;
-  a new project asks at most three questions and writes a plan; "You
-  decide" still writes one.
-- **Do:** the debounced status unit; `project_plan`; the link markup and
-  its rendering; the status on top of Overview with "As of today".
+  morning refresh runs once per project with open items and never for an
+  empty one; the computed line counts right; a status names no item that
+  does not exist and no private item of another member; `[[since:…]]`
+  renders "for four days" today and "for five days" tomorrow without a
+  new call; a new project asks at most three questions and writes a plan;
+  "You decide" still writes one; without the loop no question card appears
+  and nothing fails.
+- **Do:** the debounced status unit and the morning refresh on the memory
+  model (§0 #95, #109); `project_plan`; the link and date markup and its
+  rendering; the status on top of Overview with "As of today".
 - **Exit:** the five bullets.
 
 ### PJ21 — project memory (API)
@@ -332,9 +358,10 @@ PJ34.
 ### PJ22 — memory tab and memory choice per chat
 
 - **Goal:** J-PJ-9 step 4 and J-PJ-10.
-- **Do:** the board card "What I remember" with delete (it opens the full
-  list); "Memory" in the composer menu of a project chat, default "Project
-  memory only" (§0 #54); the lock when the chat is shared.
+- **Do:** "What I remember" under "More" with delete; "Memory" in the
+  composer menu of a project chat, default "Project memory only" (§0 #54);
+  the lock when the chat is shared. No switch for personal memories under
+  "People and settings"; one line there points to the composer (§0 #101).
 - **Tests first:** Vitest for the three states of the choice; Playwright
   for the conflict journey with two accounts.
 - **Exit:** the five bullets.
@@ -352,72 +379,29 @@ PJ34.
 
 ---
 
-## Phase D — remind and write back (push)
+## Phase D — remind and write back, no new service
 
-Push first (PJ23–PJ27), then reminders and mail; mail goes out only from
-the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
-
-### PJ23 — spike: push through a relay
-
-- **Goal:** prove `03` §8 on real phones before anything is ordered.
-- **Do:** a minimal relay, a development build of the app with the push
-  plugin, a server behind NAT. Measure delivery, check the store rules for
-  a generic text, list what the Apple and Google accounts need.
-- **Exit:** G13's cases walked by hand; findings in `STATUS.md`; the
-  account and signing details go to the private repos, not here.
-
-### PJ24 — devices and signed push requests (API)
-
-- **Goal:** `03` §8.2, §8.4, §8.5 on the server.
-- **Reads:** `Service/PlatformLink/NotificationToken.php`, `NotifyKeyStore`,
-  `SignedNotificationClient`.
-- **Tests first:** a request is signed and verifies with the published
-  key; no request without a device, with the switch off, or after `seen`;
-  a shared chat notifies only the starter; rotation keeps old devices
-  working.
-- **Do:** `BPUSHDEVICES`, the two switches, `PushNotifier`, the endpoints,
-  `PushModule`.
-- **Exit:** the tests against a relay stub.
-
-### PJ25 — relay service (`synaplan-platform`)
-
-- **Goal:** `03` §8.1–§8.3. Own repository, own plan and PR there.
-- **Exit:** the contract tests of PJ24 pass against the real relay.
-
-### PJ26 — push in the app shell (`synaplan-apps`)
-
-- **Goal:** registration, permission, tap-to-open. Own PR there; a store
-  release.
-- **Exit:** G13 on TestFlight and an internal Android track.
-
-### PJ27 — tell the phone when a run is done or needs you
-
-- **Goal:** J-PJ-11 and the push half of J-PJ-16.
-- **Do:** the in-context sheet after the first promoted run; Settings →
-  Notifications with three switches (run done, needs you, reminders), shown only inside the app; `seen`; the
-  deep link from `ref` to the chat.
-- **Tests first:** Vitest: the section is absent in a browser; the sheet
-  appears once.
-- **Touches:** keep the web part out of the paths the mobile policy marks
-  `store-required`; the native bridge ships with PJ26.
-- **Exit:** the five bullets; walked on both phones against the cloud and
-  a self-hosted server.
+Reminders by e-mail, the calendar subscription and the mail preview. No
+relay, no store release, no OAuth scope (§0 #103, #104, #107). Mail goes out
+only after a click; "Send" only from a Microsoft 365 mailbox. WhatsApp is
+Later.
 
 ### PJ35 — reminders on one-off times (API)
 
 - **Goal:** `03` §2.10 and the sending half of §15.
 - **Reads:** `Command/SavedTasksTickCommand.php`, `CronNextRun`,
-  `InternalEmailService`, PJ24.
+  `InternalEmailService`.
 - **Tests first:** a reminder is sent once even with two ticks in
   parallel; a changed date moves its unsent reminder and leaves a sent one;
-  push when a device exists, mail otherwise; a member who left gets
-  nothing; the person's zone decides "19:00".
+  it goes out by mail (push is phase G); a private item reminds only its
+  author; a member who left gets nothing; the person's zone decides
+  "19:00".
 - **Do:** `BPROJECTREMINDERS`, `ProjectRemindersTickCommand`, the
   scheduler entry, `ProjectReminderService`; flag
   `PROJECTS.REMINDERS_ENABLED`.
 - **Exit:** the tests.
 
-### PJ36 — reminders before dates and the weekly overview
+### PJ36 — reminders before dates and the weekly overview, by e-mail
 
 - **Goal:** J-PJ-16.
 - **Reads:** PJ35, PJ33's status, `02` copy "This week in {project}".
@@ -430,17 +414,21 @@ the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
 - **User-flow:** J-PJ-16 with a seeded clock.
 - **Exit:** the five bullets.
 
-### PJ37 — dates go to my calendar and stay linked
+### PJ37 — the project's dates as a calendar subscription
 
-- **Goal:** `03` §16, calendar part, write only.
-- **Reads:** `OutlookCalendarDestinationProvider`, `CalDavDestinationProvider`,
-  `GraphClient::createEvent`.
-- **Tests first:** confirming a date creates one event and stores its ID;
-  moving the date updates that event, dropping deletes it; no connection →
-  the date stays on the board and the card says "Not in a calendar".
-- **Do:** update and delete in both providers where missing; the link on
-  the item; the line on the date card.
-- **Exit:** the five bullets.
+- **Goal:** J-PJ-19; `03` §16, calendar part (§0 #103).
+- **Reads:** the `.ics` writer the destination providers use today,
+  `CalendarDeliveryId`, PJ30.
+- **Tests first:** G22; the feed is valid iCalendar (one `VEVENT` per
+  `open` or `done` date, stable `UID`, `RRULE`, `TZID`) and imports into
+  Google, Apple and Outlook test accounts; a moved date keeps its `UID`; a
+  `proposed` or `dropped` date is absent; a wrong or renewed token answers
+  404 with no hint which part was wrong.
+- **Do:** `BPROJECTMEMBERFEEDS`, `ProjectCalendarFeed`, the three
+  endpoints, "Add to my calendar" on the Dates tab (copy address, open as
+  `webcal://`, renew); flag `PROJECTS.CALENDAR_FEED_ENABLED`.
+- **User-flow:** J-PJ-19 on a phone.
+- **Exit:** G22; the five bullets.
 
 ### PJ38 — mail preview to decline, move and follow up
 
@@ -448,21 +436,19 @@ the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
 - **Reads:** `Service/Microsoft/M365MailSender.php`, `GraphClient::sendMail`,
   `EmailMeRunner`, `02` §3.8a.
 - **Tests first:** G18 — no path but the web "Send" sends (tool, run, watch
-  and command tests); "Send" twice sends once; without Microsoft 365 there
-  is no "Send", only "Copy text" and "Open in mail app"; an empty "To"
-  keeps "Send" off; after a decline the date becomes a waiting item.
+  and command tests); "Send" twice sends once; "Copy text" and "Open in
+  mail app" are always there and complete on their own (a long body goes
+  to the clipboard; "Did you send it?" does what "Send" does afterwards);
+  "Send" only with Microsoft 365 (§0 #104); an empty "To" keeps "Send"
+  off; after a decline the date becomes a task that waits.
 - **Do:** `BOUTGOINGMAILS`, `ProjectMailService`, the endpoints, the
   preview dialog with variants; flag `PROJECTS.MAIL_ENABLED`.
-- **User-flow:** J-PJ-15 against a Graph stub.
+- **User-flow:** J-PJ-15 without a mailbox (mail app) and against a Graph
+  stub.
 - **Exit:** G18; the five bullets.
 
-### PJ39 — spike: read a calendar for clashes
-
-- **Goal:** §0 #88, the read half.
-- **Do:** Microsoft 365 `calendarView` and CalDAV `REPORT` against test
-  accounts: the scope each needs, how a person is asked, the time for one
-  hour of free/busy.
-- **Exit:** a recommendation in `STATUS.md`. No product code.
+PJ39 (spike: read a calendar for clashes) moved to master plan §9 with
+writing into calendars (§0 #103).
 
 ---
 
@@ -586,11 +572,13 @@ the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
   `SharedInbox`, PJ4, PJ13.
 - **Tests first:** a member with `read` sees shared chats and sources and
   cannot write; `edit` can add a source and create a chat; a private chat
-  of one member is invisible to the others, including the owner; removing
+  of one member and its items are invisible to the others, including the
+  owner (G21); removing
   a member removes access to folder and chats at once.
 - **Do:** `ProjectKind`; derived access to the folder and the shared
-  chats; "Share with the project" on a chat; Members tab; the project in
-  "Shared with me".
+  chats; "Share with the project" on a chat, which also makes its items
+  `project`; "Show to everyone" on a private item (§0 #99, G21); members
+  under "People and settings"; the project in "Shared with me".
 - **Exit:** the five bullets.
 
 ### PJ47 — members on the board and "Since you were here"
@@ -606,18 +594,77 @@ the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
 
 ---
 
-## Phase G — things come into the project
+## Phase G — push
+
+Moved here from the old phase D (§0 #107): it needs a relay and a store
+release, and nothing before it does.
+
+### PJ23 — spike: push through a relay
+
+- **Goal:** prove `03` §8 on real phones before anything is ordered.
+- **Do:** a minimal relay, a development build of the app with the push
+  plugin, a server behind NAT. Measure delivery, check the store rules for
+  a generic text, list what the Apple and Google accounts need.
+- **Exit:** G13's cases walked by hand; findings in `STATUS.md`; the
+  account and signing details go to the private repos, not here.
+
+### PJ24 — devices and signed push requests (API)
+
+- **Goal:** `03` §8.2, §8.4, §8.5 on the server.
+- **Reads:** `Service/PlatformLink/NotificationToken.php`, `NotifyKeyStore`,
+  `SignedNotificationClient`.
+- **Tests first:** a request is signed and verifies with the published
+  key; no request without a device, with the switch off, or after `seen`;
+  a shared chat notifies only the starter; rotation keeps old devices
+  working.
+- **Do:** `BPUSHDEVICES`, the two switches, `PushNotifier`, the endpoints,
+  `PushModule`.
+- **Exit:** the tests against a relay stub.
+
+### PJ25 — relay service (`synaplan-platform`)
+
+- **Goal:** `03` §8.1–§8.3. Own repository, own plan and PR there.
+- **Exit:** the contract tests of PJ24 pass against the real relay.
+
+### PJ26 — push in the app shell (`synaplan-apps`)
+
+- **Goal:** registration, permission, tap-to-open. Own PR there; a store
+  release.
+- **Exit:** G13 on TestFlight and an internal Android track.
+
+### PJ27 — tell the phone when a run is done or needs you
+
+- **Goal:** J-PJ-11 and the push half of J-PJ-16 and of PJ46; the
+  reminders of PJ36 move to push where the person has a device.
+- **Do:** the in-context sheet after the first promoted run; Settings →
+  Notifications with three switches (run done, needs you, reminders), shown only inside the app; `seen`; the
+  deep link from `ref` to the chat.
+- **Tests first:** Vitest: the section is absent in a browser; the sheet
+  appears once.
+- **Touches:** keep the web part out of the paths the mobile policy marks
+  `store-required`; the native bridge ships with PJ26.
+- **Exit:** the five bullets; walked on both phones against the cloud and
+  a self-hosted server.
+
+---
+
+## Phase H — things come into the project
 
 ### PJ40 — forward mails to a project
 
 - **Goal:** the forwarding half of J-PJ-14; `03` §17.
 - **Reads:** `Service/Email/SmartEmailHelper.php`, the inbound mail
-  handler, `FileIngestExecutor`, PJ31.
-- **Tests first:** a mail from a member lands as files and proposals; a
-  mail from anyone else is dropped, audited and not answered; a mail
-  cannot add an `open` item (G15); the run counts to the forwarding member.
-- **Do:** `BMAILKEY`, the keyword route, the proposal run; "Forward mails…"
-  under "More" with the address and a copy button; flag
+  handler and the headers it keeps, `FileIngestExecutor`, PJ31.
+- **Tests first:** a mail from a member's confirmed address with DMARC
+  `pass` lands as files and proposals; a forged `From`, a DMARC `fail`, an
+  unconfirmed address and a stranger are dropped, audited with the reason
+  and not answered (§0 #105); a forwarded mail names the original sender as
+  contact; a mail cannot add an `open` item (G15); the extraction counts to
+  the forwarding member.
+- **Do:** `BMAILKEY`, `BPROJECTSENDERS` and the confirmation mail, the
+  keyword route, the DMARC check on `Authentication-Results`, the
+  extraction of `03` §17 with mail input; "Forward mails…" under "People
+  and settings" with the address and a copy button; flag
   `PROJECTS.INBOX_ENABLED`.
 - **Exit:** G15; the five bullets.
 
@@ -631,7 +678,7 @@ the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
 ### PJ42 — files of a project are read for items
 
 - **Goal:** an offer as PDF proposes a cost and a date.
-- **Reads:** PJ40's proposal run, the file indexing events.
+- **Reads:** PJ31's extraction, the file indexing events.
 - **Tests first:** G15 for files; a file is read once after indexing; a re-upload of the
   same file proposes nothing new; proposals name the file as source.
 - **Do:** the trigger after indexing; the source link on the card.
@@ -651,21 +698,22 @@ the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
 
 ---
 
-## Phase H — watches
+## Phase I — watches
 
-### PJ44 — watches that know the project (API)
+### PJ44 — watches for a version or a changed page (API)
 
-- **Goal:** `03` §2.12 and §18.
+- **Goal:** `03` §2.12 and §18, kinds `version` and `page` (§0 #106).
 - **Reads:** `Entity/UrlWatch.php`, `Service/UrlWatch/UrlWatchService.php`,
-  `TextDiff.php`, `WebFetchTool`, PJ35's tick pattern.
-- **Tests first:** G19 — each of the five kinds against recorded pages;
-  a report only when the condition turns true; three failures pause the
-  watch; a watch never posts a form or follows a sign-in; the model is
-  called only when the extractor fails, and that call counts to the
-  creator.
-- **Do:** `BPROJECTWATCHES`, `ProjectWatchesTickCommand`, one checker per
-  kind, the endpoints, a tool `project_watch_add` for "tell me when…";
-  flag `PROJECTS.WATCHES_ENABLED`.
+  `TextDiff.php`, `Command/SavedTasksTickCommand.php`, `CronNextRun`.
+- **Tests first:** G19 — both kinds against recorded feeds and pages; a
+  report only when the value changes as the condition says; three failures
+  pause the watch; a watch never posts a form or follows a sign-in; an
+  unchanged value never calls a model; a source without a feed is not
+  accepted as `version`; `number` and `entries` are refused with 422.
+- **Do:** `BPROJECTWATCHES`, the task kind `project_watch` on the Saved
+  Tasks tick (no own tick command), one checker per kind, the endpoints;
+  "tell me when …" in a project chat becomes a proposed watch through the
+  extraction of PJ31; flag `PROJECTS.WATCHES_ENABLED`.
 - **Exit:** G19.
 
 ### PJ45 — "Watching for you" on the board
@@ -673,24 +721,25 @@ the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
 - **Goal:** J-PJ-17.
 - **Reads:** `02` §3.8b, PJ32's cards.
 - **Tests first:** Vitest for active, triggered, failed and paused;
-  Playwright: "tell me when the oven is under 450 €" creates a watch that
-  shows on the card.
+  Playwright: "tell me when PHP 8.5.2 is out" creates a watch that shows
+  on the card.
 - **Do:** the card, the detail with the last values, pause and stop.
 - **User-flow:** J-PJ-17.
 - **Exit:** the five bullets.
 
-### PJ46 — watches report through push and mail
+### PJ46 — watches report in the project, by mail and push
 
 - **Goal:** the report half of J-PJ-17.
-- **Reads:** PJ27, PJ35's channel choice.
-- **Tests first:** a triggered watch sends one push or one mail and writes
-  one line into the project chat; a paused watch sends nothing.
+- **Reads:** PJ35's channel choice, PJ27 once it is there.
+- **Tests first:** a triggered watch sends one mail (or one push after
+  phase G) and writes one line into the project chat; a paused watch sends
+  nothing.
 - **Do:** the report through the reminder channel; the line in the chat.
 - **Exit:** the tests.
 
 ---
 
-## Phase I — rollout
+## Phase J — rollout
 
 ### PJ28 — docs and flags
 
