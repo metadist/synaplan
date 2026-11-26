@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="de" class="design-v2">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup: Projektseite, ruhige Fassung</title>
+<style>
+/* Tokens copied from frontend/src/style.css and style-v2.css (glass design). */
+:root{
+  --brand:#003fc7;--brand-light:#6b8fd6;--brand-hover:#0035b0;--on-brand:#fff;
+  --bg-app:#d5dee9;--bg-sidebar:rgba(208,218,234,.94);--bg-sidebar-panel:#dce4ef;
+  --bg-chat:#e8edf4;--bg-card:rgba(255,255,255,.96);--bg-chip:rgba(0,0,0,.07);
+  --txt-primary:#000;--txt-secondary:#3a3f48;
+  --border-light:rgba(0,45,140,.28);--brand-alpha-light:rgba(0,63,199,.12);
+  --v2-glow:rgba(0,63,199,.2);--v2-glow-strong:rgba(0,63,199,.36);
+  --v2-border:rgba(0,63,199,.3);--v2-border-hover:rgba(0,63,199,.44);--v2-radius:1rem;
+  --status-success:#16a34a;--status-success-muted:#dcfce7;--status-success-text:#166534;
+  --status-warning:#ca8a04;--status-warning-muted:#fef9c3;--status-warning-text:#854d0e;
+  --status-error:#dc2626;--status-error-muted:#fee2e2;--status-error-text:#991b1b;
+  --status-neutral-muted:#f1f5f9;--status-neutral-text:#475569;
+  --divider:rgba(0,0,0,.1);--usage-track:rgba(0,63,199,.18);
+  --hair:rgba(0,0,0,.08);--row-hover:rgba(0,0,0,.04);
+  --bubble-ai:rgba(248,249,252,.85);--shell:rgba(255,255,255,.55);
+  --pill-bg:rgba(0,0,0,.08);--pill-bd:rgba(0,0,0,.22);--pill-ink:#2f3743;
+  --sec-bg:rgba(0,0,0,.08);--sec-bd:rgba(0,0,0,.26);--ghost:#525252;
+  --av-1:#1d4ed8;--av-2:#0f766e;--av-3:#7c3aed;
+}
+html.dark{
+  --brand:#6d9ae0;--brand-light:#93b8e8;--brand-hover:#83b0e8;--on-brand:#0a0e1a;
+  --bg-app:#02050c;--bg-sidebar:rgba(8,13,24,.78);--bg-sidebar-panel:#101828;
+  --bg-chat:#02050c;--bg-card:rgba(20,31,56,.94);--bg-chip:rgba(255,255,255,.07);
+  --txt-primary:#fff;--txt-secondary:#bdc2cc;
+  --border-light:rgba(107,143,214,.24);--brand-alpha-light:rgba(107,143,214,.14);
+  --v2-glow:rgba(107,143,214,.14);--v2-glow-strong:rgba(107,143,214,.28);
+  --v2-border:rgba(107,143,214,.18);--v2-border-hover:rgba(107,143,214,.3);
+  --status-success:#4ade80;--status-success-muted:rgba(34,197,94,.15);--status-success-text:#86efac;
+  --status-warning:#facc15;--status-warning-muted:rgba(250,204,21,.15);--status-warning-text:#fef08a;
+  --status-error:#f87171;--status-error-muted:rgba(239,68,68,.15);--status-error-text:#fca5a5;
+  --status-neutral-muted:rgba(100,116,139,.2);--status-neutral-text:#cbd5e1;
+  --divider:rgba(255,255,255,.1);--usage-track:rgba(147,197,253,.26);
+  --hair:rgba(255,255,255,.07);--row-hover:rgba(255,255,255,.04);
+  --bubble-ai:rgba(20,30,52,.55);--shell:rgba(255,255,255,.08);
+  --pill-bg:rgba(255,255,255,.12);--pill-bd:rgba(255,255,255,.24);--pill-ink:#e4e5e9;
+  --sec-bg:rgba(255,255,255,.1);--sec-bd:rgba(255,255,255,.2);--ghost:#c8ccd4;
+  --av-1:#93b8e8;--av-2:#5eead4;--av-3:#c4b5fd;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:'Plus Jakarta Sans Variable','Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  font-size:14px;line-height:1.5;color:var(--txt-primary);background:var(--bg-app);-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+svg.s{width:16px;height:16px}svg.xs{width:14px;height:14px}svg.l{width:24px;height:24px}
+.sec{color:var(--txt-secondary)}
+.app{position:relative;z-index:2;display:flex;height:100dvh}
+.ambient{position:fixed;inset:0;z-index:1;pointer-events:none;overflow:hidden}
+.ambient::before{content:'';position:absolute;inset:-25vmax;background:radial-gradient(circle at 50% 42%,color-mix(in srgb,var(--brand) 8%,transparent),transparent 60%)}
+.ambient svg{position:absolute;right:26%;top:18%;width:260px;opacity:.035;color:var(--brand)}
+html.dark .ambient svg{opacity:.06}
+
+/* Rail + panel (SidebarRail.vue, SidebarPanel.vue) */
+.rail{width:56px;background:var(--bg-sidebar-panel);border-right:1px solid var(--v2-border);display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.rail .logo{height:56px;display:flex;align-items:center;justify-content:center;color:var(--brand)}
+.rail .logo svg{height:24px;width:auto}
+.rail nav{flex:1;display:flex;flex-direction:column;gap:4px;padding:4px 0}
+.rail-icon{width:44px;height:44px;border-radius:.75rem;display:inline-flex;align-items:center;justify-content:center;color:var(--txt-secondary);transition:all .2s}
+.rail-icon:hover{background:var(--brand-alpha-light);color:var(--brand);box-shadow:0 0 10px var(--v2-glow)}
+.rail-icon.on{background:var(--brand-alpha-light);color:var(--brand);box-shadow:0 0 14px var(--v2-glow)}
+.avatar{width:28px;height:28px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--bg-sidebar-panel);background:var(--av-1);flex-shrink:0}
+.avatar.b{background:var(--av-2)}.avatar.c{background:var(--av-3)}.avatar.sm{width:22px;height:22px;font-size:10px}
+.panel{width:280px;background:var(--bg-sidebar);border-right:1px solid var(--v2-border);display:flex;flex-direction:column;flex-shrink:0;backdrop-filter:blur(24px)}
+.panel header{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px}
+.badge-ic{width:36px;height:36px;border-radius:.75rem;display:inline-flex;align-items:center;justify-content:center;color:var(--brand);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--brand) 18%,transparent),color-mix(in srgb,var(--brand) 8%,transparent));box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brand) 16%,transparent)}
+.panel h2{font-size:15px;font-weight:600;margin:0;flex:1}
+.newchat{margin:4px 12px 0;padding:9px 12px;border-radius:.75rem;display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;
+  background:rgba(0,63,199,.14);color:var(--brand);border:1px solid rgba(0,63,199,.28)}
+html.dark .newchat{background:rgba(107,143,214,.12);color:var(--brand-light);border-color:rgba(107,143,214,.22)}
+.panel .scroll{flex:1;overflow:auto;padding-bottom:8px}
+.sect{display:flex;align-items:center;gap:8px;padding:6px 16px;margin-top:20px;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--txt-secondary)}
+.sect .grow{flex:1}
+.rows{padding:0 8px}
+.row{display:flex;align-items:center;gap:6px;padding:7px 12px;border-radius:.5rem;font-size:15px;line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row:hover{background:var(--row-hover)}
+.row.on{background:var(--brand-alpha-light);color:var(--brand);font-weight:600}
+html.dark .row.on{color:var(--brand-light)}
+.row .dot{margin-left:auto;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--brand);color:var(--on-brand);font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.panel footer{border-top:1px solid var(--hair);padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:13px}
+
+/* House classes */
+.surface-card{background:var(--bg-card);backdrop-filter:blur(16px);border-radius:var(--v2-radius);border:1px solid var(--v2-border);box-shadow:0 2px 16px rgba(0,0,0,.06),0 0 1px var(--v2-glow)}
+html.dark .surface-card{box-shadow:0 2px 16px rgba(0,0,0,.3),0 0 1px var(--v2-glow)}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:.75rem;font-size:14px;font-weight:500;line-height:20px;white-space:nowrap}
+.btn-primary{background:var(--brand);color:var(--on-brand);border:1px solid rgba(0,63,199,.3);box-shadow:0 0 12px rgba(0,63,199,.25),0 2px 8px rgba(0,0,0,.1)}
+.btn-primary:hover{background:var(--brand-hover)}
+.btn-secondary{background:var(--sec-bg);border:1px solid var(--sec-bd);color:var(--txt-primary)}
+.btn-sm{padding:6px 12px;font-size:13px}
+.icon-ghost{color:var(--ghost);border-radius:.75rem;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;transition:all .15s}
+.icon-ghost:hover{background:var(--brand-alpha-light);color:var(--brand)}
+.icon-ghost.sm{width:28px;height:28px;border-radius:.5rem}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;min-height:32px;border-radius:.75rem;font-size:13px;color:var(--pill-ink);background:var(--pill-bg);border:1px solid var(--pill-bd)}
+.pill.on{background:rgba(0,63,199,.16);border-color:rgba(0,63,199,.38);color:var(--brand)}
+html.dark .pill.on{background:rgba(107,143,214,.14);border-color:rgba(107,143,214,.38);color:var(--brand-light)}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:500;background:var(--status-neutral-muted);color:var(--status-neutral-text);white-space:nowrap}
+.chip.ok{background:var(--status-success-muted);color:var(--status-success-text)}
+.chip.warn{background:var(--status-warning-muted);color:var(--status-warning-text)}
+.chip.err{background:var(--status-error-muted);color:var(--status-error-text)}
+.chip.brand{background:var(--brand-alpha-light);color:var(--brand)}
+html.dark .chip.brand{color:var(--brand-light)}
+.tab-nav{display:flex;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--hair);padding-bottom:8px}
+.tab{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:.75rem;font-size:14px;font-weight:500;color:var(--txt-secondary)}
+.tab:hover{color:var(--txt-primary);background:rgba(0,63,199,.09)}
+.tab.on{background:rgba(0,63,199,.14);color:var(--brand)}
+html.dark .tab.on{background:rgba(107,143,214,.2);color:var(--brand-light)}
+.tab .n{min-width:18px;height:18px;padding:0 4px;border-radius:999px;font-size:10px;font-weight:700;background:var(--brand);color:var(--on-brand);display:inline-flex;align-items:center;justify-content:center}
+
+/* Main: board */
+.main{flex:1;min-width:0;display:flex;background:var(--bg-chat)}
+.board{flex:1;min-width:0;overflow-y:auto;padding:24px 32px 96px;container-type:inline-size}
+.board-in{max-width:980px;margin:0 auto}
+.phead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+.phead h1{font-size:24px;font-weight:600;margin:0;line-height:44px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.members{display:flex}.members .avatar{margin-left:-6px;box-shadow:0 0 0 2px var(--bg-chat)}
+.psub{font-size:13px;margin:0 0 18px}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px;margin-top:20px}
+.c12{grid-column:span 12}.c7{grid-column:span 7}.c5{grid-column:span 5}.c6{grid-column:span 6}.c4{grid-column:span 4}
+.card{padding:16px 18px}
+.card h3{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:14px;font-weight:600}
+.card h3 .grow{flex:1}
+.card h3 a{font-size:12px;font-weight:500;color:var(--brand);text-decoration:none}
+html.dark .card h3 a{color:var(--brand-light)}
+.li{display:flex;align-items:flex-start;gap:10px;padding:9px 0;border-top:1px solid var(--hair)}
+.li:first-of-type{border-top:0;padding-top:0}
+.li .t{flex:1;min-width:0}.li .t b{font-weight:600;display:block}
+.li .m{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:3px;font-size:12px;color:var(--txt-secondary)}
+.src{display:inline-flex;align-items:center;gap:4px;color:var(--txt-secondary);text-decoration:underline;text-decoration-color:var(--divider);text-underline-offset:2px}
+.cb{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--border-light);margin-top:1px;display:grid;place-items:center;flex-shrink:0;background:var(--bg-card)}
+.cb svg{opacity:0;width:14px;height:14px;stroke-width:2.4}
+.li.done .cb{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}.li.done .cb svg{opacity:1}
+.li.done .t b{text-decoration:line-through;font-weight:500;color:var(--txt-secondary)}
+.date{width:46px;text-align:center;border-radius:.75rem;padding:5px 0;background:var(--brand-alpha-light);color:var(--brand);flex-shrink:0;line-height:1.15}
+html.dark .date{color:var(--brand-light)}
+.date small{display:block;font-size:10px;font-weight:600;text-transform:uppercase}.date b{font-size:17px;font-weight:700}
+.sugg{border:1px dashed var(--v2-border-hover);background:color-mix(in srgb,var(--brand) 5%,var(--bg-card))}
+.sugg .li .acts{display:flex;gap:6px;flex-shrink:0}
+.sugg .li.taken{opacity:.55}.sugg .li.taken .acts{display:none}
+.bar{height:8px;border-radius:999px;background:var(--usage-track);overflow:hidden;margin:10px 0 8px}
+.bar i{display:block;height:100%;width:70%;border-radius:999px;background:var(--brand)}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:3px 0}.kv>:last-child{white-space:nowrap;text-align:right}
+.li .m .chip{white-space:normal}
+.price{font-size:22px;font-weight:700;line-height:1.2}
+
+.mock button.on{background:var(--brand);color:var(--on-brand)}
+
+/* Calm version: little on screen, cards appear when there is content */
+.board-in{max-width:800px}
+.card{padding:20px 22px}
+.card h3{margin-bottom:14px;font-size:15px}
+.card h3 .icon-ghost{margin:-6px -8px -6px 0}
+.sum .r{display:flex;gap:16px;padding:14px 0;border-top:1px solid var(--hair);align-items:baseline}
+.sum .r:first-of-type{border-top:0;padding-top:0}
+.sum .lab{width:118px;flex-shrink:0;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--txt-secondary)}
+.sum .txt{flex:1;min-width:0}.sum .txt b{font-size:16px;font-weight:600;display:block}.sum .txt span{color:var(--txt-secondary)}
+.prog{display:flex;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--hair);font-size:13px;color:var(--txt-secondary)}
+.prog .bar{flex:1;margin:0;height:6px}
+.ln{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--hair)}
+.ln:first-of-type{border-top:0;padding-top:0}.ln:last-child{padding-bottom:0}
+.ln .t{flex:1;min-width:0}.ln .t b{font-weight:600;display:block}.ln .t span{font-size:13px;color:var(--txt-secondary)}
+.ln>svg{color:var(--txt-secondary)}
+.drop{grid-column:span 12;border:1.5px dashed var(--v2-border);border-radius:1rem;padding:26px 20px;text-align:center;color:var(--txt-secondary);font-size:14px}
+.drop b{display:block;color:var(--txt-primary);font-weight:600;margin-bottom:2px}
+.hello{text-align:center;padding:34px 28px}
+.hello .badge-ic{width:48px;height:48px;margin:0 auto 14px}
+.hello h2{margin:0 0 6px;font-size:20px;font-weight:600}.hello p{margin:0 auto;max-width:440px;color:var(--txt-secondary)}
+.morebtn{grid-column:span 12;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:1rem;font-size:14px;font-weight:500;color:var(--txt-secondary);border:1px solid var(--hair)}
+.morebtn:hover{background:var(--row-hover);color:var(--txt-primary)}
+.morebtn svg{transition:transform .2s}
+body.more-open .morebtn svg{transform:rotate(180deg)}
+body:not(.more-open) .more{display:none!important}
+.ask{align-self:stretch;padding:14px}
+.ask .q{font-weight:600;margin:0 0 8px}.ask .q+.opts{margin-bottom:14px}
+.ask .opts{display:flex;flex-wrap:wrap;gap:6px}
+.ask .free{margin-top:8px;padding:8px 12px;border-radius:.75rem;border:1px solid var(--border-light);background:var(--bg-card);color:var(--txt-secondary);font-size:13px}
+.ask .acts{display:flex;gap:8px;margin-top:14px}
+.runline{align-self:flex-start;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--txt-secondary);padding:2px 4px}
+body[data-state=n] .sW{display:none!important}
+body[data-state=w] .sN{display:none!important}
+@container (max-width:520px){.sum .r{flex-direction:column;gap:2px}.sum .lab{width:auto}}
+
+/* Sub pages behind the tabs */
+[hidden]{display:none!important}
+.tabs{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:270px;padding:6px;display:none}
+.menu.open{display:block}
+.menu button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border-radius:.5rem;font-size:14px;text-align:left}
+.menu button:hover{background:var(--row-hover)}
+.menu button.on{background:var(--brand-alpha-light);color:var(--brand);font-weight:600}
+html.dark .menu button.on{color:var(--brand-light)}
+.menu button svg{color:var(--txt-secondary)}
+.menu hr{border:0;border-top:1px solid var(--hair);margin:6px 4px}
+.bartop{grid-column:span 12;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.bartop .grow{flex:1}
+.field{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:.75rem;border:1px solid var(--border-light);background:var(--bg-card);color:var(--txt-secondary);font-size:14px;min-width:0}
+.field.grow{flex:1;min-width:180px}
+.grp{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--txt-secondary);margin:22px 0 10px;display:flex;align-items:center;gap:8px}
+.grp:first-child{margin-top:0}
+.grp+.li,.grp+.ln{border-top:0;padding-top:0}
+.fic{width:38px;height:38px;border-radius:.75rem;display:grid;place-items:center;background:var(--brand-alpha-light);color:var(--brand);flex-shrink:0}
+html.dark .fic{color:var(--brand-light)}
+.read{font-size:13px;margin-top:4px;color:var(--txt-primary)}
+.hint{grid-column:span 12;font-size:13px;color:var(--txt-secondary);margin:0;padding:0 4px}
+.rowsum{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--hair);font-size:14px}
+.rowsum:first-of-type{border-top:0}
+.rowsum .a{flex:1;min-width:0}.rowsum .a span{display:block;font-size:13px;color:var(--txt-secondary)}
+.rowsum .v{font-weight:600;white-space:nowrap;font-variant-numeric:tabular-nums;text-align:right}
+.rowsum.tot{border-top:1px solid var(--divider);font-weight:700}
+.sw-t{width:38px;height:22px;border-radius:999px;background:var(--usage-track);position:relative;flex-shrink:0}
+.sw-t::after{content:'';position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:999px;background:var(--bg-card);box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .15s}
+.sw-t.on{background:var(--brand)}.sw-t.on::after{left:18px}
+.hist{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.card .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.card p.sec{margin:0 0 12px;font-size:13px}
+@container (max-width:520px){.ln .avatar+.t,.ln svg+.t{flex-basis:calc(100% - 50px)}.ln{flex-wrap:wrap}.ln .avatar~.btn,.ln svg~.btn{margin-left:40px}.field.grow{flex-basis:100%}}
+
+/* Chat sidebar */
+.chat{width:var(--chatw,40%);min-width:420px;max-width:calc(100% - 460px);flex-shrink:0;display:flex;flex-direction:column;background:var(--bg-sidebar);backdrop-filter:blur(24px)}
+.chat-h{display:flex;align-items:center;gap:6px;padding:10px 10px 10px 16px;border-bottom:1px solid var(--hair)}
+.chat-h .sw{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:14px;padding:6px 8px;border-radius:.5rem;flex:1;min-width:0}
+.chat-h .sw:hover{background:var(--row-hover)}
+.msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.who{font-size:12px;color:var(--txt-secondary);display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.bub{padding:10px 14px;border-radius:1.125rem;font-size:14px;max-width:92%}
+.bub.ai{background:var(--bubble-ai);border:1px solid var(--hair);align-self:flex-start;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+.bub.me{background:var(--brand);color:var(--on-brand);align-self:flex-end;border:1px solid rgba(0,63,199,.2);box-shadow:0 4px 20px rgba(0,63,199,.18)}
+.bub p{margin:0 0 8px}.bub p:last-child{margin:0}
+.right{align-self:flex-end;display:flex;flex-direction:column;align-items:flex-end;max-width:92%}
+.run{align-self:stretch;padding:12px 14px;font-size:13px}
+.run .rh{display:flex;align-items:center;gap:8px;font-weight:600;margin-bottom:8px}
+.run .st{display:flex;align-items:center;gap:8px;padding:3px 0;color:var(--txt-secondary)}
+.run .st.ok{color:var(--txt-primary)}.run .st.ok svg{color:var(--status-success)}
+.pulse{width:8px;height:8px;border-radius:999px;background:var(--brand);animation:p 1.2s ease-in-out infinite}
+@keyframes p{50%{opacity:.25;transform:scale(.7)}}
+.wrote{align-self:flex-start;display:flex;align-items:center;gap:8px;font-size:12px;padding:6px 10px;border-radius:.75rem;background:var(--brand-alpha-light);color:var(--brand)}
+html.dark .wrote{color:var(--brand-light)}
+.wrote button{text-decoration:underline;font-weight:600}
+.composer{padding:10px 12px 12px}
+.shell{background:var(--shell);border:1px solid var(--v2-border);border-radius:1.25rem;box-shadow:0 4px 24px rgba(0,0,0,.06),0 0 16px var(--v2-glow);padding:10px 10px 8px 14px}
+.shell .ph{color:var(--txt-secondary);font-size:14px;padding:4px 0 10px}
+.shell .tools{display:flex;align-items:center;gap:6px}
+.shell .tools .grow{flex:1}
+.send{width:36px;height:36px;border-radius:999px;background:var(--brand);color:var(--on-brand);display:grid;place-items:center}
+
+/* Mockup controls */
+.mock{position:fixed;left:68px;bottom:12px;z-index:50;display:flex;gap:6px;padding:6px;border-radius:999px;background:var(--bg-card);border:1px solid var(--v2-border);box-shadow:0 8px 40px rgba(0,0,0,.18)}
+.mock button{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:600}
+.mock button:hover{background:var(--brand-alpha-light)}
+.mobtabs{display:none}
+
+@media (max-width:1240px){.panel{display:none}}
+@container (max-width:860px){.c4{grid-column:span 6}.c4.w12{grid-column:span 12}}
+@container (max-width:700px){.c7,.c5,.c6,.c4,.c4.w12{grid-column:span 12}.lage{grid-template-columns:auto 1fr}.lage .btn{grid-column:span 2;justify-content:center}}
+@container (max-width:520px){.sugg .li{flex-wrap:wrap}.sugg .li .acts{width:100%;padding-left:56px}.sugg h3{flex-wrap:wrap}.sugg h3 .grow{display:none}.sugg h3>span:last-child{width:100%}.tab-nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}.tab{flex-shrink:0}}
+@media (max-width:1020px){.board{padding:20px 20px 96px}}
+@media (max-width:820px){
+  .rail{display:none}.main{flex-direction:column}
+  .chat{width:100%!important;border-left:0;flex:1;min-height:0}
+  body[data-view=board] .chat{display:none}body[data-view=chat] .board{display:none}
+  .board{padding:16px 14px 150px}.lage{grid-template-columns:auto 1fr}.lage .btn{grid-column:span 2;justify-content:center}
+  .phead h1{font-size:20px}.hide-m{display:none}
+  .mobtabs{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg-sidebar-panel);border-top:1px solid var(--v2-border);padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+  .mobtabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;font-weight:600;padding:6px;border-radius:.75rem;color:var(--txt-secondary)}
+  .mobtabs button.on{color:var(--brand);background:var(--brand-alpha-light)}
+  .mock{position:fixed;top:0;left:0;right:0;bottom:auto;height:36px;border-radius:0;border-width:0 0 1px;box-shadow:none;padding:4px 8px;justify-content:center;background:var(--bg-sidebar-panel)}
+  .mock button{padding:4px 10px;white-space:nowrap}
+  .app{height:calc(100dvh - 36px);margin-top:36px}.composer{padding-bottom:76px}
+  .hello .wide-only{display:none}
+  .sugg .ln{flex-wrap:wrap}.sugg .ln .t{flex-basis:calc(100% - 40px)}.sugg .ln .btn{margin-left:32px}
+}
+
+/* Written status on top of the overview */
+.lagebild{grid-column:span 12;font-size:18px;line-height:1.6;margin:0;max-width:62ch;text-wrap:pretty}
+.lagebild a{color:inherit;text-decoration:underline;text-decoration-color:var(--v2-border);text-underline-offset:3px}
+.lagebild a:hover{text-decoration-color:var(--brand)}
+.lagebild .late{color:var(--status-error-text)}
+.stand{font-size:13px;color:var(--txt-secondary);margin:8px 0 0}
+.lead{grid-column:span 12;padding:0 4px 4px}
+@container (max-width:520px){.lagebild{font-size:17px}}
+
+/* Mail preview: nothing is sent without this dialog */
+.ov{position:fixed;inset:0;z-index:60;background:rgba(6,12,28,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.dlg{width:100%;max-width:580px;max-height:100%;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.dlg h2{margin:0 0 4px;font-size:18px;font-weight:600}
+.dlg .why{margin:0 0 14px;font-size:13px;color:var(--txt-secondary)}
+.dlg .vars{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.dlg .vars button{cursor:pointer}
+.mf{display:flex;gap:12px;padding:8px 0;border-top:1px solid var(--hair);font-size:14px}
+.mf span:first-child{width:56px;flex-shrink:0;color:var(--txt-secondary)}
+.mf span:last-child{min-width:0;overflow-wrap:anywhere}
+.mbody{margin-top:10px;padding:12px 14px;border-radius:.75rem;border:1px solid var(--border-light);background:var(--bg-card);font-size:14px;line-height:1.55;white-space:pre-wrap;min-height:150px;max-height:38vh;overflow:auto;outline:0}
+.mbody:focus{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-alpha-light)}
+.dlg .note{font-size:13px;color:var(--txt-secondary);margin:10px 0 0}
+.dlg .acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;align-items:center}
+.dlg .acts .grow{flex:1}
+.dlg .mocksw{font-size:12px;color:var(--txt-secondary);text-decoration:underline}
+body.nomail .with-mail{display:none!important}
+body:not(.nomail) .no-mail{display:none!important}
+.sent{color:var(--status-success-text);font-size:13px;font-weight:500;white-space:nowrap}
+@media (max-width:820px){.sugg .ln .btn+.btn{margin-left:0}}
+@container (max-width:520px){.li:has(>.btn){flex-wrap:wrap}.li:has(>.btn) .t{flex-basis:calc(100% - 70px)}.li>.btn:first-of-type{margin-left:56px}}
+
+/* Chat left, board right, one drag handle */
+.split{width:9px;margin:0 -4px;flex-shrink:0;position:relative;z-index:6;cursor:col-resize;touch-action:none}
+.split::before{content:"";position:absolute;top:0;bottom:0;left:4px;width:1px;background:var(--v2-border);transition:background .15s,box-shadow .15s}
+.split:hover::before,body.dragging .split::before{background:var(--brand);box-shadow:0 0 0 1px var(--brand)}
+body.dragging{cursor:col-resize;user-select:none}
+body.dragging .board,body.dragging .chat{pointer-events:none}
+.reopen{display:none;position:absolute;left:10px;top:12px;z-index:7;width:40px;height:40px;border-radius:.75rem;align-items:center;justify-content:center;background:var(--bg-sidebar-panel);border:1px solid var(--v2-border);color:var(--txt-secondary)}
+.reopen:hover{color:var(--brand);background:var(--brand-alpha-light)}
+.main{position:relative}
+body.boardonly .chat,body.boardonly .split{display:none}
+body.boardonly .reopen{display:inline-flex}
+body.boardonly .board{padding-left:64px}
+body.chatonly .board,body.chatonly .split{display:none}
+body.chatonly .chat,body[data-state=n] .chat{width:auto;flex:1;max-width:none;min-width:0}
+body.chatonly .chat>*,body[data-state=n] .chat>*{width:100%;max-width:820px;margin-left:auto;margin-right:auto}
+body.chatonly .chat-h,body[data-state=n] .chat-h{border-bottom-color:transparent}
+body[data-state=n] .board,body[data-state=n] .split,body[data-state=n] .reopen,body[data-state=n] .mobtabs{display:none!important}
+body[data-state=w] .board{animation:boardin .35s ease-out}
+@keyframes boardin{from{opacity:0;transform:translateX(24px)}to{opacity:1;transform:none}}
+.chat-proj{padding:18px 16px 2px}
+.chat-proj b{display:block;font-size:24px;font-weight:600}
+.chat-proj span{font-size:13px;color:var(--txt-secondary)}
+.boardhint{font-size:13px;color:var(--txt-secondary);margin:4px 0 0;max-width:60ch}
+#wide.on,#hidechat.on{color:var(--brand)}
+@media (max-width:820px){
+  .split,.reopen{display:none!important}
+  body.boardonly:not([data-view=board]) .chat,body[data-state=n] .chat{display:flex!important}
+  body.chatonly:not([data-view=chat]) .board{display:block}
+  body[data-state=n] .composer{padding-bottom:12px}
+}
+</style>
+</head>
+<body data-view="board">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="bird" viewBox="0 0 211.2 256.38"><path fill="currentColor" stroke="none" d="m67.06,158.58l19.18,0c-0.29,6.75 -1.53,13.38 -3.17,19.9c5.85,-0.06 11.88,0.2 17.71,-0.61c5.83,-0.81 13.87,-5.74 11.88,-14.39c-1.12,-4.84 -4.18,-6.46 -8.33,-8.39c-13.5,-6.32 -27.91,-10.81 -41.44,-17.1c-4.38,-1.33 -9.08,0.95 -12.4,3.75c-15.4,12.98 -17.97,47.99 -19.32,66.9c0,0.32 -0.09,1.3 0.14,1.3c19.18,-10.73 32.93,-29.47 35.33,-51.62c0.12,-0.14 0.35,0.29 0.43,0.29l0,-0.03l-0.01,0zm65.03,95.16c0.37,-9.52 -5.59,-16.96 -14.27,-20.19c-7.64,-2.85 -16.55,-0.66 -24.54,-1.61c-7.81,8.97 -17.53,16.24 -29.13,19.47c-9.34,2.6 -18.74,2.45 -28.38,2.34c-0.14,-0.66 0.09,-0.46 0.37,-0.63c2.97,-1.9 7.24,-3.55 10.5,-5.36c14.94,-8.39 27.48,-19.52 37.58,-33.36l15.46,-0.12c29.88,-0.61 60.7,-22.55 58.68,-54.96c-1.93,-31.06 -36.91,-37.86 -59.61,-49.11c-6.66,-3.32 -13.84,-7.53 -17.45,-14.27c-7.44,-13.93 2.16,-29.44 17.48,-30.48c5.31,-0.37 13.47,-0.35 18.77,0c6.2,0.4 13.7,3.11 15.92,9.46c5.08,14.45 -16.03,19 -17.27,4.15c-5.83,-0.32 -17.01,-0.49 -15.8,8.16c1.21,8.65 6.23,7.24 9.49,8.97c8.33,4.44 17.85,7.56 26.44,11.62c3.75,1.79 7.44,3.75 11.04,5.83c1.21,-7.27 0.81,-14.65 0.87,-22c11.53,-7.27 12.63,-22.38 3.75,-32.36c-12.86,-14.53 -37,-14.68 -54.96,-13.7c-27.48,1.5 -50.58,23.73 -42.3,52.43c8.07,28.03 42.36,30.8 64.11,42.88c24.4,13.58 17.13,45.45 -8.22,52.63c-10.7,3.03 -22.03,1.1 -33.02,1.87c-16.88,28.46 -45.92,47.78 -77.58,56.35c-0.2,-0.2 1.61,-2.71 1.87,-3.17c10.04,-18.14 9.8,-38.32 11.97,-58.4c2.77,-25.78 7.38,-54.33 30.86,-69.5c-6.23,-6.75 -9.98,-15.75 -11.19,-24.83c-1.36,-10.04 -0.26,-20.47 3.72,-29.79c-14.04,-1.27 -23.62,-14.65 -25.95,-27.68c12.86,4.18 26.33,6.14 39.8,7.21l-9.8,-4.47c-8.02,-4.47 -13.84,-10.93 -16.49,-19.84c-2.08,-6.95 -2.25,-14.07 -1.64,-21.28c11.56,10.7 25.84,19.7 41.18,23.85c27.94,7.56 56.81,-2.19 83.89,9.83c16.73,7.44 33.8,24.48 29.07,44.47c18.6,6.63 28.89,27.86 20.76,46.4c-3.43,7.84 -10.35,14.71 -18.6,17.3c2.57,-6.08 3.37,-18.83 -4.24,-21.57c-0.37,-0.14 -2.05,-0.63 -2.25,-0.63l-13.7,0c1.59,3.52 4.44,6 6.75,8.97c23.65,30.39 8.42,71.57 -21.6,90.81c-2.51,1.61 -5.25,2.94 -7.64,4.61c1.04,0.92 1.79,0.4 3,0.61c12.34,2.13 22.44,11.04 24.08,23.79c0.2,1.67 0.23,3.6 0.32,5.31l-32.07,0l-0.03,-0.01l0,0z"/></symbol>
+  <symbol id="chat" viewBox="0 0 24 24"><path d="M4 5h16v11H10l-5 4v-4H4z"/></symbol>
+  <symbol id="folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="book" viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3zM5 17a3 3 0 0 1 3-3h11"/></symbol>
+  <symbol id="grid" viewBox="0 0 24 24"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></symbol>
+  <symbol id="spark" viewBox="0 0 24 24"><path d="M11 3l1.8 5.2L18 10l-5.2 1.8L11 17l-1.8-5.2L4 10l5.2-1.8zM18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z"/></symbol>
+  <symbol id="check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="cal" viewBox="0 0 24 24"><path d="M4 6h16v14H4zM4 10h16M8 3v4M16 3v4"/></symbol>
+  <symbol id="bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 1 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="search" viewBox="0 0 24 24"><path d="M11 4a7 7 0 1 1 0 14 7 7 0 0 1 0-14zM20 20l-4-4"/></symbol>
+  <symbol id="clock" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 7v5l3 2"/></symbol>
+  <symbol id="eye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 9a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></symbol>
+  <symbol id="users" viewBox="0 0 24 24"><path d="M9 5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7zM2.5 20a6.5 6.5 0 0 1 13 0M16 5.5a3 3 0 0 1 0 6M18 14.5a5.5 5.5 0 0 1 3.5 5.5"/></symbol>
+  <symbol id="doc" viewBox="0 0 24 24"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></symbol>
+  <symbol id="inbox" viewBox="0 0 24 24"><path d="M4 13l3-8h10l3 8v6H4zM4 13h5a3 3 0 0 0 6 0h5"/></symbol>
+  <symbol id="expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></symbol>
+  <symbol id="scale" viewBox="0 0 24 24"><path d="M12 4v16M7 20h10M5 7h14M5 7l-3 7a3 3 0 0 0 6 0zM19 7l-3 7a3 3 0 0 0 6 0z"/></symbol>
+  <symbol id="cash" viewBox="0 0 24 24"><path d="M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></symbol>
+  <symbol id="share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 13v6h14v-6"/></symbol>
+  <symbol id="clip" viewBox="0 0 24 24"><path d="M8.5 12.5l6-6a3 3 0 0 1 4 4l-8 8a5 5 0 0 1-7-7l7.5-7.5"/></symbol>
+  <symbol id="globe" viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+  <symbol id="down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="left2" viewBox="0 0 24 24"><path d="M11 6l-6 6 6 6M19 6l-6 6 6 6"/></symbol>
+  <symbol id="hour" viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3v4l4 5 4-5V3M8 21v-4l4-5 4 5v4"/></symbol>
+  <symbol id="mail" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 7l9 7 9-7"/></symbol>
+  <symbol id="mic" viewBox="0 0 24 24"><path d="M12 3a3 3 0 0 1 3 3v5a3 3 0 0 1-6 0V6a3 3 0 0 1 3-3zM6 11a6 6 0 0 0 12 0M12 17v4"/></symbol>
+  <symbol id="panel" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M9.5 4.5v15"/></symbol>
+  <symbol id="more" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/></symbol>
+</svg>
+
+<div class="ambient"><svg><use href="#bird"/></svg></div>
+
+<div class="app">
+  <!-- Icon rail -->
+  <aside class="rail">
+    <div class="logo"><svg viewBox="0 0 211.2 256.38"><use href="#bird"/></svg></div>
+    <nav>
+      <button class="rail-icon on" title="Chats"><svg class="i l"><use href="#chat"/></svg></button>
+      <button class="rail-icon" title="Bibliothek"><svg class="i l"><use href="#book"/></svg></button>
+      <button class="rail-icon" title="Agenten"><svg class="i l"><use href="#bird"/></svg></button>
+      <button class="rail-icon" title="Werkzeuge"><svg class="i l"><use href="#grid"/></svg></button>
+    </nav>
+    <div style="padding:12px 0"><span class="avatar">AN</span></div>
+  </aside>
+
+  <!-- Context panel: Chats with Projects section (as today) -->
+  <aside class="panel">
+    <header>
+      <span class="badge-ic"><svg class="i"><use href="#chat"/></svg></span>
+      <h2>Chats</h2>
+      <button class="icon-ghost sm"><svg class="i s"><use href="#left2"/></svg></button>
+    </header>
+    <button class="newchat"><svg class="i s"><use href="#plus"/></svg>Neuer Chat</button>
+    <div class="scroll">
+      <div class="sect"><svg class="i s"><use href="#folder"/></svg>Projekte<span class="grow"></span><svg class="i s"><use href="#plus"/></svg></div>
+      <div class="rows">
+        <div class="row on">DIY Küche<span class="dot sW">2</span></div>
+        <div class="row">Wohnungskauf</div>
+        <div class="row">Relaunch Website</div>
+      </div>
+      <div class="sect">Heute</div>
+      <div class="rows">
+        <div class="row">Steuererklärung Fragen</div>
+        <div class="row">Rezept für 6 Personen</div>
+      </div>
+      <div class="sect">Letzte 7 Tage</div>
+      <div class="rows">
+        <div class="row">Mail an Vermieter</div>
+        <div class="row">Python-Skript CSV</div>
+        <div class="row">Urlaub Portugal</div>
+      </div>
+    </div>
+    <footer><svg class="i s sec"><use href="#search"/></svg><span class="sec" style="flex:1">Suchen</span><span class="avatar sm">AN</span></footer>
+  </aside>
+
+  <div class="main">
+    <!-- CHAT: where the work happens, left -->
+    <aside class="chat" id="chatpane">
+      <div class="chat-proj sN"><b>DIY Küche</b><span>Gerade angelegt</span></div>
+      <div class="chat-h">
+        <button class="sw"><svg class="i s"><use href="#chat"/></svg><span>Haupt-Chat</span><svg class="i s sec"><use href="#down"/></svg></button>
+        <span class="members hide-m"><span class="avatar sm">AN</span><span class="avatar sm b sW">BE</span></span>
+        <button class="icon-ghost sm" title="Neuer Chat im Projekt"><svg class="i s"><use href="#plus"/></svg></button>
+        <button class="icon-ghost sm hide-m sW" id="wide" title="Board ausblenden"><svg class="i s"><use href="#panel"/></svg></button>
+      </div>
+      <div class="msgs sN">
+        <div class="right"><div class="who">Ana · 14:01 <span class="avatar sm">AN</span></div>
+          <div class="bub me">Ich will eine neue Küche einbauen lassen.</div></div>
+        <div><div class="who"><svg class="i xs" style="color:var(--brand)"><use href="#spark"/></svg>Synaplan</div>
+          <div class="bub ai"><p>Gern. Zwei kurze Fragen, dann mache ich dir einen Plan mit allen Schritten.</p></div></div>
+        <div class="surface-card ask">
+          <p class="q">Wie viel soll die Küche ungefähr kosten?</p>
+          <div class="opts"><span class="pill">bis 8.000 €</span><span class="pill on">8.000 bis 15.000 €</span><span class="pill">mehr</span><span class="pill">weiß ich noch nicht</span></div>
+          <p class="q">Bis wann soll sie fertig sein?</p>
+          <div class="opts"><span class="pill">so schnell wie möglich</span><span class="pill">in 3 Monaten</span><span class="pill">kein Zeitdruck</span></div>
+          <div class="free">oder selbst schreiben …</div>
+          <div class="acts"><button class="btn btn-primary btn-sm">Weiter</button><button class="btn btn-secondary btn-sm">Entscheide du</button></div>
+        </div>
+        <p class="boardhint">Sobald es die ersten Aufgaben oder Termine gibt, erscheint daneben dein Projektboard. Angebote, Fotos oder Pläne kannst du einfach hier in den Chat ziehen.</p>
+      </div>
+      <div class="msgs sW">
+        <div class="right"><div class="who">Ben · 13:41 <span class="avatar sm b">BE</span></div>
+          <div class="bub me">Ich bin Montag zu Hause und kümmere mich um den Vermesser.</div></div>
+        <div class="wrote"><svg class="i xs"><use href="#check"/></svg>Eingetragen: Ben übernimmt das Aufmaß <button>Rückgängig</button></div>
+        <div class="right"><div class="who">Ana · 14:01 <span class="avatar sm">AN</span></div>
+          <div class="bub me">Passt der Blub X7 in unsere Nische, und wo ist er am günstigsten?</div></div>
+        <div class="runline"><svg class="i xs" style="color:var(--status-success)"><use href="#check"/></svg>Grundriss gelesen, 5 Shops verglichen · 48 Sekunden <svg class="i xs"><use href="#down"/></svg></div>
+        <div><div class="who"><svg class="i xs" style="color:var(--brand)"><use href="#spark"/></svg>Antwort an Ana</div>
+          <div class="bub ai"><p>Ja, er passt. Am günstigsten ist er heute für <b>479 €</b>, vor einer Woche waren es 499 €.</p>
+          <p>Soll ich Bescheid sagen, wenn er unter 450 € fällt?</p></div></div>
+        <div class="right"><div class="who">Ana · 14:03 <span class="avatar sm">AN</span></div>
+          <div class="bub me">Ja bitte.</div></div>
+        <div class="wrote"><svg class="i xs"><use href="#eye"/></svg>Ich halte Ausschau: Blub X7 unter 450 € <button>Rückgängig</button></div>
+      </div>
+      <div class="composer">
+        <div class="shell">
+          <div class="ph">Schreib ins Projekt …</div>
+          <div class="tools">
+            <button class="icon-ghost sm"><svg class="i s"><use href="#clip"/></svg></button>
+            
+            <span class="grow"></span>
+            <button class="icon-ghost sm"><svg class="i s"><use href="#mic"/></svg></button>
+            <button class="send"><svg class="i s"><use href="#up"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="split" id="split" role="separator" aria-orientation="vertical" title="Ziehen, um die Breite zu ändern. Doppelklick setzt zurück."></div>
+    <button class="reopen" id="reopen" title="Chat einblenden"><svg class="i"><use href="#chat"/></svg></button>
+    <!-- BOARD: the project page is the status picture -->
+    <section class="board">
+      <div class="board-in">
+        <div class="phead">
+          <h1>DIY Küche</h1>
+          <div class="members hide-m"><span class="avatar">AN</span><span class="avatar b sW">BE</span></div>
+          <button class="btn btn-secondary btn-sm hide-m"><svg class="i s"><use href="#share"/></svg>Teilen</button>
+          <button class="icon-ghost hide-m" id="hidechat" title="Chat ausblenden"><svg class="i"><use href="#panel"/></svg></button>
+          <button class="icon-ghost"><svg class="i"><use href="#more"/></svg></button>
+        </div>
+        <p class="psub sec sW">Neue Küche bis Ende Januar</p>
+        <p class="psub sec sN">Gerade angelegt</p>
+
+        <!-- Four tabs, the rest lives behind "Mehr" -->
+        <div class="tabs sW">
+          <nav class="tab-nav">
+            <button class="tab on" data-go="ov">Übersicht</button>
+            <button class="tab" data-go="tasks">Aufgaben <span class="n">7</span></button>
+            <button class="tab" data-go="dates">Termine</button>
+            <button class="tab" data-go="files">Dateien</button>
+            <button class="tab" id="moretab"><span id="morelab">Mehr</span> <svg class="i xs"><use href="#down"/></svg></button>
+          </nav>
+          <div class="surface-card menu" id="menu">
+            <button data-go="cost"><svg class="i s"><use href="#cash"/></svg>Kosten</button>
+            <button data-go="watch"><svg class="i s"><use href="#eye"/></svg>Hält für dich Ausschau</button>
+            <button data-go="dec"><svg class="i s"><use href="#scale"/></svg>Entscheidungen</button>
+            <button data-go="wait"><svg class="i s"><use href="#hour"/></svg>Wartet auf andere</button>
+            <button data-go="mem"><svg class="i s"><use href="#book"/></svg>Gemerktes</button>
+            <hr>
+            <button data-go="chats"><svg class="i s"><use href="#chat"/></svg>Chats</button>
+            <button data-go="set"><svg class="i s"><use href="#users"/></svg>Personen und Einstellungen</button>
+          </div>
+        </div>
+
+        <!-- STATE: just created. Almost empty on purpose. -->
+        <div class="grid sN">
+          <div class="surface-card card c12 hello">
+            <span class="badge-ic"><svg class="i l"><use href="#spark"/></svg></span>
+            <h2>Erzähl mir<span class="wide-only"> rechts</span>, was du vorhast.</h2>
+            <p>Ich stelle dir zwei kurze Fragen und baue daraus einen Plan. Aufgaben, Termine und Dateien erscheinen hier von selbst, sobald es sie gibt.</p>
+          </div>
+          <div class="drop"><b>Schon Unterlagen da?</b>Angebote, Fotos oder Pläne einfach hierher ziehen.</div>
+        </div>
+
+        <!-- STATE: two weeks later. Only what has content is shown. -->
+        <div class="grid sW" data-page="ov">
+          <div class="lead">
+            <p class="lagebild">Am Montag um 10 Uhr kommt Herr Vogt zum <a href="#" data-go="dates">Aufmaß</a>, Ben ist zu Hause. <span class="late">Elektro Brandt hat seit vier Tagen nicht zurückgerufen</span> (<a href="#" data-mail="brandt">nachhaken</a>), die <a href="#" data-go="tasks">Anfrage wegen Starkstrom</a> ist damit überfällig. Aus der Mail von Steinwerk Nord warten zwei Einträge auf dein Ja.</p>
+            <p class="stand">Stand heute, 14:05 Uhr. 4 von 11 Schritten sind erledigt.</p>
+          </div>
+
+          <div class="surface-card card c12 sugg">
+            <h3>Zum Bestätigen<span class="chip brand">2</span><span class="grow"></span><span class="sec" style="font-weight:400;font-size:12px">aus der Mail von Steinwerk Nord, heute 09:14</span></h3>
+            <div class="ln"><svg class="i"><use href="#cal"/></svg>
+              <div class="t"><b>Lieferung Arbeitsplatte</b><span>Montag, 14.12., zwischen 8 und 12 Uhr</span></div>
+              <button class="btn btn-primary btn-sm" data-take>Eintragen</button><button class="btn btn-secondary btn-sm" data-mail="deliv">Passt nicht</button><button class="icon-ghost sm" title="Ignorieren" data-take>✕</button></div>
+            <div class="ln"><svg class="i"><use href="#check"/></svg>
+              <div class="t"><b>Anzahlung 30 % überweisen</b><span>bis Montag, 07.12.</span></div>
+              <button class="btn btn-primary btn-sm" data-take>Eintragen</button><button class="btn btn-secondary btn-sm" data-mail="pay">Passt nicht</button><button class="icon-ghost sm" title="Ignorieren" data-take>✕</button></div>
+          </div>
+
+          <div class="surface-card card c7">
+            <h3>Aufgaben<span class="grow"></span><a href="#" data-go="tasks">Alle 7 offenen</a></h3>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Küche vermessen lassen</b><div class="m">Montag · Ben</div></div></div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Elektriker für Starkstrom anfragen</b><div class="m"><span class="chip err">überfällig</span>Ana</div></div></div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Fronten und Griffe auswählen</b><div class="m">bis 11.12. · beide</div></div></div>
+          </div>
+
+          <div class="surface-card card c5">
+            <h3>Termine<span class="grow"></span><a href="#" data-go="dates">Alle</a></h3>
+            <div class="li"><div class="date"><small>Mo</small><b>30</b></div>
+              <div class="t"><b>Aufmaß</b><div class="m">10:00 Uhr · Erinnerung am Sonntagabend</div></div></div>
+            <div class="li"><div class="date"><small>Do</small><b>3</b></div>
+              <div class="t"><b>Planungsgespräch</b><div class="m">17:30 Uhr im Studio</div></div></div>
+          </div>
+
+          <div class="surface-card card c7">
+            <h3>Hält für dich Ausschau<span class="grow"></span><a href="#" data-go="watch">Alle</a><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></h3>
+            <div class="ln"><svg class="i"><use href="#eye"/></svg>
+              <div class="t"><b>Backofen Blub X7 unter 450 €</b><span>Heute 479 €, vor einer Woche 499 €</span></div>
+              <span class="chip">geprüft 14:02</span></div>
+            <div class="ln"><svg class="i"><use href="#eye"/></svg>
+              <div class="t"><b>Gebrauchte Dunstabzugshaube</b><span>2 neue Anzeigen in deiner Nähe</span></div>
+              <span class="chip brand">neu</span></div>
+          </div>
+
+          <div class="surface-card card c5">
+            <h3>Kosten<span class="grow"></span><a href="#" data-go="cost">Details</a></h3>
+            <div class="price">8.400 € <span class="sec" style="font-size:13px;font-weight:500">von 12.000 €</span></div>
+            <div class="bar"><i></i></div>
+            <p class="sec" style="margin:0;font-size:13px">Noch offen: Backofen und Elektrik.</p>
+          </div>
+
+          <button class="morebtn" id="moreToggle">Mehr anzeigen: Entscheidungen, Wartet auf andere, Gemerktes <svg class="i s"><use href="#down"/></svg></button>
+
+          <div class="surface-card card c7 more">
+            <h3>Entscheidungen<span class="grow"></span><a href="#" data-go="dec">Alle 4</a></h3>
+            <div class="li"><div class="t"><b>Angebot B vom Küchenstudio Hansen</b><div class="m">800 € günstiger, Lieferung vor Weihnachten · 24.11.</div></div></div>
+            <div class="li"><div class="t"><b>Keine grünen Fronten</b><div class="m">Ben mag kein Grün · 22.11.</div></div></div>
+          </div>
+          <div class="surface-card card c5 more">
+            <h3>Wartet auf andere<span class="grow"></span><a href="#" data-go="wait">Alle 3</a></h3>
+            <div class="li"><span class="avatar sm c">EL</span><div class="t"><b>Elektro Brandt</b><div class="m">Rückruf, seit 4 Tagen</div></div></div>
+            <div class="li"><span class="avatar sm b">BE</span><div class="t"><b>Ben</b><div class="m">Spülbecken aussuchen</div></div></div>
+          </div>
+          <div class="surface-card card c12 more">
+            <h3>Was ich mir zu diesem Projekt gemerkt habe<span class="grow"></span><a href="#" data-go="mem">Alle 6</a></h3>
+            <div class="ln"><div class="t"><b>Die Nische für den Backofen ist 560 × 590 mm.</b><span>aus dem Grundriss</span></div></div>
+            <div class="ln"><div class="t"><b>Ben mag kein Grün.</b><span>von Ben, 22.11.</span></div></div>
+          </div>
+        </div>
+        <!-- PAGE: Aufgaben -->
+        <div class="grid sW" data-page="tasks" hidden>
+          <div class="bartop">
+            <span class="pill on">Alle 7</span><span class="pill">Meine 3</span><span class="pill">Bens 2</span><span class="pill">Beide 2</span>
+            <span class="grow"></span>
+            <button class="btn btn-primary btn-sm"><svg class="i s"><use href="#plus"/></svg>Aufgabe</button>
+          </div>
+          <div class="surface-card card c12">
+            <div class="grp">Überfällig <span class="chip err">1</span></div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Elektriker für Starkstrom anfragen</b><div class="m"><span class="chip err">seit 2 Tagen</span>Ana · fällig am 24.11. · Elektro Brandt ruft noch zurück</div></div></div>
+            <div class="grp">Nächste 7 Tage</div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Küche vermessen lassen</b><div class="m">Montag, 30.11., 10:00 Uhr · Ben · gehört zum Termin „Aufmaß“</div></div></div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Spülbecken aussuchen</b><div class="m">bis Mittwoch, 02.12. · Ben · Edelstahl oder Keramik ist noch offen</div></div></div>
+            <div class="grp">Später</div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Fronten und Griffe auswählen</b><div class="m">bis Freitag, 11.12. · beide · Farbmuster liegen in den Dateien</div></div></div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Backofen kaufen</b><div class="m">Ana · sobald der Preis unter 450 € fällt <span class="chip">ich halte Ausschau</span></div></div></div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Alte Küche abbauen und entsorgen</b><div class="m">bis Freitag, 08.01. · beide · Sperrmüll ist noch nicht bestellt</div></div></div>
+            <div class="li" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Wasseranschluss versetzen lassen</b><div class="m">bis Freitag, 15.01. · Ana · Installateur fehlt noch</div></div></div>
+            <div class="grp">Erledigt <span class="chip">4</span></div>
+            <div class="li done" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Budget festlegen</b><div class="m">12.000 € · Ana und Ben · 12.11.</div></div></div>
+            <div class="li done" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Drei Angebote einholen</b><div class="m">Küchen Meier, Küchenstudio Hansen, Möbelhaus Nordlicht · 19.11.</div></div></div>
+            <div class="li done" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Angebot auswählen</b><div class="m">Küchenstudio Hansen · 24.11.</div></div></div>
+            <div class="li done" data-task><button class="cb"><svg class="i"><use href="#check"/></svg></button><div class="t"><b>Termin für das Aufmaß vereinbaren</b><div class="m">Ben · 25.11.</div></div></div>
+          </div>
+          <p class="hint">Du musst hier nichts von Hand pflegen. Schreib im Chat „Ben kümmert sich ums Spülbecken“ und die Aufgabe steht hier.</p>
+        </div>
+
+        <!-- PAGE: Termine -->
+        <div class="grid sW" data-page="dates" hidden>
+          <div class="bartop">
+            <span class="pill on">Kommende</span><span class="pill">Vergangene</span>
+            <span class="grow"></span>
+            <button class="btn btn-secondary btn-sm"><svg class="i s"><use href="#cal"/></svg>In meinen Kalender</button>
+            <button class="btn btn-primary btn-sm"><svg class="i s"><use href="#plus"/></svg>Termin</button>
+          </div>
+          <div class="surface-card card c12">
+            <div class="grp">Nächste 7 Tage</div>
+            <div class="li"><div class="date"><small>Mo</small><b>30</b></div><div class="t"><b>Aufmaß in der Wohnung</b><div class="m">10:00 bis 11:00 Uhr · Herr Vogt, Küchenstudio Hansen · Ben ist da <span class="chip brand">Erinnerung So. 19:00</span></div></div><button class="btn btn-secondary btn-sm" data-mail="aufmass">Verschieben</button></div>
+            <div class="li"><div class="date"><small>Do</small><b>3</b></div><div class="t"><b>Planungsgespräch im Studio</b><div class="m">17:30 Uhr · Küchenstudio Hansen · Ana und Ben <span class="chip brand">Erinnerung Mi. 19:00</span></div></div><button class="btn btn-secondary btn-sm" data-mail="plan">Verschieben</button></div>
+            <div class="grp">Dezember</div>
+            <div class="li"><div class="date"><small>Mo</small><b>7</b></div><div class="t"><b>Anzahlung für die Arbeitsplatte fällig</b><div class="m">450 € an Steinwerk Nord <span class="chip warn">noch nicht bestätigt</span></div></div><button class="btn btn-primary btn-sm" data-take>Eintragen</button><button class="btn btn-secondary btn-sm" data-mail="pay">Passt nicht</button></div>
+            <div class="li"><div class="date"><small>Fr</small><b>11</b></div><div class="t"><b>Fronten und Griffe festlegen</b><div class="m">letzter Tag, damit die Küche im Januar kommt · beide</div></div></div>
+            <div class="li"><div class="date"><small>Mo</small><b>14</b></div><div class="t"><b>Lieferung der Arbeitsplatte</b><div class="m">zwischen 8 und 12 Uhr · Steinwerk Nord <span class="chip warn">noch nicht bestätigt</span></div></div><button class="btn btn-primary btn-sm" data-take>Eintragen</button><button class="btn btn-secondary btn-sm" data-mail="deliv">Passt nicht</button></div>
+            <div class="grp">Januar</div>
+            <div class="li"><div class="date"><small>Fr</small><b>8</b></div><div class="t"><b>Alte Küche muss raus sein</b><div class="m">damit der Einbau am 18.01. starten kann</div></div></div>
+            <div class="li"><div class="date"><small>Mo</small><b>18</b></div><div class="t"><b>Einbau der neuen Küche</b><div class="m">18. bis 20.01., jeweils ab 8:00 Uhr · Küchenstudio Hansen · jemand muss zu Hause sein</div></div></div>
+            <div class="li"><div class="date"><small>Fr</small><b>29</b></div><div class="t"><b>Ziel: Küche fertig</b><div class="m">euer Wunschtermin aus dem ersten Gespräch</div></div></div>
+          </div>
+          <div class="surface-card card c12">
+            <h3>Schon gewesen</h3>
+            <div class="li"><div class="date"><small>Di</small><b>17</b></div><div class="t"><b>Beratung im Küchenstudio Hansen</b><div class="m">daraus entstand Angebot B</div></div></div>
+            <div class="li"><div class="date"><small>Sa</small><b>14</b></div><div class="t"><b>Beratung bei Küchen Meier</b><div class="m">daraus entstand Angebot A</div></div></div>
+          </div>
+        </div>
+
+        <!-- PAGE: Dateien -->
+        <div class="grid sW" data-page="files" hidden>
+          <div class="bartop">
+            <span class="field grow"><svg class="i s"><use href="#search"/></svg>In den Dateien suchen, z. B. „Wie breit ist die Nische?“</span>
+            <button class="btn btn-primary btn-sm"><svg class="i s"><use href="#clip"/></svg>Hochladen</button>
+          </div>
+          <div class="surface-card card c12">
+            <div class="grp">Angebote</div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#doc"/></svg></span><div class="t"><b>Angebot B, Küchenstudio Hansen.pdf</b><div class="m">Ana · 19.11. · 6 Seiten <span class="chip ok">gewählt</span></div><div class="read">Gelesen: 6.900 € mit Montage, Lieferung vor Weihnachten, ohne Arbeitsplatte.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#doc"/></svg></span><div class="t"><b>Angebot A, Küchen Meier.pdf</b><div class="m">Ana · 16.11. · 4 Seiten</div><div class="read">Gelesen: 7.700 € mit Montage, Lieferung erst im Februar.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#doc"/></svg></span><div class="t"><b>Angebot C, Möbelhaus Nordlicht.pdf</b><div class="m">Ben · 19.11. · 5 Seiten</div><div class="read">Gelesen: 8.650 €, Montage kostet 600 € extra.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="grp">Pläne und Maße</div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#doc"/></svg></span><div class="t"><b>Grundriss Küche.pdf</b><div class="m">Ana · 12.11. · 1 Seite</div><div class="read">Gelesen: Raum 3,40 × 2,80 m, Nische für den Backofen 560 × 590 mm, Fenster an der Nordwand.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#doc"/></svg></span><div class="t"><b>Datenblatt Blub X7.pdf</b><div class="m">aus dem Web gespeichert · heute</div><div class="read">Gelesen: Einbaumaß 560 × 585 mm. Passt in eure Nische.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="grp">Post und Nachrichten</div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#mail"/></svg></span><div class="t"><b>Steinwerk Nord: Ihre Arbeitsplatte</b><div class="m">weitergeleitet von Ana · heute 09:14 <span class="chip brand">2 Vorschläge offen</span></div><div class="read">Gelesen: Lieferung am 14.12. und Anzahlung von 30 % bis 07.12.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#mail"/></svg></span><div class="t"><b>Elektro Brandt: Anfrage Starkstrom</b><div class="m">weitergeleitet von Ana · 22.11.</div><div class="read">Gelesen: Anfrage ist angekommen, Rückruf wurde zugesagt.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="grp">Fotos</div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#eye"/></svg></span><div class="t"><b>Alte Küche, 4 Fotos</b><div class="m">Ben · 15.11.</div><div class="read">Erkannt: Starkstromdose fehlt, Wasseranschluss sitzt links unter dem Fenster.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+            <div class="li"><span class="fic"><svg class="i"><use href="#eye"/></svg></span><div class="t"><b>Farbmuster Fronten.jpg</b><div class="m">Ben · 22.11.</div><div class="read">Erkannt: drei Muster in Sandgrau, Weiß matt und Eiche hell.</div></div><button class="icon-ghost sm" title="Mehr"><svg class="i s"><use href="#more"/></svg></button></div>
+          </div>
+          <div class="drop">Dateien hierher ziehen<br>oder eine Mail an dieses Projekt weiterleiten. Ich lese sie und schlage Termine und Aufgaben vor.</div>
+        </div>
+
+        <!-- PAGE: Kosten -->
+        <div class="grid sW" data-page="cost" hidden>
+          <div class="surface-card card c12">
+            <h3>Kosten</h3>
+            <div class="price">8.400 € <span class="sec" style="font-size:13px;font-weight:500">von 12.000 € verplant</span></div>
+            <div class="bar"><i></i></div>
+            <p class="sec" style="margin:0">Es bleiben 3.600 €. Mit Backofen, Elektrik und Wasseranschluss sind es voraussichtlich noch rund 2.300 €.</p>
+          </div>
+          <div class="surface-card card c7">
+            <h3>Fest eingeplant</h3>
+            <div class="rowsum"><div class="a">Küche mit Montage<span>Küchenstudio Hansen, Angebot B</span></div><div class="v">6.900 €</div></div>
+            <div class="rowsum"><div class="a">Arbeitsplatte<span>Steinwerk Nord · Anzahlung 450 € bis 07.12.</span></div><div class="v">1.500 €</div></div>
+            <div class="rowsum tot"><div class="a">Summe</div><div class="v">8.400 €</div></div>
+          </div>
+          <div class="surface-card card c5">
+            <h3>Kommt noch dazu</h3>
+            <div class="rowsum"><div class="a">Backofen Blub X7<span>heute günstigster Preis</span></div><div class="v">479 €</div></div>
+            <div class="rowsum"><div class="a">Elektrik<span>geschätzt, Angebot fehlt</span></div><div class="v">ca. 500 €</div></div>
+            <div class="rowsum"><div class="a">Wasseranschluss<span>geschätzt</span></div><div class="v">ca. 300 €</div></div>
+          </div>
+          <div class="surface-card card c12">
+            <h3>Bezahlt<span class="grow"></span><span class="chip">0 €</span></h3>
+            <p class="sec" style="margin:0">Noch nichts. Die erste Zahlung ist die Anzahlung für die Arbeitsplatte am 07.12.</p>
+          </div>
+          <p class="hint">Die Beträge stammen aus den Angeboten und der Mail von Steinwerk Nord. Schreib im Chat „Der Elektriker kostet 620 €“ und ich trage es ein.</p>
+        </div>
+
+        <!-- PAGE: Hält für dich Ausschau -->
+        <div class="grid sW" data-page="watch" hidden>
+          <div class="surface-card card c12">
+            <h3><svg class="i s"><use href="#eye"/></svg>Backofen Blub X7 unter 450 €<span class="grow"></span><span class="chip ok">läuft</span></h3>
+            <p class="sec">Ich schaue jede Stunde bei 5 Shops nach und melde mich, sobald der Preis unter 450 € fällt.</p>
+            <div class="price">479 € <span class="sec" style="font-size:13px;font-weight:500">heute, zuletzt geprüft um 14:02</span></div>
+            <div class="hist"><span class="chip">19.11. · 499 €</span><span class="chip">23.11. · 489 €</span><span class="chip brand">heute · 479 €</span></div>
+            <div class="acts"><button class="btn btn-secondary btn-sm">Ändern</button><button class="btn btn-secondary btn-sm">Pausieren</button><button class="btn btn-secondary btn-sm">Beenden</button></div>
+          </div>
+          <div class="surface-card card c12">
+            <h3><svg class="i s"><use href="#eye"/></svg>Gebrauchte Dunstabzugshaube in der Nähe<span class="grow"></span><span class="chip brand">2 neu</span></h3>
+            <p class="sec">Ich schaue zweimal am Tag nach neuen Anzeigen im Umkreis von 15 km, 60 bis 90 cm breit, höchstens 150 €.</p>
+            <div class="ln"><div class="t"><b>Umlufthaube 60 cm, Edelstahl</b><span>85 € · 4 km entfernt · eingestellt heute 11:20</span></div><button class="btn btn-secondary btn-sm">Ansehen</button></div>
+            <div class="ln"><div class="t"><b>Inselhaube 90 cm, schwarz</b><span>140 € · 11 km entfernt · eingestellt gestern</span></div><button class="btn btn-secondary btn-sm">Ansehen</button></div>
+            <div class="acts"><button class="btn btn-secondary btn-sm">Ändern</button><button class="btn btn-secondary btn-sm">Pausieren</button><button class="btn btn-secondary btn-sm">Beenden</button></div>
+          </div>
+          <p class="hint">Neu anlegen geht im Chat: „Sag Bescheid, wenn …“. Ich kaufe nichts selbst, ich melde mich nur mit dem Link.</p>
+        </div>
+
+        <!-- PAGE: Entscheidungen -->
+        <div class="grid sW" data-page="dec" hidden>
+          <div class="surface-card card c12">
+            <h3>Entschieden</h3>
+            <div class="li"><div class="t"><b>Wir nehmen Angebot B vom Küchenstudio Hansen</b><div class="m">Ana und Ben · 24.11. · im Haupt-Chat</div><div class="read">Weil es 800 € günstiger ist als Angebot A und vor Weihnachten geliefert wird.</div></div></div>
+            <div class="li"><div class="t"><b>Keine grünen Fronten</b><div class="m">Ben · 22.11. · im Chat „Fronten und Farben“</div><div class="read">Ben mag kein Grün. Sandgrau und Weiß matt bleiben in der Auswahl.</div></div></div>
+            <div class="li"><div class="t"><b>Arbeitsplatte aus Quarzkomposit statt Granit</b><div class="m">Ana · 20.11. · im Haupt-Chat</div><div class="read">Pflegeleichter und 300 € günstiger.</div></div></div>
+            <div class="li"><div class="t"><b>Höchstens 12.000 € für alles</b><div class="m">Ana und Ben · 12.11. · beim Anlegen des Projekts</div><div class="read">Geräte, Elektrik und Montage sind darin enthalten.</div></div></div>
+          </div>
+          <div class="surface-card card c12">
+            <h3>Noch offen<span class="chip warn">2</span></h3>
+            <div class="ln"><div class="t"><b>Griffe oder grifflos?</b><span>muss bis 11.12. feststehen</span></div><button class="btn btn-secondary btn-sm">Im Chat klären</button></div>
+            <div class="ln"><div class="t"><b>Spülbecken aus Edelstahl oder Keramik?</b><span>Ben sucht bis 02.12. aus</span></div><button class="btn btn-secondary btn-sm">Im Chat klären</button></div>
+          </div>
+          <p class="hint">Wenn ihr später etwas anders entscheidet, bleibt die alte Entscheidung mit Datum sichtbar.</p>
+        </div>
+
+        <!-- PAGE: Wartet auf andere -->
+        <div class="grid sW" data-page="wait" hidden>
+          <div class="surface-card card c12">
+            <h3>Wartet auf andere</h3>
+            <div class="ln"><span class="avatar c">EL</span><div class="t"><b>Elektro Brandt: Rückruf wegen Starkstrom</b><span>angefragt am 22.11., seit 4 Tagen keine Antwort</span></div><button class="btn btn-primary btn-sm" data-mail="brandt">Nachhaken</button></div>
+            <div class="ln"><span class="avatar c">KH</span><div class="t"><b>Küchenstudio Hansen: Auftragsbestätigung</b><span>zugesagt am 24.11., seit 2 Tagen offen</span></div><button class="btn btn-secondary btn-sm" data-mail="hansen">Nachhaken</button></div>
+            <div class="ln"><span class="avatar b">BE</span><div class="t"><b>Ben: Spülbecken aussuchen</b><span>hat bis Mittwoch, 02.12., Zeit</span></div><button class="btn btn-secondary btn-sm" data-nudge>Erinnern</button></div>
+          </div>
+          <p class="hint">„Nachhaken“ zeigt dir die Mail, bevor sie rausgeht. Ben bekommt stattdessen eine Nachricht aufs Handy.</p>
+        </div>
+
+        <!-- PAGE: Gemerktes -->
+        <div class="grid sW" data-page="mem" hidden>
+          <div class="surface-card card c12">
+            <h3>Was ich mir zu diesem Projekt gemerkt habe</h3>
+            <div class="ln"><div class="t"><b>Die Nische für den Backofen ist 560 × 590 mm.</b><span>aus dem Grundriss · 12.11.</span></div><button class="icon-ghost sm" title="Vergessen">✕</button></div>
+            <div class="ln"><div class="t"><b>Die Küche ist 3,40 × 2,80 m groß, das Fenster ist an der Nordwand.</b><span>aus dem Grundriss · 12.11.</span></div><button class="icon-ghost sm" title="Vergessen">✕</button></div>
+            <div class="ln"><div class="t"><b>Es gibt noch keinen Starkstromanschluss.</b><span>aus Bens Fotos · 15.11.</span></div><button class="icon-ghost sm" title="Vergessen">✕</button></div>
+            <div class="ln"><div class="t"><b>Ben mag kein Grün.</b><span>von Ben · 22.11.</span></div><button class="icon-ghost sm" title="Vergessen">✕</button></div>
+            <div class="ln"><div class="t"><b>Ansprechpartner im Küchenstudio Hansen ist Herr Vogt.</b><span>aus Angebot B · 19.11.</span></div><button class="icon-ghost sm" title="Vergessen">✕</button></div>
+            <div class="ln"><div class="t"><b>Termine unter der Woche gehen erst ab 17 Uhr.</b><span>von Ana · 16.11.</span></div><button class="icon-ghost sm" title="Vergessen">✕</button></div>
+          </div>
+          <div class="surface-card card c12">
+            <div class="ln"><div class="t"><b>Meine persönlichen Erinnerungen in diesem Projekt nutzen</b><span>Aus. Was du Synaplan außerhalb dieses Projekts erzählt hast, sieht Ben nicht und es fließt hier nicht ein.</span></div><button class="sw-t" data-sw></button></div>
+          </div>
+          <p class="hint">Alles auf dieser Seite sehen alle, die im Projekt sind.</p>
+        </div>
+
+        <!-- PAGE: Chats -->
+        <div class="grid sW" data-page="chats" hidden>
+          <div class="bartop"><span class="field grow"><svg class="i s"><use href="#search"/></svg>In allen Chats dieses Projekts suchen</span>
+            <button class="btn btn-primary btn-sm"><svg class="i s"><use href="#plus"/></svg>Neuer Chat</button></div>
+          <div class="surface-card card c12">
+            <div class="ln"><svg class="i"><use href="#chat"/></svg><div class="t"><b>Haupt-Chat</b><span>Ana: „Ja bitte.“ · heute 14:03</span></div><span class="members"><span class="avatar sm">AN</span><span class="avatar sm b">BE</span></span></div>
+            <div class="ln"><svg class="i"><use href="#chat"/></svg><div class="t"><b>Fronten und Farben</b><span>Ben: „Sandgrau gefällt mir am besten.“ · 22.11.</span></div><span class="members"><span class="avatar sm">AN</span><span class="avatar sm b">BE</span></span></div>
+            <div class="ln"><svg class="i"><use href="#chat"/></svg><div class="t"><b>Angebote vergleichen</b><span>Synaplan: „Angebot B ist unterm Strich 800 € günstiger.“ · 24.11.</span></div><span class="members"><span class="avatar sm">AN</span><span class="avatar sm b">BE</span></span></div>
+            <div class="ln"><svg class="i"><use href="#chat"/></svg><div class="t"><b>Fragen zur Elektrik</b><span>Ana: „Brauche ich für Induktion Starkstrom?“ · 21.11.</span></div><span class="chip">nur ich</span></div>
+          </div>
+          <p class="hint">Jeder Chat kennt die Aufgaben, Termine und Dateien des Projekts. Ein Chat mit „nur ich“ bleibt privat.</p>
+        </div>
+
+        <!-- PAGE: Personen und Einstellungen -->
+        <div class="grid sW" data-page="set" hidden>
+          <div class="surface-card card c12">
+            <h3>Personen<span class="grow"></span><button class="btn btn-secondary btn-sm"><svg class="i s"><use href="#plus"/></svg>Einladen</button></h3>
+            <div class="ln"><span class="avatar">AN</span><div class="t"><b>Ana (du)</b><span>hat das Projekt angelegt</span></div><span class="chip">Besitzerin</span></div>
+            <div class="ln"><span class="avatar b">BE</span><div class="t"><b>Ben</b><span>dabei seit 13.11.</span></div><span class="chip">darf alles bearbeiten</span></div>
+          </div>
+          <div class="surface-card card c12">
+            <h3>Erinnern</h3>
+            <div class="ln"><div class="t"><b>Vor Terminen erinnern</b><span>am Vorabend um 19:00 Uhr, aufs Handy und per Mail</span></div><button class="sw-t on" data-sw></button></div>
+            <div class="ln"><div class="t"><b>Wochenüberblick</b><span>jeden Montag um 8:00 Uhr: was ansteht und was hängt</span></div><button class="sw-t on" data-sw></button></div>
+            <div class="ln"><div class="t"><b>Melden, wenn etwas überfällig ist</b><span>einmal, am Tag danach</span></div><button class="sw-t on" data-sw></button></div>
+          </div>
+          <div class="surface-card card c12">
+            <h3>Post ins Projekt</h3>
+            <div class="ln"><svg class="i"><use href="#mail"/></svg><div class="t"><b>Mails weiterleiten an kueche@mein.synaplan.example</b><span>Ich lese sie und schlage Termine und Aufgaben vor. Eingetragen wird erst, wenn du bestätigst.</span></div><button class="btn btn-secondary btn-sm">Kopieren</button></div>
+          </div>
+          <div class="surface-card card c12">
+            <h3>So soll ich hier antworten<span class="grow"></span><a href="#">Ändern</a></h3>
+            <p style="margin:0">Antworte kurz. Nenne Preise immer mit Lieferkosten. Frag nach, bevor du etwas für beide einträgst, das nur Ben betrifft.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<!-- Phone: board and chat are two views -->
+<div class="ov" id="mailov" hidden>
+  <div class="surface-card dlg" role="dialog" aria-labelledby="mtitle">
+    <h2 id="mtitle"></h2>
+    <p class="why" id="mwhy"></p>
+    <div class="vars" id="mvars"></div>
+    <div class="mf"><span>Von</span><span class="with-mail">ana.keller@example.org, dein verbundenes Postfach</span><span class="no-mail">kein Postfach verbunden</span></div>
+    <div class="mf"><span>An</span><span id="mto"></span></div>
+    <div class="mf"><span>Betreff</span><span id="msubj"></span></div>
+    <div class="mbody" id="mbody" contenteditable="true" spellcheck="false"></div>
+    <p class="note with-mail">Du kannst den Text noch ändern. Die Mail geht von deiner Adresse raus und liegt danach in deinen gesendeten Mails.</p>
+    <p class="note no-mail">Ohne verbundenes Postfach kann ich nicht für dich senden. Kopier den Text oder öffne ihn in deinem Mail-Programm.</p>
+    <div class="acts">
+      <button class="btn btn-primary with-mail" id="msend">Senden</button>
+      <button class="btn btn-primary no-mail" id="mcopy">Text kopieren</button>
+      <button class="btn btn-secondary no-mail">Im Mail-Programm öffnen</button>
+      <button class="btn btn-secondary" id="mcancel">Abbrechen</button>
+      <span class="grow"></span>
+      <button class="mocksw" id="mocksw">Mockup: ohne Postfach zeigen</button>
+    </div>
+  </div>
+</div>
+<nav class="mobtabs">
+  <button class="on" data-v="chat"><svg class="i"><use href="#chat"/></svg>Chat</button>
+  <button data-v="board"><svg class="i"><use href="#grid"/></svg>Board</button>
+</nav>
+
+<!-- Mockup controls, not part of the product -->
+<div class="mock"><button data-state-btn="n">Neu angelegt</button><button data-state-btn="w">Nach 2 Wochen</button><button id="theme">Hell / Dunkel</button></div>
+
+<script>
+const names = {cost:'Kosten', watch:'Hält Ausschau', dec:'Entscheidungen', wait:'Wartet auf andere', mem:'Gemerktes', chats:'Chats', set:'Einstellungen'}
+const go = pg => {
+  document.querySelectorAll('[data-page]').forEach(g => g.hidden = g.dataset.page !== pg)
+  document.querySelectorAll('.tab[data-go], .menu [data-go]').forEach(b => b.classList.toggle('on', b.dataset.go === pg))
+  document.getElementById('moretab').classList.toggle('on', pg in names)
+  document.getElementById('morelab').textContent = names[pg] ? 'Mehr: ' + names[pg] : 'Mehr'
+  document.getElementById('menu').classList.remove('open')
+  document.querySelector('.board').scrollTop = 0
+}
+document.querySelectorAll('[data-go]').forEach(b => b.onclick = e => { e.preventDefault(); go(b.dataset.go) })
+document.getElementById('moretab').onclick = e => { e.stopPropagation(); document.getElementById('menu').classList.toggle('open') }
+document.addEventListener('click', e => { if (!e.target.closest('#menu')) document.getElementById('menu').classList.remove('open') })
+document.querySelectorAll('[data-sw]').forEach(b => b.onclick = () => b.classList.toggle('on'))
+const hi = 'Guten Tag,\n\n', bye = '\n\nViele Grüße\nAna Keller'
+const MAILS = {
+  deliv: {title: 'Liefertermin passt nicht', why: 'Antwort auf die Mail von Steinwerk Nord von heute, 09:14 Uhr.', to: 'Steinwerk Nord <auftrag@steinwerk-nord.example>', subj: 'Re: Ihre Arbeitsplatte, Liefertermin 14.12.',
+    vars: [['Anderen Termin vorschlagen', hi + 'vielen Dank für die Terminbestätigung. Am Montag, 14.12., zwischen 8 und 12 Uhr ist bei uns leider niemand zu Hause.\n\nKönnen Sie stattdessen an einem dieser Tage liefern?\n- Dienstag, 15.12., vormittags\n- Donnerstag, 17.12., ab 14 Uhr' + bye],
+           ['Nur absagen', hi + 'vielen Dank für die Terminbestätigung. Den Liefertermin am Montag, 14.12., können wir leider nicht wahrnehmen. Ich melde mich in den nächsten Tagen mit einem neuen Vorschlag.' + bye]]},
+  pay: {title: 'Anzahlung passt so nicht', why: 'Antwort auf die Mail von Steinwerk Nord von heute, 09:14 Uhr.', to: 'Steinwerk Nord <auftrag@steinwerk-nord.example>', subj: 'Re: Ihre Arbeitsplatte, Anzahlung',
+    vars: [['Um Rechnung bitten', hi + 'bevor ich die Anzahlung von 450 € überweise, brauche ich bitte eine Rechnung mit Ihrer Bankverbindung. Sobald sie da ist, überweise ich bis zum 07.12.' + bye],
+           ['Um Aufschub bitten', hi + 'die Anzahlung von 450 € schaffe ich bis zum 07.12. leider nicht. Wäre Freitag, der 11.12., für Sie in Ordnung?' + bye]]},
+  aufmass: {title: 'Aufmaß verschieben', why: 'Der Termin steht am Montag, 30.11., um 10:00 Uhr.', to: 'Herr Vogt, Küchenstudio Hansen <vogt@kuechenstudio-hansen.example>', subj: 'Aufmaß am 30.11. verschieben',
+    vars: [['Verschieben', 'Guten Tag Herr Vogt,\n\nden Termin zum Aufmaß am Montag, 30.11., um 10:00 Uhr können wir leider nicht halten.\n\nGeht es bei Ihnen auch an einem dieser Tage?\n- Dienstag, 01.12., ab 17 Uhr\n- Mittwoch, 02.12., ab 17 Uhr' + bye],
+           ['Absagen', 'Guten Tag Herr Vogt,\n\nden Termin zum Aufmaß am Montag, 30.11., um 10:00 Uhr muss ich leider absagen. Ich melde mich mit einem neuen Vorschlag.' + bye]]},
+  plan: {title: 'Planungsgespräch verschieben', why: 'Der Termin steht am Donnerstag, 03.12., um 17:30 Uhr im Studio.', to: 'Küchenstudio Hansen <vogt@kuechenstudio-hansen.example>', subj: 'Planungsgespräch am 03.12. verschieben',
+    vars: [['Verschieben', 'Guten Tag Herr Vogt,\n\ndas Planungsgespräch am Donnerstag, 03.12., um 17:30 Uhr schaffen wir leider nicht.\n\nHaben Sie am Freitag, 04.12., ab 17 Uhr Zeit?' + bye],
+           ['Absagen', 'Guten Tag Herr Vogt,\n\ndas Planungsgespräch am Donnerstag, 03.12., muss ich leider absagen. Ich melde mich mit einem neuen Vorschlag.' + bye]]},
+  brandt: {title: 'Bei Elektro Brandt nachhaken', why: 'Angefragt am 22.11., seitdem keine Antwort.', to: 'Elektro Brandt <kontakt@elektro-brandt.example>', subj: 'Re: Anfrage Starkstromanschluss für die Küche',
+    vars: [['Nachhaken', hi + 'am 22.11. hatte ich wegen eines Starkstromanschlusses für unsere neue Küche angefragt, und Sie wollten sich zurückmelden.\n\nDie Küche wird ab dem 18.01. eingebaut, bis dahin muss der Anschluss liegen. Können Sie mir diese Woche sagen, ob und wann Sie das übernehmen?' + bye]]},
+  hansen: {title: 'Beim Küchenstudio Hansen nachhaken', why: 'Die Auftragsbestätigung wurde am 24.11. zugesagt.', to: 'Herr Vogt, Küchenstudio Hansen <vogt@kuechenstudio-hansen.example>', subj: 'Auftragsbestätigung zu Angebot B',
+    vars: [['Nachhaken', 'Guten Tag Herr Vogt,\n\nwir haben uns am 24.11. für Ihr Angebot B entschieden. Die Auftragsbestätigung ist bei mir noch nicht angekommen.\n\nKönnen Sie sie mir bitte schicken?' + bye]]}
+}
+const $ = id => document.getElementById(id)
+let mailKey = null
+const openMail = k => {
+  const m = MAILS[k]; mailKey = k
+  $('mtitle').textContent = m.title; $('mwhy').textContent = m.why; $('mto').textContent = m.to; $('msubj').textContent = m.subj
+  $('mvars').innerHTML = ''
+  m.vars.forEach(([label, body], i) => {
+    const b = document.createElement('button'); b.className = 'pill' + (i ? '' : ' on'); b.textContent = label
+    b.onclick = () => { $('mbody').textContent = body; [...$('mvars').children].forEach(x => x.classList.toggle('on', x === b)) }
+    $('mvars').append(b)
+  })
+  $('mvars').hidden = m.vars.length < 2
+  $('mbody').textContent = m.vars[0][1]
+  $('mailov').hidden = false
+}
+const closeMail = () => { $('mailov').hidden = true }
+const markSent = (k, text) => document.querySelectorAll('[data-mail="' + k + '"]').forEach(t => {
+  const row = t.closest('.ln, .li'), s = document.createElement('span'); s.className = 'sent'; s.textContent = text
+  if (!row) return t.replaceWith(s)
+  row.querySelectorAll('button:not(.cb)').forEach(b => b.remove()); row.append(s)
+})
+document.querySelectorAll('[data-mail]').forEach(b => b.onclick = e => { e.preventDefault(); openMail(b.dataset.mail) })
+$('msend').onclick = () => { markSent(mailKey, 'Mail gesendet, 14:06'); closeMail() }
+$('mcopy').onclick = () => { navigator.clipboard?.writeText($('mbody').textContent).catch(() => {}); $('mcopy').textContent = 'Kopiert' }
+$('mcancel').onclick = closeMail
+$('mailov').onclick = e => { if (e.target === $('mailov')) closeMail() }
+$('mocksw').onclick = () => { const off = document.body.classList.toggle('nomail'); $('mocksw').textContent = off ? 'Mockup: mit Postfach zeigen' : 'Mockup: ohne Postfach zeigen'; $('mcopy').textContent = 'Text kopieren' }
+document.querySelectorAll('[data-nudge]').forEach(b => b.onclick = () => { const s = document.createElement('span'); s.className = 'sent'; s.textContent = 'Ben erinnert, 14:06'; b.replaceWith(s) })
+const setState = s => {
+  go('ov')
+  document.body.dataset.state = s
+  if (s === 'n') { document.body.dataset.view = 'chat'; document.querySelectorAll('.mobtabs button').forEach(x => x.classList.toggle('on', x.dataset.v === 'chat')) }
+  document.querySelectorAll('[data-state-btn]').forEach(b => b.classList.toggle('on', b.dataset.stateBtn === s))
+  document.querySelector('.board').scrollTop = 0
+}
+document.querySelectorAll('[data-state-btn]').forEach(b => b.onclick = () => setState(b.dataset.stateBtn))
+setState('w')
+document.getElementById('theme').onclick = () => document.documentElement.classList.toggle('dark')
+const mainEl = document.querySelector('.main')
+const store = (k, v) => { try { v === undefined ? localStorage.removeItem(k) : localStorage.setItem(k, v) } catch (e) {} }
+const load = k => { try { return localStorage.getItem(k) } catch (e) { return null } }
+const setW = pct => mainEl.style.setProperty('--chatw', pct + '%')
+const saved = load('sp-chatw'); if (saved) setW(saved)
+const split = document.getElementById('split')
+split.addEventListener('pointerdown', e => {
+  split.setPointerCapture(e.pointerId); document.body.classList.add('dragging')
+  const move = ev => {
+    const r = mainEl.getBoundingClientRect()
+    const pct = Math.max(25, Math.min(70, (ev.clientX - r.left) / r.width * 100))
+    setW(pct.toFixed(1))
+  }
+  const up = () => {
+    document.body.classList.remove('dragging')
+    split.removeEventListener('pointermove', move); split.removeEventListener('pointerup', up)
+    store('sp-chatw', mainEl.style.getPropertyValue('--chatw').replace('%', ''))
+  }
+  split.addEventListener('pointermove', move); split.addEventListener('pointerup', up)
+})
+split.ondblclick = () => { mainEl.style.removeProperty('--chatw'); store('sp-chatw') }
+const layout = m => {
+  document.body.classList.toggle('chatonly', m === 'chat')
+  document.body.classList.toggle('boardonly', m === 'board')
+  document.getElementById('wide').title = m === 'chat' ? 'Board einblenden' : 'Board ausblenden'
+  document.getElementById('wide').classList.toggle('on', m === 'chat')
+  store('sp-layout', m || undefined)
+}
+document.getElementById('wide').onclick = () => layout(document.body.classList.contains('chatonly') ? '' : 'chat')
+document.getElementById('hidechat').onclick = () => layout('board')
+document.getElementById('reopen').onclick = () => layout('')
+layout(load('sp-layout') || '')
+document.body.dataset.view = 'chat'
+document.getElementById('moreToggle').onclick = () => document.body.classList.toggle('more-open')
+document.querySelectorAll('[data-task] .cb').forEach(b => b.onclick = () => b.parentElement.classList.toggle('done'))
+document.querySelectorAll('[data-take]').forEach(b => b.onclick = () => { b.closest('.ln, .li').style.opacity = .45 })
+document.querySelectorAll('.mobtabs button').forEach(b => b.onclick = () => {
+  document.body.dataset.view = b.dataset.v
+  document.querySelectorAll('.mobtabs button').forEach(x => x.classList.toggle('on', x === b))
+})
+</script>
+</body>
+</html>
