@@ -22,6 +22,7 @@ final readonly class AgainHandler
     public function __construct(
         private EntityManagerInterface $em,
         private MessageProcessor $messageProcessor,
+        private MediaMarkerReader $mediaMarkerReader,
         private LoggerInterface $logger,
     ) {
     }
@@ -254,12 +255,16 @@ final readonly class AgainHandler
         $fileType = $fileMeta['type'] ?? '';
 
         if (!$hasFile) {
-            [$markerHasFile, $markerPath, $markerType, $cleanText] = $this->parseMediaMarkers($responseText);
-            if ($markerHasFile) {
+            $marker = $this->mediaMarkerReader->read(
+                $responseText,
+                (int) $user->getId(),
+                is_string($metadata['provider'] ?? null) ? $metadata['provider'] : null,
+            );
+            $responseText = $marker->text;
+            if ($marker->hasFile()) {
                 $hasFile = 1;
-                $filePath = $markerPath;
-                $fileType = $markerType;
-                $responseText = $cleanText;
+                $filePath = $marker->path;
+                $fileType = $marker->type;
             }
         }
 
@@ -304,30 +309,5 @@ final readonly class AgainHandler
         }
 
         return $message;
-    }
-
-    /**
-     * Parse media markers like [IMAGE:url] or [VIDEO:url].
-     */
-    private function parseMediaMarkers(string $text): array
-    {
-        $hasFile = false;
-        $filePath = '';
-        $fileType = '';
-        $cleanText = $text;
-
-        if (preg_match('/\[IMAGE:(.*?)]/i', $text, $matches)) {
-            $filePath = $matches[1];
-            $fileType = 'png';
-            $hasFile = true;
-            $cleanText = str_replace($matches[0], '', $text);
-        } elseif (preg_match('/\[VIDEO:(.*?)]/i', $text, $matches)) {
-            $filePath = $matches[1];
-            $fileType = 'mp4';
-            $hasFile = true;
-            $cleanText = str_replace($matches[0], '', $text);
-        }
-
-        return [$hasFile, $filePath, $fileType, $cleanText];
     }
 }
