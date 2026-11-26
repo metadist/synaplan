@@ -4,6 +4,7 @@ namespace App\AI\Provider\OpenAI;
 
 use App\AI\Exception\ProviderException;
 use App\Service\File\FileHelper;
+use App\Service\Media\PublicMediaName;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -150,7 +151,7 @@ final class OpenAISpeech
             ]);
 
             // Save to temporary file with proper permissions
-            $filename = 'tts_'.uniqid().'.mp3';
+            $filename = PublicMediaName::speech('mp3');
             $outputPath = $this->uploadDir.'/'.$filename;
 
             if (!FileHelper::createDirectory($this->uploadDir)) {

@@ -211,7 +211,9 @@ DEFAULTS (when unknown):
 
 IMPORTANT:
 - If a single provider model supports multiple capabilities, create multiple rows (one per BTAG) with the same BSERVICE+BPROVID and different BTAG.
-- Use single quotes for SQL string values and escape single quotes by doubling them.
+- Use single quotes for SQL string values and escape single quotes by doubling them. Never use a backslash or double quotes around a value.
+- Use literal values only: no SQL functions, no subqueries, no variables, no comments.
+- In a WHERE clause compare BSERVICE, BTAG and BPROVID with literal values using = and join conditions with AND, never OR.
 
 Return a minimal set of statements (only the changes needed).
 PROMPT;

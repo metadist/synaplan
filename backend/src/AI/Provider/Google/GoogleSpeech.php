@@ -4,6 +4,7 @@ namespace App\AI\Provider\Google;
 
 use App\AI\Exception\ProviderException;
 use App\Service\File\FileHelper;
+use App\Service\Media\PublicMediaName;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -360,7 +361,7 @@ final class GoogleSpeech
 
         // Save to file with proper permissions
         $this->ensureUploadDirectory();
-        $filename = 'tts_'.uniqid().'.'.$extension;
+        $filename = PublicMediaName::speech($extension);
         $outputPath = rtrim($this->uploadDir, '/\\').'/'.$filename;
 
         $written = FileHelper::writeFile($outputPath, $audioData);

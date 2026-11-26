@@ -11,6 +11,7 @@ use App\AI\Catalog\ProviderDialects;
 use App\AI\Catalog\ProviderPricing;
 use App\AI\Exception\ProviderException;
 use App\AI\Interface\TextToSpeechProviderInterface;
+use App\Service\Media\PublicMediaName;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Filesystem\Filesystem;
@@ -184,7 +185,7 @@ class PiperProvider implements TextToSpeechProviderInterface, DescribesProviderI
         $this->filesystem->dumpFile($wavPath, $wavContent);
 
         // 3. Convert to MP3 using ffmpeg
-        $filename = 'tts_'.uniqid().'.mp3';
+        $filename = PublicMediaName::speech('mp3');
         $mp3Path = $this->uploadDir.'/'.$filename;
 
         $process = new Process([

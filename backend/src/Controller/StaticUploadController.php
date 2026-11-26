@@ -8,8 +8,8 @@ use App\Repository\FileRepository;
 use App\Repository\MessageRepository;
 use App\Service\File\FileHelper;
 use App\Service\File\UploadRequestPath;
+use App\Service\Media\AnonymousMediaGate;
 use App\Service\Media\MediaAccessTokenService;
-use App\Service\Media\OutboundChannelMedia;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -31,6 +31,7 @@ class StaticUploadController extends AbstractController
         private MessageRepository $messageRepository,
         private FileRepository $fileRepository,
         private MediaAccessTokenService $mediaAccessTokenService,
+        private AnonymousMediaGate $anonymousMediaGate,
         private string $uploadDir,
         private LoggerInterface $logger,
     ) {
@@ -79,39 +80,23 @@ class StaticUploadController extends AbstractController
             return $this->serveFile($path, $request);
         }
 
-        // Filename patterns that are served without any permission check.
+        // Media that third parties fetch anonymously and cannot be given a
+        // credential: Meta's WhatsApp servers fetch the `link` we hand them,
+        // the public widget and guest chat render generated media in
+        // anonymous browsers, and image-to-video providers fetch the source
+        // image. The name is the only secret, so AnonymousMediaGate serves a
+        // file this way only when its name carries 128 random bits, or is an
+        // old-style name from before this instance was upgraded.
         //
-        // These are NOT a convenience for our own UI — authenticated clients
-        // have the cookie, the Bearer header or a media token. They exist
-        // because third parties fetch these URLs anonymously and cannot be
-        // given a credential:
-        //
-        // - `tts_*` and `{id}_{kind}_{timestamp}.{ext}`: Meta's WhatsApp
-        //   servers fetch the `link` we hand them
-        //   (`WhatsAppService::sendMedia`), and the public widget/guest chat
-        //   renders them in anonymous browsers. DAG documents are copied
-        //   into this shape via `OutboundChannelMedia::publishCopy`.
-        // - `ai_i2vsrc_*`: `MediaGenerationHandler::publishInputImageForRemoteFetch`
-        //   hands the URL to image-to-video providers, which fetch it directly.
-        //
-        // Do not widen this list. Anything reachable only from our own
+        // Do not widen that gate. Anything reachable only from our own
         // authenticated UI must go through the ownership check below.
-        $isRemoteFetchedSource = OutboundChannelMedia::isRemoteFetchedSource($filename);
-        $isOutboundChannelMedia = OutboundChannelMedia::isOutboundChannelMedia($filename);
-
-        if ($isRemoteFetchedSource || $isOutboundChannelMedia) {
-            // Security rests on the path being unguessable (user-specific
-            // directory plus a filename carrying ids and a timestamp) and on
-            // these files being ephemeral.
+        if ($this->anonymousMediaGate->allows($filename)) {
             $this->logger->info('StaticUploadController: Serving anonymously fetchable media', [
                 'path' => $path,
                 'filename' => $filename,
-                'remote_fetched_source' => $isRemoteFetchedSource,
-                'outbound_channel_media' => $isOutboundChannelMedia,
                 'user_id' => $user?->getId(),
             ]);
 
-            // Skip message/permission check - serve directly
             return $this->serveFile($path, $request);
         }
 

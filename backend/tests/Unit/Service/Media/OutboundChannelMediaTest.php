@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Service\Media;
 
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
-use PHPUnit\Framework\Attributes\DataProvider;
+use App\Service\Media\PublicMediaName;
 use PHPUnit\Framework\TestCase;
 
 final class OutboundChannelMediaTest extends TestCase
@@ -27,26 +27,6 @@ final class OutboundChannelMediaTest extends TestCase
         parent::tearDown();
     }
 
-    #[DataProvider('anonymouslyFetchableProvider')]
-    public function testIsAnonymouslyFetchable(string $filename, bool $expected): void
-    {
-        $this->assertSame($expected, OutboundChannelMedia::isAnonymouslyFetchable($filename));
-    }
-
-    /**
-     * @return iterable<string, array{0: string, 1: bool}>
-     */
-    public static function anonymouslyFetchableProvider(): iterable
-    {
-        yield 'tts prefix' => ['tts_reply.mp3', true];
-        yield 'ai image pattern' => ['123_google_1736189000.mp4', true];
-        yield 'published document copy' => ['1_document_1736189000847.docx', true];
-        yield 'i2v source' => ['ai_i2vsrc_1_1736189000_abc.jpg', true];
-        yield 'generated office doc' => ['notes_1736189000.docx', false];
-        yield 'human filename' => ['meeting.ics', false];
-        yield 'legacy generated prefix' => ['generated_abc123.png', false];
-    }
-
     public function testRelativeUploadPathStripsServePrefix(): void
     {
         $this->assertSame(
@@ -59,7 +39,7 @@ final class OutboundChannelMediaTest extends TestCase
         );
     }
 
-    public function testPublishCopyWritesAnonymouslyFetchableFilename(): void
+    public function testPublishCopyWritesAnUnguessableFilename(): void
     {
         $uploadDir = sys_get_temp_dir().'/outbound-media-'.bin2hex(random_bytes(4));
         $source = $uploadDir.'/source/notes_1736189000.docx';
@@ -76,7 +56,8 @@ final class OutboundChannelMediaTest extends TestCase
         );
 
         $this->assertIsString($published);
-        $this->assertTrue(OutboundChannelMedia::isAnonymouslyFetchable(basename($published)));
+        $this->assertTrue(PublicMediaName::isUnguessable(basename($published)));
+        $this->assertStringStartsWith('1_document_', basename($published));
         $this->assertStringEndsWith('.docx', $published);
         $this->assertFileExists($uploadDir.'/'.$published);
         $this->assertSame('docx-bytes', (string) file_get_contents($uploadDir.'/'.$published));

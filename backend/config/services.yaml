@@ -1131,6 +1131,9 @@ services:
             $environment: '%env(string:default::IAP_APPLE_ENVIRONMENT)%'
             $rootCertsDir: '%env(string:default::IAP_APPLE_ROOT_CERTS_DIR)%'
             $projectDir: '%kernel.project_dir%'
+            # The Xcode / LocalTesting environments skip signature checks; the
+            # verifier refuses them unless this is a dev or test kernel.
+            $appEnv: '%kernel.environment%'
     App\Service\Iap\AppleReceiptVerifierInterface:
         alias: App\Service\Iap\AppleStoreKitVerifier
 

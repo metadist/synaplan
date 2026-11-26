@@ -37,6 +37,14 @@ final readonly class IapEntitlement
          * secondary anti-fraud check when present and parseable.
          */
         public ?string $accountBinding = null,
+        /**
+         * When the store signed the data this snapshot was read from, as a
+         * Unix timestamp. Apple only: a transaction held by a device keeps
+         * verifying after a refund, so its age is what tells a current
+         * receipt from one that predates the refund. Null for Google, whose
+         * state is read from the Play API at verification time.
+         */
+        public ?int $signedAt = null,
     ) {
     }
 

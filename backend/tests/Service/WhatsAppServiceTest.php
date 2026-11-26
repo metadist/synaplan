@@ -2161,7 +2161,7 @@ class WhatsAppServiceTest extends TestCase
             $this->assertSame('notes_1736189000.docx', $sends[1]['document']['filename']);
             $linkPath = (string) parse_url($sends[1]['document']['link'], PHP_URL_PATH);
             $this->assertMatchesRegularExpression(
-                '/\/\d+_document_\d+\.docx$/',
+                '/\/\d+_document_[0-9a-f]{32}\.docx$/',
                 $linkPath,
                 'Meta must fetch an anonymously-servable filename, not the generated office name',
             );

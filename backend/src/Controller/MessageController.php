@@ -17,6 +17,7 @@ use App\Service\File\VectorizationService;
 use App\Service\Message\AgainHandler;
 use App\Service\Message\EnhanceChangeSummary;
 use App\Service\Message\InputEnhancer;
+use App\Service\Message\MediaMarkerReader;
 use App\Service\Message\MessageApiFormatter;
 use App\Service\Message\MessageEnqueueService;
 use App\Service\Message\MessagePreProcessor;
@@ -91,6 +92,7 @@ class MessageController extends AbstractController
     public function sendMessage(
         Request $request,
         #[CurrentUser] ?User $user,
+        MediaMarkerReader $mediaMarkerReader,
     ): JsonResponse {
         if (!$user) {
             return $this->json(['error' => 'Not authenticated'], Response::HTTP_UNAUTHORIZED);
@@ -226,26 +228,17 @@ class MessageController extends AbstractController
                 ]
             );
 
-            // Parse response for special content markers
-            $hasFile = 0;
-            $filePath = '';
-            $fileType = '';
-            $responseText = $aiResponse['content'] ?? '';
-
-            // Check for [IMAGE:url] marker
-            if (preg_match('/\[IMAGE:(.+?)\]/', $responseText, $matches)) {
-                $hasFile = 1;
-                $filePath = $matches[1];
-                $fileType = 'png';
-                $responseText = trim(preg_replace('/\[IMAGE:.+?\]/', '', $responseText));
-            }
-            // Check for [VIDEO:url] marker
-            elseif (preg_match('/\[VIDEO:(.+?)\]/', $responseText, $matches)) {
-                $hasFile = 1;
-                $filePath = $matches[1];
-                $fileType = 'mp4';
-                $responseText = trim(preg_replace('/\[VIDEO:.+?\]/', '', $responseText));
-            }
+            // A media marker in the reply counts only when it names a file
+            // of this account (MediaMarkerReader).
+            $marker = $mediaMarkerReader->read(
+                (string) ($aiResponse['content'] ?? ''),
+                (int) $user->getId(),
+                is_string($aiResponse['provider'] ?? null) ? $aiResponse['provider'] : null,
+            );
+            $hasFile = $marker->hasFile() ? 1 : 0;
+            $filePath = $marker->path;
+            $fileType = $marker->type;
+            $responseText = $marker->text;
 
             // Create outgoing message
             $outgoingMessage = new Message();

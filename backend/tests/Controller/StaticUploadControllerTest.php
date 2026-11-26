@@ -7,8 +7,11 @@ namespace App\Tests\Controller;
 use App\Entity\File;
 use App\Entity\Message;
 use App\Entity\User;
+use App\Repository\ConfigRepository;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\AnonymousMediaGate;
 use App\Service\Media\MediaAccessTokenService;
+use App\Service\Media\PublicMediaName;
 use App\Tests\Trait\AuthenticatedTestTrait;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -66,6 +69,14 @@ class StaticUploadControllerTest extends WebTestCase
      */
     private array $createdMessages = [];
 
+    /**
+     * The `LEGACY_PUBLIC_NAMES_UNTIL` value before a test changed it, kept as
+     * a one-element list so that "no row" (null) can be restored too.
+     *
+     * @var array{0: string|null}|null
+     */
+    private ?array $legacyNamesUntilBefore = null;
+
     protected function setUp(): void
     {
         self::ensureKernelShutdown();
@@ -100,6 +111,11 @@ class StaticUploadControllerTest extends WebTestCase
             }
         }
         $this->em->flush();
+
+        if (null !== $this->legacyNamesUntilBefore) {
+            $this->writeLegacyNamesUntil($this->legacyNamesUntilBefore[0]);
+            $this->legacyNamesUntilBefore = null;
+        }
 
         foreach ($this->diskPaths as $path) {
             if (is_file($path)) {
@@ -236,7 +252,7 @@ class StaticUploadControllerTest extends WebTestCase
      */
     public function testServesImageToVideoSourceAnonymously(): void
     {
-        $relativePath = $this->createUploadOnDisk('ai_i2vsrc_1_'.bin2hex(random_bytes(4)).'.jpg', 'i2v-source');
+        $relativePath = $this->createUploadOnDisk(PublicMediaName::remoteSource($this->user->getId(), 'jpg'), 'i2v-source');
 
         $this->client->getCookieJar()->clear();
         $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
@@ -278,12 +294,12 @@ class StaticUploadControllerTest extends WebTestCase
     }
 
     /**
-     * Meta's WhatsApp servers fetch the TTS `link` we hand them, so this
-     * prefix has to stay anonymously readable.
+     * Meta's WhatsApp servers fetch the TTS `link` we hand them, so a speech
+     * file has to stay anonymously readable.
      */
     public function testServesTtsAudioAnonymously(): void
     {
-        $relativePath = $this->createUploadOnDisk('tts_'.bin2hex(random_bytes(4)).'.mp3', 'spoken');
+        $relativePath = $this->createUploadOnDisk(PublicMediaName::speech('mp3'), 'spoken');
 
         $this->client->getCookieJar()->clear();
         $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
@@ -292,13 +308,13 @@ class StaticUploadControllerTest extends WebTestCase
     }
 
     /**
-     * DAG documents published via OutboundChannelMedia::publishCopy use
-     * `{userId}_document_{timestamp}.docx` so Meta can fetch them without auth.
+     * Copies published via OutboundChannelMedia::publishCopy are fetched by
+     * Meta without auth.
      */
     public function testServesPublishedDocumentCopyAnonymously(): void
     {
         $relativePath = $this->createUploadOnDisk(
-            $this->user->getId().'_document_'.time().random_int(100, 999).'.docx',
+            PublicMediaName::generated($this->user->getId(), 'document', 'docx'),
             'docx-bytes',
         );
 
@@ -306,6 +322,73 @@ class StaticUploadControllerTest extends WebTestCase
         $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
 
         $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * A link handed out before the upgrade keeps working: the time in the
+     * old-style name lies before the recorded moment.
+     *
+     * @param callable(int, int): string $name
+     */
+    #[DataProvider('oldStyleNames')]
+    public function testKeepsServingAnOldStyleNameFromBeforeTheUpgrade(callable $name): void
+    {
+        $upgradedAt = time() - 3600;
+        $this->setLegacyNamesUntil((string) $upgradedAt);
+        $relativePath = $this->createUploadOnDisk($name($this->user->getId(), $upgradedAt - 60), 'old-bytes');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_OK, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * A file that only looks like an old-style name, built after the
+     * upgrade, is not public: its name can be worked out from ids and the
+     * clock.
+     *
+     * @param callable(int, int): string $name
+     */
+    #[DataProvider('oldStyleNames')]
+    public function testDoesNotServeAnOldStyleNameFromAfterTheUpgrade(callable $name): void
+    {
+        $upgradedAt = time() - 3600;
+        $this->setLegacyNamesUntil((string) $upgradedAt);
+        $relativePath = $this->createUploadOnDisk($name($this->user->getId(), $upgradedAt + 60), 'new-bytes');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * Without the recorded moment no old-style name is public.
+     *
+     * @param callable(int, int): string $name
+     */
+    #[DataProvider('oldStyleNames')]
+    public function testDoesNotServeAnOldStyleNameWithoutTheRecordedMoment(callable $name): void
+    {
+        $this->setLegacyNamesUntil(null);
+        $relativePath = $this->createUploadOnDisk($name($this->user->getId(), time() - 86400), 'old-bytes');
+
+        $this->client->getCookieJar()->clear();
+        $this->client->request('GET', '/api/v1/files/uploads/'.$relativePath);
+
+        $this->assertSame(Response::HTTP_NOT_FOUND, $this->client->getResponse()->getStatusCode());
+    }
+
+    /**
+     * @return iterable<string, array{0: callable(int, int): string}>
+     */
+    public static function oldStyleNames(): iterable
+    {
+        yield 'speech' => [static fn (int $userId, int $time): string => 'tts_'.dechex($time).substr(bin2hex(random_bytes(3)), 0, 5).'.mp3'];
+        yield 'generated media' => [static fn (int $userId, int $time): string => random_int(100000, 999999).'_openai_'.$time.'.png'];
+        yield 'published copy' => [static fn (int $userId, int $time): string => $userId.'_document_'.$time.random_int(100, 999).'.docx'];
+        yield 'image-to-video source' => [static fn (int $userId, int $time): string => 'ai_i2vsrc_'.$userId.'_'.$time.'_'.bin2hex(random_bytes(6)).'.jpg'];
     }
 
     /**
@@ -393,6 +476,33 @@ class StaticUploadControllerTest extends WebTestCase
         $service = $this->client->getContainer()->get(MediaAccessTokenService::class);
 
         return $service->generate($this->user);
+    }
+
+    private function setLegacyNamesUntil(?string $value): void
+    {
+        if (null === $this->legacyNamesUntilBefore) {
+            $this->legacyNamesUntilBefore = [
+                $this->configRepository()->getValue(0, AnonymousMediaGate::CONFIG_GROUP, AnonymousMediaGate::CONFIG_SETTING),
+            ];
+        }
+
+        $this->writeLegacyNamesUntil($value);
+    }
+
+    private function writeLegacyNamesUntil(?string $value): void
+    {
+        if (null === $value) {
+            $this->configRepository()->deleteValue(0, AnonymousMediaGate::CONFIG_GROUP, AnonymousMediaGate::CONFIG_SETTING);
+
+            return;
+        }
+
+        $this->configRepository()->setValue(0, AnonymousMediaGate::CONFIG_GROUP, AnonymousMediaGate::CONFIG_SETTING, $value);
+    }
+
+    private function configRepository(): ConfigRepository
+    {
+        return static::getContainer()->get(ConfigRepository::class);
     }
 
     private function createUploadOnDisk(string $filename, string $contents): string

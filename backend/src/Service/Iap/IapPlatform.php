@@ -27,6 +27,18 @@ enum IapPlatform: string
         };
     }
 
+    /**
+     * The key under which this channel's stable purchase id is persisted:
+     * Apple `originalTransactionId`, Google `purchaseToken`.
+     */
+    public function purchaseIdKey(): string
+    {
+        return match ($this) {
+            self::APPLE => 'original_transaction_id',
+            self::GOOGLE => 'purchase_token',
+        };
+    }
+
     public static function tryFromSource(?string $source): ?self
     {
         return match ($source) {

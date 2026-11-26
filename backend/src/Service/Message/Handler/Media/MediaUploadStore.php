@@ -4,6 +4,7 @@ namespace App\Service\Message\Handler\Media;
 
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
+use App\Service\Media\PublicMediaName;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -59,9 +60,7 @@ final readonly class MediaUploadStore
         $extension = FileHelper::getExtensionFromMimeType($mimeType);
         $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
 
-        // Generate filename: messageId_provider_timestamp.ext
-        $timestamp = time();
-        $filename = sprintf('%d_%s_%d.%s', $messageId, $sanitizedProvider, $timestamp, $extension);
+        $filename = PublicMediaName::generated($messageId, $sanitizedProvider, $extension);
 
         // Build storage path with user subdirectories: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
         $year = date('Y');
@@ -129,9 +128,7 @@ final readonly class MediaUploadStore
             $extension = FileHelper::getExtensionFromMimeType($mimeType, $fallback);
             $sanitizedProvider = FileHelper::sanitizeProviderName($provider);
 
-            // Generate filename: messageId_provider_timestamp.ext
-            $timestamp = time();
-            $filename = sprintf('%d_%s_%d.%s', $messageId, $sanitizedProvider, $timestamp, $extension);
+            $filename = PublicMediaName::generated($messageId, $sanitizedProvider, $extension);
 
             // Build storage path with user subdirectories: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
             $year = date('Y');
@@ -172,10 +169,10 @@ final readonly class MediaUploadStore
      * Publish a locally-stored input image at a public, internet-reachable URL
      * so a remote image-to-video provider can fetch it.
      *
-     * The image is copied to an `ai_`-prefixed filename in the user's upload
-     * tree. StaticUploadController serves `ai_*` files without authentication
-     * (the same public bypass already used for AI-generated media), so the
-     * resulting absolute URL is fetchable by the provider. Returns null when
+     * The image is copied to an unguessable name in the user's upload tree
+     * ({@see PublicMediaName::remoteSource()}), which StaticUploadController
+     * serves without authentication, so the resulting absolute URL is
+     * fetchable by the provider. Returns null when
      * the file can't be read/written or no public base URL is configured.
      *
      * @param string $absoluteLocalPath absolute path to the source image on disk
@@ -210,8 +207,7 @@ final readonly class MediaUploadStore
         }
 
         $extension = strtolower(pathinfo($absoluteLocalPath, PATHINFO_EXTENSION)) ?: 'jpg';
-        // `ai_` prefix => served without auth by StaticUploadController.
-        $filename = sprintf('ai_i2vsrc_%d_%d_%s.%s', $userId, time(), bin2hex(random_bytes(6)), $extension);
+        $filename = PublicMediaName::remoteSource($userId, $extension);
 
         $userBase = $this->userUploadPathBuilder->buildUserBaseRelativePath($userId);
         $relativePath = $userBase.'/'.date('Y').'/'.date('m').'/'.$filename;

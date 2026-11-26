@@ -13,6 +13,7 @@ use App\Service\Iap\Exception\IapNotConfiguredException;
 use App\Service\Iap\Exception\IapVerificationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * MOBILE-APP SEAM (Epic 5.4): self-hosted IAP validation — the single source of
@@ -33,6 +34,11 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class MobilePurchaseService
 {
+    private const REDEEM_LOCK_PREFIX = 'iap-redeem-';
+
+    /** Covers the ownership check, the Google acknowledgement and the write. */
+    private const REDEEM_LOCK_TTL_SECONDS = 30.0;
+
     public function __construct(
         private EntityManagerInterface $em,
         private UserRepository $userRepository,
@@ -41,6 +47,8 @@ final readonly class MobilePurchaseService
         private GooglePlayVerifierInterface $googleVerifier,
         private LoggerInterface $logger,
         private LevelGrantService $levelGrants,
+        private LockFactory $lockFactory,
+        private IapPurchaseHistory $history,
     ) {
     }
 
@@ -58,7 +66,8 @@ final readonly class MobilePurchaseService
      * @param string $productId store product id (Apple reads it from the JWS,
      *                          so it may be empty there; Google requires it)
      *
-     * @throws IapVerificationException unknown/empty product, or invalid receipt
+     * @throws IapVerificationException unknown/empty product, invalid receipt,
+     *                                  or a receipt that predates a refund
      * @throws IapConflictException     block-cross or replay (receipt owned by another user)
      */
     public function redeem(User $user, IapPlatform $platform, string $receipt, string $productId = ''): RedeemResult
@@ -85,17 +94,30 @@ final readonly class MobilePurchaseService
             return RedeemResult::pending($platform->source());
         }
 
-        $this->assertNoCrossChannelConflict($user, $platform);
-        $this->assertNoParallelSameChannelSubscription($user, $platform, $entitlement);
-        $this->assertReceiptNotOwnedByAnotherUser($user, $entitlement);
+        // One redeem per purchase at a time: the ownership check and the write
+        // below are not atomic, and two accounts presenting the same receipt
+        // in the same instant would otherwise both pass the check.
+        $lock = $this->lockFactory->createLock(
+            self::REDEEM_LOCK_PREFIX.hash('sha256', $platform->value.':'.$entitlement->purchaseId),
+            self::REDEEM_LOCK_TTL_SECONDS,
+        );
+        $lock->acquire(true);
+        try {
+            $this->assertNoCrossChannelConflict($user, $platform);
+            $this->assertNoParallelSameChannelSubscription($user, $platform, $entitlement);
+            $this->assertReceiptNotOwnedByAnotherUser($user, $entitlement);
+            $this->assertReceiptNotRefunded($user, $entitlement);
 
-        // Acknowledge Google purchases within the 3-day window once we've
-        // decided to grant (Apple needs no acknowledgement).
-        if (IapPlatform::GOOGLE === $platform && $entitlement->grantsAccess()) {
-            $this->googleVerifier->acknowledge($entitlement->productId, $entitlement->purchaseId);
+            // Acknowledge Google purchases within the 3-day window once we've
+            // decided to grant (Apple needs no acknowledgement).
+            if (IapPlatform::GOOGLE === $platform && $entitlement->grantsAccess()) {
+                $this->googleVerifier->acknowledge($entitlement->productId, $entitlement->purchaseId);
+            }
+
+            $this->applyEntitlement($user, $entitlement, $tier);
+        } finally {
+            $lock->release();
         }
-
-        $this->applyEntitlement($user, $entitlement, $tier);
 
         $status = $this->statusFor($entitlement->state);
         $this->logger->info('IAP purchase redeemed', [
@@ -158,6 +180,12 @@ final readonly class MobilePurchaseService
         // platform still owns the record.
         $ownerSource = $user->getSubscriptionSource();
         if (null !== $ownerSource && $ownerSource !== $entitlement->platform->source()) {
+            // The purchase itself still changed state at the store. Keep that,
+            // or a refund reported now is forgotten by the time this account
+            // presents the old receipt again.
+            $this->history->remember($user, $entitlement, $this->statusFor($entitlement->state));
+            $this->em->flush();
+
             $this->logger->info('IAP notification ignored: subscription owned by another channel', [
                 'user_id' => $user->getId(),
                 'owner' => $ownerSource,
@@ -198,20 +226,19 @@ final readonly class MobilePurchaseService
             $this->levelGrants->remove($user, LevelGrantSource::IAP);
         }
 
-        $paymentDetails = $user->getPaymentDetails();
-        $idKey = IapPlatform::APPLE === $entitlement->platform
-            ? 'original_transaction_id'
-            : 'purchase_token';
+        $status = $this->statusFor($entitlement->state);
+        $this->history->remember($user, $entitlement, $status);
 
+        $paymentDetails = $user->getPaymentDetails();
         $paymentDetails['subscription'] = [
             'source' => $entitlement->platform->source(),
-            'status' => $this->statusFor($entitlement->state),
+            'status' => $status,
             'plan' => $grants ? $tier : 'NEW',
             'product_id' => $entitlement->productId,
             'subscription_end' => $entitlement->expiresAt,
             'cancel_at_period_end' => !$entitlement->autoRenew,
             'environment' => $entitlement->environment,
-            $idKey => $entitlement->purchaseId,
+            $entitlement->platform->purchaseIdKey() => $entitlement->purchaseId,
         ];
 
         $user->setPaymentDetails($paymentDetails);
@@ -288,6 +315,31 @@ final readonly class MobilePurchaseService
         }
     }
 
+    /**
+     * A refunded Apple purchase stays redeemable on paper: the transaction a
+     * device holds was signed before the refund and still verifies. Once the
+     * store has reported the refund, only a receipt signed after it counts.
+     * Google needs no such rule, its state is read from the Play API.
+     */
+    private function assertReceiptNotRefunded(User $user, IapEntitlement $entitlement): void
+    {
+        if (IapPlatform::APPLE !== $entitlement->platform || !$entitlement->grantsAccess()) {
+            return;
+        }
+
+        if (!$this->history->predatesRefund($user, $entitlement)) {
+            return;
+        }
+
+        $this->logger->warning('IAP redeem blocked: receipt predates a refund of the same purchase', [
+            'user_id' => $user->getId(),
+            'platform' => $entitlement->platform->value,
+            'product' => $entitlement->productId,
+        ]);
+
+        throw new IapVerificationException('This purchase was refunded by the store and cannot be redeemed again.');
+    }
+
     private function statusFor(IapEntitlementState $state): string
     {
         return match ($state) {
@@ -295,7 +347,7 @@ final readonly class MobilePurchaseService
             IapEntitlementState::GRACE_PERIOD => 'grace_period',
             IapEntitlementState::ON_HOLD => 'on_hold',
             IapEntitlementState::EXPIRED => 'expired',
-            IapEntitlementState::REVOKED => 'refunded',
+            IapEntitlementState::REVOKED => IapPurchaseHistory::STATUS_REFUNDED,
             IapEntitlementState::PENDING => 'pending',
         };
     }

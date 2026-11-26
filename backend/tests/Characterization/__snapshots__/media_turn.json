@@ -375,7 +375,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -419,12 +419,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "Paint the car blue",
                 "media_recorded_usage": null,
                 "media_type": "image",
@@ -505,7 +505,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -518,7 +518,7 @@
             [
                 7,
                 [
-                    "1001_openai_<time>.png"
+                    "1001_openai_<random>.png"
                 ]
             ]
         ],
@@ -552,12 +552,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": "Saved to Nextcloud: /Synaplan/fox.png",
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "A fox in the snow",
                 "media_recorded_usage": null,
                 "media_type": "image",
@@ -723,7 +723,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -763,12 +763,12 @@
                 "edit_source_file_id": 91,
                 "edit_source_name": "car.png",
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "Paint the car blue",
                 "media_recorded_usage": null,
                 "media_type": "image",
@@ -855,7 +855,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                "07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                 "video",
                 1001,
                 "google",
@@ -895,12 +895,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                     "type": "video"
                 },
                 "folder_delivery": null,
                 "image_url": "data:video/mp4;base64,dmVv",
-                "local_path": "07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                "local_path": "07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                 "media_prompt": "The car drives away",
                 "media_recorded_usage": null,
                 "media_type": "video",
@@ -947,7 +947,7 @@
             ]
         ],
         "thumbnails": [
-            "07/000/00007/<year>/<month>/1001_google_<time>.mp4"
+            "07/000/00007/<year>/<month>/1001_google_<random>.mp4"
         ],
         "usage": []
     },
@@ -978,7 +978,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -1018,12 +1018,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "/pic a quiet harbour",
                 "media_recorded_usage": null,
                 "media_type": "image",
@@ -1096,7 +1096,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -1136,12 +1136,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "A red bicycle",
                 "media_recorded_usage": null,
                 "media_type": "image",
@@ -1339,7 +1339,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -1379,12 +1379,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "Make the sky purple",
                 "media_recorded_usage": "<RecordedUsage>",
                 "media_type": "image",
@@ -1473,7 +1473,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -1513,12 +1513,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "https://cdn.provider.test/out/lighthouse.png",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "A lighthouse at dusk, oil painting",
                 "media_recorded_usage": "<RecordedUsage>",
                 "media_type": "image",
@@ -1612,7 +1612,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_xai_<time>.mp4",
+                "07/000/00007/<year>/<month>/1001_xai_<random>.mp4",
                 "video",
                 1001,
                 "xai",
@@ -1652,12 +1652,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_xai_<time>.mp4",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_xai_<random>.mp4",
                     "type": "video"
                 },
                 "folder_delivery": null,
                 "image_url": "data:video/mp4;base64,Z3Jvaw==",
-                "local_path": "07/000/00007/<year>/<month>/1001_xai_<time>.mp4",
+                "local_path": "07/000/00007/<year>/<month>/1001_xai_<random>.mp4",
                 "media_prompt": "The photo comes alive",
                 "media_recorded_usage": null,
                 "media_type": "video",
@@ -1709,7 +1709,7 @@
             ]
         ],
         "thumbnails": [
-            "07/000/00007/<year>/<month>/1001_xai_<time>.mp4"
+            "07/000/00007/<year>/<month>/1001_xai_<random>.mp4"
         ],
         "usage": []
     },
@@ -1798,7 +1798,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                "07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4",
                 "video",
                 1001,
                 "higgsfield",
@@ -1838,12 +1838,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4",
                     "type": "video"
                 },
                 "folder_delivery": null,
                 "image_url": "data:video/mp4;base64,bm90IGEgcmVhbCB2aWRlbw==",
-                "local_path": "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                "local_path": "07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4",
                 "media_prompt": "The sun sets over the beach",
                 "media_recorded_usage": "<RecordedUsage>",
                 "media_type": "video",
@@ -1854,7 +1854,7 @@
                 "model": "dop-turbo",
                 "model_id": 44,
                 "provider": "higgsfield",
-                "thumbnail_path": "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4.jpg",
+                "thumbnail_path": "07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4.jpg",
                 "usage_recorded": true
             }
         },
@@ -1896,7 +1896,7 @@
             ]
         ],
         "thumbnails": [
-            "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4"
+            "07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4"
         ],
         "usage": [
             [
@@ -1940,7 +1940,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -1980,12 +1980,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "A fox in the snow",
                 "media_recorded_usage": null,
                 "media_type": "image",
@@ -2167,7 +2167,7 @@
                     "image_url": "https://images.example.com/poster.webp",
                     "images": [
                         "https://images.example.com/poster.webp",
-                        "http://localhost:8000/api/v1/files/uploads/07/000/00007/<year>/<month>/ai_i2vsrc_7_<time>_<random>.png"
+                        "http://localhost:8000/api/v1/files/uploads/07/000/00007/<year>/<month>/ai_i2vsrc_7_<random>.png"
                     ],
                     "model": "dop-turbo",
                     "modelConfig": {
@@ -2191,7 +2191,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                "07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4",
                 "video",
                 1001,
                 "higgsfield",
@@ -2231,12 +2231,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4",
                     "type": "video"
                 },
                 "folder_delivery": null,
                 "image_url": "data:video/mp4;base64,bm90IGEgcmVhbCB2aWRlbw==",
-                "local_path": "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4",
+                "local_path": "07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4",
                 "media_prompt": "The poster comes alive",
                 "media_recorded_usage": null,
                 "media_type": "video",
@@ -2289,7 +2289,7 @@
             ]
         ],
         "thumbnails": [
-            "07/000/00007/<year>/<month>/1001_higgsfield_<time>.mp4"
+            "07/000/00007/<year>/<month>/1001_higgsfield_<random>.mp4"
         ],
         "usage": []
     },
@@ -2669,7 +2669,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -2710,12 +2710,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "A fox in the snow",
                 "media_recorded_usage": null,
                 "media_type": "image",
@@ -3119,7 +3119,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                "07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                 "video",
                 1001,
                 "google",
@@ -3154,12 +3154,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                     "type": "video"
                 },
                 "folder_delivery": null,
                 "image_url": "data:video/mp4;base64,dmVv",
-                "local_path": "07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                "local_path": "07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                 "media_prompt": "The harbour at sunrise",
                 "media_recorded_usage": null,
                 "media_type": "video",
@@ -3206,7 +3206,7 @@
             ]
         ],
         "thumbnails": [
-            "07/000/00007/<year>/<month>/1001_google_<time>.mp4"
+            "07/000/00007/<year>/<month>/1001_google_<random>.mp4"
         ],
         "usage": []
     },
@@ -3411,7 +3411,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                "07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                 "video",
                 1001,
                 "google",
@@ -3451,12 +3451,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                     "type": "video"
                 },
                 "folder_delivery": null,
                 "image_url": "data:video/mp4;base64,dmVv",
-                "local_path": "07/000/00007/<year>/<month>/1001_google_<time>.mp4",
+                "local_path": "07/000/00007/<year>/<month>/1001_google_<random>.mp4",
                 "media_prompt": "A paper boat on a river",
                 "media_recorded_usage": "<RecordedUsage>",
                 "media_type": "video",
@@ -3505,7 +3505,7 @@
             ]
         ],
         "thumbnails": [
-            "07/000/00007/<year>/<month>/1001_google_<time>.mp4"
+            "07/000/00007/<year>/<month>/1001_google_<random>.mp4"
         ],
         "usage": [
             [
@@ -3550,7 +3550,7 @@
         "files": [
             [
                 7,
-                "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "image",
                 1001,
                 "openai",
@@ -3590,12 +3590,12 @@
                 "edit_source_file_id": null,
                 "edit_source_name": null,
                 "file": {
-                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                    "path": "/api/v1/files/uploads/07/000/00007/<year>/<month>/1001_openai_<random>.png",
                     "type": "image"
                 },
                 "folder_delivery": null,
                 "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAACklEQVR4nGMAAQAABQABDQottAAAAABJRU5ErkJggg==",
-                "local_path": "07/000/00007/<year>/<month>/1001_openai_<time>.png",
+                "local_path": "07/000/00007/<year>/<month>/1001_openai_<random>.png",
                 "media_prompt": "A fox in the snow",
                 "media_recorded_usage": null,
                 "media_type": "image",

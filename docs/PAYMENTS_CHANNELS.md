@@ -180,6 +180,19 @@ Guarantees enforced in `MobilePurchaseService`:
 - **Replay protection.** A receipt's stable id (Apple `original_transaction_id` / Google
   `purchase_token`) maps to exactly one account; a receipt already owned by another user is
   rejected (`IAP_OWNERSHIP_CONFLICT`). Re-redeeming on the same account is idempotent.
+  The id is also kept in `BPAYMENTDETAILS.iap_purchases`, which a later Stripe subscription does
+  not replace, and the ownership check runs under a lock on the purchase, so two accounts
+  presenting one receipt at the same moment cannot both pass.
+- **This app only.** An Apple transaction whose bundle id differs from `IAP_APPLE_BUNDLE_ID` is
+  rejected. Apple signs every app's transactions with the same chain, and product ids are unique
+  only within one app.
+- **A refund is final for the refunded receipt.** The transaction a device holds was signed before
+  the refund and still verifies. Once the store has reported the refund, only a receipt signed
+  after it is granted (a new purchase is; the old receipt is not). This depends on the refund
+  notification reaching `/apple/notifications`.
+- **No unsigned environments in production.** `IAP_APPLE_ENVIRONMENT=Xcode` / `LocalTesting` skip
+  signature checks and are refused unless `APP_ENV` is `dev` or `test`; Apple IAP then reports
+  itself as not configured.
 - **PENDING never unlocks.** Google deferred/SCA purchases are accepted but not granted until the
   confirming RTDN arrives.
 - **Google `acknowledge`** is called within the 3-day window once access is granted (else Google

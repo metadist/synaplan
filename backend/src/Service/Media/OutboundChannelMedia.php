@@ -8,38 +8,12 @@ use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 
 /**
- * Filenames third parties (Meta WhatsApp, i2v providers) may fetch without auth.
- *
- * Must stay in lockstep with {@see \App\Controller\StaticUploadController}'s
- * anonymous-serve gate. Do not add patterns here unless that controller
- * (and its tests) gain the same bypass.
+ * Paths and copies for media a third party (Meta WhatsApp) fetches without
+ * a credential. Which names are served that way is decided by
+ * {@see AnonymousMediaGate}; the names come from {@see PublicMediaName}.
  */
 final class OutboundChannelMedia
 {
-    /**
-     * AI-generated images/videos/audio: `{messageId}_{provider}_{timestamp}.{ext}`.
-     * WhatsApp document copies published by {@see self::publishCopy()}:
-     * `{userId}_{kind}_{timestamp}{nonce}.{ext}`.
-     */
-    public const OUTBOUND_FILENAME_PATTERN = '/^\d+_[a-z]+_\d+\.[a-z0-9]+$/i';
-
-    public static function isOutboundChannelMedia(string $filename): bool
-    {
-        return str_starts_with($filename, 'tts_')
-            || 1 === preg_match(self::OUTBOUND_FILENAME_PATTERN, $filename);
-    }
-
-    public static function isRemoteFetchedSource(string $filename): bool
-    {
-        return str_starts_with($filename, 'ai_i2vsrc_');
-    }
-
-    public static function isAnonymouslyFetchable(string $filename): bool
-    {
-        return self::isRemoteFetchedSource($filename)
-            || self::isOutboundChannelMedia($filename);
-    }
-
     /**
      * Strip the public serve prefix so a DAG `/api/v1/files/uploads/…` path
      * and a raw upload-dir-relative path both resolve to the same relative key.
@@ -55,7 +29,7 @@ final class OutboundChannelMedia
     }
 
     /**
-     * Copy a generated file to an anonymously-fetchable name so Meta can
+     * Copy a file to an unguessable, anonymously fetchable name so Meta can
      * retrieve the WhatsApp `link` without credentials.
      *
      * @return string|null upload-dir-relative path of the published copy
@@ -76,9 +50,7 @@ final class OutboundChannelMedia
             $extension = 'bin';
         }
 
-        $sanitizedKind = preg_replace('/[^a-z]/', '', strtolower($kind));
-        $kind = (is_string($sanitizedKind) && '' !== $sanitizedKind) ? $sanitizedKind : 'file';
-        $filename = sprintf('%d_%s_%d%d.%s', $userId, $kind, time(), random_int(100, 999), $extension);
+        $filename = PublicMediaName::generated($userId, $kind, $extension);
 
         $userBase = $pathBuilder->buildUserBaseRelativePath($userId);
         $relativePath = $userBase.'/'.date('Y').'/'.date('m').'/'.$filename;

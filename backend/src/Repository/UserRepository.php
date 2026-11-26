@@ -232,7 +232,9 @@ class UserRepository extends ServiceEntityRepository
     /**
      * MOBILE-APP SEAM (Epic 5.4): find the user who owns an IAP purchase, by
      * its stable per-subscription id (Apple `original_transaction_id` or Google
-     * `purchase_token`) stored inside `BPAYMENTDETAILS.subscription`.
+     * `purchase_token`) stored inside `BPAYMENTDETAILS`: in the current
+     * subscription record, or in the purchase history that outlives it
+     * ({@see \App\Service\Iap\IapPurchaseHistory}).
      *
      * Migration-free, mirroring {@see findByStripeCustomerId()}: a LIKE over the
      * JSON column. Google purchase tokens can contain the SQL LIKE wildcard `_`

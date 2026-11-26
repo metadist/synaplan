@@ -18,6 +18,7 @@ use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Vision\ExplainsImageFromMeteredCall;
 use App\AI\Vision\VisionReply;
 use App\Service\File\FileHelper;
+use App\Service\Media\PublicMediaName;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
@@ -425,7 +426,7 @@ class MistralProvider implements ChatProviderInterface, ToolCallingChatProviderI
             }
 
             $extension = 'pcm' === $format ? 'wav' : $format;
-            $filename = 'tts_'.uniqid().'.'.$extension;
+            $filename = PublicMediaName::speech($extension);
             $outputPath = $this->uploadDir.'/'.$filename;
 
             if (!FileHelper::createDirectory($this->uploadDir)) {

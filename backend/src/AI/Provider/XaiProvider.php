@@ -24,6 +24,7 @@ use App\AI\StructuredOutput\StructuredOutputTranslator;
 use App\AI\Vision\ExplainsImageFromMeteredCall;
 use App\AI\Vision\VisionReply;
 use App\Service\File\FileHelper;
+use App\Service\Media\PublicMediaName;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Mime\Part\DataPart;
 use Symfony\Component\Mime\Part\Multipart\FormDataPart;
@@ -762,8 +763,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
     {
         $audio = $this->requestSpeech($text, $options);
         $codec = $this->ttsCodecFromOptions($options);
-
-        $filename = 'tts_'.uniqid().'.'.self::TTS_CODECS[$codec][0];
+        $filename = PublicMediaName::speech(self::TTS_CODECS[$codec][0]);
         $outputPath = $this->uploadDir.'/'.$filename;
 
         if (!FileHelper::createDirectory($this->uploadDir)) {

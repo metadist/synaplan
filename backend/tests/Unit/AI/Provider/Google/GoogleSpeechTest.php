@@ -50,7 +50,7 @@ final class GoogleSpeechTest extends TestCase
         $filename = $speech->synthesize('Hallo');
 
         $wav = (string) file_get_contents($this->uploadDir.'/'.$filename);
-        self::assertMatchesRegularExpression('/^tts_[0-9a-f]{13}\.wav$/', $filename);
+        self::assertMatchesRegularExpression('/^tts_[0-9a-f]{32}\.wav$/', $filename);
         self::assertSame(['RIFF', 'WAVE', 2, 8000, 4], [substr($wav, 0, 4), substr($wav, 8, 4), unpack('v', substr($wav, 22, 2))[1], unpack('V', substr($wav, 24, 4))[1], unpack('V', substr($wav, 40, 4))[1]]);
     }
 

@@ -39,7 +39,7 @@ final class MediaUploadStoreTest extends TestCase
     {
         $path = $this->store()->saveDataUrlAsFile('data:image/png;base64,'.self::PIXEL, 31, 7, 'Open AI');
 
-        self::assertMatchesRegularExpression('#^'.preg_quote($this->monthFolder(7), '#').'31_\w+_\d+\.png$#', (string) $path);
+        self::assertMatchesRegularExpression('#^'.preg_quote($this->monthFolder(7), '#').'31_openai_[0-9a-f]{32}\.png$#', (string) $path);
         self::assertSame(base64_decode(self::PIXEL), file_get_contents($this->uploadDir.'/'.$path));
         self::assertNull($this->store()->saveDataUrlAsFile('not a data url', 31, 7, 'openai'));
     }
@@ -55,7 +55,7 @@ final class MediaUploadStoreTest extends TestCase
     {
         $path = $this->store(fetched: base64_decode(self::PIXEL))->downloadMedia('https://cdn.example.com/out', 31, 7, 'openai', 'image');
 
-        self::assertMatchesRegularExpression('#^'.preg_quote($this->monthFolder(7), '#').'31_openai_\d+\.png$#', (string) $path);
+        self::assertMatchesRegularExpression('#^'.preg_quote($this->monthFolder(7), '#').'31_openai_[0-9a-f]{32}\.png$#', (string) $path);
         self::assertSame(base64_decode(self::PIXEL), file_get_contents($this->uploadDir.'/'.$path));
     }
 
@@ -73,7 +73,7 @@ final class MediaUploadStoreTest extends TestCase
 
         $url = (string) $this->store()->publishInputImageForRemoteFetch($source, 7);
 
-        self::assertMatchesRegularExpression('#^https://app\.example\.com/api/v1/files/uploads/'.preg_quote($this->monthFolder(7), '#').'ai_i2vsrc_7_\d+_[0-9a-f]{12}\.jpg$#', $url);
+        self::assertMatchesRegularExpression('#^https://app\.example\.com/api/v1/files/uploads/'.preg_quote($this->monthFolder(7), '#').'ai_i2vsrc_7_[0-9a-f]{32}\.jpg$#', $url);
         self::assertSame('jpeg bytes', file_get_contents($this->uploadDir.'/'.substr($url, strlen('https://app.example.com/api/v1/files/uploads/'))));
         self::assertNull($this->store()->publishInputImageForRemoteFetch($this->uploadDir.'/missing.jpg', 7));
         self::assertNull($this->store(publicBaseUrl: '')->publishInputImageForRemoteFetch($source, 7));
