@@ -1,6 +1,6 @@
 # Handoff: Synaplan Security-Audit und Fixes
 
-Stand: 2026-11-25, abends. `main` @ `12578c55f`, letzter Tag `v5.10.3`.
+Stand: 2026-11-26, mittags. `main` @ `4cb153030`, letzter Tag `v5.10.3`.
 Der Ordner `_devextras/security-audit/` liegt seit dem 26.11.2026 auf
 Entscheidung des Owners vollständig im Repo.
 
@@ -15,8 +15,8 @@ Abschnitt 5).
 
 ## 2. Was erledigt ist
 
-29 Advisories im Repo: 25 veröffentlicht, 3 Drafts (SYN-14, SYN-23, SYN-25),
-1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 25 gehören 21 zu diesem Audit
+30 Advisories im Repo: 25 veröffentlicht, 4 Drafts (SYN-14, SYN-23, SYN-25,
+SYN-30), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 25 gehören 21 zu diesem Audit
 (Tabelle unten, alle ohne CVE); vier sind ältere, davon unabhängige
 Advisories (GHSA-26f3-684h-hpjh, GHSA-2x6x-8r52-pm58, GHSA-phrw-3wm4-3xcx,
 GHSA-qqg9-qv48-j8m8).
@@ -28,7 +28,7 @@ GHSA-qqg9-qv48-j8m8).
 | SYN-03 Synaform Pfad: File read/delete | GHSA-c77r-gx6r-f4j4 | 5.10.0 | published |
 | SYN-04 Apple Sign-in per unsignierter E-Mail | GHSA-pcm8-44x4-fhq7 | 5.10.0 | published |
 | SYN-05 + SYN-06 SsrfGuard fail-open, Redirects | GHSA-6jp8-jcxm-96rx | 5.10.1 | published |
-| SYN-07 Synaform URL-Quellen SSRF | GHSA-6h69-j26q-v29m | PR #3226 | published, "patched version" leer |
+| SYN-07 Synaform URL-Quellen SSRF | GHSA-6h69-j26q-v29m | 5.9.0 (PR #3226) | published, Feld "patched version" im Advisory noch leer |
 | SYN-08 WhatsApp-Webhook ohne Signatur | GHSA-v335-3cxj-mwcm | 5.10.1 | published |
 | SYN-09 GET-Routen starten Turns | GHSA-hv6g-8mc6-9833 | 5.10.2 | published 25.11. |
 | SYN-10 Message-Status fremder Nutzer | GHSA-qh57-5q43-qr3m | 5.10.2 | published 25.11. |
@@ -82,12 +82,25 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 - Nichts davon ist gemergt. Details in 3c.
 - Das lokale Test-Setup ist umgestellt: alles läuft über `m4wt` (Abschnitt 6).
 
+**Was am 26.11.2026 dazukam (Sitzung 3)**
+
+- PR #3273 (SYN-24, Rest-Härtung) ist gemergt (`e2d267d4d`).
+- SYN-30 auf `main` nachgeprüft: war offen und braucht keine Prompt-Injection,
+  der Aufrufer schreibt den Prompt selbst. Gebaut: Draft GHSA-grvv-mwcf-vhpm,
+  PR im privaten Fork, wartet auf den Owner. Details in 3c.
+- SYN-07: der Fix (`e2d5123ae`, PR #3226) liegt laut `git tag --contains` seit
+  `v5.9.0` in einem Release. Das Feld im Advisory ist noch nicht gefüllt.
+- Die CI auf `main` ist seit dem 26.11. rot: `composer audit` meldet 19
+  Advisories in 10 `symfony/*`-Paketen (Sicherheits-Release von Symfony am
+  selben Tag). Kein Code-Fehler, blockiert aber "All Checks Passed" für jeden
+  PR und damit das nächste Release. Siehe 3a Punkt 2.
+
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
 
-0. **Drei PRs dieser Sitzung mergen** (je über die Advisory-Seite, Ablauf
-   Abschnitt 5; #3273 normal):
+0. **Drei PRs in privaten Forks mergen** (je über die Advisory-Seite, Ablauf
+   Abschnitt 5):
    - SYN-23: https://github.com/metadist/synaplan-ghsa-rmmx-x383-4p77/pull/1.
      Vor dem Deploy `IAP_APPLE_ENVIRONMENT` prüfen: nur `Sandbox` oder
      `Production` (`Xcode`/`LocalTesting` wird außerhalb von dev/test
@@ -97,10 +110,10 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
      Kein Playwright gelaufen. Folge für Admins: ein Import, dessen SQL
      Backslashes, doppelte Anführungszeichen, Kommentare, Funktionen oder ein
      `OR` im WHERE enthält, wird abgelehnt.
-   - SYN-24: https://github.com/metadist/synaplan/pull/3273. Copilot hat den
-     Head `7074a5e0b` ohne Anmerkung reviewt; beim Schreiben lief noch ein
-     Check ("Analyze (go)"), alle anderen grün. Vor dem Merge "All Checks
-     Passed" ansehen.
+   - SYN-30: https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1.
+     Keine Änderung in Produktion nötig, keine Daten betroffen. Die
+     PR-Beschreibung enthält eine Lese-Abfrage für Altzeilen (fährt nur der
+     Owner).
 
 1. **SYN-14 fertig machen:** nächstes Release schneiden (enthält `fa202d4cf`),
    deployen, einmal `php bin/console app:widget:purge-visitor-upload-vectors`
@@ -108,9 +121,11 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
    GHSA-6m8j-g99j-hg44 betroffenen Bereich und gepatchte Version eintragen und
    veröffentlichen. Der Bereich steht noch auf `<= 5.10.1`, richtig ist
    `<= 5.10.3`.
-2. **CI auf `main` @ `fa202d4cf`** lief beim Schreiben noch
-   (`gh run list --repo metadist/synaplan --branch main`). Vor dem Release
-   grün abwarten.
+2. **CI auf `main` wieder grün bekommen:** `composer audit` schlägt seit dem
+   26.11. an (19 Advisories, 10 `symfony/*`-Pakete). Nötig ist ein eigener
+   öffentlicher PR, der die betroffenen Symfony-Pakete auf den Patch-Stand
+   hebt (`composer update "symfony/*"` im Container; Stolperstein zum
+   Lockfile unten beachten). Vorher gibt es kein grünes Release.
 3. **SYN-19 auf einem Gerät gehen:** in der iOS-/Android-App einmal M365,
    Dropbox oder einen MCP-Server verbinden. Bisher nur Unit-Tests mit
    gemockten Capacitor-Plugins und curl gegen localhost. App-Frontend (OTA)
@@ -144,8 +159,17 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 
 ### 3c. Offene Findings ohne Vorentscheidung (KI, je auf Wort des Owners)
 
-Reihenfolge laut Report-Tabelle. SYN-23, 24, 25 sind gebaut und warten auf den Merge (Stand unten).
-**Als Nächstes bauen: SYN-30, dann SYN-31.** SYN-26/27 erst nach einem Ja des Owners (Docker, `install.sh`).
+Reihenfolge laut Report-Tabelle. SYN-23, 25 und 30 sind gebaut und warten auf den Merge (Stand unten);
+SYN-24 ist gemergt.
+**Als Nächstes: SYN-31, aber erst nach Klärung mit dem Owner** (kann bestehende öffentliche Links brechen).
+SYN-26/27 erst nach einem Ja des Owners (Docker, `install.sh`).
+
+**SYN-30 (Stand 26.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
+Draft-Advisory GHSA-grvv-mwcf-vhpm, PR https://github.com/metadist/synaplan-ghsa-grvv-mwcf-vhpm/pull/1,
+Branch `fix/media-marker-file-path` (Commit `ec56d9ccf`). `make ci-local` grün (PHPUnit 13143, Vitest 3818),
+Playwright `@ci` 226 passed / 2 skipped. Nicht gegen ein echtes Modell geprüft.
+Offen, Owner-Entscheidung: die Datei-Routen nehmen weiter die erste Message mit passendem Pfad als Besitzer.
+Eine Prüfung dort würde auch Altzeilen abdecken, kann aber ändern, wer bestehende Links öffnen darf.
 
 **SYN-25 (Stand 25.11.):** Fix als PR im privaten Fork, wartet auf Merge durch den Owner.
 Draft-Advisory GHSA-5vp7-6cp5-3v5g, PR https://github.com/metadist/synaplan-ghsa-5vp7-6cp5-3v5g/pull/1,
@@ -153,10 +177,8 @@ Branch `fix/model-import-sql-validator`. Validator prüft auf Statement ohne Str
 WHERE mit BSERVICE/BTAG/BPROVID gegen Werte, kein OR, keine Backslashes/doppelten Anführungszeichen.
 `make ci-local` grün (PHPUnit 13133, Vitest 3818). Strukturierter Import statt SQL bleibt offen.
 
-**SYN-24 (Stand 25.11.):** SSRF selbst seit 5.10.2 zu (GHSA-9fxp-p6f4-hfgf, veröffentlicht), kein eigenes Advisory.
-Rest-Härtung (Speicherprüfung über `SsrfGuard`) als öffentlicher PR https://github.com/metadist/synaplan/pull/3273,
-Branch `fix/castingdata-api-url-ssrf`. `make ci-local` grün; E2E lokal 185 passed / 29 failed (umgebungsbedingt,
-castingdata-Spec grün). Copilot-Review ohne Anmerkung, CI bis auf einen laufenden Check grün.
+**SYN-24 (erledigt 26.11.):** SSRF selbst seit 5.10.2 zu (GHSA-9fxp-p6f4-hfgf, veröffentlicht), kein eigenes Advisory.
+Rest-Härtung (Speicherprüfung über `SsrfGuard`) gemergt mit PR #3273 (`e2d267d4d`), noch in keinem Release.
 Neu: `plugins/castingdata/backend/Service/CastingApiUrlPolicy.php` (Schema http/https, keine Query, kein Fragment,
 keine Zugangsdaten in der URL, `SsrfGuard::isBlockedUrl`).
 
@@ -190,7 +212,8 @@ Das ist "Ask first". SYN-23 kam ohne Schemaänderung aus.
 - Konten, die über die entfernte Confirm-Route eine Nummer verifiziert haben,
   behalten sie. Keine Bereinigung gemacht.
 - Credits für `p-w` und `golam71` auf GHSA-6jp8-jcxm-96rx sind "pending".
-- GHSA-6h69-j26q-v29m (SYN-07) hat keine gepatchte Version eingetragen.
+- GHSA-6h69-j26q-v29m (SYN-07): gepatchte Version `5.9.0` ist im Advisory
+  noch nicht eingetragen (Schritt 7.3).
 - GHSA-6wf3 ging mit dem Originaltext des Melders raus, GHSA-wqjm als
   "medium"; beides nicht mehr geprüft.
 - `ChatWidgetSession.spec.ts` (Vitest, "Thinking Block Filtering") ist flaky,
@@ -256,6 +279,12 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   Wörter (Keywords, `BMODELS`, Spalten). Der Report schlug einen
   strukturierten Import (JSON statt SQL) vor; das hätte Endpoint und UI
   geändert und bleibt offen.
+- **SYN-30** (noch nicht gemergt): `MediaMarkerReader` liest den Marker für
+  beide Routen. Angenommen wird nur eine vorhandene Datei im eigenen
+  Upload-Verzeichnis des Kontos; eine https-Adresse nur in Antworten des
+  eingebauten Demo-Providers (`test`). Der Report nannte den Befund
+  "Suspected" und verlangte ein echtes Modell zum Nachweis; das ist nicht
+  nötig, weil der Aufrufer den Prompt selbst schreibt.
 - **SYN-44:** Neue Adresse wartet in den User-Details (`pending_email`), ein
   gehashter `VerificationToken` Typ `email_change` (1 h, einmalig) geht an die
   neue Adresse; erst der Link stellt um. Kern: `Service/Auth/EmailChange.php`.
@@ -326,31 +355,25 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   Konstruktoren höchstens 10 Parameter.
 - Änderungen an Classifier/Sorter verschieben die Routing-Snapshots.
 
-**Lokales Setup (Memory `m4-test-setup`, dort steht die volle Fassung)**
+**Lokales Setup**
 
-- Jeder Testlauf geht über `m4wt` (`m4wt --help`), ohne Sandbox. Nie mehr
-  `make ci-local`, `make test-e2e` oder `docker compose exec` direkt, und nie
-  mehr `mutagen sync pause/resume` von Hand. Der alte Ablauf mit Pause hat
-  parallelen Sitzungen die Läufe zerschossen.
-- Im Worktree zuerst `m4wt up` (eigener Stack, eigene Ports, eigene DB,
-  Test-DB geseedet, ~10 min), dann `m4wt ci`, `m4wt e2e`,
-  `m4wt run -- docker compose exec -T backend php bin/phpunit <pfad>`. Am
-  Ende `m4wt down --purge`. Höchstens zwei Worktree-Stacks; sind beide Slots
-  belegt, dem Owner sagen und keinen fremden Stack stoppen.
+- Das persönliche Test-Setup dieses Rechners steht im Memory `m4-test-setup`
+  und gehört nicht ins Repo. Dort nachlesen; es ändert sich öfter als diese
+  Datei. Kurz: jeder Testlauf geht über `m4wt` (`m4wt ci`, `m4wt e2e`,
+  `m4wt make <target>`), der Stack startet und stoppt pro Lauf von selbst.
+  Ein `m4wt up` vorab ist nur für einen Browser-Walk nötig.
 - Reine Doku- oder Review-Arbeit braucht keinen Stack.
 - Der Sync ist einweg (Mac → M4). Was ein Container schreibt (Formatter,
   Snapshots, `frontend/src/generated/`), kommt nicht zurück: lokal nachziehen.
 - Die ganze PHPUnit-Suite nur über das Gate; `bin/phpunit` ohne Pfad läuft
   ins Speicherlimit.
-- Playwright nur auf dem M4. `m4wt e2e-full` für `@whatsapp`.
-- Schneller Unit-Test ohne Stack (Wegwerf-Container):
-  `docker --context m4 run --rm --entrypoint sh -v "$PWD/backend:/var/www/backend" -v "$PWD/plugins:/plugins:ro" -v synaplan_backend_vendor:/var/www/backend/vendor:ro --tmpfs /var/www/backend/var -w /var/www/backend ghcr.io/metadist/synaplan:latest -c 'php vendor/bin/phpunit --no-configuration --bootstrap tests/bootstrap.php <pfad>'`.
-  Das ist Diagnose, nicht das Gate.
 - PHPUnit-Tests für Kanäle brauchen die Modul-Env-Variablen in `setUp()`
   (Muster: `WhatsAppWebhookSignatureTest`).
 
 **Bekannte Stolpersteine**
 
+- `m4wt e2e` (gebautes Image, Test-Provider, wie in der CI) lief am 26.11.
+  ohne rote Tests durch. Die folgende Liste gilt nur für `m4wt e2e --dev`.
 - Lokale E2E im Dev-Stack: rund 30 rote Tests, die auch ohne Änderung rot
   sind (Widget-Bundle fehlt, Stripe-Webhook "Invalid signature",
   `chat.spec.ts:20`, `mcp-config`, …). Die Zahl schwankt (26 bis 46). Vorgehen:
@@ -378,6 +401,9 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 - `SizeRatchetTest`: `FileStorageService::storeUploadedFile`,
   `AdvancedWidgetConfig.vue`, `widgetsApi.ts`, `WidgetLegacyController` sind
   am Limit. Neue Logik in eine eigene Klasse.
+- `MessageController` hat 14 Konstruktor-Parameter und ist damit am
+  eingefrorenen Limit. Ein weiterer Dienst kommt als Action-Argument in die
+  Methode (so bei SYN-30), nicht in den Konstruktor.
 - PHPStan lehnt `@return self::*|null` bei gemischten Konstanten ab, und
   `??` auf einem Ausdruck, der nicht null sein kann (`nullCoalesce.expr`).
 - Symfony wirft bei einem nicht-skalaren Query-Parameter in
@@ -397,14 +423,14 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 - Hauptkopie `~/Workspace/metadist/synaplan` gehört auch anderen Sitzungen;
   Stand dort nicht annehmen, sondern nachsehen.
-- Worktree dieser Sitzung: `.claude/worktrees/security-audit-handoff-f758d5`.
-  Sein Stack ist abgebaut (`m4wt down --purge`). Alle drei Branches sind
-  gepusht, der Worktree kann weg.
+- Worktree der Sitzung vom 26.11.:
+  `.claude/worktrees/security-audit-handoff-754513`. Alle Branches sind
+  gepusht.
 - Branches und Remotes:
   - `fix/apple-iap-entitlement` @ `108a075ec` → Remote `ghsa-syn23` (nur dort)
   - `fix/model-import-sql-validator` @ `99b224350` → Remote `ghsa-syn25` (nur dort)
-  - `fix/castingdata-api-url-ssrf` @ `7074a5e0b` → `origin`, PR #3273
-  Die Branches von SYN-23 und SYN-25 nie nach `origin` pushen.
+  - `fix/media-marker-file-path` @ `ec56d9ccf` → Remote `ghsa-syn30` (nur dort)
+  Diese drei Branches nie nach `origin` pushen.
 - Ältere Fix-Branches und `ghsa-*`-Remotes veröffentlichter Advisories sind
   in `main` und können weg.
 - Dev-Datenbank der Hauptkopie: Migration `Version20261124120000` ist
@@ -416,19 +442,22 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-1. Owner: die drei PRs aus 3a Punkt 0 mergen, dann Release (enthält auch
-   SYN-14) und der Gerätetest für SYN-19.
-2. KI, auf Wort des Owners: nach dem Release GHSA-6m8j (SYN-14),
-   GHSA-rmmx (SYN-23) und GHSA-5vp7 (SYN-25) mit betroffenem Bereich und
-   gepatchter Version füllen und veröffentlichen. Vorher je
-   `git tag --contains <merge-commit>`.
-3. KI: SYN-30 (`[IMAGE:…]`-Marker setzt `filePath`), dann SYN-31 (generierte
-   Medien anonym unter ratbaren Namen), je nach Abschnitt 5. Zuerst das
-   Finding im Report lesen und auf aktuellem `main` nachprüfen, ob es noch
-   offen ist. SYN-31 kann bestehende öffentliche Links brechen: vor dem
-   Bauen mit dem Owner klären.
-4. SYN-26/27: erst fragen (Docker, `install.sh`). Danach die Lows SYN-32 bis
+1. Owner oder KI: Symfony-Pakete per öffentlichem PR auf den Patch-Stand
+   heben, damit die CI auf `main` wieder grün ist (3a Punkt 2).
+2. Owner: die drei PRs aus 3a Punkt 0 mergen, dann Release (enthält auch
+   SYN-14 und die Rest-Härtung zu SYN-24) und der Gerätetest für SYN-19.
+3. KI, auf Wort des Owners: nach dem Release GHSA-6m8j (SYN-14),
+   GHSA-rmmx (SYN-23), GHSA-5vp7 (SYN-25) und GHSA-grvv (SYN-30) mit
+   betroffenem Bereich und gepatchter Version füllen und veröffentlichen.
+   Vorher je `git tag --contains <merge-commit>`. Bei der Gelegenheit in
+   GHSA-6h69 (SYN-07) die gepatchte Version `5.9.0` eintragen.
+4. SYN-31 (generierte Medien anonym unter ratbaren Namen): vor dem Bauen mit
+   dem Owner klären, ob bestehende öffentliche Links (WhatsApp, Widget)
+   brechen dürfen oder eine Übergangszeit brauchen. Zuerst das Finding im
+   Report lesen und auf aktuellem `main` nachprüfen, ob es noch offen ist.
+5. SYN-26/27: erst fragen (Docker, `install.sh`). Danach die Lows SYN-32 bis
    43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
-5. Offene Entscheidungen zu SYN-23: Statusabfrage über die App Store Server
+6. Offene Entscheidungen: zu SYN-23 Statusabfrage über die App Store Server
    API (neue Credentials), `appAccountToken`-Bindung (Änderung in
-   `synaplan-apps`), automatisches Auslaufen des IAP-Tiers.
+   `synaplan-apps`), automatisches Auslaufen des IAP-Tiers; zu SYN-30 die
+   Besitzerprüfung in den Datei-Routen.
