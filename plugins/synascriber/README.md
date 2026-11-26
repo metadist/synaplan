@@ -1,6 +1,11 @@
-# synascriber: meeting notes for Jitsi in openDesk
+# synascriber
 
-How it works, who talks to whom, what is stored where: [ARCHITECTURE.md](ARCHITECTURE.md).
+Meeting notes for a Jitsi in openDesk, and live subtitles for OpenTalk.
+Operators start with [docs/OPENDESK_MEETING_NOTES.md](../../docs/OPENDESK_MEETING_NOTES.md).
+OpenTalk is a second transcriber and is not in the openDesk chart:
+[docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
+
+How a Jitsi meeting moves from the button to the saved file: [ARCHITECTURE.md](ARCHITECTURE.md).
 
 Jitsi's bridge streams each speaker's audio to the transcriber
 ([sidecars/synaplan-transcriber](../../sidecars/synaplan-transcriber/)); the
@@ -88,30 +93,13 @@ captions without this plugin).
 
 ## OpenTalk
 
-Live subtitles in an OpenTalk meeting. Nothing is saved.
-
-1. On the plugin page, turn on **OpenTalk meetings**. Set the speech server
-   (`stt_url`, `stt_model`, `stt_api_key`) and `transcriber_secret`.
-2. Start the transcriber with `TRANSCRIBER_MODE=opentalk`, on a host that can
-   reach OpenTalk's LiveKit. Give it `SYNAPLAN_URL`,
-   `SYNAPLAN_TRANSCRIBER_SECRET` (the same secret), `OPENTALK_CONTROLLER_URL`,
-   `OPENTALK_SERVICE_KEY` and `OPENTALK_INIT_KEY` (`id:secret`), and
-   `OPENTALK_LIVEKIT_URL`.
-3. In the OpenTalk controller:
-
-   ```toml
-   [roomserver.modules.transcription]
-   url = "https://transcriber.example:8095"
-   api_key = { id = "transcription", secret = "the-transcription-secret" }
-   ```
-
-   That id and secret are `OPENTALK_INIT_KEY`. Restart the controller.
+Live subtitles in an OpenTalk meeting. Nothing is saved. The steps, including
+the second transcriber and the controller block, are in
+[docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
 
 In the meeting a moderator opens **More options → Enable subtitles**, turns
 the switch on, picks a language, and saves. **Show** displays the lines.
 Turning the switch off stops them. No file is written.
-
-The same steps, written out: [docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
 
 ### Upgrading from 0.3.0
 
@@ -127,8 +115,9 @@ idempotent and a rerun changes nothing. The owner's API key row in
 `BAPIKEYS` stays; it authorises nothing on the plugin routes any more and
 can be deleted from the API keys page.
 
-Deployment (Jitsi's values, the Keycloak client, the transcriber, the
-registration of the plugin): [synaplan-charts](https://github.com/metadist/synaplan-charts),
-`technical.synaplan.synascriber`.
+Deployment for Jitsi (Jitsi's values, the Keycloak client, the transcriber,
+the registration of the plugin): [synaplan-charts](https://github.com/metadist/synaplan-charts),
+`technical.synaplan.synascriber`. That chart does not start the OpenTalk
+transcriber.
 
 Tests: `backend/tests/Plugin/SynaScriber/`.

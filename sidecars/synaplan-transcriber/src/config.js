@@ -77,11 +77,17 @@ export function loadConfig(env) {
   const opentalkControllerUrl = clean(env.OPENTALK_CONTROLLER_URL).replace(/\/$/, '')
   const opentalkServiceKey = keyPair(env.OPENTALK_SERVICE_KEY)
   const opentalkInitKey = keyPair(env.OPENTALK_INIT_KEY)
+  const opentalkLivekitUrl = clean(env.OPENTALK_LIVEKIT_URL).replace(/\/$/, '')
   if (opentalk && (opentalkControllerUrl === '' || !opentalkServiceKey || !opentalkInitKey)) {
     throw new Error('OPENTALK_CONTROLLER_URL, OPENTALK_SERVICE_KEY and OPENTALK_INIT_KEY are required in opentalk mode')
   }
   if (opentalk && transcriberSecret === '') {
     throw new Error('SYNAPLAN_TRANSCRIBER_SECRET is required in opentalk mode')
+  }
+  // OpenTalk's popout token does not carry the media address. Without this
+  // URL the process can sign in and still hear nobody.
+  if (opentalk && opentalkLivekitUrl === '') {
+    throw new Error('OPENTALK_LIVEKIT_URL is required in opentalk mode')
   }
   const authToken = clean(env.TRANSCRIBER_AUTH_TOKEN)
   if (jitsi && authToken === '') {
@@ -103,7 +109,7 @@ export function loadConfig(env) {
     opentalkControllerUrl,
     opentalkServiceKey,
     opentalkInitKey,
-    opentalkLivekitUrl: clean(env.OPENTALK_LIVEKIT_URL).replace(/\/$/, ''),
+    opentalkLivekitUrl,
     element: elementRequested && matrixReady && apiKey !== '',
     elementRequested,
     matrixReady,

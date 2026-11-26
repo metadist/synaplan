@@ -1,11 +1,13 @@
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**
-> **← Previous:** [4.11 openDesk Meeting Notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
+> **← Previous:** [4.11 Meeting notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
 
 # OpenTalk subtitles
 
 Synaplan writes the subtitles in an OpenTalk meeting. People read the lines in the meeting. Synaplan does not keep the audio, and it does not save a transcript.
 
-You need three things: the meeting-notes plugin, the transcriber, and one setting in OpenTalk.
+This is not the Jitsi install. Jitsi meeting notes are [Meeting notes](OPENDESK_MEETING_NOTES.md). The openDesk Helm release does not start this mode. Run a second transcriber. One process cannot do both.
+
+You need OpenTalk 26.3 or later, the meeting-notes plugin, a speech server, and this transcriber on a host that can reach OpenTalk's LiveKit. A process on another machine can sign in and still fail to hear anyone, so the transcriber refuses to start until `OPENTALK_LIVEKIT_URL` is set.
 
 ## 1. Turn it on in Synaplan
 
@@ -28,7 +30,7 @@ echo '{"opentalk_enabled": true, "stt_url": "https://api.groq.com/openai", "stt_
 
 ## 2. Start the transcriber
 
-Run `synaplan-transcriber` where it can reach OpenTalk's LiveKit server. On Docker Desktop that means the same network as LiveKit. A process on another machine can sign in and still fail to hear anyone.
+Run `synaplan-transcriber` where it can reach OpenTalk's LiveKit server. On Docker Desktop that means the same network as LiveKit.
 
 ```bash
 TRANSCRIBER_MODE=opentalk
@@ -43,10 +45,12 @@ OPENTALK_LIVEKIT_URL=http://livekit:7880
 Both keys are written `id:secret`.
 
 - `OPENTALK_SERVICE_KEY` is how the transcriber calls OpenTalk.
-- `OPENTALK_INIT_KEY` is how OpenTalk calls the transcriber.
-- `OPENTALK_LIVEKIT_URL` is the media server. OpenTalk's popout token does not include that address.
+- `OPENTALK_INIT_KEY` is how OpenTalk calls the transcriber. The same pair is the controller's `api_key` below.
+- `OPENTALK_LIVEKIT_URL` is the media server. OpenTalk's popout token does not include that address. The process does not start without it.
 
-`GET /health` on port 8095 answers when the process is up.
+`GET /health` on port 8095 answers when the process is up. `opentalk` is true and `jitsi` is false. The image is Debian, not Alpine: the LiveKit client ships a glibc build only.
+
+Compose can pass the same variables into the `transcriber` profile. Set `TRANSCRIBER_MODE=opentalk` or that container stays on the older openDesk default.
 
 ## 3. Point OpenTalk at the transcriber
 
@@ -73,8 +77,9 @@ To stop, open the same dialog, turn the switch off, and save. The lines stop. No
 - It does not save a transcript. Jitsi meeting notes do. OpenTalk subtitles do not.
 - It does not cover a breakout room.
 - It does not run when the meeting is end-to-end encrypted. OpenTalk hides the control in that case.
+- It does not share a process with Jitsi meeting notes.
 
 ---
 
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**
-> **← Previous:** [4.11 openDesk Meeting Notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)
+> **← Previous:** [4.11 Meeting notes](OPENDESK_MEETING_NOTES.md) · **Next:** [5.1 Local Development Workflow →](DEVELOPMENT.md)

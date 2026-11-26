@@ -1,5 +1,5 @@
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (10/11)**  
-> **← Previous:** [4.9 Live Voice (Full-Duplex Speech)](LIVE_VOICE.md) · **Next:** [4.11 openDesk Meeting Notes (Jitsi & Matrix) →](OPENDESK_MEETING_NOTES.md)
+> **← Previous:** [4.9 Live Voice (Full-Duplex Speech)](LIVE_VOICE.md) · **Next:** [4.11 Meeting notes →](OPENDESK_MEETING_NOTES.md)
 
 # Self-Hosted Live Voice Endpoints
 
@@ -56,4 +56,4 @@ Without a realtime model, the chat still reads an answer aloud and listens with 
 ---
 
 > **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (10/11)**  
-> **← Previous:** [4.9 Live Voice (Full-Duplex Speech)](LIVE_VOICE.md) · **Next:** [4.11 openDesk Meeting Notes (Jitsi & Matrix) →](OPENDESK_MEETING_NOTES.md)
+> **← Previous:** [4.9 Live Voice (Full-Duplex Speech)](LIVE_VOICE.md) · **Next:** [4.11 Meeting notes →](OPENDESK_MEETING_NOTES.md)

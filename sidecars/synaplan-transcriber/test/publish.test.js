@@ -56,6 +56,22 @@ test('openDesk mode requires a Synaplan key and can run Jitsi without Element', 
   assert.equal(config.synaplanUrl, 'http://synaplan')
 })
 
+test('opentalk mode refuses to start when it cannot reach LiveKit', () => {
+  const opentalk = {
+    SYNAPLAN_URL: 'http://synaplan',
+    SYNAPLAN_TRANSCRIBER_SECRET: 'plugin-secret',
+    TRANSCRIBER_MODE: 'opentalk',
+    OPENTALK_CONTROLLER_URL: 'https://controller.example',
+    OPENTALK_SERVICE_KEY: 'controller:the-controller-secret',
+    OPENTALK_INIT_KEY: 'transcription:the-transcription-secret',
+  }
+  assert.throws(() => loadConfig(opentalk), /OPENTALK_LIVEKIT_URL is required in opentalk mode/)
+  const started = loadConfig({ ...opentalk, OPENTALK_LIVEKIT_URL: 'http://livekit:7880/' })
+  assert.equal(started.opentalk, true)
+  assert.equal(started.jitsi, false)
+  assert.equal(started.opentalkLivekitUrl, 'http://livekit:7880')
+})
+
 test('a finished meeting is stored and the audio is not', async () => {
   const calls = []
   const fetchImpl = async (url, options) => {

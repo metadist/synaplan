@@ -1,10 +1,8 @@
 # Meeting notes
 
-Sidecar for openDesk. It speaks the Jitsi caption socket and Element voice messages, sends audio to Synaplan, and deletes the audio.
+One process, one mode (`TRANSCRIBER_MODE`). It holds the meeting audio, sends short windows to Synaplan, and deletes the audio. PHP does not see the media.
 
-PHP does not see the media. Configuration, the Jitsi snippet, and saved transcripts live in Synaplan when `OPENDESK_STT_URL` is set.
-
-Operator guide: [`docs/OPENDESK_MEETING_NOTES.md`](../../docs/OPENDESK_MEETING_NOTES.md).
+Operator guide: [`docs/OPENDESK_MEETING_NOTES.md`](../../docs/OPENDESK_MEETING_NOTES.md). OpenTalk: [`docs/OPENTALK_MEETING_NOTES.md`](../../docs/OPENTALK_MEETING_NOTES.md).
 
 The image is `ghcr.io/metadist/synaplan-transcriber`. CI publishes `ci-<sha>-amd64` from the tested tar and `ci-<sha>-arm64` from a native build, then a manifest under `latest` on `main` or `<version>`, `<major>.<minor>` and `<major>` on a release tag. A promote tag moves those aliases onto the already published digests. There is no short-commit tag.
 
@@ -13,21 +11,18 @@ npm test
 npm start
 ```
 
-Modes (`TRANSCRIBER_MODE`):
+| Mode | What is armed | Credential |
+| --- | --- | --- |
+| `jitsi` | Jitsi Videobridge WebSocket `GET /transcribe`. With `SYNAPLAN_TRANSCRIBER_SECRET` this is the meeting-notes plugin (the openDesk chart). With only `SYNAPLAN_API_KEY` these are captions without the plugin | `TRANSCRIBER_AUTH_TOKEN`, sent by Jicofo as `Authorization: Bearer` |
+| `element` | Matrix sync for voice messages | `SYNAPLAN_API_KEY` with scope `audio:transcribe` |
+| `opendesk` | Both of the above. Compose defaults to this. It is the older path | both of the above, as far as you use each side |
+| `opentalk` | `POST /v1/init` for an OpenTalk 26.3 transcription service. Subtitles only; audio is not stored. Not started by the openDesk chart | `SYNAPLAN_TRANSCRIBER_SECRET`, plus the OpenTalk keys and `OPENTALK_LIVEKIT_URL` |
 
-| Mode | What runs |
-| --- | --- |
-| `jitsi` | `GET /transcribe` WebSocket for Jitsi Videobridge |
-| `element` | Matrix sync for voice messages |
-| `opendesk` | Both. This is the openDesk default |
-| `opentalk` | `POST /v1/init` for an OpenTalk 26.3 transcription service. Subtitles only; audio is not stored |
+`GET /health` names the paths that are actually armed (`plugin`, `captionsWithoutPlugin`, `opentalk`, `element`). `GET /element-call` explains why live Element Call captions are not in this version: the bot would have to join as a visible participant.
 
 ## OpenTalk
 
-Subtitles only. Audio is not stored, and no transcript is written.
-
-1. In Synaplan, turn on **OpenTalk meetings** on the synascriber plugin page and set the speech server and `transcriber_secret`.
-2. Run this process where it can reach LiveKit:
+Subtitles only. A missing `OPENTALK_LIVEKIT_URL` stops the process at startup. OpenTalk's popout token does not carry the media address, so a process without it can sign in and still hear nobody.
 
 ```bash
 TRANSCRIBER_MODE=opentalk
@@ -39,13 +34,9 @@ OPENTALK_INIT_KEY=transcription:the-transcription-secret
 OPENTALK_LIVEKIT_URL=http://livekit:7880
 ```
 
-3. In the OpenTalk controller, set `[roomserver.modules.transcription]` `url` to this process (port 8095) and `api_key` to the same id and secret as `OPENTALK_INIT_KEY`.
+In the OpenTalk controller, set `[roomserver.modules.transcription]` `url` to this process (port 8095) and `api_key` to the same id and secret as `OPENTALK_INIT_KEY`.
 
 A moderator then uses **More options → Enable subtitles**. The image is Debian, not Alpine: the LiveKit client ships a glibc build only.
-
-Full steps: [`docs/OPENTALK_MEETING_NOTES.md`](../../docs/OPENTALK_MEETING_NOTES.md).
-
-`GET /health` reports which side is on. `GET /element-call` explains why live Element Call captions are not in this version: the bot would have to join as a visible participant.
 
 ## Prosody module
 
