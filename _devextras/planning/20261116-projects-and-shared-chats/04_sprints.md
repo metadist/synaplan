@@ -84,7 +84,7 @@ five locales, the five exit bullets for an `ota-candidate` step.
 - **Tests first:** Vitest for the source row states; Playwright `@ci`:
   create a project, add a text source, ask, see the source named.
 - **Do:** section "Projects" in the panel; route `/projects/:id` with tabs
-  Chats, Sources, Instructions (Memory and Members arrive with PJ20–PJ22);
+  Chats, Sources, Instructions (the board replaces the tabs in PJ32);
   "Add source" dialog; project name in the composer of a project chat;
   move a chat into and out of a project from its menu.
 - **Touches:** new `views/ProjectView.vue`, `components/projects/*`,
@@ -228,7 +228,245 @@ their limits as profile input.
 
 ---
 
-## Phase C — shared chats
+## Phase C — the project board
+
+Starts after PJ11. PJ21 and PJ22 moved here from the old phase D (owner,
+2026-11-26). Order: PJ29 → PJ30 → PJ31 → PJ32 → PJ33, then PJ21, PJ22,
+PJ34.
+
+### PJ29 — a chat area that a page can embed
+
+- **Goal:** the project page can show a real chat next to the board
+  without a second chat implementation. No visible change.
+- **Reads:** `views/ChatView.vue` (4,462 lines), `components/ChatMessage.vue`,
+  `stores/chats.ts`, the composer components, `docs/FRONTEND_CONVENTIONS.md`.
+- **Tests first:** the existing chat E2E suite passes unchanged before and
+  after; a Vitest mounts `ChatArea` with a chat ID and stubbed services.
+- **Do:** extract `components/chat/ChatArea.vue` (message list, composer,
+  stream handling) and the composables it needs; `ChatView.vue` keeps
+  routing, sidebar and header and uses it. Each new file under 300 lines;
+  `ChatView.vue` shrinks, its size-ledger entry drops.
+- **Touches:** frontend only.
+- **Exit:** `make test-e2e` green with no spec changed; the ledger entry
+  for `ChatView.vue` smaller.
+
+### PJ30 — project items (API)
+
+- **Goal:** `03` §2.7–§2.9 and §13 without the AI: tasks, dates,
+  decisions, waiting, costs through the API.
+- **Reads:** PJ3's `Service/Project/*`, `ProjectController`,
+  `docs/MIGRATIONS.md`, `docs/API_PATTERNS.md`.
+- **Tests first:** create, change, finish, drop each kind; a `read` member
+  cannot write; an item of another project is 404; a date without zone
+  takes the project's zone; `MAX_ITEMS` refuses with 422; every change
+  writes one log row; flag off → 404.
+- **Do:** migration (`BPROJECTITEMS`, `BPROJECTITEMLOG`, the new
+  `BPROJECTS` columns); entity, repository, `ProjectItemService`,
+  `ProjectItemController`; OpenAPI and Zod; flag `PROJECTS.BOARD_ENABLED`.
+- **Touches:** new `Service/Project/Item/*`; no edit to the chat path.
+- **Exit:** the tests.
+
+### PJ31 — the AI keeps the board from the chat
+
+- **Goal:** J-PJ-13: what a member says in the chat becomes an item, with
+  a line under the answer and "Undo".
+- **Reads:** `ToolRegistry`, the loop of PJ5, `PromptCatalog`, PJ30.
+- **Tests first:** G14, G16 and G17 with the corpus in
+  `backend/tests/Eval/ProjectBoard/` (40 messages: plain dates, relative
+  dates, repetitions, "Ben does it", a cost, a decision, chatter that must
+  add nothing); a run whose input is a mail cannot call
+  `project_item_add` (G15); "Undo" restores all items of one run; no tool
+  is offered outside a project or with the flag off.
+- **Do:** the five tools of `03` §13; `tools:project_board`; the open
+  items in the prompt; `POST /projects/{uuid}/undo`; the `project.item`
+  event.
+- **Exit:** G14, G16, G17.
+
+### PJ32 — project page with chat and board side by side
+
+- **Goal:** J-PJ-12 (the page part) and J-PJ-18; the mockup
+  `mockups/project-page.html` as product.
+- **Reads:** the mockup, `02` §3.2, PJ4's `ProjectView.vue`, PJ29's
+  `ChatArea`, `style.css` tokens, UX contract §4.
+- **Tests first:** Vitest for each card's empty, filled and loading state;
+  Playwright `@ci`: open a project, write a task in the chat, see it on
+  the board, drag the divider, hide the board, reload and keep the layout;
+  phone width lands in the chat with a "Board" tab.
+- **Do:** chat left, board right, divider 25–70 %, "Hide board" and "Hide
+  chat"; the cards Overview, Tasks, Dates, Files (sources inside), Costs,
+  Decisions, Waiting on others, More; the main chat (§0 #93); a new
+  project shows the chat only; `GET /projects/{uuid}/board` and the
+  layout endpoint. Cards are fixed components, each under 300 lines.
+- **Touches:** `views/ProjectView.vue`, new `components/projects/board/*`;
+  the old tabs become the "More" menu.
+- **User-flow:** J-PJ-12, J-PJ-18, both themes, phone width.
+- **Exit:** the five bullets; `make -C frontend test-e2e-layout`.
+
+### PJ33 — a written status and a first plan
+
+- **Goal:** `03` §14; J-PJ-12 complete.
+- **Reads:** PJ9 (`ask_user`), PJ31, `async_ai_low` handlers.
+- **Tests first:** ten changes within 30 seconds make one status call; the
+  computed line counts right; a status names no item that does not exist;
+  a new project asks at most three questions and writes a plan; "You
+  decide" still writes one.
+- **Do:** the debounced status unit; `project_plan`; the link markup and
+  its rendering; the status on top of Overview with "As of today".
+- **Exit:** the five bullets.
+
+### PJ21 — project memory (API)
+
+- **Goal:** `03` §7, memory. Moved into phase C (§0 #92): the board needs
+  it from the first project on.
+- **Reads:** `MemoryExtractionService`, `UserMemoryService` (in the size
+  ledger — nothing is added there), `ChatMemoryContextLoader`.
+- **Tests first:** an entry is written from the sender's message and names
+  the sender; nothing is written from a private chat in a shared project;
+  nothing is ever copied from `BUSERMEMORIES`; a new statement of the same
+  author replaces the old one; G12's corpus.
+- **Do:** `BPROJECTMEMORIES`, the Qdrant collection, extraction, the
+  prompt block with names, rule 8 of the prompt, the endpoints, flag
+  `PROJECTS.MEMORY_ENABLED`.
+- **Exit:** G12.
+
+### PJ22 — memory tab and memory choice per chat
+
+- **Goal:** J-PJ-9 step 4 and J-PJ-10.
+- **Do:** the board card "What I remember" with delete (it opens the full
+  list); "Memory" in the composer menu of a project chat, default "Project
+  memory only" (§0 #54); the lock when the chat is shared.
+- **Tests first:** Vitest for the three states of the choice; Playwright
+  for the conflict journey with two accounts.
+- **Exit:** the five bullets.
+
+### PJ34 — search all chats of a project
+
+- **Goal:** §0 #92: "Where did we talk about the tiles?" finds it.
+- **Reads:** PJ7a's chat search, `AccessGate`.
+- **Tests first:** a hit in a member's private chat is never shown to
+  another member; a hit in a shared project chat is; the AI's
+  `chat_search` inside a project searches the project.
+- **Do:** `GET /projects/{uuid}/search`; the search field in the project
+  header; the project scope for `chat_search`.
+- **Exit:** the five bullets.
+
+---
+
+## Phase D — remind and write back (push)
+
+Push first (PJ23–PJ27), then reminders and mail; mail goes out only from
+the person's own mailbox after "Send" (§0 #81–#83). WhatsApp is Later.
+
+### PJ23 — spike: push through a relay
+
+- **Goal:** prove `03` §8 on real phones before anything is ordered.
+- **Do:** a minimal relay, a development build of the app with the push
+  plugin, a server behind NAT. Measure delivery, check the store rules for
+  a generic text, list what the Apple and Google accounts need.
+- **Exit:** G13's cases walked by hand; findings in `STATUS.md`; the
+  account and signing details go to the private repos, not here.
+
+### PJ24 — devices and signed push requests (API)
+
+- **Goal:** `03` §8.2, §8.4, §8.5 on the server.
+- **Reads:** `Service/PlatformLink/NotificationToken.php`, `NotifyKeyStore`,
+  `SignedNotificationClient`.
+- **Tests first:** a request is signed and verifies with the published
+  key; no request without a device, with the switch off, or after `seen`;
+  a shared chat notifies only the starter; rotation keeps old devices
+  working.
+- **Do:** `BPUSHDEVICES`, the two switches, `PushNotifier`, the endpoints,
+  `PushModule`.
+- **Exit:** the tests against a relay stub.
+
+### PJ25 — relay service (`synaplan-platform`)
+
+- **Goal:** `03` §8.1–§8.3. Own repository, own plan and PR there.
+- **Exit:** the contract tests of PJ24 pass against the real relay.
+
+### PJ26 — push in the app shell (`synaplan-apps`)
+
+- **Goal:** registration, permission, tap-to-open. Own PR there; a store
+  release.
+- **Exit:** G13 on TestFlight and an internal Android track.
+
+### PJ27 — tell the phone when a run is done or needs you
+
+- **Goal:** J-PJ-11 and the push half of J-PJ-16.
+- **Do:** the in-context sheet after the first promoted run; Settings →
+  Notifications with three switches (run done, needs you, reminders), shown only inside the app; `seen`; the
+  deep link from `ref` to the chat.
+- **Tests first:** Vitest: the section is absent in a browser; the sheet
+  appears once.
+- **Touches:** keep the web part out of the paths the mobile policy marks
+  `store-required`; the native bridge ships with PJ26.
+- **Exit:** the five bullets; walked on both phones against the cloud and
+  a self-hosted server.
+
+### PJ35 — reminders on one-off times (API)
+
+- **Goal:** `03` §2.10 and the sending half of §15.
+- **Reads:** `Command/SavedTasksTickCommand.php`, `CronNextRun`,
+  `InternalEmailService`, PJ24.
+- **Tests first:** a reminder is sent once even with two ticks in
+  parallel; a changed date moves its unsent reminder and leaves a sent one;
+  push when a device exists, mail otherwise; a member who left gets
+  nothing; the person's zone decides "19:00".
+- **Do:** `BPROJECTREMINDERS`, `ProjectRemindersTickCommand`, the
+  scheduler entry, `ProjectReminderService`; flag
+  `PROJECTS.REMINDERS_ENABLED`.
+- **Exit:** the tests.
+
+### PJ36 — reminders before dates and the weekly overview
+
+- **Goal:** J-PJ-16.
+- **Reads:** PJ35, PJ33's status, `02` copy "This week in {project}".
+- **Tests first:** the Monday overview lists the next seven days, the
+  overdue tasks and what waits for the person, and is skipped for an
+  empty project; the three switches per person work; the mail renders in
+  five locales.
+- **Do:** the three kinds of `03` §15; the settings endpoint; the switches
+  under "People and settings"; the mail template.
+- **User-flow:** J-PJ-16 with a seeded clock.
+- **Exit:** the five bullets.
+
+### PJ37 — dates go to my calendar and stay linked
+
+- **Goal:** `03` §16, calendar part, write only.
+- **Reads:** `OutlookCalendarDestinationProvider`, `CalDavDestinationProvider`,
+  `GraphClient::createEvent`.
+- **Tests first:** confirming a date creates one event and stores its ID;
+  moving the date updates that event, dropping deletes it; no connection →
+  the date stays on the board and the card says "Not in a calendar".
+- **Do:** update and delete in both providers where missing; the link on
+  the item; the line on the date card.
+- **Exit:** the five bullets.
+
+### PJ38 — mail preview to decline, move and follow up
+
+- **Goal:** J-PJ-15 and the decline half of J-PJ-14; `03` §2.11 and §16.
+- **Reads:** `Service/Microsoft/M365MailSender.php`, `GraphClient::sendMail`,
+  `EmailMeRunner`, `02` §3.8a.
+- **Tests first:** G18 — no path but the web "Send" sends (tool, run, watch
+  and command tests); "Send" twice sends once; without Microsoft 365 there
+  is no "Send", only "Copy text" and "Open in mail app"; an empty "To"
+  keeps "Send" off; after a decline the date becomes a waiting item.
+- **Do:** `BOUTGOINGMAILS`, `ProjectMailService`, the endpoints, the
+  preview dialog with variants; flag `PROJECTS.MAIL_ENABLED`.
+- **User-flow:** J-PJ-15 against a Graph stub.
+- **Exit:** G18; the five bullets.
+
+### PJ39 — spike: read a calendar for clashes
+
+- **Goal:** §0 #88, the read half.
+- **Do:** Microsoft 365 `calendarView` and CalDAV `REPORT` against test
+  accounts: the scope each needs, how a person is asked, the time for one
+  hour of free/busy.
+- **Exit:** a recommendation in `STATUS.md`. No product code.
+
+---
+
+## Phase E — shared chats
 
 ### PJ12 — write together in one chat (API)
 
@@ -316,6 +554,7 @@ their limits as profile input.
 
 ### PJ18 — spike: Notion limited to chosen pages
 
+- **Status:** proposed for Later (§0 #49); kept here so the brief is not lost.
 - **Goal:** decide §0 #49 between the two ways of `01` §2.4.
 - **Do:** against a test workspace: fetch with an ancestor check through
   the hosted MCP server (cost per fetch, failure cases, moved pages); a
@@ -325,6 +564,8 @@ their limits as profile input.
 
 ### PJ19 — narrow an app to a folder, a calendar or pages
 
+- **Status:** the folder and calendar rows stay; the Notion row waits for
+  PJ18 and may move to Later with it.
 - **Goal:** `03` §6.4.
 - **Depends:** PJ18's result for the Notion row.
 - **Tests first:** a WebDAV grant with `folder` cannot read a sibling or a
@@ -336,7 +577,7 @@ their limits as profile input.
 
 ---
 
-## Phase D — shared projects and project memory
+## Phase F — shared projects
 
 ### PJ20 — share a project
 
@@ -352,87 +593,109 @@ their limits as profile input.
   "Shared with me".
 - **Exit:** the five bullets.
 
-### PJ21 — project memory (API)
+### PJ47 — members on the board and "Since you were here"
 
-- **Goal:** `03` §7, memory.
-- **Reads:** `MemoryExtractionService`, `UserMemoryService` (in the size
-  ledger — nothing is added there), `ChatMemoryContextLoader`.
-- **Tests first:** an entry is written from the sender's message and names
-  the sender; nothing is written from a private chat in a shared project;
-  nothing is ever copied from `BUSERMEMORIES`; a new statement of the same
-  author replaces the old one; G12's corpus.
-- **Do:** `BPROJECTMEMORIES`, the Qdrant collection, extraction, the
-  prompt block with names, rule 8 of the prompt, the endpoints, flag
-  `PROJECTS.MEMORY_ENABLED`.
-- **Exit:** G12.
-
-### PJ22 — memory tab and memory choice per chat
-
-- **Goal:** J-PJ-9 step 4 and J-PJ-10.
-- **Do:** tab "Memory" with delete; "Memory" in the composer menu of a
-  project chat; the lock when the chat is shared.
-- **Tests first:** Vitest for the three states of the choice; Playwright
-  for the conflict journey with two accounts.
+- **Goal:** §0 #56 and #94 in a shared project.
+- **Reads:** PJ20, PJ22, `BPROJECTITEMLOG`.
+- **Tests first:** the list shows what others changed since the caller's
+  last visit and nothing of their own; a private chat leaves no trace in
+  it; tasks show their assignee's avatar.
+- **Do:** `GET /projects/{uuid}/since`; the strip on top of Overview;
+  avatars on tasks; the members under "People and settings".
 - **Exit:** the five bullets.
 
 ---
 
-## Phase E — push
+## Phase G — things come into the project
 
-### PJ23 — spike: push through a relay
+### PJ40 — forward mails to a project
 
-- **Goal:** prove `03` §8 on real phones before anything is ordered.
-- **Do:** a minimal relay, a development build of the app with the push
-  plugin, a server behind NAT. Measure delivery, check the store rules for
-  a generic text, list what the Apple and Google accounts need.
-- **Exit:** G13's cases walked by hand; findings in `STATUS.md`; the
-  account and signing details go to the private repos, not here.
+- **Goal:** the forwarding half of J-PJ-14; `03` §17.
+- **Reads:** `Service/Email/SmartEmailHelper.php`, the inbound mail
+  handler, `FileIngestExecutor`, PJ31.
+- **Tests first:** a mail from a member lands as files and proposals; a
+  mail from anyone else is dropped, audited and not answered; a mail
+  cannot add an `open` item (G15); the run counts to the forwarding member.
+- **Do:** `BMAILKEY`, the keyword route, the proposal run; "Forward mails…"
+  under "More" with the address and a copy button; flag
+  `PROJECTS.INBOX_ENABLED`.
+- **Exit:** G15; the five bullets.
 
-### PJ24 — devices and signed push requests (API)
+### PJ41 — share to a project from the phone (`synaplan-apps`)
 
-- **Goal:** `03` §8.2, §8.4, §8.5 on the server.
-- **Reads:** `Service/PlatformLink/NotificationToken.php`, `NotifyKeyStore`,
-  `SignedNotificationClient`.
-- **Tests first:** a request is signed and verifies with the published
-  key; no request without a device, with the switch off, or after `seen`;
-  a shared chat notifies only the starter; rotation keeps old devices
-  working.
-- **Do:** `BPUSHDEVICES`, the two switches, `PushNotifier`, the endpoints,
-  `PushModule`.
-- **Exit:** the tests against a relay stub.
+- **Goal:** a photo, a PDF or a link from the share sheet into a project.
+  Own PR there; a store release.
+- **Exit:** walked on both phones; the file appears under Files and its
+  proposals under "To confirm".
 
-### PJ25 — relay service (`synaplan-platform`)
+### PJ42 — files of a project are read for items
 
-- **Goal:** `03` §8.1–§8.3. Own repository, own plan and PR there.
-- **Exit:** the contract tests of PJ24 pass against the real relay.
+- **Goal:** an offer as PDF proposes a cost and a date.
+- **Reads:** PJ40's proposal run, the file indexing events.
+- **Tests first:** G15 for files; a file is read once after indexing; a re-upload of the
+  same file proposes nothing new; proposals name the file as source.
+- **Do:** the trigger after indexing; the source link on the card.
+- **Exit:** the tests.
 
-### PJ26 — push in the app shell (`synaplan-apps`)
+### PJ43 — "To confirm"
 
-- **Goal:** registration, permission, tap-to-open. Own PR there; a store
-  release.
-- **Exit:** G13 on TestFlight and an internal Android track.
-
-### PJ27 — tell the phone when a run is done or needs you
-
-- **Goal:** J-PJ-11.
-- **Do:** the in-context sheet after the first promoted run; Settings →
-  Notifications with two switches, shown only inside the app; `seen`; the
-  deep link from `ref` to the chat.
-- **Tests first:** Vitest: the section is absent in a browser; the sheet
-  appears once.
-- **Touches:** keep the web part out of the paths the mobile policy marks
-  `store-required`; the native bridge ships with PJ26.
-- **Exit:** the five bullets; walked on both phones against the cloud and
-  a self-hosted server.
+- **Goal:** J-PJ-14 complete.
+- **Reads:** PJ38, PJ40, `02` copy for "To confirm".
+- **Tests first:** Vitest for the card's states; Playwright: a forwarded
+  mail shows two proposals, "Add" makes one open, "Doesn't work" opens the
+  mail preview, "Ignore" drops the other.
+- **Do:** the card on top of Overview when it has entries; accept and
+  ignore endpoints; the source preview.
+- **User-flow:** J-PJ-14.
+- **Exit:** the five bullets.
 
 ---
 
-## Phase F — rollout
+## Phase H — watches
+
+### PJ44 — watches that know the project (API)
+
+- **Goal:** `03` §2.12 and §18.
+- **Reads:** `Entity/UrlWatch.php`, `Service/UrlWatch/UrlWatchService.php`,
+  `TextDiff.php`, `WebFetchTool`, PJ35's tick pattern.
+- **Tests first:** G19 — each of the five kinds against recorded pages;
+  a report only when the condition turns true; three failures pause the
+  watch; a watch never posts a form or follows a sign-in; the model is
+  called only when the extractor fails, and that call counts to the
+  creator.
+- **Do:** `BPROJECTWATCHES`, `ProjectWatchesTickCommand`, one checker per
+  kind, the endpoints, a tool `project_watch_add` for "tell me when…";
+  flag `PROJECTS.WATCHES_ENABLED`.
+- **Exit:** G19.
+
+### PJ45 — "Watching for you" on the board
+
+- **Goal:** J-PJ-17.
+- **Reads:** `02` §3.8b, PJ32's cards.
+- **Tests first:** Vitest for active, triggered, failed and paused;
+  Playwright: "tell me when the oven is under 450 €" creates a watch that
+  shows on the card.
+- **Do:** the card, the detail with the last values, pause and stop.
+- **User-flow:** J-PJ-17.
+- **Exit:** the five bullets.
+
+### PJ46 — watches report through push and mail
+
+- **Goal:** the report half of J-PJ-17.
+- **Reads:** PJ27, PJ35's channel choice.
+- **Tests first:** a triggered watch sends one push or one mail and writes
+  one line into the project chat; a paused watch sends nothing.
+- **Do:** the report through the reminder channel; the line in the chat.
+- **Exit:** the tests.
+
+---
+
+## Phase I — rollout
 
 ### PJ28 — docs and flags
 
-- **Do:** `docs/FEATURES.md`, a user page each for projects, shared chats
-  and long answers, the admin page for the four flags and the cost limit,
+- **Do:** `docs/FEATURES.md`, a user page each for projects and the board,
+  reminders and mail, watches, shared chats and long answers, the admin page for the flags (`03` §11) and the cost limit,
   the push section for self-hosters (what leaves the server). Flags on by
   migration, one at a time, each after its gate.
 - **Exit:** every journey of `02` walked on `web.synaplan.com`; this track

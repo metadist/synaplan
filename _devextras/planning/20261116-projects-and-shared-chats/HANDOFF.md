@@ -1,11 +1,11 @@
 # HANDOFF — Projects and shared chats
 
-Stand: 2026-11-25, `main` @ `ffbea95a6` (Bildkosten im Lauf #3269 und PJ7b #3270 gemergt). Geschrieben für einen Agenten ohne Zugriff
+Stand: 2026-11-26, Plan umgebaut (Board, Erinnerungen, Mail, Beobachtungen; Mockup #3282). Code-Stand wie 2026-11-25: Bildkosten im Lauf #3269 und PJ7b #3270 gemergt. Geschrieben für einen Agenten ohne Zugriff
 auf den bisherigen Chat. Jede Aussage wurde gegen `main` und die Planungsdateien
 geprüft. Was nicht geprüft wurde, steht unter "Nicht verifiziert".
 
 Lies zuerst: `/AGENTS.md` (die Schleife und das Gate), danach in diesem Ordner
-`STATUS.md` (Schrittprotokoll), `04_sprints.md` (die Briefs PJ0–PJ28),
+`STATUS.md` (Schrittprotokoll), `04_sprints.md` (die Briefs PJ0–PJ47),
 `00_master_plan.md` §0 (Entscheidungstabelle, ☐ = offen) und `03_contracts.md`
 (§1.1 ist der Vertrag für PJ5). Für den Kernel:
 `../20261023-agent-handling/STATUS.md` (AH8a, AH8b). Für den Loop:
@@ -15,7 +15,11 @@ Lies zuerst: `/AGENTS.md` (die Schleife und das Gate), danach in diesem Ordner
 
 **Ziel (Planungsordner):** Projekte (Quellen und Instruktionen für mehrere Chats) und
 gemeinsame Chats für Synaplan, dazu ein Chat, der als Lauf ("Loop", mehrere Schritte)
-beliebig lange arbeiten darf. 28 Schritte PJ0–PJ28 in Phasen 0, A–F.
+beliebig lange arbeiten darf. Seit 2026-11-26 weiß ein Projekt, wo es steht: ein
+Board (Aufgaben, Termine, Entscheidungen, Warten auf, Kosten) neben dem Chat, das die
+KI aus dem Chat pflegt; dazu Erinnerungen, Mail-Vorschau an Dritte, Mails ins Projekt
+weiterleiten und Beobachtungen ("sag mir, wenn …"). 48 Schritte PJ0–PJ47 in Phasen
+0, A–I. Mockup: `mockups/project-page.html`.
 
 **Auftrag des Owners:** die Schritte der Reihe nach umsetzen, nach `AGENTS.md`,
 mit Blick auf Usability und vor allem Sicherheit.
@@ -49,7 +53,8 @@ im Lauf (#3269) und **PJ7b** (Notizen und Verdichtung, #3270). Als Nächstes kom
 | Bildkosten im Lauf (`analyze_image` zählt zum Limit) | gemergt | #3269 |
 | PJ7b Notizen, Verdichtung, `BRUNS.BNOTES` | gemergt | #3270 |
 | PJ7c Bild bearbeiten per file_id | **nächster Schritt** | — |
-| PJ8–PJ28 | nicht begonnen | — |
+| Plan umgebaut (Board, Phasen neu) | offen (Doku) | — |
+| PJ8–PJ47 | nicht begonnen | — |
 
 ## 2. Bisherige Implementierungen
 
@@ -400,8 +405,15 @@ Fehlercodes: 401, 404 (`feature_not_configured`), 409 (Limit/Speicher), 422, 429
    (Owner, 2026-11-25; §0 #13 bleibt offen). Ebenso "Jetzt antworten".
 3. **PJ8–PJ11** (Karte für den Lauf, Stop, Rückfragekarte usw.); offene Zeilen siehe
    Abschnitt 6. `LOOP.ENABLED` bleibt 0 bis PJ8 gemergt ist.
-4. **Phase C (PJ12–PJ19)** gemeinsame Chats, noch nicht beauftragt.
-5. **Phase D (PJ20–PJ22)**, **Phase E (PJ23–PJ27)**, **PJ28** Flags an.
+4. **Phase C — Board** (PJ29 Chat-Bereich herauslösen, PJ30 Items-API, PJ31 KI pflegt
+   das Board, PJ32 Projektseite Chat links / Board rechts, PJ33 Status und erster
+   Plan, PJ21/PJ22 Projekt-Memory, PJ34 Suche im Projekt).
+5. **Phase D — Erinnern und zurückschreiben**: Push PJ23–PJ27, dann PJ35–PJ39
+   (Erinnerungen, Wochenüberblick, Kalender-Link, Mail-Vorschau, Spike Kalender lesen).
+6. **Phase E** gemeinsame Chats (PJ12–PJ19; PJ18 und Notion in PJ19 vorgeschlagen für
+   später), **F** geteilte Projekte (PJ20, PJ47), **G** Dinge kommen ins Projekt
+   (PJ40–PJ43), **H** Beobachtungen (PJ44–PJ46), **I** Rollout (PJ28).
+   Alte Buchstaben: C→E, D→F, E→D, F→I.
 
 ## 9. Exakt nächster Schritt: PJ7c
 
@@ -475,8 +487,12 @@ den neuen Lauf aus diesen Notizen.
   "Conversation summarized"; Dateien per ID im ganzen Chat; Rückfragekarte mit Optionen
   und freiem Text; gemeinsame Chats mit mehreren Schreibenden; keine persönlichen
   Erinnerungen in gemeinsamen Chats; Apps standardmäßig aus; Push aufs Telefon.
-  Freigegeben am 2026-11-19: #21–#25, #63, #66, #68–#73. Offene ☐-Zeilen **nicht**
-  selbst entscheiden.
+  Freigegeben am 2026-11-19: #21–#25, #63, #66, #68–#73. Am 2026-11-26: #54 (in
+  Projekt-Chats nur Projekt-Memory, persönliche Memories aus), #74–#82, #84–#86
+  (Board, Vorschläge statt Schreiben aus Mails, Mail nur nach "Senden" aus dem eigenen
+  Postfach, Push und Mail zuerst, WhatsApp später), Reihenfolge Board vor gemeinsamen
+  Chats, kein Modell-Picker pro Projekt. Offen: #49, #83, #87–#95; die neuen Tabellen
+  in #63 sind eine Ask-Zeile (Schema). Offene ☐-Zeilen **nicht** selbst entscheiden.
 
 ## 11. Lokale Umgebung
 
