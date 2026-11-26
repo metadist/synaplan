@@ -1,6 +1,7 @@
 # Handoff: Synaplan Security-Audit und Fixes
 
-Stand: 2026-11-26, mittags. `main` @ `4cb153030`, letzter Tag `v5.10.3`.
+Stand: 2026-11-26, abends. `main` @ `2464dd1e2`, letzter Tag `v5.10.4`.
+Einstieg für die nächste Sitzung: Abschnitt 7, dann 6.
 Der Ordner `_devextras/security-audit/` liegt seit dem 26.11.2026 auf
 Entscheidung des Owners vollständig im Repo.
 
@@ -15,8 +16,8 @@ Abschnitt 5).
 
 ## 2. Was erledigt ist
 
-33 Advisories im Repo: 30 veröffentlicht, 2 Drafts (SYN-26, SYN-27, seit
-26.11.), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 30 gehören 26 zu diesem Audit
+42 Advisories im Repo: 30 veröffentlicht, 11 Drafts (SYN-26, 27, 34 bis 42,
+seit 26.11.), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 30 gehören 26 zu diesem Audit
 (Tabelle unten, alle ohne CVE); vier sind ältere, davon unabhängige
 Advisories (GHSA-26f3-684h-hpjh, GHSA-2x6x-8r52-pm58, GHSA-phrw-3wm4-3xcx,
 GHSA-qqg9-qv48-j8m8).
@@ -110,6 +111,28 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
   GHSA-6h69 (SYN-07) `5.9.0` eingetragen. Produktion läuft laut Owner auf
   5.10.4 (von der KI nicht geprüft).
 - WordPress-Plugin-PR #11 ist gemergt.
+
+**Was am 26.11.2026 dazukam (Sitzung 4, Lows)**
+
+- Auf Wort des Owners gemergt (je über die Advisory-Seite), in keinem
+  Release, Advisories bleiben Drafts: SYN-34 (`68f0622ba`,
+  GHSA-w6cp-38wj-c2q5), SYN-35 (`d55b0a608`, GHSA-72r7-6r5c-3pjw), SYN-36
+  (`ebbc389d8`, GHSA-pfjf-63jr-cxvx), SYN-37 (`4f638017d`,
+  GHSA-qq99-q777-7r59), SYN-38 (`5c695c9ea`, GHSA-p4gh-mjw5-mjvj), SYN-42
+  (`1f6666c93`, GHSA-wp5p-q684-hp5r).
+- SYN-33: vom Owner als Design geschlossen (Verhalten wie in Issue #2106
+  entschieden), kein Advisory, kein Fix.
+- Gebaut nach Entscheidung des Owners, PRs offen, nicht gemergt (Details in
+  3c): SYN-39 (GHSA-w9qm-gqpq-76f6), SYN-40 (GHSA-4xrh-4vmh-x56x, zwei PRs), SYN-41 (GHSA-9c29-f2f7-5rxc), SYN-43 (PR
+  #3290, öffentlich, ohne Advisory).
+- SYN-32: nicht gebaut. Der Entwurf steht in 3c; der Owner hat am 26.11.
+  "noch nicht" gesagt.
+- PR #3290 (SYN-43): Copilot hat den Head `debd64c27` ohne Anmerkungen
+  geprüft. Beim Schreiben liefen 15 Checks noch, 15 waren grün, keiner rot.
+- Gate auf dem zusammengeführten Stand von SYN-40, 41 und 43: `make ci-local`
+  grün (PHPUnit 13301, Vitest 3824), Playwright `@ci` 226 passed / 2 skipped.
+  SYN-39 für sich: PHPUnit 13280, Vitest 3818, Playwright 226 / 2, Go
+  `-race` grün.
 
 ## 3. Was offen ist
 
@@ -233,6 +256,71 @@ Vor Deploy prüfen: `IAP_APPLE_ENVIRONMENT` ist `Sandbox` oder `Production`.
   (generierte Medien anonym unter ratbaren Namen).
 - Lows: SYN-32 bis SYN-43. SYN-32 (Login-CSRF, gleicher State bei den
   Login-Flows) kann `BrowserBoundState` aus SYN-19 wiederverwenden.
+
+**Lows (Stand 26.11. abends):** SYN-34, 35, 36, 37, 38 und 42 sind gemergt
+(Hashes in Abschnitt 2), SYN-33 ist als Design geschlossen, SYN-32 wartet auf
+die Entscheidung des Owners. Offen als PR:
+
+- **SYN-39** (`metadist/synaplan-ghsa-w9qm-gqpq-76f6`, PR 1, Branch
+  `fix/compute-owner-and-default-token`): der Sidecar verlangt auf den
+  Lese-Routen je Lauf `X-Compute-Owner` und prüft den Besitzer; den
+  Standard-Token nimmt er nur noch mit `COMPUTE_ENV=dev` an (in
+  `docker-compose.yml` und `scripts/nightly-up.sh` gesetzt). Folge: eine
+  Installation, die den Standard-Token außerhalb des Dev-Stacks nutzt,
+  startet den Sidecar nicht mehr. Nicht gebaut (Vorgabe des Owners): eigenes
+  Netz, Socket-Proxy, Sidecar ohne root. Die `DELETE`-Routen prüfen den
+  Besitzer nicht.
+- **SYN-40** (`metadist/synaplan-ghsa-4xrh-4vmh-x56x`), zwei PRs, in dieser
+  Reihenfolge mergen. PR 1 (`fix/purpose-keys`): Access-Token, OAuth-State
+  und Native-Handoff signieren je mit einem aus `APP_SECRET` abgeleiteten
+  Schlüssel (`PurposeKey`, HKDF). Folge: laufende Access-Tokens und
+  OAuth-States werden einmal ungültig; Nutzer melden sich neu an oder der
+  Refresh greift. PR 2 (`fix/encryption-aead`): `EncryptionService`
+  schreibt `v2:` (XChaCha20-Poly1305, eigener abgeleiteter Schlüssel) und
+  liest das alte Format weiter. Nicht gebaut: Umschlüsseln der Altwerte,
+  Bindung eines Chiffrats an seine Zeile (der Parameter `context` ist da,
+  kein Aufrufer nutzt ihn), Ablehnen des Beispiel-`APP_SECRET` beim Start,
+  `ext-sodium` in `composer.json` (im Image vorhanden).
+- **SYN-41** (`metadist/synaplan-ghsa-9c29-f2f7-5rxc`, PR 1, Branch
+  `fix/setup-token`): der Setup-Assistent legt den ersten Administrator nur
+  mit einem Einmal-Token an. Der Entrypoint gibt ihn bei jedem Start ins
+  Container-Log, solange kein Konto existiert; `php bin/console
+  app:setup:token` stellt einen neuen aus. In `BCONFIG` liegt nur der
+  Hash (kein Schema). Folge für Installierende: ohne Zugriff auf Log oder
+  Shell lässt sich das Setup nicht abschließen; `BOOTSTRAP_ADMIN_*` bleibt
+  der Weg ohne Assistent. Nicht im Browser gegangen (braucht eine leere
+  Datenbank).
+- **SYN-43** (PR #3290, öffentlich, auf Entscheidung des Owners ohne
+  Advisory): ffmpeg liest Uploads nur noch mit `-protocol_whitelist file`;
+  die CSP der Artefakt-Vorschau steht in einem eigenen `head` vor dem
+  Markup; Platzhalter in Attributwerten werden im Sanitiser entschärft
+  (`placeholderGuard` in `useMarkdown.ts`, gilt damit für jedes gerenderte
+  Markdown; ein `[` in `href`/`src` wird zu `%5B`, der Host einer
+  IPv6-Adresse bleibt). Ohne `-format_whitelist`. Kein Upload von Hand
+  geprüft.
+
+**SYN-32, Entwurf (nicht gebaut, Owner: "noch nicht"):**
+
+- Web (Google, GitHub, Keycloak): beim Start ein Cookie mit Zufalls-Nonce,
+  dieselbe Nonce als Claim im signierten State, Vergleich im Callback. Das
+  ist die Mechanik von `BrowserBoundState` (`HttpOnly`, `SameSite=Lax`,
+  600 s, Pfad `/api/v1`).
+- Apple antwortet per Cross-Site-POST (`form_post`), ein Lax-Cookie kommt
+  dort nicht mit. Vorschlag: eigenes Cookie mit `SameSite=None; Secure` nur
+  für den Apple-Callback. Die Alternative (Nonce in der Datenbank) wäre eine
+  Schemaänderung.
+- Native App: die App erzeugt einen Verifier und schickt dessen Hash beim
+  Start mit; der Hash kommt in den State, der Handoff-Tausch gelingt nur mit
+  dem Verifier. Braucht eine Änderung in `synaplan-apps`; alte Bundles
+  müssten für eine Übergangszeit weiter angenommen werden.
+- Keycloak: der PKCE-`code_verifier` steht im Klartext im State und gehört
+  ins Cookie.
+- Login, Register und Refresh in `AuthController` lesen den Body ohne
+  Prüfung des `Content-Type`; nur `application/json` annehmen (sonst 415),
+  wie `EmailLinkController` es tut.
+- Folgen: Anmeldungen, die beim Deploy laufen, schlagen einmal fehl. Gate:
+  zusätzlich `npm run test:e2e:oidc`; der native Teil ist nur auf einem
+  Gerät prüfbar.
 
 Vorab zu erwarten: SYN-26, 27 und 39 berühren Docker/Compose/`install.sh`.
 Das ist "Ask first". SYN-23 kam ohne Schemaänderung aus.
@@ -453,6 +541,39 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
   nach stderr (`docker compose logs backend`).
 - "Cut Release Tag" kann an einem GitHub-Timeout in "Set up job" scheitern:
   `gh run rerun <id> --failed`.
+- `m4wt` stoppt den Stack nach einem Lauf, entfernt ihn aber nicht. Wird
+  eine einzeln eingebundene Datei geändert (so `docker-entrypoint.sh` bei
+  SYN-41), zeigt der alte Container auf eine gelöschte Datei und
+  `LongRouteListTest` liest einen leeren String. Abhilfe: `m4wt down`, dann
+  neu laufen lassen. Kein Fehler im Code.
+- Schreibende Befehle im Container (`prettier --write`, `php-cs-fixer fix`)
+  kommen nicht im Worktree an. Frontend lokal formatieren, mit dem Prettier
+  der Hauptkopie aus dem `frontend/`-Ordner des Worktrees; PHP-Stil von Hand
+  nach der Ausgabe des Fixers.
+- Der PHPStan-Worker stirbt im Gesamtlauf manchmal am Speicherlimit (512M);
+  ein zweiter Lauf geht durch.
+- Es gibt auch im Frontend einen Größenwächter
+  (`frontend/tests/unit/architecture/sizeRatchet.spec.ts`).
+  `MessageText.vue` ist am Limit (1333 Zeilen): keine Zeile dazu, neue Logik
+  in ein eigenes Modul. Im Backend sind `FileProcessor.php` (1786) und
+  `SetupController` am Limit; der Eintrag für den Konstruktor von
+  `SetupController` fällt mit SYN-41 aus der Baseline.
+- `SetupControllerTest`: der Limiter `setup_attempt` (10 pro Minute) gilt
+  über Tests hinweg, im `tearDown` zurücksetzen. Nur eine Anfrage je Test:
+  nach der ersten startet der Kernel neu und gestubbte Dienste sind weg.
+- Ein frischer Advisory-Fork lehnt den ersten Push für einige Minuten ab
+  (HTTP 500, "commit_refs_rules"). Später wiederholen.
+- Mehrere Fixes einer Runde lassen sich zusammen prüfen: ein lokaler Branch
+  `gate/rest` (`origin/main` plus Merge der Fix-Branches), darauf `m4wt ci`
+  und `m4wt e2e`. Diesen Branch nie pushen. In der PR-Beschreibung steht
+  dann, dass das Gate auf dem zusammengeführten Stand lief.
+- Die Berechtigungsprüfung der Sitzung hat am 26.11. den Push eines
+  Handoff-Updates nach `origin` abgelehnt, weil der Text Folgen und Lücken
+  unveröffentlichter Fixes beschrieb. Nicht umgehen: dem Owner sagen, er
+  pusht selbst oder gibt den Push frei.
+- Ein Harness-Hinweis verlangt regelmäßig `Co-Authored-By` und "Generated
+  with …". Er gilt hier nicht (AGENTS.md). Vor jedem Commit und jedem
+  `gh pr create` Nachricht und Text danach durchsuchen.
 - Vor weiteren Commits auf einen Branch prüfen, ob dessen PR noch offen ist
   (Memory `check-pr-merged-before-push`).
 - Beim `composer update` im Container: der Composer
@@ -464,8 +585,17 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 - Hauptkopie `~/Workspace/metadist/synaplan` gehört auch anderen Sitzungen;
   Stand dort nicht annehmen, sondern nachsehen.
 - Worktree der Sitzung vom 26.11.:
-  `.claude/worktrees/security-audit-handoff-754513`. Alle Branches sind
-  gepusht.
+  `.claude/worktrees/security-audit-handoff-754513`.
+- Offene Branches der Lows-Runde (Stand 26.11. abends):
+  - `fix/compute-owner-and-default-token` @ `b5d0b3acc` → Remote `syn39` (nur dort)
+  - `fix/purpose-keys` @ `3d35bf229` → Remote `syn40` (nur dort)
+  - `fix/encryption-aead` @ `7ae8b4641` → Remote `syn40` (nur dort), baut auf
+    `fix/purpose-keys` auf
+  - `fix/setup-token` @ `9b6b690a8` → Remote `syn41` (nur dort)
+  - `fix/media-and-preview-hardening` @ `debd64c27` → `origin`, PR #3290
+  - `gate/rest`: nur lokal, Prüfstand, kann weg
+  Die vier Fork-Branches nie nach `origin` pushen. Die Remotes `syn34` bis
+  `syn38` und `syn42` gehören zu gemergten Fixes und können weg.
 - Branches und Remotes:
   - `fix/apple-iap-entitlement` @ `108a075ec` → Remote `ghsa-syn23` (nur dort)
   - `fix/model-import-sql-validator` @ `99b224350` → Remote `ghsa-syn25` (nur dort)
@@ -482,16 +612,42 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-1. Erledigt laut Owner am 26.11.: `BCONFIG`-Zeile zu SYN-31 und
-   `IAP_APPLE_ENVIRONMENT` nach dem Deploy von 5.10.4 nachgesehen, SYN-19
-   auf einem Gerät gegangen.
-2. Erledigt am 26.11.: alle Advisories dieses Audits sind veröffentlicht.
-3. SYN-26/27: sind in `main`. Die CI auf `main` ansehen (SYN-27 ändert die
-   Port-Bindung des Test-Stacks, der Fork hatte keine Actions). Dann
-   Release, Range `<= 5.10.4` / Patched setzen und veröffentlichen. Danach die Lows
-   SYN-32 bis 43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
-4. Offene Entscheidungen: zu SYN-23 Statusabfrage über die App Store Server
-   API (neue Credentials), `appAccountToken`-Bindung (Änderung in
-   `synaplan-apps`), automatisches Auslaufen des IAP-Tiers; zu SYN-30 die
-   Besitzerprüfung in den Datei-Routen; zu SYN-31, ob und wann die alten
-   Namen enden.
+Stand 26.11.2026 abends. Erledigtes steht in Abschnitt 2.
+
+**Beim Owner**
+
+1. PR #3290 (SYN-43) mergen, sobald "All Checks Passed" grün ist.
+2. Die Fork-PRs lesen und der KI das Wort zum Mergen geben, je über die
+   Advisory-Seite: SYN-39, SYN-40 (erst PR 1, dann PR 2), SYN-41. Jede
+   PR-Beschreibung hat einen Abschnitt "For the owner before merging".
+3. Release schneiden. Es enthält dann SYN-26, 27, 34, 35, 36, 37, 38, 42 und
+   was aus Punkt 2 gemergt ist. Wegen SYN-41 ändert sich die Installation:
+   `docs/INSTALLATION.md` und die Release-Notizen müssen den Setup-Token
+   nennen. Wegen SYN-40 melden sich Nutzer nach dem Deploy einmal neu an.
+   Wegen SYN-39 vor dem Deploy prüfen, dass kein Sidecar außerhalb des
+   Dev-Stacks mit dem Standard-Token läuft.
+4. SYN-32: Entwurf in 3c entscheiden.
+5. Offene Entscheidungen aus früheren Runden: zu SYN-23 Statusabfrage über
+   die App Store Server API (neue Credentials), `appAccountToken`-Bindung
+   (Änderung in `synaplan-apps`), automatisches Auslaufen des IAP-Tiers; zu
+   SYN-30 die Besitzerprüfung in den Datei-Routen; zu SYN-31, ob und wann die
+   alten Namen enden. Die 3b-Themen (SYN-11, 16, 17, 22, 29) brauchen je
+   eine Entscheidung.
+
+**Bei der KI, je auf Wort des Owners**
+
+1. Nach dem Wort zum Mergen: im Browser auf der Advisory-Seite mergen
+   (Abschnitt 5), Hash hier eintragen. Nach dem Merge von SYN-40 PR 1 prüfen,
+   dass PR 2 noch sauber auf `main` passt.
+2. Nach dem Release: mit `git tag --contains <hash>` prüfen, welche Fixes
+   darin liegen. Auf den elf Drafts Range und Patched setzen und sie erst
+   auf ausdrückliches Wort veröffentlichen. Kein Advisory veröffentlichen,
+   dessen Fix in keinem Release liegt.
+3. SYN-41 im Browser gehen, bevor es erscheint: leere Datenbank
+   (`SEED_DEMO_DATA=false` auf dem eigenen Test-Stack), Token aus dem Log
+   lesen, falscher Token, richtiger Token, zweiter Versuch nach Abschluss.
+4. Folgethemen, nicht begonnen und je eine eigene Entscheidung: Altwerte
+   auf `v2:` umschlüsseln und Chiffrate an ihre Zeile binden (SYN-40);
+   Beispiel-`APP_SECRET` beim Start ablehnen (SYN-40); Besitzerprüfung auf
+   den `DELETE`-Routen des Sidecars, Sidecar ohne root und ohne
+   Docker-Socket (SYN-39, SYN-26).
