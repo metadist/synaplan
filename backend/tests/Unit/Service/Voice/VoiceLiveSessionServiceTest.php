@@ -24,6 +24,7 @@ use App\Service\Voice\VoiceLiveConcurrency;
 use App\Service\Voice\VoiceLiveDelegationService;
 use App\Service\Voice\VoiceLiveInstructions;
 use App\Service\Voice\VoiceLiveSessionService;
+use App\Service\Voice\VoiceLiveSocketUrl;
 use App\Service\Voice\VoiceLiveTicketService;
 use App\Service\Voice\VoiceLiveUsageService;
 use App\Service\Voice\VoiceTranscriptWriter;
@@ -79,7 +80,7 @@ final class VoiceLiveSessionServiceTest extends TestCase
             ->resumeTicket($this->user(), 5, Request::create('https://synaplan.test/'));
 
         self::assertSame(5, $result['sessionId']);
-        self::assertStringEndsWith('?ticket=a.b.c', $result['wsUrl']);
+        self::assertSame('wss://synaplan.test/voice/ws?ticket=a.b.c', $result['wsUrl']);
     }
 
     public function testTheOptionsDefaultFollowsTheModelIdSavedOnTheModelsPage(): void
@@ -177,7 +178,7 @@ final class VoiceLiveSessionServiceTest extends TestCase
             $em,
             $redis ?? $this->createStub(RedisService::class),
             new NullLogger(),
-            '/voice/ws',
+            new VoiceLiveSocketUrl('/voice/ws', ''),
             $this->createStub(VoiceLiveCompatibleEndpoint::class),
             $this->createStub(MessageApiFormatter::class),
         );
