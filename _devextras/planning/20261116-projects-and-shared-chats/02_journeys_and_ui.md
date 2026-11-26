@@ -200,6 +200,139 @@ what it **must survive**.
   phone; two accounts on one phone; relay down (the answer is in the chat
   anyway).
 
+### J-PJ-12 — A new project gets a plan
+
+1. Chats panel → "New project". Ana types "DIY kitchen". The project page
+   opens with the chat only, full width, the project name above it.
+2. Ana: "I want a new kitchen fitted." The chat asks two things in one
+   question card: the rough budget (four options) and by when (three
+   options), with "You decide".
+3. She taps "8,000 to 15,000 €" and "in 3 months". The chat writes eleven
+   steps, three dates it already knows and the budget. Under the answer:
+   "Added: 11 steps, budget 12,000 € · Undo".
+4. The board slides in from the right. The overview starts with two
+   sentences on where the project stands.
+
+- **Found:** the first message in a new project.
+- **Undo:** "Undo" under the answer removes all of it; a single item is
+  deleted on the board.
+- **Must survive:** "You decide" on both questions; a project name that
+  says nothing ("Project 1"); the phone (the board tab appears with the
+  first item); flag off (today's project page).
+
+### J-PJ-13 — The AI enters what someone writes
+
+1. Ben writes in the project chat: "I'm home on Monday and will deal with
+   the measurer."
+2. Under his message: "Added: Ben takes care of the measuring · Undo".
+   On the board the task "Have the kitchen measured" gets Ben and Monday;
+   the date "Measuring at home" gets "Ben is home".
+3. Ana sees it in the status on top the next time it is written.
+
+- **Found:** the line under the message; the board.
+- **Undo:** "Undo" in that line, for as long as the item was not changed
+  since; afterwards the item's own menu.
+- **Must survive:** a message that only mentions a date ("the shop is
+  closed on Monday" writes nothing); a time without a time zone (the
+  project's zone, said back in the line); two members writing at once.
+
+### J-PJ-14 — A forwarded mail and a date that does not fit
+
+1. Ana forwards the mail of Steinwerk Nord to the project's address
+   ("People and settings → Forward mails to this project", with "Copy").
+2. A minute later the overview shows "To confirm · 2", source "from the
+   mail of Steinwerk Nord, today 09:14": delivery of the worktop on Monday
+   14 Dec between 8 and 12, and a 30 % deposit by 7 Dec. The mail is under
+   Files with what was read from it.
+3. Deposit: "Add". Delivery: "Doesn't work". A mail preview opens: to
+   Steinwerk Nord, subject "Re: Delivery of the worktop", variants
+   "Decline" and "Other times", text editable.
+4. She picks "Other times", changes a date, presses "Send". The row says
+   "Mail sent, 14:06"; the item moves to "Waiting on others".
+
+- **Found:** "To confirm" on top of the overview and on the Dates tab.
+- **Undo:** an added item like any item; "Ignore" (✕) drops a proposal
+  without a mail; a sent mail cannot be undone, which is why it is shown
+  first.
+- **Must survive:** a mail from someone who is not a member (refused, the
+  sender gets nothing back); a mail with no date (filed, nothing proposed);
+  no connected mailbox (J-PJ-15, step 4).
+
+### J-PJ-15 — Follow up
+
+1. "More → Waiting on others": "Elektro Brandt: callback about the power
+   line, asked on 22 Nov, no answer for 4 days". The status on top says the
+   same in one sentence, with "follow up" as a link.
+2. "Follow up" opens the preview: from Ana's address, to Elektro Brandt,
+   subject "Re: Request about a power line for the kitchen", a short polite
+   text that names the date of the first mail and the deadline.
+3. She changes one word and presses "Send". The row says "Mail sent,
+   14:06"; the waiting item gets a new date to look again.
+4. Without a connected mailbox the preview says so and offers "Copy text"
+   and "Open in mail app" instead of "Send".
+5. For Ben, who is a member, the button is "Remind": he gets a push, not a
+   mail.
+
+- **Found:** "Waiting on others"; the link in the status.
+- **Undo:** "Cancel" in the preview; nothing is sent before "Send".
+- **Must survive:** the recipient's address is unknown (the preview asks
+  for it first); "Send" pressed twice (one mail); the mailbox connection
+  expired (the preview says so and offers the copy path).
+
+### J-PJ-16 — Reminders and the week
+
+1. Sunday 19:00: Ben's phone shows "Tomorrow 10:00: measuring at home". A
+   tap opens the project on the Dates tab.
+2. Monday 08:00: Ana gets "This week in DIY kitchen": two dates, one
+   overdue task, two items waiting for her. By push when the app has it,
+   else by e-mail.
+3. "People and settings" has three switches: before dates, weekly
+   overview, overdue.
+
+- **Found:** the phone; "People and settings".
+- **Undo:** the switches; a reminder is not sent for a date that was
+  deleted or moved meanwhile.
+- **Must survive:** a date moved after the reminder was planned; the
+  person's time zone differs from the project's; push off on the phone
+  (e-mail instead).
+
+### J-PJ-17 — Watching for you
+
+1. Ana: "Tell me when the Blub X7 oven is under 450 €." Under the answer:
+   "I'm watching: Blub X7 under 450 € · Undo". "Watching for you" on the
+   overview: "479 € today, 499 € a week ago, last checked 14:02, 5 shops".
+2. Another project, a different value: "Tell me when PHP 8.5.2 is out."
+   The same frame shows "8.5.1 → not yet", then "8.5.2 is out, changelog"
+   and "Make a task of it".
+3. The price falls to 439 €. Push: "Blub X7 at 439 €". The card has the
+   link to the shop. Nothing is bought.
+
+- **Found:** "Watching for you" on the overview and under "More".
+- **Undo:** "Undo" under the answer; pause and stop on the card.
+- **Must survive:** a shop that blocks the check ("Could not check" with
+  the reason, no invented price); a value that does not change for weeks
+  (no model call, no cost); the creator leaves the project (the watch
+  stops).
+
+### J-PJ-18 — Chat and board side by side
+
+1. On a laptop the project opens with the chat on the left and the board
+   on the right. Ana drags the divider to give the board more room.
+2. For a long answer she hides the board (button in the chat header); the
+   chat takes the full width with a readable column. The same button brings
+   the board back.
+3. From the board's header she hides the chat; a small chat button on the
+   left edge brings it back.
+4. Next day the page opens as she left it. On the phone the project opens
+   in the chat; the board is the second tab.
+
+- **Found:** the divider; the two buttons in the headers.
+- **Undo:** double-click on the divider resets the width; the same buttons
+  show the hidden side.
+- **Must survive:** a window narrower than both minimums (the chat keeps
+  420 px, the board takes the rest or the phone layout starts at 820 px);
+  keyboard only (the divider is a focusable separator with arrow keys).
+
 ## 3. Wireframes
 
 ### 3.1 Chats panel
@@ -221,22 +354,49 @@ what it **must survive**.
 
 ### 3.2 Project page
 
+The agreed look is [`mockups/project-page.html`](./mockups/project-page.html).
+The wireframes below are its skeleton.
+
+**After two weeks** (laptop):
+
 ```
- New kitchen                          [ Share ]  [ ⋯ ]
- [ Chats ]  Sources   Instructions   Memory   Members
- ───────────────────────────────────────────────────────
- [ New chat ]
- Induction hobs                 Ana        today
- Offers compared                Ana, Ben   yesterday   shared
- ───────────────────────────────────────────────────────
- Sources                                  [ Add source ▾ ]
-   floorplan.png        picture     Ready            ⋯
-   offer-mueller.pdf    12 pages    Ready            ⋯
-   ikea.com/…           link        Reading…
-   Note: measurements   text        Ready            ⋯
+ rail │ Chats panel │ Main chat ▾          (A)(B) [+] [▣]┃ DIY kitchen            (A)(B) [Share][▣][⋯]
+      │             │                                   ┃ New kitchen by the end of January
+      │ Projects    │ (B) I'm home on Monday and will   ┃ [Overview] Tasks 7  Dates  Files  More ▾
+      │  DIY kitchen│     deal with the measurer.       ┃
+      │  Flat       │  ✓ Added: Ben takes care of the   ┃ On Monday at 10 Mr Vogt comes to measure,
+      │             │    measuring · Undo               ┃ Ben is home. Elektro Brandt has not called
+      │             │                                   ┃ back for four days (follow up) …
+      │             │ (A) Does the Blub X7 fit …?       ┃ As of today, 14:05. 4 of 11 steps done.
+      │             │  ✓ Read the floor plan, compared  ┃
+      │             │    5 shops · 48 s                 ┃ ┌ To confirm · 2 ─ from the mail of … ┐
+      │             │  Yes, it fits. 479 € today …      ┃ │ Delivery of the worktop  [Add][Doesn't work] ✕
+      │             │  👁 I'm watching: under 450 € ·   ┃ │ Deposit 30 %             [Add][Doesn't work] ✕
+      │             │    Undo                           ┃ └─────────────────────────────────────┘
+      │             │ ┌───────────────────────────────┐ ┃ ┌ Tasks ──────────┐ ┌ Dates ──────────┐
+      │             │ │ Write in the project …        │ ┃ │ ☐ Measure  Ben  │ │ Mon 30 Measuring│
+      │             │ └───────────────────────────────┘ ┃ └─────────────────┘ └─────────────────┘
+                     chat ~40 %, min 420 px         divider            board, the rest
 ```
 
-"Add source" opens: File · Link · Text. One dialog, one field each.
+- `[▣]` in the chat header hides the board; in the board header it hides
+  the chat. A hidden chat leaves a chat button on the board's left edge.
+- "More" opens: Costs · Watching for you · Decisions · Waiting on others ·
+  What I remember · Chats · People and settings.
+- "Show more" under the overview cards opens Decisions, Waiting on others
+  and What I remember.
+
+**New project** (laptop): the chat only, full width, a readable column, the
+project name and "Just created" above it, the question card as the first
+answer, one line under it: "As soon as there are tasks or dates, your
+project board appears next to the chat. Drag offers, photos or plans into
+the chat."
+
+**Phone:** a bar at the bottom with "Chat" (first, selected) and "Board".
+A new project has no bar.
+
+**Sources** stay where PJ4 put them, now under the "Files" tab: "Add
+source" opens File · Link · Text. One dialog, one field each.
 
 ### 3.3 Run card (working)
 
@@ -315,6 +475,38 @@ Folded when done: `Worked 24 min · 31 sources · 6 files read  ▾`.
   Microsoft 365    (○ )
 ```
 
+### 3.8a Mail preview
+
+```
+ ┌ Delivery date doesn't work ─────────────────────────────┐
+ │ From the mail of Steinwerk Nord: Mon 14 Dec, 8–12.     │
+ │ ( Decline ) ( Other times )                             │
+ │ From     ana.keller@…, your connected mailbox           │
+ │ To       Steinwerk Nord <service@…>                     │
+ │ Subject  Re: Delivery of the worktop                    │
+ │ ┌─────────────────────────────────────────────────────┐ │
+ │ │ Good morning,                                        │ │
+ │ │ the delivery on Monday, 14 Dec does not work for us. │ │
+ │ │ Could you deliver on one of these days instead? …    │ │
+ │ └─────────────────────────────────────────────────────┘ │
+ │ You can still change the text. The mail goes out from   │
+ │ your address and lies in your sent mails afterwards.    │
+ │                                   [ Send ]  [ Cancel ]  │
+ └─────────────────────────────────────────────────────────┘
+```
+
+Without a connected mailbox: "From: no mailbox connected", and the buttons
+are "Copy text", "Open in mail app", "Cancel".
+
+### 3.8b Watching for you
+
+```
+ Watching for you
+  👁 Blub X7 oven under 450 €          479 €  ▁▂▂▁  last checked 14:02 · 5 shops
+  👁 Extractor hood, classifieds       2 new  last checked 13:40
+                                                            [⋯ change · pause · stop]
+```
+
 ### 3.8 Project memory
 
 ```
@@ -378,6 +570,39 @@ are identical in every locale.
 | Project memory and my memories | Projekt-Erinnerungen und meine Erinnerungen | Recuerdos del proyecto y mis recuerdos | Mémoires du projet et mes mémoires | Proje anıları ve kendi anılarım |
 | Share with the project | Mit dem Projekt teilen | Compartir con el proyecto | Partager avec le projet | Projeyle paylaş |
 | Notifications | Benachrichtigungen | Notificaciones | Notifications | Bildirimler |
+| Overview | Übersicht | Resumen | Aperçu | Genel bakış |
+| Tasks | Aufgaben | Tareas | Tâches | Görevler |
+| Dates | Termine | Citas | Rendez-vous | Randevular |
+| Files | Dateien | Archivos | Fichiers | Dosyalar |
+| More | Mehr | Más | Plus | Daha fazla |
+| Show more | Mehr anzeigen | Mostrar más | Afficher plus | Daha fazla göster |
+| Costs | Kosten | Costes | Coûts | Maliyetler |
+| Watching for you | Hält für dich Ausschau | Vigilando por ti | Je surveille pour vous | Senin için takip ediyor |
+| Decisions | Entscheidungen | Decisiones | Décisions | Kararlar |
+| Waiting on others | Wartet auf andere | Esperando a otros | En attente d'autres personnes | Başkalarını bekliyor |
+| What I remember | Was ich mir gemerkt habe | Lo que recuerdo | Ce dont je me souviens | Hatırladıklarım |
+| People and settings | Personen und Einstellungen | Personas y ajustes | Personnes et paramètres | Kişiler ve ayarlar |
+| To confirm | Zum Bestätigen | Por confirmar | À confirmer | Onay bekleyenler |
+| Add | Eintragen | Añadir | Ajouter | Ekle |
+| Doesn't work | Passt nicht | No me va bien | Ne convient pas | Uymuyor |
+| Ignore | Ignorieren | Ignorar | Ignorer | Yok say |
+| Move | Verschieben | Cambiar fecha | Déplacer | Ertele |
+| Follow up | Nachhaken | Hacer seguimiento | Relancer | Hatırlatma gönder |
+| Remind | Erinnern | Recordar | Rappeler | Hatırlat |
+| Send | Senden | Enviar | Envoyer | Gönder |
+| Copy text | Text kopieren | Copiar texto | Copier le texte | Metni kopyala |
+| Open in mail app | Im Mail-Programm öffnen | Abrir en la app de correo | Ouvrir dans l'application de messagerie | E-posta uygulamasında aç |
+| Mail sent, {time} | Mail gesendet, {time} | Correo enviado, {time} | E-mail envoyé, {time} | E-posta gönderildi, {time} |
+| Added: {what} | Eingetragen: {what} | Añadido: {what} | Ajouté : {what} | Eklendi: {what} |
+| Undo | Rückgängig | Deshacer | Annuler | Geri al |
+| As of today, {time}. {done} of {total} steps done. | Stand heute, {time} Uhr. {done} von {total} Schritten sind erledigt. | Hoy a las {time}. {done} de {total} pasos hechos. | Aujourd'hui, {time}. {done} étapes sur {total} terminées. | Bugün {time} itibarıyla. {total} adımdan {done} tamamlandı. |
+| Last checked {time} | Zuletzt geprüft {time} | Última comprobación {time} | Dernière vérification {time} | Son kontrol {time} |
+| Could not check | Konnte nicht prüfen | No se pudo comprobar | Vérification impossible | Kontrol edilemedi |
+| Forward mails to this project | Mails an dieses Projekt weiterleiten | Reenviar correos a este proyecto | Transférer des e-mails à ce projet | Bu projeye e-posta ilet |
+| Hide board · Show board | Board ausblenden · Board einblenden | Ocultar panel · Mostrar panel | Masquer le tableau · Afficher le tableau | Panoyu gizle · Panoyu göster |
+| Hide chat · Show chat | Chat ausblenden · Chat einblenden | Ocultar chat · Mostrar chat | Masquer le chat · Afficher le chat | Sohbeti gizle · Sohbeti göster |
+| This week in {project} | Diese Woche in {project} | Esta semana en {project} | Cette semaine dans {project} | {project} projesinde bu hafta |
+| Since you were here | Seit du zuletzt hier warst | Desde tu última visita | Depuis votre dernière visite | Son ziyaretinden beri |
 | When an answer is ready | Wenn eine Antwort fertig ist | Cuando una respuesta esté lista | Quand une réponse est prête | Bir yanıt hazır olduğunda |
 | When a chat needs you | Wenn ein Chat auf dich wartet | Cuando un chat te necesite | Quand un chat attend votre réponse | Bir sohbet seni beklediğinde |
 | Tell you when an answer is ready? | Bescheid geben, wenn eine Antwort fertig ist? | ¿Avisarte cuando una respuesta esté lista? | Vous prévenir quand une réponse est prête ? | Bir yanıt hazır olduğunda haber verelim mi? |
@@ -395,8 +620,9 @@ that names the member.
 
 **Words that do not appear on screen:** loop, agentic, run profile,
 iteration, token, RAG, vector, index, embedding, grant, payer, quota,
-compaction, MCP, relay, wrap-up. Use: working, step, sources, memory,
-amount, budget, summarized.
+compaction, MCP, relay, wrap-up, agent (on the board), watcher, item,
+collection, metric, dashboard. Use: working, step, sources, memory, amount,
+budget, summarized, watching for you, what I remember, to confirm.
 
 ## 5. States
 
@@ -410,6 +636,10 @@ amount, budget, summarized.
 | Allowance bar | hidden when "everyone pays" | — | bar hidden, mode line stays | — |
 | My apps in this chat | "You have no connected apps" + link to Apps | — | switch reverts with a toast | menu entry absent |
 | Project memory | "Nothing remembered yet" | skeleton | retry | tab absent |
+| Project page, board | the chat only, full width; the board appears with the first item | skeleton cards beside the chat | "The board could not be loaded" + retry; the chat still works | today's project page |
+| To confirm | card absent | — | "Could not add" + retry; the proposal stays | absent |
+| Mail preview | — | "Writing the mail…" | "Not sent" + reason (mailbox expired, address missing) + the copy path | buttons absent |
+| Watching for you | card absent | — | the row says "Could not check" + reason | absent |
 | Notifications (settings) | — | — | "Notifications are off for Synaplan on this phone" + how to turn on | section absent; in the browser always absent |
 
 ## 6. Exit bullets

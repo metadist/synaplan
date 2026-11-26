@@ -153,6 +153,36 @@ Backend: `Service/PlatformLink/NotificationToken.php` signs Ed25519 JWTs
 `/.well-known/jwks.json` publishes it when Platform Links are on. The only
 device table is `BDESKTOPDEVICES`.
 
+### 1.13 Board, reminders, mail and watches
+
+- **Calendars write only.** `Service/Destination/OutlookCalendarDestinationProvider.php`
+  and `CalDavDestinationProvider.php` create events (`GraphClient::createEvent`);
+  nothing reads a calendar today. Update and delete are added in PJ37,
+  reading is PJ39.
+- **Mail from the person's own mailbox** exists only for Microsoft 365:
+  `Service/Microsoft/M365MailSender.php` over `GraphClient::sendMail`, used
+  by `Service/Multitask/Execution/Runner/EmailMeRunner.php`. Gmail and
+  generic SMTP/IMAP accounts are not connected; they would be a new
+  provider (ask first).
+- **System mail:** `Service/Email/InternalEmailService.php` (the server's
+  SMTP) — fit for reminders to the person, not for mail to third persons.
+- **Inbound mail:** `smart+keyword@` through
+  `Service/Email/SmartEmailHelper.php`; the keyword route is where the
+  project address hooks in. `GraphClient::listMessages`, `searchMessages`
+  and `messageBody` read a connected Microsoft 365 mailbox.
+- **Watching pages:** `Entity/UrlWatch.php`, `Service/UrlWatch/UrlWatchService.php`
+  and `TextDiff.php` diff a page on a schedule — the `page` kind of a watch
+  as it is.
+- **Schedules:** `Service/SavedTask/Schedule/CronNextRun.php` and
+  `Command/SavedTasksTickCommand.php` are the pattern for the reminder and
+  watch ticks.
+- **Chat UI size:** `views/ChatView.vue` 4,462 lines,
+  `components/ChatMessage.vue` 2,373 lines. Embedding the chat in the
+  project page needs a chat area extracted first (PJ29).
+- **Project UI on `main`:** `components/projects/` (`AddSourceDialog`,
+  `ProjectChatsTab`, `ProjectSourcesTab`, `ProjectsSidebarSection`, …) from
+  PJ4; the board replaces the tabs.
+
 ## 2. What others do
 
 ### 2.1 Projects
@@ -227,10 +257,53 @@ web push inside the app (not available in the iOS web view).
 Chosen: a relay with ID-only pushes (§0 #59, #60). The contract is in
 [`03_contracts.md`](./03_contracts.md) §8.
 
+### 2.6 Project state, reminders and acting on a yes (2026-11-26)
+
+- **No assistant keeps a project's state.** ChatGPT, Claude, Gemini and
+  Perplexity projects hold files, instructions and chats; none has tasks,
+  dates, decisions or costs that the chat keeps up to date. The person
+  asks "where are we?" and the model reads the chats again.
+- **Group chats are hard to sell.** OpenAI retired group chats in ChatGPT
+  in July 2026
+  (<https://help.openai.com/en/articles/12703475-retiring-group-chats-in-chatgpt>).
+  A shared project with a board gives the group a reason to come back;
+  a shared chat alone did not.
+- **Scheduled tasks without the project.** ChatGPT's scheduled tasks
+  cannot read project files
+  (<https://help.openai.com/en/articles/10291617-scheduled-tasks-in-chatgpt>);
+  a reminder there does not know the project.
+- **Buying for the person is not ready.** OpenAI scaled back Instant
+  Checkout in March 2026
+  (<https://techcrunch.com/2026/03/24/openais-plans-to-make-chatgpt-more-like-amazon-arent-going-so-well>).
+  Watches report; they never buy (§0 #87).
+- **WhatsApp later.** Meta's rules for general AI assistants on the
+  business API, and the EU's interim measures against them
+  (<https://www.houthoff.com/insights/news/a-rare-show-offorce-commission-deploys-interim-measures-against-meta-to-safeguard-ai-competition/>),
+  make the channel uncertain; no bot can join an existing group; messages
+  outside 24 hours are paid templates. Push and mail first (§0 #84).
+- **The renovation case is real.** Houzz 2026: 37 % of renovations go over
+  budget
+  (<https://www.houzz.com/magazine/2026-u-s-houzz-and-home-study-renovation-trends-stsetivw-vs~185090855>)
+  — the Costs card with a budget answers a known pain.
+- **Dates are where assistants fail.** Reminder assistants (Poke, Gemini)
+  get time zones and repetitions wrong in public reports. Hence G16: the
+  zone and the repetition are said back in the "Added" line.
+- **What looks machine-made.** Lists of AI-default UI patterns (gradient
+  heroes, emoji headings, uniform rounded cards, filler copy):
+  <https://world.hey.com/kostac/spot-the-slop-a-ui-designer-s-guide-to-fixing-ai-defaults-4c448c9c>,
+  <https://www.thefountaininstitute.com/blog/signs-vibe-coded-ui>,
+  <https://github.com/Laith0003/ux-skill/wiki/Anti-AI-slop-ban-list>. The
+  board uses the house tokens, plain words and few cards; the banned-words
+  list in `02` grew accordingly.
+- **Cards over a dashboard.** In the mockup sessions the owner preferred a
+  board of plain cards next to the chat over a dashboard in the middle,
+  with the chat smaller on the left (`mockups/project-page.html`).
+
 ## 3. Open questions the spikes answer
 
 | Spike | Question | Decides |
 | ----- | -------- | ------- |
 | PJ2 | Is "first call in the request, the rest as units" within 10 % of today for simple turns? What does the hand-over cost in time to the next token? Does a two-hour run with three compactions keep its goal? | §0 #21, G1, G7 |
 | PJ18 | Can a hosted-MCP `fetch` be limited to chosen pages and their children reliably, or is a public integration needed? | §0 #49 |
+| PJ39 | Can a calendar be read for one hour of free/busy with the scopes a person already granted, or does it need a new consent? | §0 #88 |
 | PJ23 | Does the relay contract hold on real devices with a server behind NAT? What do Apple and Google require for the generic text? | §0 #59–#62, G13 |

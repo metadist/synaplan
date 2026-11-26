@@ -19,9 +19,35 @@ to them.
 | Image cost in a run | merged | #3269 | `analyze_image` in a run adds the vision call's billed cost to the run, so the cost guard sees it. Copilot did not review (quota); the owner approved. |
 | PJ7b | merged | #3270 | Run notes and compaction, flag off. See "2026-11-25 — PJ7b" below. "Keep going" moved to PJ8, editing a picture by file ID to PJ7c (owner, 2026-11-25). |
 | PJ7c | not started | — | Editing a picture by file ID: the chat loop has no image tool yet. |
-| PJ8–PJ28 | not started | — | every other ☐ and Ask row of §0 waits for its step |
+| Plan reshaped | open | — | board, reminders, mail, watches; phases relettered; PJ29–PJ47. See 2026-11-26 below. |
+| PJ8–PJ47 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
 ---
+
+## 2026-11-26 — plan reshaped around the board
+
+After a whiteboard session with the owner and the mockup
+(`mockups/project-page.html`, #3282). No code.
+
+- **What changed:** a project knows where it stands — a board of tasks,
+  dates, decisions, waiting and costs next to the chat, kept by the AI from
+  what members write (`00` goals 6–8, §0 #74–#95). Reminders and a weekly
+  overview, a mail preview to decline, move or follow up (sent only from
+  the person's own mailbox after "Send"), forwarding mails into a project,
+  and watches that report when a value changes.
+- **Order (owner, 2026-11-26):** B → C board → D remind and write back
+  (push first) → E shared chats → F shared projects → G into the project →
+  H watches → I rollout. Old C, D, E, F are now E, F, D, I.
+- **Owner answers:** push and e-mail first, WhatsApp later (#84); the board
+  before shared chats; project memory on, personal memories off by default
+  in a project chat (#54); no model picker per project.
+- **Moved:** PJ21 and PJ22 into C; PJ18 and the Notion row of PJ19 are
+  proposed for Later (#49).
+- **New:** PJ29–PJ47 (`04`), journeys J-PJ-12–J-PJ-18 and copy (`02`),
+  storage §2.7–§2.12 and §13–§18 (`03`), code facts §1.13 and market
+  findings §2.6 (`01`), gates G14–G19.
+- **Waiting for the owner:** ☐ #49, #83, #87–#95; the new tables of #63
+  are an Ask row (schema).
 
 ## 2026-11-25 — PJ7b: notes and compaction
 
