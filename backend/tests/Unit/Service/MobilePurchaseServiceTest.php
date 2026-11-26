@@ -15,17 +15,21 @@ use App\Service\Iap\IapEntitlement;
 use App\Service\Iap\IapEntitlementState;
 use App\Service\Iap\IapPlatform;
 use App\Service\Iap\IapPricingService;
+use App\Service\Iap\IapPurchaseHistory;
 use App\Service\Iap\MobilePurchaseService;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 /**
  * Unit tests for self-hosted IAP validation (Epic 5.4).
  *
  * The store verifiers are faked, so the business logic — product→tier mapping,
- * block-cross, replay protection, PENDING handling, grant/revoke, and
- * notification application — is covered without any real store call or account.
+ * block-cross, replay protection, refund replay, PENDING handling,
+ * grant/revoke, and notification application — is covered without any real
+ * store call or account.
  */
 final class MobilePurchaseServiceTest extends TestCase
 {
@@ -267,17 +271,187 @@ final class MobilePurchaseServiceTest extends TestCase
         $this->assertFalse($service->applyNotification($entitlement));
     }
 
+    public function testRedeemRemembersThePurchaseOutsideTheSubscriptionRecord(): void
+    {
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, signedAt: 1_700_000_000));
+        $user = $this->makeUser(20);
+
+        $this->service(apple: $apple)->redeem($user, IapPlatform::APPLE, 'signed-jws');
+
+        $this->assertSame(
+            [['original_transaction_id' => self::APPLE_TX, 'status' => 'active', 'at' => 1_700_000_000]],
+            $user->getPaymentDetails()[IapPurchaseHistory::KEY],
+        );
+    }
+
+    /**
+     * The transaction a device holds was signed before the refund and keeps
+     * verifying. Once the store has reported the refund it must not grant again.
+     */
+    public function testReceiptSignedBeforeARefundIsRefused(): void
+    {
+        $refundedAt = time() - 600;
+        $user = $this->makeUser(21, 'PRO', [
+            'subscription' => ['source' => 'apple', 'status' => 'active', 'original_transaction_id' => self::APPLE_TX],
+        ]);
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, signedAt: $refundedAt - 86400));
+        $service = $this->service(apple: $apple, ownerByPurchaseId: $user);
+
+        $service->applyNotification(
+            $this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, IapEntitlementState::REVOKED, signedAt: $refundedAt),
+        );
+        $this->assertSame('NEW', $user->getUserLevel());
+
+        try {
+            $service->redeem($user, IapPlatform::APPLE, 'signed-jws');
+            $this->fail('Expected IapVerificationException');
+        } catch (IapVerificationException) {
+            $this->assertSame('NEW', $user->getUserLevel(), 'a refunded purchase must not grant again');
+            $this->assertSame('refunded', $user->getPaymentDetails()['subscription']['status']);
+        }
+    }
+
+    public function testPurchaseMadeAfterARefundIsGranted(): void
+    {
+        $refundedAt = time() - 600;
+        $user = $this->makeUser(22, 'NEW', [
+            'subscription' => ['source' => 'apple', 'status' => 'refunded', 'original_transaction_id' => self::APPLE_TX],
+            IapPurchaseHistory::KEY => [
+                ['original_transaction_id' => self::APPLE_TX, 'status' => 'refunded', 'at' => $refundedAt],
+            ],
+        ]);
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, signedAt: $refundedAt + 60));
+
+        $result = $this->service(apple: $apple, ownerByPurchaseId: $user)->redeem($user, IapPlatform::APPLE, 'signed-jws');
+
+        $this->assertTrue($result->granted);
+        $this->assertSame('PRO', $user->getUserLevel());
+    }
+
+    /**
+     * A Stripe subscription replaces the subscription record. The refund of
+     * the earlier store purchase has to outlive that.
+     */
+    public function testRefundIsRememberedAfterAStripeSubscriptionReplacedTheRecord(): void
+    {
+        $refundedAt = time() - 600;
+        $user = $this->makeUser(23, 'NEW', [
+            'subscription' => [
+                'source' => 'stripe',
+                'status' => 'canceled',
+                'subscription_end' => time() - 60,
+                'stripe_subscription_id' => 'sub_old',
+            ],
+            IapPurchaseHistory::KEY => [
+                ['original_transaction_id' => self::APPLE_TX, 'status' => 'refunded', 'at' => $refundedAt],
+            ],
+        ]);
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, signedAt: $refundedAt - 3600));
+
+        $this->expectException(IapVerificationException::class);
+        $this->service(apple: $apple, ownerByPurchaseId: $user)->redeem($user, IapPlatform::APPLE, 'signed-jws');
+    }
+
+    /**
+     * Refunds stored before the purchase history existed name only the
+     * refunded billing period.
+     */
+    public function testRefundRecordedBeforeTheHistoryExistedStillBlocksTheSameReceipt(): void
+    {
+        $periodEnd = time() + 86400;
+        $details = [
+            'subscription' => [
+                'source' => 'apple',
+                'status' => 'refunded',
+                'subscription_end' => $periodEnd,
+                'original_transaction_id' => self::APPLE_TX,
+            ],
+        ];
+
+        $refunded = $this->makeUser(24, 'NEW', $details);
+        $sameReceipt = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, expiresAt: $periodEnd));
+        try {
+            $this->service(apple: $sameReceipt, ownerByPurchaseId: $refunded)->redeem($refunded, IapPlatform::APPLE, 'signed-jws');
+            $this->fail('Expected IapVerificationException');
+        } catch (IapVerificationException) {
+            $this->assertSame('NEW', $refunded->getUserLevel());
+        }
+
+        $resubscribed = $this->makeUser(25, 'NEW', $details);
+        $laterPurchase = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, expiresAt: $periodEnd + 86400 * 30));
+        $result = $this->service(apple: $laterPurchase, ownerByPurchaseId: $resubscribed)->redeem($resubscribed, IapPlatform::APPLE, 'signed-jws');
+        $this->assertTrue($result->granted);
+    }
+
+    public function testRefundNotificationIsRememberedWhileAnotherChannelOwnsTheRecord(): void
+    {
+        $user = $this->makeUser(26, 'PRO', [
+            'subscription' => [
+                'source' => 'stripe',
+                'status' => 'active',
+                'subscription_end' => time() + 3600,
+                'stripe_subscription_id' => 'sub_live',
+            ],
+            IapPurchaseHistory::KEY => [
+                ['original_transaction_id' => self::APPLE_TX, 'status' => 'active', 'at' => 1_700_000_000],
+            ],
+        ]);
+        $service = $this->service(ownerByPurchaseId: $user);
+
+        $handled = $service->applyNotification(
+            $this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX, IapEntitlementState::REVOKED, signedAt: 1_700_000_500),
+        );
+
+        $this->assertFalse($handled);
+        $this->assertSame('stripe', $user->getPaymentDetails()['subscription']['source'], 'the Stripe record stays untouched');
+        $this->assertSame('PRO', $user->getUserLevel());
+        $this->assertSame(
+            [['original_transaction_id' => self::APPLE_TX, 'status' => 'refunded', 'at' => 1_700_000_500]],
+            $user->getPaymentDetails()[IapPurchaseHistory::KEY],
+        );
+    }
+
+    /**
+     * Two accounts presenting one receipt at the same moment must not both
+     * pass the ownership check: it runs under a lock named after the purchase.
+     */
+    public function testOwnershipCheckRunsUnderALockOnThePurchase(): void
+    {
+        $locks = new LockFactory(new InMemoryStore());
+        $lockName = 'iap-redeem-'.hash('sha256', 'apple:'.self::APPLE_TX);
+        $heldDuringCheck = null;
+
+        $repo = $this->createStub(UserRepository::class);
+        $repo->method('findByIapPurchaseId')->willReturnCallback(
+            static function () use ($locks, $lockName, &$heldDuringCheck): ?User {
+                $heldDuringCheck = !$locks->createLock($lockName)->acquire();
+
+                return null;
+            },
+        );
+
+        $apple = new FakeAppleVerifier($this->entitlement(IapPlatform::APPLE, 'app.pro', self::APPLE_TX));
+        $this->service(apple: $apple, repo: $repo, locks: $locks)->redeem($this->makeUser(27), IapPlatform::APPLE, 'signed-jws');
+
+        $this->assertTrue($heldDuringCheck, 'the ownership check must hold the purchase lock');
+        $this->assertTrue($locks->createLock($lockName)->acquire(), 'the lock is released after the redeem');
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private function service(
         ?FakeAppleVerifier $apple = null,
         ?FakeGoogleVerifier $google = null,
         ?User $ownerByPurchaseId = null,
+        ?UserRepository $repo = null,
+        ?LockFactory $locks = null,
     ): MobilePurchaseService {
         $em = $this->createStub(EntityManagerInterface::class);
 
-        $repo = $this->createStub(UserRepository::class);
-        $repo->method('findByIapPurchaseId')->willReturn($ownerByPurchaseId);
+        if (null === $repo) {
+            $repo = $this->createStub(UserRepository::class);
+            $repo->method('findByIapPurchaseId')->willReturn($ownerByPurchaseId);
+        }
 
         return new MobilePurchaseService(
             $em,
@@ -287,6 +461,8 @@ final class MobilePurchaseServiceTest extends TestCase
             $google ?? new FakeGoogleVerifier(null),
             new NullLogger(),
             $this->levelGrants(),
+            $locks ?? new LockFactory(new InMemoryStore()),
+            new IapPurchaseHistory(),
         );
     }
 
@@ -295,15 +471,18 @@ final class MobilePurchaseServiceTest extends TestCase
         string $productId,
         string $purchaseId,
         IapEntitlementState $state = IapEntitlementState::ACTIVE,
+        ?int $signedAt = null,
+        ?int $expiresAt = null,
     ): IapEntitlement {
         return new IapEntitlement(
             platform: $platform,
             productId: $productId,
             purchaseId: $purchaseId,
             state: $state,
-            expiresAt: time() + 86400,
+            expiresAt: $expiresAt ?? time() + 86400,
             autoRenew: true,
             environment: 'sandbox',
+            signedAt: $signedAt,
         );
     }
 

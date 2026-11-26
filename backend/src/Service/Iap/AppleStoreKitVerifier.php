@@ -20,15 +20,25 @@ use AppStoreServerLibrary\SignedDataVerifier\VerificationException;
  * against Apple's root CAs. All store-specific shapes are normalized to
  * {@see IapEntitlement} here so the rest of the app stays store-agnostic.
  *
- * NOTE: the verification path is intentionally NOT unit tested — it needs real
- * Apple root certificates + bundle id and produces values only Apple can sign.
- * The business logic that consumes it ({@see MobilePurchaseService})
- * is tested against {@see AppleReceiptVerifierInterface} fakes instead. The
- * configuration guards below run before any Apple data is touched and ARE
- * covered, because a misconfigured deployment fails silently in production.
+ * NOTE: the certificate-chain path is intentionally NOT unit tested — it needs
+ * real Apple root certificates and produces values only Apple can sign. The
+ * business logic that consumes it ({@see MobilePurchaseService}) is tested
+ * against {@see AppleReceiptVerifierInterface} fakes instead. The
+ * configuration guards and the checks this class adds on top of the library
+ * (bundle id, unsigned environments) ARE covered, because a misconfigured
+ * deployment fails silently in production.
  */
 final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
 {
+    /**
+     * Kernel environments in which the library's unsigned modes (`Xcode`,
+     * `LocalTesting`) may run. In those modes no certificate chain is checked,
+     * so anyone can write a transaction that grants a paid tier.
+     */
+    private const UNSIGNED_ALLOWED_APP_ENVS = ['dev', 'test'];
+
+    private const UNSIGNED_ENVIRONMENTS = [Environment::XCODE, Environment::LOCAL_TESTING];
+
     private ?SignedDataVerifier $verifier = null;
 
     private readonly ?int $appAppleId;
@@ -42,6 +52,7 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         string $rootCertsDir = '',
         private readonly bool $enableOnlineChecks = false,
         string $projectDir = '',
+        private readonly string $appEnv = 'prod',
     ) {
         // Env wiring passes 0 (or null, if a processor is ever reordered) when
         // IAP_APPLE_APP_APPLE_ID is unset. Absorb both rather than refusing to
@@ -60,7 +71,9 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
 
     public function isConfigured(): bool
     {
-        return '' !== $this->bundleId && [] !== $this->rootCertificates();
+        return '' !== $this->bundleId
+            && [] !== $this->rootCertificates()
+            && !$this->skipsSignaturesOutsideDevelopment();
     }
 
     public function verifySignedTransaction(string $signedTransaction): IapEntitlement
@@ -68,7 +81,7 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         $verifier = $this->verifier();
 
         try {
-            $tx = $verifier->verifyAndDecodeSignedTransaction($signedTransaction);
+            $tx = $this->decodeTransaction($verifier, $signedTransaction);
         } catch (VerificationException $e) {
             throw new IapVerificationException('Apple transaction verification failed: '.$e->getMessage(), 0, $e);
         }
@@ -87,7 +100,7 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
             if (null === $signedTx) {
                 throw new IapVerificationException('Apple notification carries no transaction info.');
             }
-            $tx = $verifier->verifyAndDecodeSignedTransaction($signedTx);
+            $tx = $this->decodeTransaction($verifier, $signedTx);
         } catch (VerificationException $e) {
             throw new IapVerificationException('Apple notification verification failed: '.$e->getMessage(), 0, $e);
         }
@@ -106,6 +119,26 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         return $this->toEntitlement($tx, $state);
     }
 
+    /**
+     * The library checks the bundle id of a notification, but not of a single
+     * transaction. Apple signs transactions of every app with the same chain
+     * and product ids are only unique per app, so without this comparison a
+     * purchase made in any other app that reuses one of our product ids would
+     * be accepted here.
+     *
+     * @throws VerificationException
+     * @throws IapVerificationException
+     */
+    private function decodeTransaction(SignedDataVerifier $verifier, string $signedTransaction): JWSTransactionDecodedPayload
+    {
+        $tx = $verifier->verifyAndDecodeSignedTransaction($signedTransaction);
+        if ($tx->getBundleId() !== $this->bundleId) {
+            throw new IapVerificationException('Apple transaction belongs to another app (bundle id mismatch).');
+        }
+
+        return $tx;
+    }
+
     private function toEntitlement(JWSTransactionDecodedPayload $tx, IapEntitlementState $state): IapEntitlement
     {
         $purchaseId = $tx->getOriginalTransactionId() ?? $tx->getTransactionId();
@@ -114,6 +147,7 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         }
 
         $expiresMs = $tx->getExpiresDate();
+        $signedMs = $tx->getSignedDate();
 
         return new IapEntitlement(
             platform: IapPlatform::APPLE,
@@ -124,6 +158,7 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
             autoRenew: true,
             environment: Environment::SANDBOX === $tx->getEnvironment() ? 'sandbox' : 'production',
             accountBinding: $tx->getAppAccountToken(),
+            signedAt: null !== $signedMs ? intdiv($signedMs, 1000) : null,
         );
     }
 
@@ -181,6 +216,13 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         if ('' === $this->bundleId) {
             $missing[] = 'IAP_APPLE_BUNDLE_ID is empty';
         }
+        if ($this->skipsSignaturesOutsideDevelopment()) {
+            $missing[] = sprintf(
+                'IAP_APPLE_ENVIRONMENT is "%s", which accepts unsigned transactions and is refused when APP_ENV is "%s" (use Sandbox or Production)',
+                $this->environment,
+                $this->appEnv,
+            );
+        }
 
         // A directory that ceased to exist (what a container recreate does to an
         // unmounted one) is named separately from an empty one: the first points
@@ -204,6 +246,26 @@ final class AppleStoreKitVerifier implements AppleReceiptVerifierInterface
         }
 
         return $message;
+    }
+
+    /**
+     * True when the configured Apple environment skips signature verification
+     * and this server is not a development or test install. Such a server
+     * reports itself as not configured instead of trusting unsigned data.
+     */
+    private function skipsSignaturesOutsideDevelopment(): bool
+    {
+        if (in_array($this->appEnv, self::UNSIGNED_ALLOWED_APP_ENVS, true)) {
+            return false;
+        }
+
+        foreach (self::UNSIGNED_ENVIRONMENTS as $unsigned) {
+            if (0 === strcasecmp($unsigned->value, $this->environment)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
