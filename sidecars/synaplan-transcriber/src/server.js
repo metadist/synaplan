@@ -117,8 +117,26 @@ export function createApp(config, { synaplan, plugin = null, opentalk = null, lo
         return
       }
       const chunks = []
-      request.on('data', (chunk) => chunks.push(chunk))
+      let received = 0
+      let tooBig = false
+      request.on('data', (chunk) => {
+        if (tooBig) {
+          return
+        }
+        received += chunk.length
+        if (received > 4096) {
+          tooBig = true
+          chunks.length = 0
+          json(response, 413, { error: 'too_large', message: 'The request is larger than this service accepts.' })
+          request.resume()
+          return
+        }
+        chunks.push(chunk)
+      })
       request.on('end', () => {
+        if (tooBig || response.headersSent) {
+          return
+        }
         let body = {}
         try {
           body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')

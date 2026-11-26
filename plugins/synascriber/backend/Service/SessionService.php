@@ -332,6 +332,19 @@ final readonly class SessionService
 
             return;
         }
+        if ('language' === $type) {
+            $language = (string) ($event['language'] ?? '');
+            if (!in_array($language, $this->settings->languages(), true)) {
+                throw new SessionException('language_not_offered', sprintf('Language "%s" is not offered here.', $language), 422);
+            }
+            if (!in_array($session['state'], self::ACTIVE, true)) {
+                throw new SessionException('not_accepting', 'These meeting notes do not accept audio any more.', 409);
+            }
+            $session['language'] = $language;
+            $this->store->save($session);
+
+            return;
+        }
         if (!in_array($type, ['speaker-start', 'speaker-stop', 'session-end'], true)) {
             throw new SessionException('unknown_event', sprintf('Unknown transcriber event "%s".', mb_substr($type, 0, 40)), 422);
         }

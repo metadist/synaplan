@@ -81,6 +81,18 @@ function rms(samples) {
   return Math.sqrt(sum / samples.length)
 }
 
+function deferred() {
+  let resolve
+  let reject
+  const promise = new Promise((ok, fail) => {
+    resolve = ok
+    reject = fail
+  })
+  // A failed start rejects this even when nobody else is waiting on it.
+  promise.catch(() => {})
+  return { promise, resolve, reject }
+}
+
 function send(socket, message) {
   const body = JSON.stringify(message)
   const write = () => {
@@ -111,6 +123,7 @@ export function createOpenTalkBridge({
   fetchImpl = fetch,
   log = () => {},
   now = Date.now,
+  lobbyWaitMs = 5000,
 }) {
   const meetings = new Map()
 
@@ -123,35 +136,63 @@ export function createOpenTalkBridge({
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(room)) {
       return { status: 422, body: { error: 'invalid_room', message: 'This is not a meeting this service can join.' } }
     }
-    if (meetings.has(room)) {
-      return { status: 204, body: {} }
+    if (body?.breakout_room != null) {
+      return { status: 422, body: { error: 'breakout_unsupported', message: 'Subtitles for a breakout room are not available yet.' } }
     }
+    const current = meetings.get(room)
+    if (current) {
+      try {
+        await current.ready
+        return { status: 204, body: {} }
+      } catch {
+        return { status: 503, body: { error: 'not_ready', message: 'Subtitles could not be started.' } }
+      }
+    }
+    const gate = deferred()
+    const reserved = { ready: gate.promise, abort: async () => {} }
+    meetings.set(room, reserved)
     let session
     try {
       session = await plugin.create(room, body?.language || '')
     } catch (error) {
+      meetings.delete(room)
+      gate.reject(error)
       log(`OpenTalk ${room}: the plugin did not open a session (${error.message}).`)
       return { status: 503, body: { error: 'not_ready', message: 'Subtitles could not be started.' } }
     }
-    const meeting = startMeeting({ room, language: session.language || body?.language || 'de', ref: session.ref })
+    const meeting = startMeeting({ room, language: session.language || body?.language || 'de', ref: session.ref, ready: gate.promise })
     meetings.set(room, meeting)
     try {
       await meeting.join()
     } catch (error) {
-      meetings.delete(room)
+      if (meetings.get(room) === meeting) {
+        meetings.delete(room)
+      }
+      await meeting.abort().catch(() => {})
+      gate.reject(error)
       log(`OpenTalk ${room}: ${error.message}`)
       return { status: 502, body: { error: 'not_joined', message: 'The meeting could not be joined.' } }
     }
+    gate.resolve()
     return { status: 204, body: {} }
   }
 
-  function startMeeting({ room, language, ref }) {
+  function startMeeting({ room, language, ref, ready }) {
     const speakers = new Map()
+    const inflight = new Set()
     let socket
     let media = null
+    let connecting = null
     let stopped = false
     let sequence = 0
+    let spoken = language
     const startedAt = now()
+
+    function track(work) {
+      const promise = work.catch(() => {})
+      inflight.add(promise)
+      promise.finally(() => inflight.delete(promise))
+    }
 
     function speaker(id) {
       let entry = speakers.get(id)
@@ -186,7 +227,7 @@ export function createOpenTalkBridge({
           audio: wavFromPcm(samples),
         })
         text = result.text || ''
-        log(text ? `OpenTalk ${room}: ${text}` : `OpenTalk ${room}: the window had no words.`)
+        log(text ? `OpenTalk ${room}: subtitle, ${text.length} characters.` : `OpenTalk ${room}: the window had no words.`)
       } catch (error) {
         log(`OpenTalk ${room}: a window was not recognised (${error.message}).`)
       }
@@ -218,15 +259,18 @@ export function createOpenTalkBridge({
       const entry = speaker(speakerId)
       if (rms(frame) < SILENCE_RMS) {
         if (entry.samples.length >= SILENCE_FLUSH_SAMPLES) {
-          flush(speakerId, 'pause').catch(() => {})
+          track(flush(speakerId, 'pause'))
         }
         return
+      }
+      if (entry.samples.length === 0) {
+        entry.from = now()
       }
       for (const sample of frame) {
         entry.samples.push(sample)
       }
       if (entry.samples.length >= FLUSH_SAMPLES) {
-        flush(speakerId, 'hard').catch(() => {})
+        track(flush(speakerId, 'hard'))
       }
     }
 
@@ -235,6 +279,7 @@ export function createOpenTalkBridge({
         return
       }
       stopped = true
+      await Promise.all([...inflight])
       for (const id of speakers.keys()) {
         await flush(id, 'stop')
       }
@@ -244,13 +289,46 @@ export function createOpenTalkBridge({
           payload: { action: 'transcription_service_event', event: { kind: 'stopped' } },
         })
         socket.close()
+        socket = null
+      }
+      const pending = connecting
+      connecting = null
+      if (pending) {
+        const opened = await pending.catch(() => null)
+        if (opened && opened !== media) {
+          await opened.close().catch(() => {})
+        }
       }
       if (media) {
-        await media.close().catch(() => {})
+        const open = media
+        media = null
+        await open.close().catch(() => {})
       }
       await plugin.event(ref, { type: 'finished', at: now() }).catch(() => {})
-      meetings.delete(room)
+      if (meetings.get(room)?.ready === ready) {
+        meetings.delete(room)
+      }
       log(`OpenTalk ${room}: subtitles stopped (${reason}) after ${sequence} lines.`)
+    }
+
+    async function openMedia(url, token) {
+      if (stopped || media || connecting) {
+        return
+      }
+      const pending = connectLiveKit({ url, token, onFrame: hear, log })
+      connecting = pending
+      try {
+        const opened = await pending
+        if (stopped || media) {
+          await opened.close().catch(() => {})
+          return
+        }
+        media = opened
+      } finally {
+        if (connecting === pending) {
+          connecting = null
+        }
+      }
     }
 
     async function onMessage(raw) {
@@ -272,28 +350,31 @@ export function createOpenTalkBridge({
           await finish('stopped')
         }
         if (payload.command?.kind === 'change_language' && payload.command.language) {
-          language = String(payload.command.language)
-          send(socket, {
-            namespace: 'transcription',
-            payload: { action: 'transcription_service_event', event: { kind: 'updated', language } },
-          })
+          const next = String(payload.command.language)
+          try {
+            await plugin.event(ref, { type: 'language', language: next })
+            spoken = next
+            send(socket, {
+              namespace: 'transcription',
+              payload: { action: 'transcription_service_event', event: { kind: 'updated', language: spoken } },
+            })
+          } catch (error) {
+            log(`OpenTalk ${room}: the language was not changed (${error.message}).`)
+          }
         }
       }
       if (message?.namespace === 'livekit' && payload.message === 'popout_stream_access_token' && payload.token) {
-        media = await connectLiveKit({ url: payload.service_url || payload.public_url || livekitUrl, token: payload.token, onFrame: hear, log })
+        await openMedia(payload.service_url || payload.public_url || livekitUrl, payload.token)
       }
-      if (message?.namespace === 'livekit' && payload.message === 'credentials' && payload.token && !media) {
-        media = await connectLiveKit({
-          url: payload.service_url || payload.public_url,
-          token: payload.token,
-          onFrame: hear,
-          log,
-        })
+      if (message?.namespace === 'livekit' && payload.message === 'credentials' && payload.token) {
+        await openMedia(payload.service_url || payload.public_url, payload.token)
       }
     }
 
     return {
+      ready,
       hear,
+      abort: () => finish('not_joined'),
       async join() {
         const start = await fetchImpl(`${controllerUrl}/internal/transcription/start`, {
           method: 'POST',
@@ -311,11 +392,31 @@ export function createOpenTalkBridge({
         const address = String(admitted.roomserver_address || '').replace(/^http/, 'ws')
         socket = openSocket(new URL(`v1/signaling/${admitted.token}`, address).toString())
         await new Promise((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('the meeting did not answer')), 5000)
+          let settled = false
+          const timer = setTimeout(() => fail(new Error('the meeting did not answer')), lobbyWaitMs)
+          const fail = (error) => {
+            if (settled) {
+              return
+            }
+            settled = true
+            clearTimeout(timer)
+            reject(error)
+          }
+          const succeed = () => {
+            if (settled) {
+              return
+            }
+            settled = true
+            clearTimeout(timer)
+            resolve()
+          }
           socket.on('message', (data) => {
             onMessage(data).catch((error) => log(`OpenTalk ${room}: ${error.message}`))
           })
-          socket.on('close', () => finish('disconnected').catch(() => {}))
+          socket.on('close', () => {
+            finish('disconnected').catch(() => {})
+            fail(new Error('the meeting closed'))
+          })
           socket.on('error', () => {})
           const wait = (data) => {
             let message
@@ -334,10 +435,10 @@ export function createOpenTalkBridge({
                 send(socket, { namespace: 'livekit', payload: { action: 'request_popout_stream_access_token' } })
                 send(socket, {
                   namespace: 'transcription',
-                  payload: { action: 'transcription_service_event', event: { kind: 'started', language } },
+                  payload: { action: 'transcription_service_event', event: { kind: 'started', language: spoken } },
                 })
               }
-              resolve()
+              succeed()
             }
           }
           socket.on('message', wait)

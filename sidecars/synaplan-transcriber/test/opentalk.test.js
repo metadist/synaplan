@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import test from 'node:test'
+import { loadConfig } from '../src/config.js'
 import { createOpenTalkBridge, signServiceToken, tokenMatches, wavFromPcm } from '../src/opentalk.js'
+import { createApp } from '../src/server.js'
 
 const key = { id: 'transcription', secret: 'secret' }
 const serviceKey = { id: 'controller', secret: 'secret' }
@@ -115,9 +117,138 @@ test('a signed init joins the meeting and a spoken window becomes a subtitle', a
 
   socket.emit('message', JSON.stringify({
     namespace: 'transcription',
+    payload: { message: 'service_command', command: { kind: 'change_language', language: 'en' } },
+  }))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(events.at(-1).type, 'language')
+  assert.equal(events.at(-1).language, 'en')
+  assert.equal(socket.sent.at(-1).payload.event.kind, 'updated')
+  assert.equal(socket.sent.at(-1).payload.event.language, 'en')
+
+  const refused = await bridge.accept(`Bearer ${signServiceToken(key, 1_700_000_000_000)}`, {
+    room_id: 'room-1',
+    language: 'de',
+    breakout_room: 'side',
+  })
+  assert.equal(refused.status, 422)
+
+  socket.emit('message', JSON.stringify({
+    namespace: 'transcription',
     payload: { message: 'service_command', command: { kind: 'stop' } },
   }))
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(events.at(-1).type, 'finished')
   assert.equal(socket.sent.at(-1).payload.event.kind, 'stopped')
+})
+
+test('a meeting that never answers is closed and the plugin session ends', async () => {
+  const events = []
+  const bridge = createOpenTalkBridge({
+    controllerUrl: 'http://controller',
+    serviceKey,
+    initKey: key,
+    now: () => 1_700_000_000_000,
+    lobbyWaitMs: 20,
+    plugin: {
+      async create() {
+        return { ref: 'Ab3dEf9hJkLmN0pQrStUvW', language: 'de' }
+      },
+      async window() {
+        return { text: '' }
+      },
+      async event(_ref, payload) {
+        events.push(payload)
+      },
+    },
+    openSocket() {
+      const socket = new EventEmitter()
+      socket.readyState = 1
+      socket.sent = []
+      socket.send = () => {}
+      socket.close = () => {
+        socket.readyState = 3
+        socket.emit('close')
+      }
+      return socket
+    },
+    async fetchImpl() {
+      return { status: 200, async text() { return JSON.stringify({ token: 'admit', roomserver_address: 'http://room/' }) } }
+    },
+  })
+  const result = await bridge.accept(`Bearer ${signServiceToken(key, 1_700_000_000_000)}`, { room_id: 'room-1', language: 'de' })
+  assert.equal(result.status, 502)
+  assert.equal(events.at(-1).type, 'finished')
+})
+
+test('a pause does not stretch the next subtitle back across the silence', async () => {
+  let clock = 1_000
+  const windows = []
+  let onFrame = null
+  const { sockets, openSocket } = socketPair()
+  const bridge = createOpenTalkBridge({
+    controllerUrl: 'http://controller',
+    serviceKey,
+    initKey: key,
+    now: () => clock,
+    plugin: {
+      async create() {
+        return { ref: 'Ab3dEf9hJkLmN0pQrStUvW', language: 'de' }
+      },
+      async window(_ref, fields) {
+        windows.push({ t0Ms: fields.t0Ms, t1Ms: fields.t1Ms })
+        return { text: '' }
+      },
+      async event() {},
+    },
+    async connectLiveKit({ onFrame: hear }) {
+      onFrame = hear
+      return { async close() {} }
+    },
+    openSocket,
+    async fetchImpl() {
+      return { status: 200, async text() { return JSON.stringify({ token: 'admit', roomserver_address: 'http://room/' }) } }
+    },
+  })
+  await bridge.accept(`Bearer ${signServiceToken(key, clock)}`, { room_id: 'room-1', language: 'de' })
+  sockets[0].emit('message', JSON.stringify({
+    namespace: 'livekit',
+    payload: { message: 'popout_stream_access_token', token: 'lk' },
+  }))
+  await new Promise((resolve) => setImmediate(resolve))
+  onFrame('speaker-1', new Int16Array(1600))
+  clock += 40_000
+  onFrame('speaker-1', new Int16Array(16_000).fill(8000))
+  onFrame('speaker-1', new Int16Array(1600))
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(windows.length, 1)
+  assert.ok(windows[0].t1Ms - windows[0].t0Ms < 5_000)
+})
+
+test('an oversized init is refused before a session starts', async () => {
+  const config = loadConfig({
+    SYNAPLAN_URL: 'http://synaplan',
+    SYNAPLAN_TRANSCRIBER_SECRET: 'secret',
+    TRANSCRIBER_MODE: 'opentalk',
+    OPENTALK_CONTROLLER_URL: 'http://controller',
+    OPENTALK_SERVICE_KEY: 'controller:secret',
+    OPENTALK_INIT_KEY: 'transcription:secret',
+  })
+  let created = 0
+  const server = createApp(config, {
+    synaplan: {},
+    opentalk: { async accept() { created += 1; return { status: 204, body: {} } } },
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = server.address()
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/v1/init`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: 'x'.repeat(5000),
+    })
+    assert.equal(response.status, 413)
+    assert.equal(created, 0)
+  } finally {
+    server.close()
+  }
 })
