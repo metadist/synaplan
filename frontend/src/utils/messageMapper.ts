@@ -163,17 +163,19 @@ export function parseContentWithThinking(
     content = collapseApiToolTurn(content)
   }
 
-  // Handle special file generation markers from backend
+  // Handle special file generation markers from backend. The first line is
+  // the file name; anything after it is what changed and must stay visible.
   if (content.startsWith('__FILE_GENERATED__:')) {
-    const filename = content.replace('__FILE_GENERATED__:', '').trim()
-    // Return a placeholder - the actual translation will be done in the component
-    // because we need access to i18n there
-    return [
-      {
-        type: 'text',
-        content: `__FILE_GENERATED__:${filename}`,
-      },
-    ]
+    const newline = content.indexOf('\n')
+    const firstLine = (newline === -1 ? content : content.slice(0, newline)).trim()
+    const filename = firstLine.replace('__FILE_GENERATED__:', '').trim()
+    const marker = `__FILE_GENERATED__:${filename}`
+    const rest = newline === -1 ? '' : content.slice(newline).trim()
+    const markerPart: Part[] = [{ type: 'text', content: marker }]
+    if (rest === '') {
+      return markerPart
+    }
+    return [...markerPart, ...parseContentWithThinking(rest, role, thinkingSeconds)]
   }
 
   if (content === '__FILE_GENERATION_FAILED__') {
@@ -783,12 +785,28 @@ export function reconcileLocalMessage(local: Message, persisted: Message): void 
     (p) => p.type === 'text' && isFileGenerationMarker(p.content)
   )
   if (persistedMarker) {
+    const notes = persisted.parts.filter(
+      (part) =>
+        part.type === 'text' &&
+        part !== persistedMarker &&
+        !isFileGenerationMarker(part.content) &&
+        Boolean(part.content?.trim())
+    )
     const alreadyShown = local.parts.some(
       (p) => p.type === 'text' && p.content === persistedMarker.content
     )
     if (!alreadyShown) {
       const preserved = local.parts.filter((p) => p.type !== 'text' && p.type !== 'code')
-      local.parts = [persistedMarker, ...preserved]
+      local.parts = [persistedMarker, ...notes, ...preserved]
+    } else {
+      for (const note of notes) {
+        const present = local.parts.some(
+          (part) => part.type === 'text' && part.content === note.content
+        )
+        if (!present) {
+          local.parts.push(note)
+        }
+      }
     }
   }
 

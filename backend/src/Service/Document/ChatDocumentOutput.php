@@ -174,7 +174,13 @@ final readonly class ChatDocumentOutput
         if (null !== $fileData) {
             $this->logger->info('ChatHandler: Detected AI file generation');
 
-            return $this->attachGeneratedDocument($fileData, $message, $metadata, $ephemeral);
+            return $this->attachGeneratedDocument(
+                $fileData,
+                $message,
+                $metadata,
+                $ephemeral,
+                FileGenerationEnvelope::changeNote($content),
+            );
         }
 
         if ('officemaker' === $topic && is_string($content) && FileGenerationEnvelope::hasSignature($content)) {
@@ -244,7 +250,7 @@ final readonly class ChatDocumentOutput
      *
      * @return array{0: string, 1: array<string, mixed>}
      */
-    private function attachGeneratedDocument(array $fileData, Message $message, array $metadata, bool $ephemeral): array
+    private function attachGeneratedDocument(array $fileData, Message $message, array $metadata, bool $ephemeral, string $changeNote = ''): array
     {
         $bundle = $this->storeDocument($fileData, $message, $ephemeral);
         if (null === $bundle) {
@@ -272,7 +278,7 @@ final readonly class ChatDocumentOutput
             'filename' => $primary->getFileName(),
         ]);
 
-        return ["__FILE_GENERATED__:{$primary->getFileName()}", $metadata];
+        return [FileGenerationEnvelope::storedReply($primary->getFileName(), $changeNote), $metadata];
     }
 
     /**

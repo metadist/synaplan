@@ -268,4 +268,112 @@ final class FileGenerationEnvelope
 
         return $decoded;
     }
+
+    /**
+     * The download marker, with the note of what changed underneath it.
+     * An empty note, the file body, or a raw envelope stays the marker alone.
+     */
+    public static function storedReply(string $filename, string $changeNote = ''): string
+    {
+        $marker = '__FILE_GENERATED__:'.$filename;
+        $note = self::clip(trim($changeNote));
+        if ('' === $note || $note === $marker || self::hasSignature($note)) {
+            return $marker;
+        }
+        if (str_starts_with($note, $marker."\n")) {
+            return $note;
+        }
+
+        return $marker."\n\n".$note;
+    }
+
+    /**
+     * What the person should read next to the file.
+     *
+     * BSUMMARY wins when the model filled it. Otherwise prose that sits
+     * outside the JSON envelope is kept. A raw or broken envelope, and a
+     * summary that is only a copy of the file body, contribute nothing.
+     */
+    public static function changeNote(string $content): string
+    {
+        $trimmed = trim($content);
+        if ('' === $trimmed) {
+            return '';
+        }
+        if (str_starts_with($trimmed, '__') && !str_starts_with($trimmed, '__FILE_GENERATED__:')) {
+            return '';
+        }
+        if (str_starts_with($trimmed, '__FILE_GENERATED__:')) {
+            $break = strpos($trimmed, "\n");
+            if (false === $break) {
+                return '';
+            }
+
+            return self::changeNote(substr($trimmed, $break + 1));
+        }
+        if (self::hasSignature($trimmed)) {
+            $fromField = self::summaryField($trimmed);
+            if (null !== $fromField && '' !== $fromField) {
+                return self::clip($fromField);
+            }
+
+            return self::clip(self::proseBeside($trimmed));
+        }
+        if (str_starts_with($trimmed, '{') || str_starts_with($trimmed, '```')) {
+            return '';
+        }
+
+        return self::clip($trimmed);
+    }
+
+    private static function summaryField(string $content): ?string
+    {
+        $object = self::embeddedObject($content);
+        if (null === $object) {
+            return null;
+        }
+        try {
+            $data = json_decode($object, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return null;
+        }
+        if (!is_array($data) || !isset($data['BSUMMARY']) || !is_string($data['BSUMMARY'])) {
+            return null;
+        }
+        $summary = trim($data['BSUMMARY']);
+        if ('' === $summary) {
+            return null;
+        }
+        $body = $data['BFILETEXT'] ?? null;
+        if (is_string($body) && trim($body) === $summary) {
+            return null;
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Text the model wrote around the file envelope. Empty when stripping
+     * the object leaves another envelope or nothing.
+     */
+    private static function proseBeside(string $content): string
+    {
+        $object = self::embeddedObject($content);
+        $without = null !== $object ? str_replace($object, ' ', $content) : $content;
+        $without = trim((string) preg_replace('/```(?:json)?|```/', '', $without));
+        if ('' === $without || self::hasSignature($without)) {
+            return '';
+        }
+
+        return $without;
+    }
+
+    private static function clip(string $note): string
+    {
+        if (mb_strlen($note) <= 2000) {
+            return $note;
+        }
+
+        return rtrim(mb_substr($note, 0, 2000)).'…';
+    }
 }

@@ -582,6 +582,26 @@ describe('messageMapper (issue #1070)', () => {
       expect(local.files![0].filename).toBe('report.docx')
     })
 
+    it('keeps the change note stored under the file marker', () => {
+      const local = localStreamedMessage({
+        parts: [
+          { partId: 'p1', type: 'text', content: "I've created the file 'report.docx' for you." },
+        ],
+      })
+      const persisted = mapApiMessageRow(
+        baseRow({
+          text: '__FILE_GENERATED__:report.docx\n\nReplaced the timeline with three columns.',
+        })
+      )
+
+      reconcileLocalMessage(local, persisted)
+
+      expect(local.parts.map((part) => part.content)).toEqual([
+        '__FILE_GENERATED__:report.docx',
+        'Replaced the timeline with three columns.',
+      ])
+    })
+
     it('adopts the persisted file-generation marker when the streamed bubble is empty (#1258)', () => {
       const local = localStreamedMessage({ parts: [{ partId: 'p1', type: 'text', content: '' }] })
       const persisted = mapApiMessageRow(baseRow({ text: '__FILE_GENERATED__:notes.docx' }))

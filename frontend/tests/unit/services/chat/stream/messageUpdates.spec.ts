@@ -78,6 +78,28 @@ describe('message updates', () => {
     expect(prose.files).toHaveLength(1)
   })
 
+  it('keeps the change note that follows a generated-file marker', () => {
+    const message = assistantMessage({
+      parts: [
+        {
+          type: 'text',
+          content: '__FILE_GENERATED__:roadmap.pdf\n\nReplaced the timeline with three columns.',
+        },
+      ],
+    })
+
+    applyGeneratedFile(
+      message,
+      { id: 2, filename: 'roadmap.pdf', path: 'p', size: 1, type: 'pdf', mime: 'm' },
+      'Saved roadmap.pdf'
+    )
+
+    expect(message.parts).toEqual([
+      { type: 'text', content: 'Saved roadmap.pdf' },
+      { type: 'text', content: 'Replaced the timeline with three columns.' },
+    ])
+  })
+
   it('keeps the sources and the request the answer leaned on', () => {
     const message = assistantMessage()
 

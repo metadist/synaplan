@@ -182,6 +182,15 @@ describe('useMarkdown', () => {
         expect(html).not.toContain('__FILE_GENERATED__')
       })
 
+      it('should keep the change note under a file marker', () => {
+        const html = markdown.render(
+          '__FILE_GENERATED__:report.pdf\n\nReplaced the timeline with three columns.'
+        )
+        expect(html).toContain('report.pdf')
+        expect(html).toContain('Replaced the timeline with three columns.')
+        expect(html).not.toContain('__FILE_GENERATED__')
+      })
+
       it('should process file generation failed marker', () => {
         const html = markdown.render('__FILE_GENERATION_FAILED__')
         expect(html).not.toContain('__FILE_GENERATION_FAILED__')

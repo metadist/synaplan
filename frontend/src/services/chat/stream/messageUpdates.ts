@@ -212,8 +212,29 @@ export function applyGeneratedFile(
     (first.type === 'code' && first.content?.includes('BFILEPATH')) ||
     (first.type === 'text' && first.content?.includes('__FILE_GENERATED__'))
   if (showsEnvelope) {
-    message.parts = [{ type: 'text', content: confirmation }]
+    const inlineNote = first?.type === 'text' ? noteUnderFileMarker(first.content) : ''
+    const trailingNotes = message.parts
+      .slice(1)
+      .filter(
+        (part) =>
+          part.type === 'text' &&
+          Boolean(part.content?.trim()) &&
+          !part.content?.includes('__FILE_GENERATED__') &&
+          !part.content?.includes('BFILEPATH')
+      )
+    message.parts = [
+      { type: 'text', content: confirmation },
+      ...(inlineNote ? [{ type: 'text', content: inlineNote }] : []),
+      ...trailingNotes,
+    ]
   }
+}
+
+/** Text under the file marker: the note of what changed, not the file name. */
+function noteUnderFileMarker(content: string | undefined): string {
+  if (!content?.includes('__FILE_GENERATED__')) return ''
+  const newline = content.indexOf('\n')
+  return newline === -1 ? '' : content.slice(newline).trim()
 }
 
 /** The topic routing chose, kept on the answer so Again picks the right model. */

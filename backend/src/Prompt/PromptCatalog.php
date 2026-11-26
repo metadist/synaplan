@@ -1757,7 +1757,7 @@ on follow-up edits of that document so the PDF is re-exported. Never put
 `.pdf` in BFILEPATH.
 
 Example:
-{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nBody","BEXPORT":"pdf"}
+{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nBody","BSUMMARY":"Wrote the report and exported a PDF.","BEXPORT":"pdf"}
 
 Do not set BEXPORT unless the user asked for a PDF in this conversation.
 PROMPT;
@@ -1778,7 +1778,9 @@ add_slide, merge_documents, and the other listed tools). Call those tools to
 create or edit the file. Do NOT return a BFILEPATH / BFILETEXT JSON envelope.
 When the user message already contains the document text, copy every section
 into the file. A heading alone is not the document.
-After the tools finish, write a short plain-language summary of what you changed.
+After the tools finish, write a short summary in the user's language of what
+you changed. The chat shows that summary next to the file. Do not paste the
+file body into it.
 PROMPT;
     }
 
@@ -1807,7 +1809,7 @@ PowerPoint or Word.
 You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO formatting!
 
 **CORRECT FORMAT:**
-{"BFILEPATH":"filename.ext","BFILETEXT":"content"}
+{"BFILEPATH":"filename.ext","BFILETEXT":"content","BSUMMARY":"what changed"}
 
 **WRONG - DO NOT USE:**
 ```json
@@ -1818,7 +1820,8 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
 
 {
   "BFILEPATH": "filename.ext",
-  "BFILETEXT": "file content here"
+  "BFILETEXT": "file content here",
+  "BSUMMARY": "what you created or changed, in the user's language"
 }
 
 - **BFILEPATH**: The filename with appropriate extension (.csv, .xlsx, .docx, .pptx, .txt, .md).
@@ -1826,6 +1829,10 @@ You MUST respond with PURE JSON - NO markdown code blocks, NO backticks, NO form
   BFILEPATH MUST use that extension — never default to .csv when Excel was asked for.
   When they name a file ("counter_weekday.txt"), use that name.
 - **BFILETEXT**: The actual file content
+- **BSUMMARY**: Two to five sentences in the user's language saying what you
+  created or changed: which parts you added, removed, or rewrote. The chat
+  shows this next to the download. Do not paste the file body here, and do
+  not mention BFILEPATH, BFILETEXT, or BEXPORT.
 
 ## Supported Formats
 
@@ -1917,19 +1924,20 @@ When the user asks to change, add to, or reformat that document
 
 Example — user says "add a bold, bigger title 'Report' to the file" and the
 current content is "Some body text.":
-{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nSome body text."}
+{"BFILEPATH":"report.docx","BFILETEXT":"# Report\n\nSome body text.","BSUMMARY":"Added a bold title 'Report' and kept the existing body."}
 
 ## Example Output
 
 For a sales data CSV request, respond with EXACTLY this format (no backticks!):
 
-{"BFILEPATH":"sales_data.csv","BFILETEXT":"Date,Product,Quantity,Revenue\n2024-01-01,Widget A,100,5000\n2024-01-02,Widget B,150,7500"}
+{"BFILEPATH":"sales_data.csv","BFILETEXT":"Date,Product,Quantity,Revenue\n2024-01-01,Widget A,100,5000\n2024-01-02,Widget B,150,7500","BSUMMARY":"Created a short sales table with two days of widget revenue."}
 
 **IMPORTANT REMINDERS:**
 - Send PURE JSON only - no markdown wrapper
 - Do NOT use ```json or ``` around your response
 - Start your response directly with {
 - End your response directly with }
+- Always set BSUMMARY. It is the only text the user reads about the change.
 PROMPT
         );
 
