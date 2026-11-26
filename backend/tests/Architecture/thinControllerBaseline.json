@@ -123,8 +123,6 @@
     "aiFacade": [
         "src/Controller/MessageController.php",
         "src/Controller/OpenAICompatibleController.php",
-        "src/Controller/TestController.php",
-        "src/Controller/TestMessageController.php",
         "src/Controller/TtsController.php"
     ]
 }

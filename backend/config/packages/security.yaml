@@ -145,9 +145,8 @@ security:
         # Health monitoring (API-Key protected probe)
         - { path: ^/api/health/probe, roles: IS_AUTHENTICATED_FULLY }
 
-        # Public health + test endpoints
+        # Public health endpoint
         - { path: ^/api/health, roles: PUBLIC_ACCESS }
-        - { path: ^/api/test, roles: PUBLIC_ACCESS }
 
         # Public OIDC endpoints
         - { path: ^/api/v1/oidc/discovery, roles: PUBLIC_ACCESS }
