@@ -772,7 +772,8 @@ PROMPT;
 
         $prompt = $this->promptRepository->find($id);
 
-        if (!$prompt) {
+        // Internal `tools:` prompts are the system's own instructions; only an admin reads them by id.
+        if (!$prompt || (0 === $prompt->getOwnerId() && !$user->isAdmin() && str_starts_with($prompt->getTopic(), 'tools:'))) {
             return $this->json(['error' => 'Prompt not found'], Response::HTTP_NOT_FOUND);
         }
 
