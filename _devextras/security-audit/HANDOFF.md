@@ -105,8 +105,8 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 - `v5.10.4` ist am 26.11. erschienen und enthält laut `git tag --contains`
   alle fünf Fixes (SYN-14, 23, 25, 30, 31). Auf Wort des Owners: die fünf
   Advisories mit `<= 5.10.3` / `5.10.4` gefüllt und veröffentlicht; in
-  GHSA-6h69 (SYN-07) `5.9.0` eingetragen. Ob Produktion auf 5.10.4 läuft,
-  ist nicht geprüft.
+  GHSA-6h69 (SYN-07) `5.9.0` eingetragen. Produktion läuft laut Owner auf
+  5.10.4 (von der KI nicht geprüft).
 - WordPress-Plugin-PR #11 ist gemergt.
 
 ## 3. Was offen ist
@@ -125,19 +125,22 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
    - SYN-31: die Migration muss mit dem Deploy laufen (eine Zeile in
      `BCONFIG`, kein Schema). Ohne sie antworten alte Links für nicht
      angemeldete Besucher mit 404.
-1. **SYN-14 nach dem Deploy von 5.10.4:** einmal
-   `php bin/console app:widget:purge-visitor-upload-vectors` laufen lassen
-   (`--dry-run` zählt nur). Das Advisory ist veröffentlicht.
+1. Erledigt am 26.11. (Owner): SYN-14 in Produktion bereinigt mit
+   `app:widget:purge-visitor-upload-vectors`. Der Probelauf zählte 195
+   Chunks aus 213 Besucher-Uploads; 3 Uploads ohne Widget oder Sitzung
+   blieben liegen (die Suche liefert sie nicht aus).
 2. Erledigt: CI auf `main` ist seit PR #3276 (Symfony 8.1.12) wieder grün.
 3. **SYN-19 auf einem Gerät gehen:** in der iOS-/Android-App einmal M365,
    Dropbox oder einen MCP-Server verbinden. Bisher nur Unit-Tests mit
    gemockten Capacitor-Plugins und curl gegen localhost. App-Frontend (OTA)
    und Backend müssen zusammen ausgerollt sein: Apps mit altem Bundle senden
    kein `native=1` und werden abgelehnt.
-4. **Produktion auf 5.10.3?** Nicht geprüft (kein Traffic an Produktion). Die
-   Details aller 14 Advisories sind seit dem 25.11. öffentlich.
-5. **SYN-28:** Zugangsdaten in der öffentlichen Git-Historie rotieren. Kein
-   Code-Fix; Ort und Typ stehen im Report.
+4. Erledigt: Produktion läuft laut Owner seit dem 26.11. auf 5.10.4.
+5. Erledigt am 26.11. (Owner): die Zugangsdaten aus SYN-28 sind laut Owner
+   rotiert (Turnstile-Secret des Widgets `synaplan.com`, SES-SMTP-Zugang).
+   Nicht geprüft: der Google-API-Key in der gespeicherten Doku-Seite, und ob
+   die alten Zugänge fremd benutzt wurden. Offen: Secret Scanning mit Push
+   Protection in GitHub einschalten.
 6. **SYN-21 in Produktion:** nachsehen, dass genau das eine erwartete Widget
    `allowUnsignedVisitorId` trägt (`syn21-affected-widgets.sql`, fährt nur der
    Owner), und dessen Owner informieren. Das Widget bleibt offen, bis er
@@ -459,9 +462,9 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-1. Owner: 5.10.4 deployen, falls noch nicht geschehen, und dabei die Punkte
-   aus 3a Punkt 0 und 1 beachten. Dann der Gerätetest für SYN-19 und die
-   Rotation zu SYN-28.
+1. Owner: nach dem Deploy von 5.10.4 die Punkte aus 3a Punkt 0 nachsehen
+   (`BCONFIG`-Zeile zu SYN-31, `IAP_APPLE_ENVIRONMENT`), dann der Gerätetest
+   für SYN-19.
 2. Erledigt am 26.11.: alle Advisories dieses Audits sind veröffentlicht.
 3. SYN-26/27: erst fragen (Docker, `install.sh`). Danach die Lows SYN-32 bis
    43. Die 3b-Themen brauchen je eine Owner-Entscheidung.
