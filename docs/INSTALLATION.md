@@ -611,6 +611,18 @@ Change a host port in `.env`. Do not edit the port mappings in `docker-compose.y
 | Ollama | http://localhost:11435 (`local-ai` profile only) |
 | TTS | http://127.0.0.1:10200 (localhost-only, no UI — `GET /health`; host port is `SYNAPLAN_TTS_PORT`) |
 
+The development stack answers on this machine only: every published port binds
+to `127.0.0.1`. It ships fixed development passwords, so keep it that way on any
+network you do not control. To reach it from another device on a network you
+trust (a phone on your Wi-Fi, for example), set `SYNAPLAN_BIND=0.0.0.0` in the
+`.env` next to `docker-compose.yml` and run `make up` again. On a remote machine,
+forward the ports instead: `ssh -L 5173:localhost:5173 -L 8000:localhost:8000 <host>`.
+Keycloak (profile `oidc`) is the one exception and listens on every address,
+because the backend reaches it through the host gateway; on Docker Desktop
+`SYNAPLAN_KEYCLOAK_BIND=127.0.0.1` closes that as well.
+
+phpMyAdmin asks for the database login: `synaplan_user` / `synaplan_password`.
+
 ### Worker / queue issues
 Async jobs (AI processing, document indexing) run in the `worker` container:
 

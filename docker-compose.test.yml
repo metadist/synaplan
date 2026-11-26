@@ -20,7 +20,7 @@ services:
       dockerfile: _docker/backend/Dockerfile
     container_name: synaplan-app-test
     ports:
-      - "8001:80"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:8001:80"
     env_file:
       - backend/.env.test
     volumes:
@@ -113,7 +113,7 @@ services:
       MYSQL_PASSWORD: synaplan_test
       MYSQL_ROOT_PASSWORD: test_root_password
     ports:
-      - "3308:3306"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:3308:3306"
     tmpfs:
       - /var/lib/mysql:rw,noexec,nosuid,size=512m
     healthcheck:
@@ -149,7 +149,7 @@ services:
     image: ollama/ollama:latest@sha256:1cabd20e1762a7a8444bf4a7110b346d923cd77ab6c97c984434140638c913ec
     container_name: synaplan-ollama-test
     ports:
-      - "11436:11434"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:11436:11434"
     volumes:
       - ollama_test_data:/root/.ollama
     environment:
@@ -166,7 +166,7 @@ services:
     container_name: synaplan-tika-test
     command: -h 0.0.0.0 -p 9998
     ports:
-      - "9997:9998"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:9997:9998"
     profiles:
       - integration
     restart: "no"
@@ -186,7 +186,7 @@ services:
       PORT: "11434"
     command: ["node", "ollama-stub-server.ts"]
     ports:
-      - "11434:11434"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:11434:11434"
     init: true
     restart: "no"
     networks:
@@ -207,7 +207,7 @@ services:
       STUB_HOST: whatsapp-stub
     command: ["node", "whatsapp-stub-server.ts"]
     ports:
-      - "3999:3999"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:3999:3999"
     init: true
     restart: "no"
     networks:
@@ -224,7 +224,7 @@ services:
       PORT: "3998"
     command: ["node", "telegram-stub-server.ts"]
     ports:
-      - "3998:3998"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:3998:3998"
     init: true
     restart: "no"
     networks:
@@ -237,8 +237,8 @@ services:
     # Host ports differ from the dev stack (8025/1025) so both can run at once.
     # Container ports stay 8025/1025 — internal MAILER_DSN (mailhog_test:1025) is unaffected.
     ports:
-      - "${MAILHOG_TEST_WEB_PORT:-8026}:8025"  # Web UI / API
-      - "${MAILHOG_TEST_SMTP_PORT:-1026}:1025"  # SMTP
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${MAILHOG_TEST_WEB_PORT:-8026}:8025"  # Web UI / API
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${MAILHOG_TEST_SMTP_PORT:-1026}:1025"  # SMTP
     restart: "no"
     networks:
       - synaplan-test-network
@@ -273,9 +273,11 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/cert.pem
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/key.pem
+    # Published beyond loopback on purpose: app_test reaches Keycloak through
+    # host.docker.internal, which on Linux cannot see a 127.0.0.1 port.
     ports:
-      - "${KEYCLOAK_TEST_PORT:-8081}:8080"
-      - "${KEYCLOAK_TEST_HTTPS_PORT:-8444}:8443"
+      - "${SYNAPLAN_KEYCLOAK_BIND:-0.0.0.0}:${KEYCLOAK_TEST_PORT:-8081}:8080"
+      - "${SYNAPLAN_KEYCLOAK_BIND:-0.0.0.0}:${KEYCLOAK_TEST_HTTPS_PORT:-8444}:8443"
     volumes:
       - keycloak_test_certs:/opt/keycloak/certs:ro
     healthcheck:

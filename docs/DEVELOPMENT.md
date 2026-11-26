@@ -361,7 +361,7 @@ docker compose exec backend php bin/console doctrine:migrations:migrate
 # Create migration
 docker compose exec backend php bin/console doctrine:migrations:diff
 
-# Access phpMyAdmin
+# Access phpMyAdmin (login: synaplan_user / synaplan_password)
 open http://localhost:8082
 ```
 
@@ -410,7 +410,7 @@ make test    # Run tests
 | Frontend | http://localhost:5173 |
 | Backend API | http://localhost:8000 |
 | API Docs (Swagger) | http://localhost:8000/api/doc |
-| phpMyAdmin | http://localhost:8082 |
+| phpMyAdmin | http://localhost:8082 (login `synaplan_user` / `synaplan_password`) |
 | MailHog | http://localhost:8025 |
 | Ollama | http://localhost:11435 |
 | Collabora CODE | convert-to `http://collabora:9980` (compose network); editor http://localhost:9981 |

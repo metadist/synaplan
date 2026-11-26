@@ -49,6 +49,23 @@ die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 # Copy SYNAPLAN_*_PORT from a Compose env file. An exported shell variable
 # wins, matching Docker Compose. Only a decimal port is accepted.
+# The address the try-mode stack publishes on: the environment first, then the
+# project .env, then the compose default (this machine only).
+synaplan_bind() {
+    local file="$1" line value="${SYNAPLAN_BIND:-}"
+    if [ -z "$value" ] && [ -f "$file" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            line=${line%$'\r'}
+            line="${line#"${line%%[![:space:]]*}"}"
+            case "$line" in
+                SYNAPLAN_BIND=*) value=${line#*=}; value=${value%%#*} ;;
+            esac
+        done < "$file"
+        value="${value//[[:space:]\"\']/}"
+    fi
+    printf '%s' "${value:-127.0.0.1}"
+}
+
 load_synaplan_ports() {
     local file="$1"
     [ -f "$file" ] || return 0
@@ -194,6 +211,12 @@ if [ "$MODE" = "try" ]; then
     fi
     step "Starting the standard stack (cloud AI only, ~4 GB on first run)"
 
+    BIND=$(synaplan_bind "${INSTALL_DIR}/.env")
+    case "$BIND" in
+        127.*|localhost|::1) ;;
+        *) warn "SYNAPLAN_BIND=${BIND} publishes this stack beyond this machine. It ships fixed development passwords (app admin, database, MailHog) - use it only on a network you trust, never on a public address. A server install is --mode server." ;;
+    esac
+
     ./scripts/compose-up.sh -f "$COMPOSE_FILE"
 
     say ""
@@ -205,6 +228,15 @@ if [ "$MODE" = "try" ]; then
     say " The first start takes 5-15 minutes; later starts seconds."
     say ""
     say " Login:  admin@synaplan.com / admin123"
+    say ""
+    case "$BIND" in
+        127.*|localhost|::1)
+            say " This stack answers on this machine only. On a remote host,"
+            say " forward the two ports from your own machine:"
+            say "   ssh -L ${SYNAPLAN_FRONTEND_PORT:-5173}:localhost:${SYNAPLAN_FRONTEND_PORT:-5173} -L ${SYNAPLAN_BACKEND_PORT:-8000}:localhost:${SYNAPLAN_BACKEND_PORT:-8000} <host>"
+            say " For a server others reach, install with --mode server."
+            ;;
+    esac
     say " Chat needs one AI provider key - the app guides you"
     say " through it after login (free key: console.groq.com)."
     say "============================================================"

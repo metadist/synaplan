@@ -205,8 +205,12 @@ services:
       SYNAPLAN_BACKEND_PORT: ${SYNAPLAN_BACKEND_PORT:-8000}
       SYNAPLAN_MAILHOG_UI_PORT: ${SYNAPLAN_MAILHOG_UI_PORT:-8025}
       SYNAPLAN_PHPMYADMIN_PORT: ${SYNAPLAN_PHPMYADMIN_PORT:-8082}
+    # Every published port in this file binds to this machine only. The stack
+    # ships fixed development passwords, so SYNAPLAN_BIND=0.0.0.0 (in .env next
+    # to this file) belongs on a network you trust, for example to test from a
+    # phone. A server install uses deploy/compose.yaml instead.
     ports:
-      - "${SYNAPLAN_FRONTEND_PORT:-5173}:5173"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_FRONTEND_PORT:-5173}:5173"
     volumes:
       - ./_docker/frontend/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint.sh:ro
       - ./_devextras/frontend/docker-entrypoint.d:/docker-entrypoint.d:ro
@@ -305,7 +309,7 @@ services:
       - path: backend/.env
         required: false
     ports:
-      - "${SYNAPLAN_BACKEND_PORT:-8000}:80"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_BACKEND_PORT:-8000}:80"
     volumes:
       - ./backend:/var/www/backend
       # The dev image already installed these. A bind mount of ./backend would
@@ -945,7 +949,7 @@ services:
       MYSQL_PASSWORD: synaplan_password
       MYSQL_ROOT_PASSWORD: root_password
     ports:
-      - "${SYNAPLAN_DB_PORT:-3307}:3306"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_DB_PORT:-3307}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./_devextras/db-init:/docker-entrypoint-initdb.d:ro
@@ -1054,7 +1058,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${SYNAPLAN_OLLAMA_PORT:-11435}:11434"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_OLLAMA_PORT:-11435}:11434"
     volumes:
       - ollama_data:/root/.ollama
     environment:
@@ -1098,7 +1102,7 @@ services:
     container_name: synaplan-tika
     command: -h 0.0.0.0 -p 9998
     ports:
-      - "${SYNAPLAN_TIKA_PORT:-9999}:9998"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_TIKA_PORT:-9999}:9998"
     # Healthcheck uses bash /dev/tcp + HTTP probe (the apache/tika image has no
     # curl/wget). Measures the round-trip on /version and treats anything
     # slower than 3000 ms as not-yet-ready -- Tika's JVM warm-up can keep the
@@ -1232,10 +1236,10 @@ services:
     environment:
       PMA_HOST: db
       PMA_PORT: 3306
-      PMA_USER: synaplan_user
-      PMA_PASSWORD: synaplan_password
+    # No PMA_USER / PMA_PASSWORD: phpMyAdmin asks for the database login instead
+    # of handing the database to whoever opens the page.
     ports:
-      - "${SYNAPLAN_PHPMYADMIN_PORT:-8082}:80"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_PHPMYADMIN_PORT:-8082}:80"
     depends_on:
       db:
         condition: service_started
@@ -1260,7 +1264,7 @@ services:
       PORT: "3998"
     command: ["node", "telegram-stub-server.ts"]
     ports:
-      - "3998:3998"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:3998:3998"
     init: true
     restart: unless-stopped
     networks:
@@ -1274,8 +1278,8 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${SYNAPLAN_MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP
-      - "${SYNAPLAN_MAILHOG_UI_PORT:-8025}:8025"  # Web UI
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_MAILHOG_SMTP_PORT:-1025}:1025"  # SMTP
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_MAILHOG_UI_PORT:-8025}:8025"  # Web UI
     restart: unless-stopped
     networks:
       - synaplan-network
@@ -1315,9 +1319,14 @@ services:
       KC_HOSTNAME_STRICT: "false"
       KC_HTTPS_CERTIFICATE_FILE: /opt/keycloak/certs/cert.pem
       KC_HTTPS_CERTIFICATE_KEY_FILE: /opt/keycloak/certs/key.pem
+    # Published beyond loopback on purpose: the backend reaches Keycloak through
+    # host.docker.internal, and on Linux a 127.0.0.1 port is not reachable from
+    # the host gateway. Docker Desktop users can set SYNAPLAN_KEYCLOAK_BIND=127.0.0.1.
+    # The bootstrap admin below is a development login; never run this on a
+    # network you do not trust.
     ports:
-      - "${SYNAPLAN_KEYCLOAK_HTTP_PORT:-8080}:8080"
-      - "${SYNAPLAN_KEYCLOAK_HTTPS_PORT:-8443}:8443"
+      - "${SYNAPLAN_KEYCLOAK_BIND:-0.0.0.0}:${SYNAPLAN_KEYCLOAK_HTTP_PORT:-8080}:8080"
+      - "${SYNAPLAN_KEYCLOAK_BIND:-0.0.0.0}:${SYNAPLAN_KEYCLOAK_HTTPS_PORT:-8443}:8443"
     volumes:
       - keycloak_certs:/opt/keycloak/certs:ro
     healthcheck:
@@ -1554,7 +1563,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${SYNAPLAN_QDRANT_PORT:-6333}:6333"
+      - "${SYNAPLAN_BIND:-127.0.0.1}:${SYNAPLAN_QDRANT_PORT:-6333}:6333"
     volumes:
       - qdrant_storage:/qdrant/storage
     restart: unless-stopped
