@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\File;
 
 use App\Entity\Message;
+use App\Service\Media\PublicMediaName;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
@@ -59,7 +60,7 @@ final readonly class DataUrlFixer
     /**
      * Save a data URL as a file on disk.
      *
-     * Filename format: {messageId}_{provider}_{timestamp}.{ext}
+     * Filename format: {messageId}_{provider}_{random token}.{ext}
      * Path format: {userBase}/{year}/{month}/{filename}
      */
     private function saveDataUrlAsFile(string $dataUrl, Message $message): ?string
@@ -102,9 +103,7 @@ final readonly class DataUrlFixer
         $ext = FileHelper::getExtensionFromMimeType($mimeType);
         $provider = FileHelper::sanitizeProviderName($message->getMeta('ai_chat_provider') ?? 'unknown');
 
-        // Generate filename: messageId_provider_timestamp.ext
-        $timestamp = time();
-        $filename = sprintf('%d_%s_%d.%s', $message->getId(), $provider, $timestamp, $ext);
+        $filename = PublicMediaName::generated((int) $message->getId(), $provider, $ext);
 
         // Build storage path with user subdirectories: {last2}/{prev3}/{paddedUserId}/{year}/{month}/{filename}
         $userId = $message->getUserId();

@@ -9,6 +9,7 @@ use App\Service\Disclosure\AiDisclosure;
 use App\Service\Disclosure\ChannelReplyNotice;
 use App\Service\File\UserUploadPathBuilder;
 use App\Service\Media\OutboundChannelMedia;
+use App\Service\Media\PublicMediaName;
 use App\Service\Notification\DiscordNotificationService;
 use App\Service\RateLimitService;
 use App\Service\WhatsApp\WhatsAppService;
@@ -407,10 +408,9 @@ final readonly class WhatsAppReplyDelivery
     }
 
     /**
-     * Build the URL Meta should fetch, rewriting generated documents (and any
-     * other file whose basename is not already anonymously fetchable) to a
-     * copy whose name matches {@see OutboundChannelMedia} so
-     * StaticUploadController will serve it without auth.
+     * Build the URL Meta should fetch. A file whose name is not already an
+     * unguessable public one ({@see PublicMediaName}) is copied to such a
+     * name, so StaticUploadController serves it without auth.
      *
      * @return array{0: string, 1: string} [absolute URL, original display filename]
      */
@@ -423,7 +423,7 @@ final readonly class WhatsAppReplyDelivery
 
         $originalUrl = rtrim($this->appUrl, '/').'/'.ltrim($mediaPath, '/');
 
-        if (OutboundChannelMedia::isAnonymouslyFetchable($displayFilename)) {
+        if (PublicMediaName::isUnguessable($displayFilename)) {
             return [$originalUrl, $displayFilename];
         }
 

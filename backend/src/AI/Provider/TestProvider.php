@@ -12,6 +12,7 @@ use App\AI\Interface\ToolCallingChatProviderInterface;
 use App\AI\Interface\VisionProviderInterface;
 use App\AI\StructuredOutput\StructuredOutputSchema;
 use App\AI\Tool\CatalogToolUse;
+use App\Service\Media\PublicMediaName;
 
 class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInterface, EmbeddingProviderInterface, VisionProviderInterface, ImageGenerationProviderInterface, SpeechToTextProviderInterface, TextToSpeechProviderInterface, FileAnalysisProviderInterface
 {
@@ -997,8 +998,7 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         if (!is_dir($this->uploadDir)) {
             mkdir($this->uploadDir, 0775, true);
         }
-
-        $filename = 'tts_test_'.uniqid().'.mp3';
+        $filename = PublicMediaName::speech('mp3');
         // Single silent MPEG-1 Layer III frame (128 kbit/s, 44.1 kHz).
         $frame = "\xFF\xFB\x90\x64".str_repeat("\x00", 413);
         file_put_contents($this->uploadDir.'/'.$filename, $frame);

@@ -513,7 +513,7 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
     {
         array_walk_recursive($outcome, function (mixed &$value): void {
             if (\is_string($value)) {
-                $value = preg_replace(['/tts_[0-9a-f]{13}\./', '/^php[A-Za-z0-9]{6,}$/'], ['tts_<unique>.', '<tmpfile>'], str_replace($this->uploadDir, '<uploads>', $value));
+                $value = preg_replace(['/tts_[0-9a-f]{32}\./', '/^php[A-Za-z0-9]{6,}$/'], ['tts_<unique>.', '<tmpfile>'], str_replace($this->uploadDir, '<uploads>', $value));
             }
         });
 

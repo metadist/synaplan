@@ -781,6 +781,6 @@ final class MediaTurnCharacterizationTest extends TestCase
 
         $value = str_replace([$this->uploadDir, '/'.date('Y').'/'.date('m').'/'], ['<uploads>', '/<year>/<month>/'], $value);
 
-        return (string) preg_replace(['/_\d{10}\./', '/_\d{10}_[0-9a-f]{12}\./'], ['_<time>.', '_<time>_<random>.'], $value);
+        return (string) preg_replace(['/_\d{10}\./', '/_[0-9a-f]{32}\./'], ['_<time>.', '_<random>.'], $value);
     }
 }

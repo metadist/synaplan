@@ -573,7 +573,7 @@ final class GoogleProviderRequestCharacterizationTest extends TestCase
     {
         array_walk_recursive($outcome, function (mixed &$value): void {
             if (\is_string($value)) {
-                $value = preg_replace(['/call_[0-9a-f]{12}/', '/tts_[0-9a-f]{13}\./'], ['call_<random>', 'tts_<unique>.'], str_replace($this->uploadDir, '<uploads>', $value));
+                $value = preg_replace(['/call_[0-9a-f]{12}/', '/tts_[0-9a-f]{32}\./'], ['call_<random>', 'tts_<unique>.'], str_replace($this->uploadDir, '<uploads>', $value));
             }
         });
 

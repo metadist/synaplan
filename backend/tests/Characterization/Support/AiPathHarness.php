@@ -1995,8 +1995,8 @@ final class AiPathHarness
                     $value,
                 );
                 $value = (string) preg_replace(
-                    ['/tts_[0-9a-f]{13}\./', '/^php[A-Za-z0-9]{6,}$/', '/_\d{10}_[0-9a-f]{12}\./', '/_\d{10}\./', '/^msg_[0-9a-f]{16}$/'],
-                    ['tts_<unique>.', '<tmpfile>', '_<time>_<random>.', '_<time>.', 'msg_<random>'],
+                    ['/tts_[0-9a-f]{32}\./', '/^php[A-Za-z0-9]{6,}$/', '/_[0-9a-f]{32}\./', '/_\d{10}\./', '/^msg_[0-9a-f]{16}$/'],
+                    ['tts_<unique>.', '<tmpfile>', '_<random>.', '_<time>.', 'msg_<random>'],
                     $value,
                 );
             }
