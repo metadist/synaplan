@@ -7,8 +7,10 @@ state that the AI keeps (tasks, dates, decisions, waiting on, costs), the
 project page becomes chat plus board, and reminders, mail and watching move
 into the plan (§0 #74–#95, §10). A review of the same day (§0 #96–#111)
 decouples the board from the loop, narrows calendar, mail and watches, and
-moves push behind sharing. §0 records what the owner said; rows marked ☐
-wait for the owner.
+moves push behind sharing. A hands-on comparison with ChatGPT and Claude
+Projects (§0 #112–#119) adds: update instead of append, confirm before
+write, generated files stay in the project, and a first cut for one
+person. §0 records what the owner said; rows marked ☐ wait for the owner.
 **Owner:** product owner.
 **Roadmap:** row 46. Steps `PJ0`–`PJ47`, journeys `J-PJ-1`–`J-PJ-20`.
 **Mockup:** [`mockups/project-page.html`](./mockups/project-page.html), the
@@ -296,6 +298,29 @@ The rest of this plan already follows these rows.
 | 109 | **Small model for the side calls.** Extraction (#96) and the status (#95) use the person's memory model (`ModelConfigService::getMemoryModelConfig()`), as memory extraction does today, not the Chat model. #86 is about the answer; these are not answers. | Memory model | ☐ |
 | 110 | **A second case before PJ32.** The mockup gets a second project of another kind (a PHP upgrade or a client project) before PJ32 builds the page, to prove that the fixed blocks fit more than a kitchen (#76). | Second mockup | ☐ |
 | 111 | **Whom C is for first.** Households (Ana: GMX or Gmail, phone first) or teams and businesses (Microsoft 365, Nextcloud, desktop first). It decides the examples, the mail path of #104 and whether Gmail sending moves up from §9. | — | ☐ Owner |
+
+### Hands-on comparison with ChatGPT and Claude (2026-11-26)
+
+The same kitchen project (offer, measurements, a phone call, an oven search,
+a research question, a reminder) was run in ChatGPT Projects and in Claude
+Projects. Findings are in `01` §2.7. ChatGPT keeps no project state: every
+answer builds a new checklist, and a new chat learns the state only after
+about ten minutes. Claude keeps one status document in the project, writes
+it only after asking, updates it in place, and every new chat reads it at
+once. Neither puts generated files into the project, and neither has a
+board or a group chat in a project. The rows below are proposals; each
+names the row it changes.
+
+| # | Decision | Default | Agree? |
+| - | -------- | ------- | ------ |
+| 112 | **Update, never append.** The extraction of #96 first matches a statement against the open items. News about an item that exists (moved date, new price, done) changes that item and its history; it never adds a second one. A plan from `project_plan` replaces the open tasks of the plan it continues. Reason: ChatGPT built a new checklist with every answer (31, then 39 items) and the old ones went stale. Extends #96 and G14. | Match first | ☐ |
+| 113 | **Recommended is not decided.** What the AI suggests (an oven, a date, a budget split) is never written as `decided` or `done`. It becomes an item only when a person says it or confirms it ("Add" on the offer, or "yes" in the chat). Both products kept recommendation and decision apart, and Claude asked before every write. Narrows #96. | Confirm before write | ☐ |
+| 114 | **The answer claims only what was written.** The answer never says "added to the board" or "noted"; the "Added: … · Undo" line of #96 is the only receipt, and it lists what the extraction really wrote. If the extraction fails, the line says so. Reason: the extraction runs after the answer, so the answer cannot know. | Receipt only | ☐ |
+| 115 | **Every chat knows the board at once.** The open items block (#108) is built at the start of every project turn from the board, not from a chat index. A new chat sees an item written a few seconds earlier. Gate G23. | Read at turn start | ☐ |
+| 116 | **What a project makes stays in the project.** A file the AI makes in a project chat (sheet, document, research report, picture) lands in the project's Files and is a source for later chats. A research result goes through the extraction of #96 like an answer, so its dates, costs and tasks reach the board as offers. Both products put such files into a global gallery outside the project. | Project files | ☐ |
+| 117 | **A reminder is a project item with a confirmed time.** "Remind me on 2 December" offers a date item with the time and the person's time zone said back ("2 Dec, 18:00, Berlin · Add"); nothing is scheduled before "Add". ChatGPT scheduled a task at 08:00 on one click without asking, Claude at 18:00 without saying why. Reminders and watches belong to the project and are listed on its board, not only in a global list. Extends #81 and G16. | Offer, then add | ☐ |
+| 118 | **A watch reports only when something is worth telling.** A check that finds nothing new sends nothing; "Last checked" on the board shows it ran. Claude's scheduled tasks offer exactly this switch. Extends #106. | Quiet when unchanged | ☐ |
+| 119 | **First cut for one person.** Ship C and D without the calendar subscription (board, e-mail reminders, mail preview) before deciding on E–I. Shared chats (E), push (G), forwarded mail (#91, #105) and the calendar subscription (#103) wait until C and D have real use. Neither product has a board or a group chat in a project, so the board is the bet to test first. Changes #107 (owner). | C and D first | ☐ Owner (changes #107) |
 
 ---
 
@@ -694,6 +719,7 @@ turns from five kinds of project, five locales; `backend/tests/Eval/ProjectBoard
 | G17 | Undo | Restores the exact state before, also after a later change to the same item |
 | G20 | Cost of a project turn (§0 #108) | The same 40 turns cost at most 15 % more inside a project than outside, extraction and status included; the open items block never exceeds 2,000 tokens |
 | G21 | Private items (§0 #99) | No item from a member's private chat reaches another member through the board, the status text, the weekly overview, the calendar subscription or search |
+| G23 | State across chats (§0 #112, #115) | An item written in one chat is in the open items block of a new chat of the same project within 10 seconds; the same news told twice leaves one item, not two |
 
 **Before the calendar subscription is on:** G22 — a feed address of one
 member never shows another member's private items; a renewed address makes
@@ -806,4 +832,5 @@ refused.
 | 2026-11-16 | First version, from the owner's sessions of 2026-11-12 and 2026-11-13 and a code map on `0d228e323`. Plan only. |
 | 2026-11-26 | Reshaped after the owner's whiteboard session and the mockup (`mockups/project-page.html`, #3282): goals 6–8; §0 #74–#95; #5, #17, #49, #54, #63, #64, #66 changed; phases relettered (C board, D remind and write back with push, E shared chats, F shared projects, G into the project, H watches, I rollout); steps PJ29–PJ47; PJ21 and PJ22 move into C; journeys J-PJ-12–J-PJ-18; gates G14–G19. `01`–`04` follow. |
 | 2026-11-26 | Review of the reshaped plan: §0 #96–#111 (proposals; #97, #102, #107 and #111 need the owner). The board is filled by an extraction after the answer instead of loop tools, so C does not wait for PJ11; four item kinds; memory and board split; private items; quick-add; fewer tabs; calendar as a subscription; copy and mail app before "Send"; DMARC for forwarded mail; watches `version` and `page` only; push moves to G after the shared phases (G → H, H → I, I → J); #95 changed; journeys J-PJ-19, J-PJ-20; gates G20–G22. `02`–`04` follow. |
+| 2026-11-26 | Hands-on comparison with ChatGPT and Claude Projects (`01` §2.7): §0 #112–#119 (proposals; #119 needs the owner because it changes #107); gate G23. `02`–`04` follow once the rows are ticked. |
 | 2026-11-19 | After PJ4 (`89694c4b2`): §0 #21–#25 ticked; #63 partly; #66 order fixed (AU26 → AH8a → AH8b → PJ5); new rows #68–#73 (end of a run, limits as profile input, budget per call until PJ6, no write share for project chats before PJ20, deleted member's text, projects flag with PJ28). `03` and `04` follow. |
