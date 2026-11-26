@@ -212,10 +212,11 @@ export function createOpenTalkBridge({
       entry.samples = []
       log(`OpenTalk ${room}: ${cut} window from ${id}, ${(samples.length / SAMPLE_RATE).toFixed(1)}s.`)
       const from = entry.from
-      entry.from = now()
+      const end = now()
+      entry.from = end
       entry.seq += 1
       const t0 = Math.max(0, from - startedAt)
-      const t1 = Math.max(t0 + 1, now() - startedAt)
+      const t1 = Math.max(t0 + 1, end - startedAt)
       let text = ''
       try {
         const result = await plugin.window(ref, {
@@ -242,7 +243,7 @@ export function createOpenTalkBridge({
               participant_id: id,
               track_id: `mic-${id}`,
               starts_at: new Date(from).toISOString(),
-              ends_at: new Date(entry.from).toISOString(),
+              ends_at: new Date(end).toISOString(),
               text,
             },
           },

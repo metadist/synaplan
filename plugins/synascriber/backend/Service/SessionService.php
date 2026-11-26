@@ -262,15 +262,17 @@ final readonly class SessionService
         }
 
         $result = $this->whisper->recognize($window['audio'], (string) $session['language']);
-        $session['lastAudioAt'] = time();
-        if ('' !== $result['text'] && false !== ($session['keep'] ?? true)) {
+        // Recognition waited. A language change in that time must survive this save.
+        $fresh = $this->store->find($ref) ?? $session;
+        $fresh['lastAudioAt'] = time();
+        if ('' !== $result['text'] && false !== ($fresh['keep'] ?? true)) {
             $this->store->addSegment($ref, $segment + ['text' => $result['text']]);
-            $session['segmentCount'] = (int) ($session['segmentCount'] ?? 0) + 1;
-            $session = $this->learnSpeaker($session, $window['endpointId']);
+            $fresh['segmentCount'] = (int) ($fresh['segmentCount'] ?? 0) + 1;
+            $fresh = $this->learnSpeaker($fresh, $window['endpointId']);
         }
-        $this->store->save($session);
+        $this->store->save($fresh);
 
-        return $answer + ['text' => $result['text'], 'dropped' => $result['dropped'], 'speaker' => $this->speakerName($session, $window['endpointId'])];
+        return $answer + ['text' => $result['text'], 'dropped' => $result['dropped'], 'speaker' => $this->speakerName($fresh, $window['endpointId'])];
     }
 
     /**

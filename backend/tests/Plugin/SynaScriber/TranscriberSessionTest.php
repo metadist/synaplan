@@ -273,6 +273,24 @@ final class TranscriberSessionTest extends PluginTestCase
         self::assertFails('language_not_offered', 422, fn () => $sessions->event($session['ref'], ['type' => 'language', 'language' => 'zh']));
     }
 
+    public function testAWindowInFlightDoesNotRestoreThePreviousLanguage(): void
+    {
+        $sessions = null;
+        $ref = '';
+        $whisper = $this->createStub(WhisperClient::class);
+        $whisper->method('recognize')->willReturnCallback(function (string $audio, string $language) use (&$sessions, &$ref): array {
+            self::assertSame('de', $language);
+            $sessions->event($ref, ['type' => 'language', 'language' => 'en']);
+
+            return self::recognized(['text' => 'Hello', 'dropped' => null]);
+        });
+        $sessions = $this->service(['opentalk_enabled' => '1'], $whisper);
+        $ref = $sessions->beginOpenTalk('room-1', 'de')['ref'];
+
+        self::assertSame('Hello', $sessions->window($ref, self::window())['text']);
+        self::assertSame('en', $this->store->find($ref)['language'] ?? null);
+    }
+
     public function testOpenTalkStaysOffUntilAnAdministratorEnablesIt(): void
     {
         $sessions = $this->service();
