@@ -27,7 +27,7 @@ final readonly class DeleteComputeWorkspaceCommandHandler
     public function __invoke(DeleteComputeWorkspaceCommand $command): void
     {
         try {
-            $this->client->deleteWorkspace($command->workspaceId);
+            $this->client->deleteWorkspace($command->owner, $command->workspaceId);
         } catch (ComputeRefusedException $e) {
             if (self::ALREADY_GONE !== $e->errorCode()) {
                 throw $e;

@@ -51,7 +51,7 @@ final readonly class ComputeRunReaper
                     $run->setReason('lost');
                     $run->markFinished(ComputeRun::STATUS_FAILED);
                     $this->runs->save($run);
-                    $this->cancelQuietly($run->getRunId());
+                    $this->cancelQuietly($run);
                     ++$closed;
                 }
             } catch (\Throwable $e) {
@@ -66,7 +66,7 @@ final readonly class ComputeRunReaper
         $purgeBefore = $now->modify(sprintf('-%d seconds', self::FINAL_PURGE_AFTER_SECONDS));
         foreach ($this->runs->findFinalRunsBefore($purgeBefore) as $run) {
             try {
-                $this->cancelQuietly($run->getRunId());
+                $this->cancelQuietly($run);
                 ++$purged;
             } catch (\Throwable $e) {
                 ++$skipped;
@@ -99,10 +99,10 @@ final readonly class ComputeRunReaper
         ], true);
     }
 
-    private function cancelQuietly(string $runId): void
+    private function cancelQuietly(ComputeRun $run): void
     {
         try {
-            $this->client->cancel($runId);
+            $this->client->cancel(ComputeWorkspaceService::ownerString($run->getUserId()), $run->getRunId());
         } catch (ComputeRefusedException $e) {
             if (404 !== $e->getCode()) {
                 throw $e;

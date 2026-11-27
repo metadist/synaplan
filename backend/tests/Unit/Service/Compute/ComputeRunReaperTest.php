@@ -37,8 +37,8 @@ final class ComputeRunReaperTest extends TestCase
         }));
 
         $seen = [];
-        $client = new ComputeClient(new MockHttpClient(static function (string $method, string $url) use (&$seen): MockResponse {
-            $seen[] = $method.' '.$url;
+        $client = new ComputeClient(new MockHttpClient(static function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen[] = $method.' '.$url.' '.($options['normalized_headers']['x-compute-owner'][0] ?? 'no owner');
             if (str_ends_with($url, '/v1/runs/run-stale')) {
                 return new MockResponse('{"code":"not_found","message":"no such run","details":null}', ['http_code' => 404]);
             }
@@ -51,7 +51,7 @@ final class ComputeRunReaperTest extends TestCase
 
         self::assertSame(['closed' => 1, 'purged' => 0, 'skipped' => 0], $result);
         self::assertSame(ComputeRun::STATUS_FAILED, $stale->getStatus());
-        self::assertContains('DELETE http://compute:8080/v1/runs/run-stale', $seen);
+        self::assertContains('DELETE http://compute:8080/v1/runs/run-stale X-Compute-Owner: user:7', $seen);
     }
 
     public function testStillOpenRunLeftAlone(): void
@@ -83,8 +83,8 @@ final class ComputeRunReaperTest extends TestCase
         $runs->method('findFinalRunsBefore')->willReturn([$done]);
 
         $seen = [];
-        $client = new ComputeClient(new MockHttpClient(static function (string $method, string $url) use (&$seen): MockResponse {
-            $seen[] = $method.' '.$url;
+        $client = new ComputeClient(new MockHttpClient(static function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen[] = $method.' '.$url.' '.($options['normalized_headers']['x-compute-owner'][0] ?? 'no owner');
 
             return new MockResponse('', ['http_code' => 204]);
         }), $this->config(enabled: true));
@@ -92,7 +92,7 @@ final class ComputeRunReaperTest extends TestCase
         $reaper = new ComputeRunReaper($this->config(enabled: true), $client, $runs, new NullLogger());
 
         self::assertSame(['closed' => 0, 'purged' => 1, 'skipped' => 0], $reaper->reap());
-        self::assertContains('DELETE http://compute:8080/v1/runs/run-done', $seen);
+        self::assertContains('DELETE http://compute:8080/v1/runs/run-done X-Compute-Owner: user:7', $seen);
     }
 
     public function testMetadataOnly(): void

@@ -8,7 +8,9 @@ namespace App\Message;
  * Delete the sidecar folder of a workspace whose account was deleted. The
  * row that pointed at the folder went with the account, so this message is
  * the only reference left: the transport retries a busy or unreachable
- * sidecar and parks the message in `failed` after the last attempt.
+ * sidecar and parks the message in `failed` after the last attempt. The
+ * owner travels with it because the sidecar deletes a folder only for the
+ * owner it was created with.
  *
  * Queued in: async_index
  * Handled by: DeleteComputeWorkspaceCommandHandler
@@ -16,6 +18,7 @@ namespace App\Message;
 final readonly class DeleteComputeWorkspaceCommand
 {
     public function __construct(
+        public string $owner,
         public string $workspaceId,
     ) {
     }

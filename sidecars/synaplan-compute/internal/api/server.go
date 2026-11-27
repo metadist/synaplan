@@ -244,11 +244,12 @@ func (s *Server) getView(id string) (runView, bool) {
 	return rec.view(), true
 }
 
-// OwnerHeader names the account a by-id read is made for. The token says the
-// caller is the backend; this says whose run or folder it may be handed.
+// OwnerHeader names the account a by-id request is made for. The token says
+// the caller is the backend; this says whose run or folder it may be handed,
+// cancel or delete.
 const OwnerHeader = "X-Compute-Owner"
 
-// requestOwner returns the owner a read is made for, or answers 400.
+// requestOwner returns the owner a request is made for, or answers 400.
 func requestOwner(w http.ResponseWriter, r *http.Request) (string, bool) {
 	owner := strings.TrimSpace(r.Header.Get(OwnerHeader))
 	if owner == "" {
@@ -274,7 +275,7 @@ func (s *Server) ownedView(w http.ResponseWriter, r *http.Request) (runView, boo
 }
 
 // ownedWorkspace answers 404 or 403 unless the folder belongs to the owner
-// the read is made for.
+// the request is made for.
 func (s *Server) ownedWorkspace(w http.ResponseWriter, r *http.Request) (string, bool) {
 	owner, ok := requestOwner(w, r)
 	if !ok {

@@ -794,9 +794,14 @@ func setDownloadHeaders(w http.ResponseWriter, mimeType, name string, size int64
 }
 
 func (s *Server) handleDeleteRun(w http.ResponseWriter, r *http.Request) {
+	owner, ok := requestOwner(w, r)
+	if !ok {
+		return
+	}
 	s.mu.Lock()
 	rec, ok := s.runs[r.PathValue("id")]
-	if !ok {
+	// Another owner's run answers like one that does not exist, as on a read.
+	if !ok || rec.Owner != owner {
 		s.mu.Unlock()
 		writeError(w, http.StatusNotFound, contract.ErrRunNotFound, "run not found", nil)
 		return
