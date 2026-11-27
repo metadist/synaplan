@@ -22,7 +22,8 @@ to them.
 | Plan reshaped | merged | #3283 | board, reminders, mail, watches; phases relettered; PJ29–PJ47. See 2026-11-26 below. |
 | Plan review | open | — | §0 #96–#111: board without the loop, four kinds, calendar subscription, copy-first mail, DMARC, two watch kinds, push after sharing. See "2026-11-26 — review" below. |
 | Hands-on comparison | merged | #3288 | §0 #112–#119: update instead of append, confirm before write, receipt only, state read at turn start, files stay in the project, reminders said back, quiet watches, one person first. See "2026-11-26 — hands-on comparison" below. |
-| v1 spec | open | — | §0 #120–#130 and `05_v1_spec.md`: three stages, one store with `note`, sharing only in projects with a project budget, households first, success numbers, order. See "2026-11-27 — v1 spec" below. |
+| v1 spec | merged | #3300 | §0 #120–#130 and `05_v1_spec.md`: three stages, one store with `note`, sharing only in projects with a project budget, households first, success numbers, order. See "2026-11-27 — v1 spec" below. |
+| General core | merged | #3309 | §0 #128 reworded (general, for every purpose; connections for companies later), #131 second mockup "learning something", #132 board corpus from five spread cases. See "2026-11-27 — general core" below. |
 | PJ30 | open | #3307 | Project items through the API, flag off (`PROJECTS.BOARD_ENABLED` = 0). See "2026-11-27 — PJ30" below. |
 | PJ8–PJ47 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
@@ -71,6 +72,17 @@ What the step built:
 - Not in this step: a hard delete (drop is the removal; Undo needs the
   row), changing the kind of an item, assignees and "read" members (there
   are no members before sharing).
+
+## 2026-11-27 — general core
+
+No code. The owner corrected #128: projects are not for one audience but
+for every purpose (a kitchen, tuning a car, learning something). The core
+works without setup and connections; connections for companies (cloud
+storage, Jira or Asana through MCP, finer roles, a model restriction per
+project) are a later, optional layer. To keep the core general, the second
+mockup case is "learning something" (#131) and the board corpus takes eight
+turns each from five spread kinds of project (#132). The "households first"
+line in the v1 spec entry below is replaced by this.
 
 ## 2026-11-27 — v1 spec
 

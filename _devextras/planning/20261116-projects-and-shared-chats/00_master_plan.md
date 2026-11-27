@@ -13,7 +13,8 @@ write, generated files stay in the project, and a first cut for one
 person. A discussion of 2026-11-27 (§0 #120–#130) fixes v1 in
 [`05_v1_spec.md`](./05_v1_spec.md): three stages for writing to the board,
 one store for board and memory, sharing only in projects with a project
-budget, households first, and the numbers that decide what comes after v1.
+budget, a general core for every purpose (#128, #131, #132), and the
+numbers that decide what comes after v1.
 §0 records what the owner said; rows marked ☐ wait for the owner.
 **Owner:** product owner.
 **Roadmap:** row 46. Steps `PJ0`–`PJ47`, journeys `J-PJ-1`–`J-PJ-20`.
@@ -303,7 +304,7 @@ The rest of this plan already follows these rows.
 | 107 | **Order after B.** C board → D remind and write back without a new service (e-mail reminders, the calendar subscription, the mail preview) → E shared chats → F shared projects → G push → H into the project → I watches → J rollout. Push leaves D because it needs a store release and a relay and nothing in C, D or E needs it (e-mail stands in). Sharing comes before push because the board is worth most with a second person (the mockup's "after two weeks" needs F). Changes #85 and the phase named in #84 (owner). | As written | ☐ Owner (changes #84, #85) |
 | 108 | **A project turn has its own cost gate.** The board adds to every project turn: the open items block (at most 40 items and 2,000 tokens), the extraction call and the status call. G20 (§6) bounds it. | G20 | Yes — owner, 2026-11-27, as `05` and #120–#130 read it |
 | 109 | **Small model for the side calls.** Extraction (#96) and the status (#95) use the person's memory model (`ModelConfigService::getMemoryModelConfig()`), as memory extraction does today, not the Chat model. #86 is about the answer; these are not answers. | Memory model | Yes — owner, 2026-11-27, as `05` and #120–#130 read it |
-| 110 | **A second case before PJ32.** The mockup gets a second project of another kind (a PHP upgrade or a client project) before PJ32 builds the page, to prove that the fixed blocks fit more than a kitchen (#76). | Second mockup | Yes — owner, 2026-11-27, as `05` and #120–#130 read it |
+| 110 | **A second case before PJ32.** The mockup gets a second project of another kind (a PHP upgrade or a client project) before PJ32 builds the page, to prove that the fixed blocks fit more than a kitchen (#76). | Second mockup | Decided by #131 (learning something) |
 | 111 | **Whom C is for first.** Households (Ana: GMX or Gmail, phone first) or teams and businesses (Microsoft 365, Nextcloud, desktop first). It decides the examples, the mail path of #104 and whether Gmail sending moves up from §9. | — | Answered by #128 |
 
 ### Hands-on comparison with ChatGPT and Claude (2026-11-26)
@@ -346,8 +347,10 @@ step that builds each part.
 | 125 | **Apps when sharing starts:** off in the shared chats of a project, on in a member's private chats inside a shared project. Apps in shared chats with the per-person switches of #43–#46 follow after the first sharing step; the owner wants them then. | Off in shared chats first | Yes — owner, 2026-11-27 |
 | 126 | **Project budget.** The creator sets an amount per month for the members of a project; the creator's own use never counts; when it is used up, a member's messages draw on their own budget automatically; a member without a budget gets one sentence that names who can raise it. Per project, not per chat. Replaces #39; #40 stays. | Per project, monthly | Yes — owner, 2026-11-27 |
 | 127 | **The partner before the guest.** The common case is a member who chats along. A guest link without an account (sees only the dates and tasks that name them, confirms, uploads, ticks; no chat, no costs) comes later. | Member first | Yes — owner, 2026-11-27 |
-| 128 | **Households first.** Answers #111. | Households | Yes — owner, 2026-11-27 |
+| 128 | **General, for every purpose.** Projects are not built for one audience or one kind of project: a kitchen, tuning a car, learning something, a client project. The core works without any setup and without any connection, for one person and a small group. Connections for companies (cloud storage as sources, Jira or Asana through MCP, finer roles, a model restriction per project) are an optional layer after it, never a precondition. Answers #111; reworded 2026-11-27 (first text: "Households first"). | General core, connections later | Yes — owner, 2026-11-27 |
 | 129 | **How v1 is judged.** Undo rate of stage-1 items below 10 %, accept rate of proposals above 60 %, projects still used in week 3 clearly more often with board than without, G20. Counted on the server without content: `BPROJECTITEMLOG` gets `accepted`, `rejected`, `undone` and `BSTAGE`; one counter for "board opened"; the board flag on for part of the people who use projects. Team use first, then a beta (`05` §6). | As written | Yes — owner, 2026-11-27 |
+| 131 | **The second mockup case is "learning something".** It is the case furthest from the kitchen: hardly any dates or costs, a lot of progress, material, notes and open questions. The mockup shows whether the board is still worth a look when cards stay empty (#79), whether progress fits ordered tasks (`BSORT`), and whether the status text reads well ("3 of 12 chapters"). Decides #110. | Learning | Yes — owner, 2026-11-27 |
+| 132 | **The board corpus is spread wide.** The 40 turns of G14 come from five kinds of project, eight each: a kitchen renovation, tuning a car, learning something (a language to B1), a client project, a move. If the core fails one of them, it is not general, and that shows before PJ31 is built. | Five spread cases | Yes — owner, 2026-11-27 |
 | 130 | **Order.** v1 = phase C for one person, measured → sharing with the partner and the project budget → phase D (reminders, mail preview, calendar subscription) → guest link, apps in shared chats, push, forwarded mail and watches, each decided on the numbers of #129. Refines #107 and #119. | As written | Yes — owner, 2026-11-27 |
 
 ---
@@ -737,7 +740,8 @@ locales): the conflict is named in at least 18; an entry is never attributed
 to the wrong member.
 
 **Before `PROJECTS.BOARD_ENABLED` is on** — a board corpus (40 chat
-turns from five kinds of project, five locales; `backend/tests/Eval/ProjectBoard/`):
+turns from five kinds of project, eight each: kitchen, car, learning, client
+project, move (§0 #132); five locales; `backend/tests/Eval/ProjectBoard/`):
 
 | # | Gate | Bar |
 | - | ---- | --- |
@@ -861,5 +865,6 @@ refused.
 | 2026-11-26 | Reshaped after the owner's whiteboard session and the mockup (`mockups/project-page.html`, #3282): goals 6–8; §0 #74–#95; #5, #17, #49, #54, #63, #64, #66 changed; phases relettered (C board, D remind and write back with push, E shared chats, F shared projects, G into the project, H watches, I rollout); steps PJ29–PJ47; PJ21 and PJ22 move into C; journeys J-PJ-12–J-PJ-18; gates G14–G19. `01`–`04` follow. |
 | 2026-11-26 | Review of the reshaped plan: §0 #96–#111 (proposals; #97, #102, #107 and #111 need the owner). The board is filled by an extraction after the answer instead of loop tools, so C does not wait for PJ11; four item kinds; memory and board split; private items; quick-add; fewer tabs; calendar as a subscription; copy and mail app before "Send"; DMARC for forwarded mail; watches `version` and `page` only; push moves to G after the shared phases (G → H, H → I, I → J); #95 changed; journeys J-PJ-19, J-PJ-20; gates G20–G22. `02`–`04` follow. |
 | 2026-11-26 | Hands-on comparison with ChatGPT and Claude Projects (`01` §2.7): §0 #112–#119 (proposals; #119 needs the owner because it changes #107); gate G23. `02`–`04` follow once the rows are ticked. |
+| 2026-11-27 | #128 reworded from "Households first" to a general core for every purpose with connections for companies as a later layer; #131 (second mockup case: learning something, decides #110) and #132 (board corpus from five spread cases). `04` PJ31 and the C intro follow. |
 | 2026-11-27 | Owner discussion of an outside review: §0 #120–#130 and [`05_v1_spec.md`](./05_v1_spec.md) (three stages, proposals visible until decided, one store with kind `note`, writing together only in projects, apps and project budget for sharing, partner before guest, households first, success numbers, order). #111 answered, #119 refined. J-PJ-19 no longer promises "within the hour". `02`–`04` follow in the steps that build each part. |
 | 2026-11-19 | After PJ4 (`89694c4b2`): §0 #21–#25 ticked; #63 partly; #66 order fixed (AU26 → AH8a → AH8b → PJ5); new rows #68–#73 (end of a run, limits as profile input, budget per call until PJ6, no write share for project chats before PJ20, deleted member's text, projects flag with PJ28). `03` and `04` follow. |

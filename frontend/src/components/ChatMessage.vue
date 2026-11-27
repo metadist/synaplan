@@ -24,7 +24,7 @@
     <div
       :class="[
         'flex flex-col flex-1 min-w-0 max-w-[min(100%,60rem)] gap-2',
-        role === 'user' ? 'items-end md:flex-none md:w-fit' : 'md:flex-initial md:w-max',
+        role === 'user' ? 'items-end md:flex-initial md:w-fit' : 'md:flex-initial md:w-max',
       ]"
     >
       <!-- Thinking blocks (ABOVE bubble, only for assistant) -->
