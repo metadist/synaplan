@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Service\Project;
 
 use App\Entity\Project;
+use App\Repository\UserRepository;
+use App\Service\Project\Item\ProjectZone;
 use App\Service\Project\ProjectPresenter;
 use PHPUnit\Framework\TestCase;
 
@@ -36,7 +38,7 @@ final class ProjectPinTest extends TestCase
     public function testPresenterShowsThePin(): void
     {
         $project = new Project(7, 'Kitchen', 'u-1', 'project:u-1');
-        $presenter = new ProjectPresenter();
+        $presenter = new ProjectPresenter(new ProjectZone($this->createStub(UserRepository::class)));
 
         self::assertFalse($presenter->project($project)['pinned']);
         $project->pin(true);

@@ -8,6 +8,11 @@ use App\Module\Contract\ConfiguredBy;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Contract\MobileClass;
 use App\Module\Contract\ModuleStatus;
+use App\Service\Project\Item\ProjectItemChanger;
+use App\Service\Project\Item\ProjectItemInput;
+use App\Service\Project\Item\ProjectItemPresenter;
+use App\Service\Project\Item\ProjectItemService;
+use App\Service\Project\Item\ProjectZone;
 use App\Service\Project\ProjectChatMembership;
 use App\Service\Project\ProjectChatScope;
 use App\Service\Project\ProjectsConfig;
@@ -41,8 +46,12 @@ final class ProjectsModule implements FeatureModuleInterface
     public function configuredBy(): ConfiguredBy
     {
         return new ConfiguredBy(
-            envKeys: ['PROJECTS_ENABLED'],
-            bconfigKeys: [ProjectsConfig::GROUP.'.'.ProjectsConfig::ENABLED],
+            envKeys: ['PROJECTS_ENABLED', 'PROJECTS_BOARD_ENABLED'],
+            bconfigKeys: [
+                ProjectsConfig::GROUP.'.'.ProjectsConfig::ENABLED,
+                ProjectsConfig::GROUP.'.'.ProjectsConfig::BOARD_ENABLED,
+                ProjectsConfig::GROUP.'.'.ProjectsConfig::MAX_ITEMS,
+            ],
         );
     }
 
@@ -81,6 +90,10 @@ final class ProjectsModule implements FeatureModuleInterface
             'api_projects_chats_create',
             'api_projects_chats_join',
             'api_projects_chats_leave',
+            'api_projects_items_list',
+            'api_projects_items_create',
+            'api_projects_items_get',
+            'api_projects_items_update',
         ];
     }
 
@@ -93,6 +106,11 @@ final class ProjectsModule implements FeatureModuleInterface
             ProjectSourceIndexer::class,
             ProjectChatScope::class,
             ProjectChatMembership::class,
+            ProjectItemService::class,
+            ProjectItemInput::class,
+            ProjectItemChanger::class,
+            ProjectItemPresenter::class,
+            ProjectZone::class,
         ];
     }
 

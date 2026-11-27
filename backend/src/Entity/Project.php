@@ -45,6 +45,14 @@ class Project
     #[ORM\Column(name: 'BPINNEDAT', type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeInterface $pinnedAt = null;
 
+    /** IANA zone for a board time given without a zone; null means the owner's zone. */
+    #[ORM\Column(name: 'BTIMEZONE', type: 'string', length: 64, nullable: true)]
+    private ?string $timezone = null;
+
+    /** ISO 4217 code the board's costs are shown in; null until set. */
+    #[ORM\Column(name: 'BCURRENCY', type: 'string', length: 3, nullable: true, options: ['fixed' => true])]
+    private ?string $currency = null;
+
     #[ORM\Column(name: 'BCREATED', type: 'datetime_immutable')]
     private \DateTimeInterface $created;
 
@@ -121,6 +129,28 @@ class Project
             return;
         }
         $this->pinnedAt = $pinned ? new \DateTimeImmutable() : null;
+    }
+
+    public function getTimezone(): ?string
+    {
+        return $this->timezone;
+    }
+
+    public function setTimezone(?string $timezone): void
+    {
+        $this->timezone = $timezone;
+        $this->touch();
+    }
+
+    public function getCurrency(): ?string
+    {
+        return $this->currency;
+    }
+
+    public function setCurrency(?string $currency): void
+    {
+        $this->currency = $currency;
+        $this->touch();
     }
 
     public function getGroupKey(): string

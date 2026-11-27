@@ -17,13 +17,15 @@ nelmio_api_doc:
                 # Projects: a name, instructions and sources (ProjectPresenter).
                 Project:
                     type: object
-                    required: [id, name, description, instructions, pinned, createdAt, updatedAt]
+                    required: [id, name, description, instructions, pinned, timezone, currency, createdAt, updatedAt]
                     properties:
                         id: {type: string, format: uuid, example: 7b0f4c1e-6a4e-4a4b-9d0e-3a5b7c9d1e2f}
                         name: {type: string, example: New kitchen}
                         description: {type: string, nullable: true}
                         instructions: {type: string, nullable: true}
                         pinned: {type: boolean, description: Pinned projects are listed first}
+                        timezone: {type: string, example: "Europe/Berlin", description: "IANA zone the board's times are read and said in: the project's own, else the owner's, else UTC"}
+                        currency: {type: string, nullable: true, example: "EUR", description: "ISO 4217 code of the board's costs"}
                         createdAt: {type: string, format: date-time}
                         updatedAt: {type: string, format: date-time}
                 ProjectSource:
@@ -39,6 +41,68 @@ nelmio_api_doc:
                         fetchedAt: {type: integer, nullable: true, description: Unix time of the last fetch of a link}
                         size: {type: integer}
                         createdAt: {type: integer, description: Unix time}
+                ProjectBoardItem:
+                    type: object
+                    description: "One item of a project's board. An all-day time is a calendar day (2026-11-30), any other time ISO 8601 in UTC."
+                    required: [id, kind, state, parentId, sort, visibility, waitingSince, title, detail, startAt, endAt, dueAt, allDay, rrule, contact, amount, estimated, sourceKind, createdAt, updatedAt]
+                    properties:
+                        id: {type: string, format: uuid}
+                        kind: {type: string, enum: [task, date, decision, cost, note]}
+                        state: {type: string, enum: [proposed, open, done, dropped], description: "proposed waits for a yes; an open decision is an open question; an open cost is planned, a done cost is paid"}
+                        parentId: {type: string, format: uuid, nullable: true, description: "The date a task belongs to, or the decision a cost belongs to"}
+                        sort: {type: integer, nullable: true, description: "Order inside a plan"}
+                        visibility: {type: string, enum: [project, private]}
+                        waitingSince: {type: string, format: date-time, nullable: true, description: "Set while a task waits on someone else"}
+                        title: {type: string, example: "Measure the kitchen niche"}
+                        detail: {type: string, nullable: true}
+                        startAt: {type: string, nullable: true, description: "A date's start"}
+                        endAt: {type: string, nullable: true, description: "A date's end"}
+                        dueAt: {type: string, nullable: true, description: "A task's due time"}
+                        allDay: {type: boolean}
+                        rrule: {type: string, nullable: true, example: "FREQ=WEEKLY;BYDAY=MO", description: "Repetition of a date, a subset of RFC 5545"}
+                        contact: {type: string, nullable: true, example: "Mr Vogt, kitchen studio"}
+                        amount: {type: string, nullable: true, example: "8400.00", description: "A cost's amount in the project's currency"}
+                        estimated: {type: boolean, description: "The amount is an estimate"}
+                        sourceKind: {type: string, enum: [message, file, manual]}
+                        createdAt: {type: string, format: date-time}
+                        updatedAt: {type: string, format: date-time}
+                ProjectBoardItemChange:
+                    type: object
+                    description: "The fields of an item. A kind takes only its own: task (title, detail, parentId, sort, dueAt, allDay, contact, waiting), date (title, detail, sort, startAt, endAt, allDay, rrule, contact), decision and note (title, detail), cost (title, detail, parentId, amount, estimated). A time without a zone is read in the project's zone; a calendar day makes the item all-day."
+                    properties:
+                        state: {type: string, enum: [open, done, dropped]}
+                        title: {type: string, maxLength: 200}
+                        detail: {type: string, maxLength: 1000, nullable: true}
+                        parentId: {type: string, format: uuid, nullable: true}
+                        sort: {type: integer, minimum: 0, maximum: 100000, nullable: true}
+                        startAt: {type: string, nullable: true, example: "2026-11-30T10:00"}
+                        endAt: {type: string, nullable: true}
+                        dueAt: {type: string, nullable: true, example: "2026-12-02"}
+                        allDay: {type: boolean}
+                        rrule: {type: string, nullable: true, example: "FREQ=WEEKLY;BYDAY=MO"}
+                        contact: {type: string, maxLength: 200, nullable: true}
+                        waiting: {type: boolean, description: "The task waits on someone else"}
+                        amount: {oneOf: [{type: string}, {type: number}], example: "8400.00"}
+                        estimated: {type: boolean}
+                ProjectBoardItemInput:
+                    type: object
+                    description: "A new item: kind and title, a date also startAt, a cost also amount, then the fields of its kind as in ProjectBoardItemChange, without state."
+                    required: [kind, title]
+                    properties:
+                        kind: {type: string, enum: [task, date, decision, cost, note]}
+                        title: {type: string, maxLength: 200, example: "Measure the kitchen niche"}
+                        detail: {type: string, maxLength: 1000, nullable: true}
+                        parentId: {type: string, format: uuid, nullable: true}
+                        sort: {type: integer, minimum: 0, maximum: 100000, nullable: true}
+                        startAt: {type: string, nullable: true, example: "2026-11-30T10:00"}
+                        endAt: {type: string, nullable: true}
+                        dueAt: {type: string, nullable: true, example: "2026-12-02"}
+                        allDay: {type: boolean}
+                        rrule: {type: string, nullable: true}
+                        contact: {type: string, maxLength: 200, nullable: true}
+                        waiting: {type: boolean}
+                        amount: {oneOf: [{type: string}, {type: number}], example: "8400.00"}
+                        estimated: {type: boolean}
                 ProjectChat:
                     type: object
                     required: [id, title, updatedAt]
