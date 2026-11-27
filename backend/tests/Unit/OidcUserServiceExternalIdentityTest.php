@@ -126,6 +126,38 @@ final class OidcUserServiceExternalIdentityTest extends TestCase
         self::assertSame('keycloak', $result->getProviderId());
     }
 
+    public function testFindExistingBySubjectUsesTheIssuerScopedIdentityBeforeTheLegacyRow(): void
+    {
+        $user = $this->keycloakUser(6, 'identity-first@synaplan.internal');
+        $identity = new ExternalIdentity();
+        $identity->setUserId(6);
+        $this->externalIdentities->method('findOneByTriple')->willReturn($identity);
+        $this->userRepository->expects(self::once())->method('find')->with(6)->willReturn($user);
+        $this->userRepository->expects(self::never())->method('findByLegacyOidcSub');
+
+        self::assertSame($user, $this->service()->findExistingBySubject('sub-ada'));
+    }
+
+    public function testFindExistingBySubjectRejectsALegacyRowWhoseSubjectDiffers(): void
+    {
+        $user = $this->keycloakUser(5, 'other@synaplan.internal');
+        $user->setUserDetails(['oidc_sub' => 'userA1']);
+        $this->externalIdentities->method('findOneByTriple')->willReturn(null);
+        $this->userRepository->expects(self::once())->method('findByLegacyOidcSub')->with('user_1')->willReturn($user);
+
+        self::assertNull($this->service()->findExistingBySubject('user_1'));
+    }
+
+    public function testFindExistingBySubjectAcceptsTheLegacyRowWhenTheSubjectMatches(): void
+    {
+        $user = $this->keycloakUser(5, 'ada@synaplan.internal');
+        $user->setUserDetails(['oidc_sub' => 'user_1']);
+        $this->externalIdentities->method('findOneByTriple')->willReturn(null);
+        $this->userRepository->expects(self::once())->method('findByLegacyOidcSub')->with('user_1')->willReturn($user);
+
+        self::assertSame($user, $this->service()->findExistingBySubject('user_1'));
+    }
+
     public function testFallsBackToDiscoveryIssuerWhenIssMissing(): void
     {
         $user = $this->keycloakUser(33, 'no-iss@synaplan.internal');

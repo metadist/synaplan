@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Model\SecretPlace;
 use App\Repository\CredentialRepository;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -43,6 +44,14 @@ class Credential
         $this->kind = $kind;
         $this->created = $now;
         $this->updated = $now;
+    }
+
+    /**
+     * The place the secret of one owner's credential is bound to.
+     */
+    public static function secretPlace(int $ownerId): string
+    {
+        return SecretPlace::column('BCREDENTIALS', 'BSECRET', $ownerId);
     }
 
     public function getId(): ?int

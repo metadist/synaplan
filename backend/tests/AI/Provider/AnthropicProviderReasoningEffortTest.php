@@ -115,6 +115,103 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
         self::assertArrayNotHasKey('output_config', $captured['body']);
     }
 
+    public function testReasoningOffDisablesThinkingForHaiku55(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', ['temperature' => 0.2]);
+
+        // Omitting `thinking` would run adaptive thinking on this model.
+        self::assertSame(['type' => 'disabled'], $captured['body']['thinking'] ?? null);
+        self::assertArrayNotHasKey('output_config', $captured['body']);
+        self::assertArrayNotHasKey('temperature', $captured['body']);
+        self::assertArrayNotHasKey('anthropic-beta', $captured['headers']);
+    }
+
+    public function testStreamingReasoningOffDisablesThinkingForHaiku55(): void
+    {
+        $captured = [];
+        $sse = "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+        $client = new MockHttpClient(function (string $method, string $url, array $requestOptions) use (&$captured, $sse): MockResponse {
+            $captured = $this->captureRequest($requestOptions);
+
+            return new MockResponse($sse, [
+                'response_headers' => ['content-type' => 'text/event-stream'],
+            ]);
+        });
+
+        (new AnthropicProvider($client, new NullLogger(), 'test-key'))->chatStream(
+            [['role' => 'user', 'content' => 'Hello']],
+            static function (): void {},
+            ['model' => 'claude-haiku-5-5'],
+        );
+
+        self::assertSame(['type' => 'disabled'], $captured['body']['thinking'] ?? null);
+    }
+
+    public function testReasoningOnUsesAdaptiveThinkingForHaiku55(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', ['reasoning' => true]);
+
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'summarized'],
+            $captured['body']['thinking'] ?? null,
+        );
+    }
+
+    public function testChosenMaxEffortOnHaiku55KeepsMaxWithAdaptiveThinking(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', [
+            'reasoning' => false,
+            'reasoning_effort' => 'max',
+            'temperature' => 0.2,
+        ]);
+
+        // Haiku 5.5 accepts max, but `disabled` next to xhigh or max is a 400,
+        // so the chosen level keeps adaptive thinking.
+        self::assertSame('max', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame('adaptive', $captured['body']['thinking']['type'] ?? null);
+        self::assertArrayNotHasKey('temperature', $captured['body']);
+    }
+
+    public function testChosenXhighEffortOnHaiku55WithReasoningOnStaysXhigh(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', [
+            'reasoning' => true,
+            'reasoning_effort' => 'xhigh',
+        ]);
+
+        self::assertSame('xhigh', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'summarized'],
+            $captured['body']['thinking'] ?? null,
+        );
+    }
+
+    public function testVisionDisablesThinkingForHaiku55(): void
+    {
+        $captured = $this->captureVision('claude-haiku-5-5');
+
+        // The vision call has a small max_tokens that thinking would use up.
+        self::assertSame(['type' => 'disabled'], $captured['body']['thinking'] ?? null);
+    }
+
+    public function testVisionLeavesThinkingUnsetForSonnet5(): void
+    {
+        $captured = $this->captureVision('claude-sonnet-5');
+
+        self::assertArrayNotHasKey('thinking', $captured['body']);
+    }
+
+    public function testChosenLowEffortOnHaiku55KeepsThinkingOffWhenReasoningIsOff(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', [
+            'reasoning' => false,
+            'reasoning_effort' => 'low',
+        ]);
+
+        self::assertSame('low', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(['type' => 'disabled'], $captured['body']['thinking'] ?? null);
+    }
+
     public function testReasoningOffSendsBetweenToolsForSonnet55(): void
     {
         $captured = $this->captureChat('claude-sonnet-5-5', []);
@@ -237,6 +334,36 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
         $captured = $this->captureChat('claude-sonnet-4-6', ['reasoning' => true]);
 
         self::assertSame(['type' => 'adaptive'], $captured['body']['thinking'] ?? null);
+    }
+
+    /**
+     * @return array{body: array<string, mixed>, headers: array<string, mixed>}
+     */
+    private function captureVision(string $model): array
+    {
+        $uploadDir = sys_get_temp_dir().'/anthropic-vision-'.bin2hex(random_bytes(4));
+        mkdir($uploadDir);
+        // 1x1 transparent PNG.
+        file_put_contents($uploadDir.'/pixel.png', base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', true));
+
+        $captured = ['body' => [], 'headers' => []];
+        $client = new MockHttpClient(function (string $method, string $url, array $requestOptions) use (&$captured): MockResponse {
+            $captured = $this->captureRequest($requestOptions);
+
+            return new MockResponse('{"content":[{"type":"text","text":"a pixel"}],"stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1}}', [
+                'response_headers' => ['content-type' => 'application/json'],
+            ]);
+        });
+
+        try {
+            (new AnthropicProvider($client, new NullLogger(), 'test-key', uploadDir: $uploadDir))
+                ->analyzeImage('pixel.png', 'Describe it.', ['model' => $model]);
+        } finally {
+            unlink($uploadDir.'/pixel.png');
+            rmdir($uploadDir);
+        }
+
+        return $captured;
     }
 
     /**

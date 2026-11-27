@@ -351,11 +351,6 @@ final class OpenAICompatibleProvider implements ChatProviderInterface, ToolCalli
         throw new ProviderException('Image variations are not supported by the OpenAI-compatible provider. Generate a new image from a prompt instead.', $this->getName());
     }
 
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        throw new ProviderException('Masked image editing is not supported by the OpenAI-compatible provider. Generate a new image from a prompt instead.', $this->getName());
-    }
-
     // ==================== INTERNALS ====================
 
     /**

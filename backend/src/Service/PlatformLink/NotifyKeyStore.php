@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\PlatformLink;
 
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Federation\FederationSigner;
 use App\Service\Infrastructure\RedisService;
@@ -112,7 +113,7 @@ final class NotifyKeyStore
             0,
             self::GROUP,
             self::SETTING,
-            $this->encryption->encrypt(json_encode($keys, JSON_THROW_ON_ERROR)),
+            $this->encryption->encrypt(json_encode($keys, JSON_THROW_ON_ERROR), SecretPlace::config(0, self::GROUP, self::SETTING)),
         );
         $winner = $this->live($this->decode($stored));
 
@@ -151,7 +152,7 @@ final class NotifyKeyStore
             return [];
         }
         try {
-            $json = $this->encryption->decrypt($stored);
+            $json = $this->encryption->decrypt($stored, SecretPlace::config(0, self::GROUP, self::SETTING));
         } catch (\RuntimeException) {
             return [];
         }
@@ -180,6 +181,6 @@ final class NotifyKeyStore
      */
     private function save(array $keys): void
     {
-        $this->configs->setValue(0, self::GROUP, self::SETTING, $this->encryption->encrypt(json_encode($keys, JSON_THROW_ON_ERROR)));
+        $this->configs->setValue(0, self::GROUP, self::SETTING, $this->encryption->encrypt(json_encode($keys, JSON_THROW_ON_ERROR), SecretPlace::config(0, self::GROUP, self::SETTING)));
     }
 }

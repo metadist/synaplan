@@ -59,6 +59,7 @@
     "fallbackTitle": "Eklenti",
     "loading": "Eklenti yükleniyor…",
     "notFound": "Eklenti bulunamadı veya hesabınız için etkinleştirilmemiş",
+    "loadFailed": "Bu eklenti yüklenemedi. Sayfayı yenileyin.",
     "commandEmpty": "Eklenti boş bir yanıt döndürdü.",
     "commandError": "Eklenti komutu başarısız oldu. Lütfen tekrar deneyin."
   },

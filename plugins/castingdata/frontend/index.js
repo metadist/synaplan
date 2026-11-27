@@ -2,7 +2,7 @@ export default {
   /**
    * Mount the Casting Data Connector settings into the provided container.
    * @param {HTMLElement} el - The container element
-   * @param {Object} context - Context provided by the host app (userId, apiBaseUrl, pluginBaseUrl, token)
+   * @param {Object} context - Context provided by the host app (userId, apiBaseUrl, pluginBaseUrl, locale, t, request)
    */
   mount(el, context) {
     const baseUrl = context.pluginBaseUrl.replace(/\/assets$/, '')
@@ -84,14 +84,11 @@ export default {
       statusEl.style.display = 'block'
       statusEl.textContent = message
       statusEl.style.background = isSuccess
-        ? 'var(--bg-success, #d4edda)'
-        : 'var(--bg-danger, #f8d7da)'
+        ? 'var(--status-success-muted, #dcfce7)'
+        : 'var(--status-error-muted, #fee2e2)'
       statusEl.style.color = isSuccess
-        ? 'var(--txt-success, #155724)'
-        : 'var(--txt-danger, #721c24)'
-      statusEl.style.border = isSuccess
-        ? '1px solid var(--border-success, #c3e6cb)'
-        : '1px solid var(--border-danger, #f5c6cb)'
+        ? 'var(--status-success-text, #166534)'
+        : 'var(--status-error-text, #991b1b)'
     }
 
     function setLoading(btn, loading) {

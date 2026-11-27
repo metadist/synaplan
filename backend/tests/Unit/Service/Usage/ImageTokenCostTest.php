@@ -19,8 +19,8 @@ use Psr\Log\NullLogger;
  */
 final class ImageTokenCostTest extends TestCase
 {
-    private const IMAGE_ID = 451;
-    private const WRAPPER_ID = 453;
+    private const IMAGE_ID = 457;
+    private const WRAPPER_ID = 455;
 
     /** GPT Image 2.6 rates, USD per 1M tokens. */
     private const META = [

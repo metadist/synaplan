@@ -93,7 +93,10 @@ final class TranscriptRenderer
             if (isset($labels[$tag])) {
                 continue;
             }
-            $name = trim((string) ($roster[self::endpointOf($tag)] ?? ''));
+            $name = trim((string) ($roster[$tag] ?? ''));
+            if ('' === $name) {
+                $name = trim((string) ($roster[self::endpointOf($tag)] ?? ''));
+            }
             $labels[$tag] = '' !== $name ? $name : sprintf('%s %d', $fallback, ++$unknown);
         }
 

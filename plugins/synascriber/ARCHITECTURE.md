@@ -165,8 +165,10 @@ still talking. Captions and transcript are the same text.
 OpenTalk 26.3 calls the transcriber (`POST /v1/init`). The transcriber opens
 a session on this plugin with the transcriber secret and joins the meeting's
 LiveKit. Windows come back through the same transcriber routes as Jitsi.
-The session is subtitles only: text goes back to OpenTalk as a subtitle
-segment, and no file is written. A missing LiveKit address stops the
+The session keeps the spoken lines. Text goes back to OpenTalk as a subtitle
+segment, and when the meeting stops the transcript is written for each
+matched account, or for the administrators when nobody matches. A missing
+LiveKit address stops the
 transcriber at startup. The operator steps are in
 [docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
 

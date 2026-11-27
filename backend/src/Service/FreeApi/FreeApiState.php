@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\FreeApi;
 
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use Symfony\Component\Uid\Uuid;
@@ -23,7 +24,7 @@ final readonly class FreeApiState
     private const KEY_ID = 'KEY_ID';
     private const LIMITS = 'LIMITS';
     private const SNAPSHOT = 'SNAPSHOT';
-    private const PENDING_REVOKE = 'PENDING_REVOKE';
+    public const PENDING_REVOKE = 'PENDING_REVOKE';
     private const PENDING_REVOKE_UNTIL = 'PENDING_REVOKE_UNTIL';
     private const ACTIVATED_AT = 'ACTIVATED_AT';
     private const ACTIVATED_BY = 'ACTIVATED_BY';
@@ -157,7 +158,7 @@ final readonly class FreeApiState
      */
     public function rememberPendingRevoke(string $key, ?int $until): void
     {
-        $this->write(self::PENDING_REVOKE, $this->encryption->encrypt($key));
+        $this->write(self::PENDING_REVOKE, $this->encryption->encrypt($key, SecretPlace::config(0, FreeApiConfig::GROUP, self::PENDING_REVOKE)));
         if (null === $until) {
             $this->configRepository->deleteValue(0, FreeApiConfig::GROUP, self::PENDING_REVOKE_UNTIL);
         } else {
@@ -180,7 +181,7 @@ final readonly class FreeApiState
         }
 
         try {
-            $key = $this->encryption->decrypt($stored);
+            $key = $this->encryption->decrypt($stored, SecretPlace::config(0, FreeApiConfig::GROUP, self::PENDING_REVOKE));
         } catch (\Throwable) {
             return null;
         }

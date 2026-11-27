@@ -25,6 +25,7 @@ import { modelStatusApi } from '../services/api/adminModelStatusApi'
 import { partnersApi } from '../services/api/partnersApi'
 import { isSavedTasksEnabled } from './useSavedTasksFeature'
 import { idsReportedAsDown, servicesNeedingAttention } from '../utils/serviceReadiness'
+import { pluginLabel } from '../utils/pluginLabel'
 import { isApprovalsEnabled } from './useApprovalsFeature'
 import { isAgentsEnabled } from './useAgentsFeature'
 import { capacityNavEntries } from './useCapacityNav'
@@ -328,13 +329,11 @@ export function useNavItems() {
         label: t('nav.plugins'),
         icon: PuzzlePieceIcon,
         requiresAuth: true,
-        children: configStore.plugins.map((plugin: { name?: string }) => ({
+        children: configStore.plugins.map((plugin) => ({
           key: `plugin-${plugin.name ?? 'unknown'}`,
           path: `/plugins/${plugin.name}`,
           icon: PuzzlePieceIcon,
-          label: plugin.name
-            ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
-            : t('common.unknown'),
+          label: pluginLabel(plugin) || t('common.unknown'),
         })),
       })
     }

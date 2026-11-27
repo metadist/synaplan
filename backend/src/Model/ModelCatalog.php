@@ -131,8 +131,10 @@ class ModelCatalog
         92 => [
             'providerId' => 'claude-3-haiku-20240307',
             'retiredOn' => '2026-05-08',
-            'successor' => 'anthropic:claude-haiku-4-5-20251001:chat',
-            'reason' => 'Superseded by Claude Haiku 4.5.',
+            // Haiku 4.5 was itself retired on 2026-11-27, so the binding goes
+            // straight to Haiku 5.5 instead of through a retired row.
+            'successor' => 'anthropic:claude-haiku-5-5:chat',
+            'reason' => 'Superseded by Claude Haiku 4.5, then Claude Haiku 5.5.',
         ],
 
         // --- 2026-07-27 (Version20260727120000) ---
@@ -609,6 +611,26 @@ class ModelCatalog
             'successor' => 'openai:gpt-6-luna:pic2text',
             'reason' => 'Superseded by GPT-6 Luna.',
         ],
+
+        // --- 2026-11-27 (Claude Haiku 5.5 replaces Claude Haiku 4.5) ---
+        // Anthropic still serves Haiku 4.5 (retirement not before 2026-10-15),
+        // so this is our retirement, not a shutdown. Haiku 5.5 (BIDs 448/449)
+        // is the same tier on the same key at a tenth of the price: $0.10 /
+        // $0.50 up to 100K prompt tokens (vs $1 / $5), 1M context, 128K
+        // output, vision, tools and adaptive thinking. Stored bindings move to
+        // it so nobody keeps paying ten times as much for the older model.
+        162 => [
+            'providerId' => 'claude-haiku-4-5-20251001',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'anthropic:claude-haiku-5-5:chat',
+            'reason' => 'Superseded by Claude Haiku 5.5.',
+        ],
+        235 => [
+            'providerId' => 'claude-haiku-4-5-20251001',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'anthropic:claude-haiku-5-5:pic2text',
+            'reason' => 'Superseded by Claude Haiku 5.5.',
+        ],
     ];
 
     /**
@@ -681,6 +703,10 @@ class ModelCatalog
         // Official xAI Text API pricing 2026-09-24: >=200k is 2x input/output
         // and cached input ($4/$12, cache $1.00) — https://docs.x.ai/docs/models.
         'grok-4.7' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
+        // Official Anthropic pricing 2026-11-27: base $0.10/$0.50, cache $0.01;
+        // a prompt over 100,000 tokens pays $0.50/$2.50, cache $0.05
+        // (https://platform.claude.com/docs/en/about-claude/pricing#long-context-pricing).
+        'claude-haiku-5-5' => ['threshold_tokens' => 100000, 'price_in_above' => 0.50, 'price_out_above' => 2.50, 'cache_price_in_above' => 0.05],
     ];
 
     /**
@@ -1694,7 +1720,7 @@ class ModelCatalog
         // (verified 2026-11-27). OpenAISpeech asks for `json` (no segments)
         // and sends a language hint as `languages[]` instead of `language`.
         [
-            'id' => 448,
+            'id' => 454,
             'service' => 'OpenAI',
             'name' => 'GPT Transcribe',
             'tag' => 'sound2text',
@@ -1985,7 +2011,7 @@ class ModelCatalog
         // cache writes $1.25. Long-context (>272k) in CONTEXT_PRICING.
         // ----------------------------------------------------------------
         [
-            'id' => 449,
+            'id' => 455,
             'service' => 'OpenAI',
             'name' => 'GPT-6.1 Terra',
             'tag' => 'chat',
@@ -2019,7 +2045,7 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 450,
+            'id' => 456,
             'service' => 'OpenAI',
             'name' => 'GPT-6.1 Terra (Vision)',
             'tag' => 'pic2text',
@@ -2370,7 +2396,7 @@ class ModelCatalog
         // prices are only the fallback for an answer without usage; no page
         // gives them for 2.6, so they reuse the GPT Image 2.5 token budgets.
         [
-            'id' => 451,
+            'id' => 457,
             'service' => 'OpenAI',
             'name' => 'GPT Image 2.6 Flare',
             'tag' => 'text2pic',
@@ -2409,7 +2435,7 @@ class ModelCatalog
             ],
         ],
         [
-            'id' => 452,
+            'id' => 458,
             'service' => 'OpenAI',
             'name' => 'GPT Image 2.6 Sunburst',
             'tag' => 'text2pic',
@@ -2458,8 +2484,9 @@ class ModelCatalog
             'service' => 'Anthropic',
             'name' => 'Claude Haiku 4.5',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: replaced by Claude Haiku 5.5. See ModelCatalog::RETIREMENTS[162].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'claude-haiku-4-5-20251001',
             'priceIn' => 1,
             'inUnit' => 'per1M',
@@ -2784,8 +2811,9 @@ class ModelCatalog
             'service' => 'Anthropic',
             'name' => 'Claude Haiku 4.5 (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired: replaced by Claude Haiku 5.5. See ModelCatalog::RETIREMENTS[235].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'claude-haiku-4-5-20251001',
             'priceIn' => 1,
             'inUnit' => 'per1M',
@@ -6202,6 +6230,66 @@ class ModelCatalog
             ],
         ],
         [
+            // Snapshot 2026-11-27 (https://platform.claude.com/docs/en/models/overview
+            // and https://platform.claude.com/docs/en/about-claude/pricing).
+            // Claude Haiku 5.5 — successor to Haiku 4.5 for high-volume,
+            // latency-sensitive work (sorting, routing, extraction, summaries).
+            // Input $0.10 / output $0.50 per 1M while the prompt is 100,000
+            // tokens or fewer; a longer prompt bills the whole request at
+            // $0.50 / $2.50 (CONTEXT_PRICING). Cache reads are the Anthropic-wide
+            // 0.1x ($0.01), so no `cache_read_price_per_1M` is authored.
+            // Adaptive thinking is on when the field is omitted; `disabled` is
+            // accepted at effort high or below. Effort low..max, default medium.
+            // Forced tool_choice is accepted. Non-default temperature / top_p /
+            // top_k and assistant prefill are a 400.
+            'id' => 448,
+            'service' => 'Anthropic',
+            'name' => 'Claude Haiku 5.5',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-haiku-5-5',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.50,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Haiku 5.5 - Anthropic\'s fastest model, for high-volume tasks such as sorting, extraction and summaries. 1M context, 128K max output. Prompts over 100K tokens cost five times as much.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'claude-haiku-5-5'],
+                'features' => ['vision', 'reasoning', 'tool_use'],
+                // Stated so the long-context tier scales from an authored rate.
+                'cache_read_price_per_1M' => 0.01,
+                'meta' => ['family' => 'anthropic', 'jurisdiction' => 'US', 'context_window' => '1000000', 'max_output' => '128000', 'knowledge_cutoff' => '2026-06-30', 'reasoning_effort_default' => 'medium'],
+            ],
+        ],
+        [
+            'id' => 449,
+            'service' => 'Anthropic',
+            'name' => 'Claude Haiku 5.5 (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'claude-haiku-5-5',
+            'priceIn' => 0.10,
+            'inUnit' => 'per1M',
+            'priceOut' => 0.50,
+            'outUnit' => 'per1M',
+            'quality' => 8,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Claude Haiku 5.5 for image analysis and vision tasks. Fastest Anthropic vision tier.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'claude-haiku-5-5'],
+                'features' => ['vision'],
+                // Stated so the long-context tier scales from an authored rate.
+                'cache_read_price_per_1M' => 0.01,
+                'meta' => ['supports_images' => true, 'context_window' => '1000000'],
+            ],
+        ],
+        [
             'id' => 342,
             'service' => 'Perplexity',
             'name' => 'Sonar',
@@ -6367,7 +6455,7 @@ class ModelCatalog
         // steadier voice across languages
         // (https://developers.openai.com/api/docs/models/gpt-live-1.1, verified 2026-11-27).
         [
-            'id' => 453,
+            'id' => 459,
             'service' => 'OpenAI',
             'name' => 'GPT-Live 1.1',
             'tag' => 'voice2voice',

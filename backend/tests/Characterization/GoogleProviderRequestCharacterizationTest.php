@@ -258,14 +258,6 @@ final class GoogleProviderRequestCharacterizationTest extends TestCase
             'image.variations' => [
                 'call' => static fn (GoogleProvider $p): array => $p->createVariations('photo.png', 2),
             ],
-            'image.edit' => [
-                'responses' => [self::json(['candidates' => [['content' => ['parts' => [['inline_data' => ['mime_type' => 'image/png', 'data' => self::PIXEL]]]]]]])],
-                'call' => static fn (GoogleProvider $p): string => $p->editImage('photo.png', 'mask.png', 'Add a hat'),
-            ],
-            'image.edit_no_image' => [
-                'responses' => [self::json(['candidates' => [['content' => ['parts' => [['text' => 'No.']]]]]])],
-                'call' => static fn (GoogleProvider $p): string => $p->editImage('/photo.png', 'mask.png', 'Add a hat'),
-            ],
         ];
     }
 

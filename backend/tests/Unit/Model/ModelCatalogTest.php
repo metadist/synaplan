@@ -590,8 +590,8 @@ class ModelCatalogTest extends TestCase
 
         $this->assertCount(2, $terra, 'Expected gpt-6.1-terra chat + vision variants');
         $this->assertSame(['chat', 'pic2text'], array_column($terra, 'tag'));
-        $this->assertSame(449, ModelCatalog::findBidByKey('openai:gpt-6.1-terra:chat'));
-        $this->assertSame(450, ModelCatalog::findBidByKey('openai:gpt-6.1-terra:pic2text'));
+        $this->assertSame(455, ModelCatalog::findBidByKey('openai:gpt-6.1-terra:chat'));
+        $this->assertSame(456, ModelCatalog::findBidByKey('openai:gpt-6.1-terra:pic2text'));
 
         foreach ($terra as $variant) {
             $this->assertSame('OpenAI', $variant['service']);
@@ -617,10 +617,10 @@ class ModelCatalogTest extends TestCase
     public function testNewOpenAiImageVoiceAndTranscriptionRowsAreSelectable(): void
     {
         $expected = [
-            'openai:gpt-image-2.6-flare:text2pic' => 451,
-            'openai:gpt-image-2.6-sunburst:text2pic' => 452,
-            'openai:gpt-live-1.1:voice2voice' => 453,
-            'openai:gpt-transcribe:sound2text' => 448,
+            'openai:gpt-image-2.6-flare:text2pic' => 457,
+            'openai:gpt-image-2.6-sunburst:text2pic' => 458,
+            'openai:gpt-live-1.1:voice2voice' => 459,
+            'openai:gpt-transcribe:sound2text' => 454,
         ];
 
         foreach ($expected as $key => $bid) {
@@ -848,8 +848,8 @@ class ModelCatalogTest extends TestCase
 
     /**
      * Every provider that raises input and output above a context threshold
-     * raises the cached-input rate with it, always to exactly 2x the short-context
-     * rate.
+     * raises the cached-input rate with it, by the same factor as the input rate
+     * (2x on most tiers, 5x on Claude Haiku 5.5).
      *
      * Both halves are required. A tiered row that authors no base cache rate
      * silently falls back to the 50% default discount, and a tier that omits
@@ -883,11 +883,12 @@ class ModelCatalogTest extends TestCase
                 $tier,
                 sprintf('%s caches reads but its long-context tier does not raise the cache rate', $providerId),
             );
+            $factor = $tier['price_in_above'] / (float) $rows[0]['priceIn'];
             $this->assertEqualsWithDelta(
-                2 * (float) $baseCache,
+                $factor * (float) $baseCache,
                 $tier['cache_price_in_above'],
                 1e-9,
-                sprintf('%s long-context cache rate should be 2x the short-context rate', $providerId),
+                sprintf('%s long-context cache rate should rise by the input factor (%sx)', $providerId, $factor),
             );
             ++$checked;
         }

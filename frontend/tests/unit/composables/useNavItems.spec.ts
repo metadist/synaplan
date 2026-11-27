@@ -52,7 +52,7 @@ vi.mock('@/services/api/httpClient', () => ({
   getConfigSync: () => ({ features: runtimeFeatures, modules: runtimeModules }),
 }))
 
-const pluginList: { name: string }[] = []
+const pluginList: { name: string; displayName?: string }[] = []
 
 vi.mock('@/stores/config', () => ({
   useConfigStore: () => ({
@@ -388,5 +388,13 @@ describe('useNavItems rail', () => {
     const keys = wrapper.vm.navItems.map((item: { key: string }) => item.key)
     expect(keys).toContain('plugins')
     expect(keys.indexOf('plugins')).toBeLessThan(keys.indexOf('manage') + 10)
+  })
+
+  it('labels a plugin with its display name, or its id in words', () => {
+    pluginList.push({ name: 'synascriber', displayName: 'Meeting notes' }, { name: 'hello_world' })
+    const wrapper = mountNav({ email: 'user@test.com', level: 'PRO' })
+    const entry = wrapper.vm.navItems.find((item: { key: string }) => item.key === 'plugins')
+    const labels = (entry?.children ?? []).map((child: { label: string }) => child.label)
+    expect(labels).toEqual(['Meeting notes', 'Hello world'])
   })
 })

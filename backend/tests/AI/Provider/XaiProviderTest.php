@@ -498,7 +498,7 @@ class XaiProviderTest extends TestCase
         $this->makeProvider(httpClient: $client)->generateImage('a red cube');
     }
 
-    public function testImageVariationsAndEditingAreRejectedWithAReason(): void
+    public function testImageVariationsAreRejectedWithAReason(): void
     {
         $provider = $this->makeProvider();
 
@@ -507,13 +507,6 @@ class XaiProviderTest extends TestCase
             $this->fail('Expected ProviderException');
         } catch (ProviderException $e) {
             $this->assertStringContainsString('no image-variation endpoint', $e->getMessage());
-        }
-
-        try {
-            $provider->editImage('image.png', 'mask.png', 'make it blue');
-            $this->fail('Expected ProviderException');
-        } catch (ProviderException $e) {
-            $this->assertStringContainsString('not enabled in Synaplan yet', $e->getMessage());
         }
     }
 

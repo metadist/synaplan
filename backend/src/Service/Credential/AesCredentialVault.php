@@ -21,7 +21,7 @@ final readonly class AesCredentialVault implements CredentialVaultInterface
     public function store(int $ownerId, string $kind, string $plaintext): int
     {
         $credential = new Credential($ownerId, $kind);
-        $credential->setSecret($this->encryption->encrypt($plaintext));
+        $credential->setSecret($this->encryption->encrypt($plaintext, Credential::secretPlace($ownerId)));
         $this->credentials->save($credential);
         $id = $credential->getId();
         if (null === $id) {
@@ -39,13 +39,13 @@ final readonly class AesCredentialVault implements CredentialVaultInterface
 
     public function reveal(int $credentialId, int $ownerId): string
     {
-        return $this->encryption->decrypt($this->owned($credentialId, $ownerId)->getSecret());
+        return $this->encryption->decrypt($this->owned($credentialId, $ownerId)->getSecret(), Credential::secretPlace($ownerId));
     }
 
     public function rotate(int $credentialId, int $ownerId, string $plaintext): void
     {
         $credential = $this->owned($credentialId, $ownerId);
-        $credential->setSecret($this->encryption->encrypt($plaintext));
+        $credential->setSecret($this->encryption->encrypt($plaintext, Credential::secretPlace($ownerId)));
         $this->credentials->save($credential);
         $this->logger->info('Credential rotated', [
             'credential_id' => $credentialId,

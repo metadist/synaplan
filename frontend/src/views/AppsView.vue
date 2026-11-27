@@ -101,6 +101,7 @@ import AppCard from '@/components/apps/AppCard.vue'
 import { APP_CATEGORIES, appMessageKey, availableApps, type AppDefinition } from '@/apps/catalog'
 import { loadAttentionAppIds, loadConnectedAppIds } from '@/apps/status'
 import { useConfigStore } from '@/stores/config'
+import { pluginLabel } from '@/utils/pluginLabel'
 
 interface Card {
   id: string
@@ -136,12 +137,12 @@ const tabs = computed<TabNavItem[]>(() => [
 ])
 
 const pluginCards = computed<Card[]>(() =>
-  (configStore.plugins as { name?: string }[])
-    .filter((plugin): plugin is { name: string } => !!plugin.name)
+  configStore.plugins
+    .filter((plugin) => !!plugin.name)
     .map((plugin) => ({
       id: `plugin-${plugin.name}`,
       to: `/plugins/${plugin.name}`,
-      name: plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1),
+      name: pluginLabel(plugin),
       tagline: t('apps.pluginTagline'),
       icon: 'heroicons:puzzle-piece',
       // A plugin installed for the user is in use by definition.

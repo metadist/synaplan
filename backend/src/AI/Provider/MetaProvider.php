@@ -330,11 +330,6 @@ class MetaProvider extends AbstractChatCompletionsCloudProvider implements Image
         throw new ProviderException('Muse Image has no variation endpoint. Attach the picture and describe the change instead.', self::PROVIDER_NAME);
     }
 
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        throw new ProviderException('Muse Image does not take a mask. Attach the picture and describe the change instead.', self::PROVIDER_NAME);
-    }
-
     // ==================== SPEECH TO TEXT (Muse Voice Transcribe) ====================
 
     /**

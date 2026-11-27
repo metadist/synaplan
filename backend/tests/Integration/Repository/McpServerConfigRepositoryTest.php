@@ -98,6 +98,6 @@ final class McpServerConfigRepositoryTest extends KernelTestCase
             resource: 'https://mcp.example.com/mcp',
             accessToken: 'at-1',
             status: McpOAuthState::STATUS_CONNECTED,
-        ), $this->encryption);
+        ), $this->encryption, (int) $this->server?->getUserId());
     }
 }

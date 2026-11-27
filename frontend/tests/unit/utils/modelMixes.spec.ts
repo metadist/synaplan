@@ -111,7 +111,7 @@ describe('resolveModelMix', () => {
       name: 'GPT Image 2.5 Flare',
     })
     const flare26 = model({
-      id: 451,
+      id: 457,
       service: 'OpenAI',
       providerId: 'gpt-image-2.6-flare',
       name: 'GPT Image 2.6 Flare',
@@ -131,7 +131,7 @@ describe('resolveModelMix', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
       TEXT2PIC: [
         model({
-          id: 451,
+          id: 457,
           service: 'OpenAI',
           providerId: 'gpt-image-2.6-flare',
           name: 'GPT Image 2.6 Flare',
@@ -149,7 +149,7 @@ describe('resolveModelMix', () => {
 
     const resolved = resolveModelMix(mixDefinition('openai'), models)
 
-    expect(resolved.defaults.TEXT2PIC).toBe(451)
+    expect(resolved.defaults.TEXT2PIC).toBe(457)
     expect(resolved.defaults.TEXT2SOUND).toBeUndefined()
   })
 

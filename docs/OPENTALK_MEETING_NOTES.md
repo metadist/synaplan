@@ -3,7 +3,7 @@
 
 # Meeting subtitles in OpenTalk
 
-Synaplan writes the subtitles in an OpenTalk meeting. People read the lines in the meeting. Synaplan does not save a file.
+Synaplan writes the subtitles in an OpenTalk meeting, and saves the transcript when they stop. People read the lines in the meeting. Each person with a Synaplan account finds the text afterwards. Audio is not kept.
 
 You already have OpenTalk 26.3 or newer. You start Synaplan's subtitles service and you tell OpenTalk where it is. Jitsi is a different install: [Meeting subtitles in Jitsi](OPENDESK_MEETING_NOTES.md). If that service is already running, leave it alone and start a second one.
 
@@ -47,6 +47,8 @@ api_key = { id = "transcription", secret = "password-you-invent" }
 ```
 
 **4. In a meeting.** A moderator opens **More options → Enable subtitles**, turns the switch on, picks a language, and saves. Everyone else presses **Show**. Turning the switch off stops the lines.
+
+When the lines stop, Synaplan saves the transcript. Each person in the meeting who has a Synaplan account gets a copy under **Sources → Generated**. When nobody in the meeting matches an account, every administrator gets the copy, so the meeting is not lost. Audio is not kept. OpenTalk itself only says that subtitles are on, so tell people that a transcript is kept.
 
 Open `http://the-service:8095/health`. The page says `"ok": true`.
 

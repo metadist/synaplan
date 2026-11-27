@@ -6,6 +6,7 @@ namespace App\Tests\Unit\AI\Credential;
 
 use App\AI\Credential\HiggsfieldCredentialResolver;
 use App\AI\Credential\ProviderKeyStore;
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -147,8 +148,8 @@ class HiggsfieldCredentialResolverTest extends TestCase
         self::assertArrayHasKey('api_secret', $stored);
         // Stored values must be ciphertext (not the plaintext), and must decrypt back.
         self::assertNotSame('my-key', $stored['api_key']);
-        self::assertSame('my-key', $this->encryption->decrypt($stored['api_key']));
-        self::assertSame('my-secret', $this->encryption->decrypt($stored['api_secret']));
+        self::assertSame('my-key', $this->encryption->decrypt($stored['api_key'], SecretPlace::config(7, HiggsfieldCredentialResolver::CONFIG_GROUP, HiggsfieldCredentialResolver::SETTING_API_KEY)));
+        self::assertSame('my-secret', $this->encryption->decrypt($stored['api_secret'], SecretPlace::config(7, HiggsfieldCredentialResolver::CONFIG_GROUP, HiggsfieldCredentialResolver::SETTING_API_SECRET)));
     }
 
     public function testMaskedUserApiKeyHidesMostOfTheKey(): void

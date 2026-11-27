@@ -6,11 +6,7 @@
     >
       <div class="mx-auto w-full max-w-[100rem]">
         <PageHeader
-          :title="
-            plugin?.name
-              ? plugin.name.charAt(0).toUpperCase() + plugin.name.slice(1)
-              : $t('plugins.fallbackTitle')
-          "
+          :title="title"
           :subtitle="plugin?.description || $t('plugins.loading')"
           icon="heroicons:puzzle-piece"
           data-testid="section-header"
@@ -33,7 +29,6 @@
 </template>
 
 <script setup lang="ts">
-import { getErrorMessage } from '@/utils/errorMessage'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -43,6 +38,7 @@ import MainLayout from '@/components/MainLayout.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { authedFetch } from '@/services/api/authedFetch'
 import { createLoadGate, pluginTranslator, readPluginLocale } from '@/services/pluginLocale'
+import { pluginLabel } from '@/utils/pluginLabel'
 
 const route = useRoute()
 const { t, locale } = useI18n()
@@ -59,9 +55,13 @@ const plugin = computed(() => {
   return configStore.plugins.find((p) => p.name === pluginName.value)
 })
 
+const title = computed(
+  () => (plugin.value && pluginLabel(plugin.value)) || t('plugins.fallbackTitle')
+)
+
 /**
- * Loads the plugin frontend dynamically.
- * We look for an 'index.js' ES module in the plugin's assets.
+ * Mounts the plugin's page: the `index.js` ES module in its assets, or its
+ * `index.html` when the module cannot be loaded.
  */
 async function loadPlugin() {
   const generation = loadGate.begin()
@@ -91,11 +91,6 @@ async function loadPlugin() {
   const entryUrl = `${pluginBaseUrl}/index.js?v=${Date.now()}`
 
   try {
-    // 1. Fetch index.html if it exists to support "webpage" style plugins
-    // But since the user wants everything in the div without iframe,
-    // an ES module entry point is more reliable for dynamic mounting.
-
-    // 2. Import the plugin's ES module
     const module = await import(/* @vite-ignore */ entryUrl)
     if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
 
@@ -127,9 +122,8 @@ async function loadPlugin() {
   } catch (err: unknown) {
     if (!loadGate.isCurrent(generation)) return
     console.error('Failed to load plugin', pluginName.value, err)
-    error.value = `Failed to load plugin: ${getErrorMessage(err) || 'Unknown error'}`
+    error.value = t('plugins.loadFailed')
 
-    // Fallback: Check for index.html if index.js failed
     try {
       const htmlUrl = `${pluginBaseUrl}/index.html`
       const response = await fetch(htmlUrl)
@@ -137,10 +131,10 @@ async function loadPlugin() {
         const html = await response.text()
         if (!loadGate.isCurrent(generation) || !pluginContainer.value) return
         pluginContainer.value.innerHTML = html
-        error.value = null // Clear error if we found index.html
+        error.value = null
       }
     } catch {
-      // Ignore html error if JS failed
+      // The load-failed message above stays.
     }
   } finally {
     if (loadGate.isCurrent(generation)) loading.value = false

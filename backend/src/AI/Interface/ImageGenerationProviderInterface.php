@@ -1,21 +1,19 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\AI\Interface;
 
 interface ImageGenerationProviderInterface extends ProviderMetadataInterface
 {
     /**
-     * Generiert Bild aus Text-Prompt.
+     * Generates images from a text prompt. Image-to-image (pic2pic) passes the
+     * source images as $options['images'].
      */
     public function generateImage(string $prompt, array $options = []): array;
 
     /**
-     * Erstellt Variationen eines Bildes.
+     * Creates variations of an existing image.
      */
     public function createVariations(string $imageUrl, int $count = 1): array;
-
-    /**
-     * Image Editing mit Mask.
-     */
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string;
 }

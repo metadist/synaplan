@@ -250,16 +250,9 @@ class MetaProviderTest extends TestCase
         }
     }
 
-    public function testMaskedEditAndTranslationAreRefused(): void
+    public function testTranslationIsRefused(): void
     {
         $provider = $this->makeProvider();
-
-        try {
-            $provider->editImage('/tmp/a.png', '/tmp/mask.png', 'change it');
-            $this->fail('Masked editing should be refused.');
-        } catch (ProviderException $e) {
-            $this->assertStringContainsString('mask', $e->getMessage());
-        }
 
         $this->expectException(ProviderException::class);
         $provider->translateAudio('/tmp/a.wav', 'en');

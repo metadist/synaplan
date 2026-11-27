@@ -22,7 +22,7 @@ class InboundEmailHandlerTest extends TestCase
 
     public function testSetAndGetDecryptedPassword(): void
     {
-        $handler = new InboundEmailHandler();
+        $handler = (new InboundEmailHandler())->setUserId(7);
         $plainPassword = 'my-secret-password';
 
         $handler->setDecryptedPassword($plainPassword, $this->encryptionService);
@@ -32,13 +32,13 @@ class InboundEmailHandlerTest extends TestCase
         $this->assertGreaterThan(20, strlen($handler->getPassword()));
 
         // Should be able to decrypt
-        $decrypted = $this->encryptionService->decrypt($handler->getPassword());
+        $decrypted = $this->encryptionService->decrypt($handler->getPassword(), InboundEmailHandler::passwordPlace(7));
         $this->assertEquals($plainPassword, $decrypted);
     }
 
     public function testSetAndGetSmtpCredentials(): void
     {
-        $handler = new InboundEmailHandler();
+        $handler = (new InboundEmailHandler())->setUserId(7);
 
         $handler->setSmtpCredentials(
             'smtp.gmail.com',
@@ -62,7 +62,7 @@ class InboundEmailHandlerTest extends TestCase
 
     public function testEmailFilterConfiguration(): void
     {
-        $handler = new InboundEmailHandler();
+        $handler = (new InboundEmailHandler())->setUserId(7);
 
         // Test default (new mode)
         $this->assertEquals('new', $handler->getEmailFilter()['mode']);
@@ -84,7 +84,7 @@ class InboundEmailHandlerTest extends TestCase
 
     public function testEmptyPasswordHandling(): void
     {
-        $handler = new InboundEmailHandler();
+        $handler = (new InboundEmailHandler())->setUserId(7);
 
         $handler->setDecryptedPassword('', $this->encryptionService);
         $this->assertEquals('', $handler->getPassword());

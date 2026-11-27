@@ -48,21 +48,14 @@ final class AnthropicDescriptor implements DescribesProviderInterface
         'claude-sonnet-5-5',
     ];
 
-    /**
-     * Sonnet 5.5 and Fable 5.2 accept xhigh and max as well as low|medium|high.
-     * Checked before the adaptive models: `claude-fable-5` is a prefix of
-     * `claude-fable-5-2`, and `claude-sonnet-5` is a prefix of `claude-sonnet-5-5`.
-     *
-     * @var list<string>
-     */
-    private const EXTENDED_EFFORT_MODELS = ['claude-sonnet-5-5', 'claude-fable-5-2'];
-
     public static function descriptor(): ProviderDescriptor
     {
-        // Adaptive models take output_config.effort low|medium|high. Sonnet 5.5
-        // and Fable 5.2 also take xhigh and max. Budget models keep the toggle.
+        // Adaptive models take output_config.effort low|medium|high. Sonnet 5.5,
+        // Fable 5.2 and Haiku 5.5 also take xhigh and max; that rule is checked
+        // first because `claude-sonnet-5` and `claude-fable-5` are prefixes of
+        // them. Budget models keep the toggle.
         $reasoning = new ReasoningLadder([
-            new ReasoningLevelRule(ReasoningMatch::Prefix, self::EXTENDED_EFFORT_MODELS, ['low', 'medium', 'high', 'xhigh', 'max']),
+            new ReasoningLevelRule(ReasoningMatch::Prefix, AnthropicProvider::EXTENDED_EFFORT_MODELS, ['low', 'medium', 'high', 'xhigh', 'max']),
             new ReasoningLevelRule(ReasoningMatch::Prefix, AnthropicProvider::ADAPTIVE_THINKING_MODELS, ['low', 'medium', 'high']),
         ]);
 
@@ -96,9 +89,9 @@ final class AnthropicDescriptor implements DescribesProviderInterface
                 'CHAT' => 'anthropic:claude-sonnet-5:chat',
                 'TOOLS' => 'anthropic:claude-sonnet-5:chat',
                 'ANALYZE' => 'anthropic:claude-sonnet-5:chat',
-                'SORT' => 'anthropic:claude-haiku-4-5-20251001:chat',
-                'PLAN' => 'anthropic:claude-haiku-4-5-20251001:chat',
-                'SUMMARIZE' => 'anthropic:claude-haiku-4-5-20251001:chat',
+                'SORT' => 'anthropic:claude-haiku-5-5:chat',
+                'PLAN' => 'anthropic:claude-haiku-5-5:chat',
+                'SUMMARIZE' => 'anthropic:claude-haiku-5-5:chat',
                 'MEM' => 'anthropic:claude-sonnet-5:mem',
                 'PIC2TEXT' => 'anthropic:claude-sonnet-5:pic2text',
             ], preferenceRank: 5),

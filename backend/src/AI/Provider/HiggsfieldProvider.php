@@ -250,11 +250,6 @@ final class HiggsfieldProvider implements ImageGenerationProviderInterface, Vide
         throw new ProviderException('Higgsfield does not support image variations via the REST API.', self::PROVIDER_NAME);
     }
 
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        throw new ProviderException('Higgsfield does not support mask-based image editing via the REST API.', self::PROVIDER_NAME);
-    }
-
     // ==================== VIDEO GENERATION ====================
 
     /**

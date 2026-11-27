@@ -376,6 +376,27 @@ Rotate `APP_SECRET`:
    *Sessions survive restarts*. Provider API keys encrypted with the old
    secret become unreadable and must be re-entered.
 
+### Stored secrets after an update
+
+Provider keys, mailbox passwords and connector tokens are stored encrypted.
+Every value is bound to its owner and its field, so a value copied into
+another account's row does not open there. Values saved by a release before
+this binding stay readable, and are replaced the next time someone saves
+them. To replace them all at once, run this once after the update:
+
+```bash
+docker compose exec -T backend php bin/console app:secrets:reencrypt --dry-run
+docker compose exec -T backend php bin/console app:secrets:reencrypt
+```
+
+The first line only counts. The second rewrites the values; nobody has to
+enter a key again or sign in again, and it can run while the application
+serves requests. Take a database backup first. A row listed as unreadable
+was written with another `APP_SECRET`: it is left as it is, and its value
+has to be entered again in the application. A later release will stop
+reading the older formats, so run the command before you update past it;
+the release notes will name that release.
+
 ### CORS
 
 `CORS_ALLOW_ORIGIN` is not read. The API allows any browser origin. The
