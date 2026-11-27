@@ -66,8 +66,8 @@ final class ComputeWorkspaceExpirerTest extends TestCase
         );
 
         $seen = [];
-        $client = new ComputeClient(new MockHttpClient(static function (string $method, string $url) use (&$seen): MockResponse {
-            $seen[] = $method.' '.$url;
+        $client = new ComputeClient(new MockHttpClient(static function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $seen[] = $method.' '.$url.' '.($options['normalized_headers']['x-compute-owner'][0] ?? 'no owner');
 
             return new MockResponse('', ['http_code' => 204]);
         }), $this->config(enabled: true));
@@ -86,7 +86,7 @@ final class ComputeWorkspaceExpirerTest extends TestCase
         self::assertNotNull($stale->getExpiresAt());
         self::assertSame(ComputeWorkspace::STATUS_DELETED, $due->getStatus());
         self::assertCount(1, $sent);
-        self::assertContains('DELETE http://compute:8080/v1/workspaces/ws-due', $seen);
+        self::assertContains('DELETE http://compute:8080/v1/workspaces/ws-due X-Compute-Owner: user:7', $seen);
     }
 
     public function testSkipsLocalPlaceholderAddresses(): void
