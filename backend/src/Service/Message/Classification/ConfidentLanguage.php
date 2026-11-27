@@ -43,6 +43,17 @@ final class ConfidentLanguage
     }
 
     /**
+     * The text's own language when a distinctive word names it, otherwise
+     * the language already chosen (the UI locale, or the sorter). A German
+     * interface must not answer an English message in German, and the other
+     * way round neither: the interface is only the fallback.
+     */
+    public static function preferText(string $text, string $classified): string
+    {
+        return self::detect($text) ?? $classified;
+    }
+
+    /**
      * Cheap, confidence-aware language heuristic for the fast-path.
      *
      * The full AI sorter detects language too — we lose that signal when we
@@ -83,7 +94,7 @@ final class ConfidentLanguage
             ' ich ', ' der ', ' die ', ' das ', ' und ', ' nicht ', ' ist ', ' für ',
             ' können ', ' kannst ', ' möchte ', ' über ', ' wäre ', ' mit ', ' auch ',
             ' wer ', ' wie ', ' was ', ' warum ', ' wo ', ' wann ', ' welche ', ' welcher ',
-            ' du ', ' bist ', ' bin ', ' sind ', ' hast ', ' habe ', ' mir ', ' mich ',
+            ' du ', ' bist ', ' bin ', ' sind ', ' hast ', ' habe ', ' es ', ' mir ', ' mich ',
             ' dich ', ' dein ', ' deine ', ' machst ', ' heißt ', ' gibt ', ' soll ',
             ' mein ', ' eine ', ' einen ', ' hallo ', ' danke ', ' bitte ', ' guten ',
         ] as $w) {

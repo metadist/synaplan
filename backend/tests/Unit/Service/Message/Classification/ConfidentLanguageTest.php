@@ -30,6 +30,21 @@ final class ConfidentLanguageTest extends TestCase
         yield 'no signal' => ['ok', null];
     }
 
+    public function testAClearMessageWinsOverTheInterfaceLanguage(): void
+    {
+        self::assertSame(
+            'en',
+            ConfidentLanguage::preferText('Hi Synaplan, whats up. What could you help me with today?', 'de'),
+        );
+        self::assertSame('de', ConfidentLanguage::preferText('wer bist du?', 'en'));
+        self::assertSame('en', ConfidentLanguage::preferText('make a song', 'de'));
+        // "es" is also a French anchor. A German "es" must not become French
+        // when the sorter already said German, and a real French sentence still wins.
+        self::assertSame('de', ConfidentLanguage::preferText('mach es blau', 'de'));
+        self::assertSame('fr', ConfidentLanguage::preferText('es tu là', 'de'));
+        self::assertSame('de', ConfidentLanguage::preferText('ok', 'de'));
+    }
+
     public function testWithoutASignalThePinnedLanguageAnswersButNeverAnUnknownOne(): void
     {
         self::assertSame(
