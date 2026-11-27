@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Meeting notes for openDesk: Jitsi captions and Element voice messages, transcribed by Synaplan.",
+  "description": "Meeting notes: Jitsi through the synascriber plugin, OpenTalk subtitles, and the older Jitsi and Element path.",
   "engines": {
     "node": ">=22"
   },

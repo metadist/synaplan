@@ -25,8 +25,21 @@ const opentalk = config.opentalk
   })
   : null
 const server = createApp(config, { synaplan, plugin, opentalk, log })
+const armed = []
+if (config.jitsi && plugin) {
+  armed.push('Jitsi meeting notes')
+}
+if (config.jitsi && synaplan) {
+  armed.push('Jitsi captions without the plugin')
+}
+if (config.opentalk) {
+  armed.push(`OpenTalk subtitles via ${config.opentalkControllerUrl}`)
+}
+if (config.element) {
+  armed.push(`Element voice messages as ${config.matrixUserId}`)
+}
 server.listen(config.port, config.host, () => {
-  log(`Meeting notes listening on ${config.host}:${config.port} (${config.mode})`)
+  log(`Meeting notes listening on ${config.host}:${config.port} (${config.mode}): ${armed.length > 0 ? armed.join('; ') : 'no path is armed'}.`)
 })
 
 if (config.element) {
@@ -41,23 +54,15 @@ if (config.element) {
     onLog: log,
   })
   bot.run()
-  log(`Element voice messages on as ${config.matrixUserId}`)
 } else if (config.elementRequested && !config.matrixReady) {
   log('Element mode is selected, but MATRIX_HOMESERVER, MATRIX_ACCESS_TOKEN, and MATRIX_USER_ID are not all set. Voice messages stay off.')
 } else if (config.elementRequested) {
   log('Element mode is selected, but SYNAPLAN_API_KEY is not set. Voice messages stay off.')
 }
 
-if (config.opentalk) {
-  log(`OpenTalk subtitles on, controller ${config.opentalkControllerUrl}.`)
+if (config.jitsi && !plugin) {
+  log('SYNAPLAN_TRANSCRIBER_SECRET is not set: Jitsi meetings cannot use the meeting-notes plugin.')
 }
-if (!config.jitsi) {
-  log('Jitsi captions are off in this mode.')
-} else {
-  if (!plugin) {
-    log('SYNAPLAN_TRANSCRIBER_SECRET is not set: Jitsi meetings cannot use the meeting-notes plugin.')
-  }
-  if (!synaplan) {
-    log('SYNAPLAN_API_KEY is not set: Jitsi captions without the meeting-notes plugin are refused.')
-  }
+if (config.jitsi && !synaplan) {
+  log('SYNAPLAN_API_KEY is not set: Jitsi captions without the meeting-notes plugin are refused.')
 }

@@ -159,7 +159,10 @@ export function createApp(config, { synaplan, plugin = null, opentalk = null, lo
         product: 'Meeting notes',
         mode: config.mode,
         jitsi: config.jitsi,
+        plugin: plugin != null,
+        captionsWithoutPlugin: config.jitsi && synaplan != null,
         element: config.element,
+        opentalk: config.opentalk,
         elementCall: ELEMENT_CALL_LATER,
         synaplan: true,
       })
@@ -177,6 +180,7 @@ export function createApp(config, { synaplan, plugin = null, opentalk = null, lo
         product: 'Meeting notes',
         mode: config.mode,
         transcribe: config.jitsi ? '/transcribe' : null,
+        opentalk: config.opentalk ? '/v1/init' : null,
       })
       return
     }

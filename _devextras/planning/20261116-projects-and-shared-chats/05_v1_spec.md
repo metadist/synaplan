@@ -1,7 +1,7 @@
 # Projects v1: the spec
 
 **Status:** 2026-11-27. Owner decisions from a discussion of the plan
-(`00` §0 #120–#130). Where this page and `00`–`04` differ, this page wins
+(`00` §0 #120–#132). Where this page and `00`–`04` differ, this page wins
 until those files are brought in line in the step that builds the part.
 **Builds on:** [`00_master_plan.md`](./00_master_plan.md) §0 #96–#119.
 
@@ -15,7 +15,25 @@ the question with as little as possible and measures the answer (§6).
 ## 2. What v1 is
 
 One person. A project page with the chat on the left and the board on the
-right. The board fills itself from the chat. Households first (§0 #128).
+right. The board fills itself from the chat.
+
+**For every purpose** (§0 #128). Projects are not built for one audience
+or one kind of project. The core works without setup and without any
+connection, for one person and a small group. Connections for companies
+(cloud storage as sources, Jira or Asana through MCP, finer roles, a model
+restriction per project) are an optional layer after it.
+
+**Proven on spread cases, not on the kitchen.** The plan and the mockup so
+far think in one case. That is how a general product ends up made for one
+thing. Two checks stop that:
+
+| Check | What | Decision |
+| ----- | ---- | -------- |
+| Second mockup | "Learning something": hardly any dates or costs, a lot of progress, material, notes and open questions. Does the board stay worth a look when cards are empty, does progress fit ordered tasks, does the status read well? | §0 #131 |
+| Board corpus | 40 turns, eight each from a kitchen renovation, tuning a car, learning a language to B1, a client project, a move. G14 must hold in every case, not only on average. | §0 #132 |
+
+If the core fails one case, it is not general; then the kinds or the
+blocks change before PJ31 and PJ32 are built.
 
 | In v1 | Step |
 | ----- | ---- |
@@ -188,7 +206,7 @@ This refines §0 #107 and #119.
   a morning call for every project with open items.
 - **A mockup of v1:** one person, no price watch, no classified ads, no
   second member; the tabs of #102; the quick-add line of #100; the second
-  case of #110.
+  case "learning something" (#131).
 - **Superseded rows in `00` §0** (#83, #88, #90 and the rows this page
   replaces) are folded into their replacements, so a reader sees one
   answer per question.

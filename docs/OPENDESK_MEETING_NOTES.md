@@ -1,123 +1,113 @@
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**
 > **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [4.12 OpenTalk subtitles →](OPENTALK_MEETING_NOTES.md)
 
-# openDesk Meeting Notes (Jitsi & Element Matrix)
+# Meeting subtitles in Jitsi
 
-> **In this guide:** How the `synaplan-transcriber` sidecar provides live Jitsi meeting captions and Element (Matrix) voice-message transcription against Synaplan's `/v1/audio/transcriptions` API while discarding raw audio after each window.
+Synaplan writes what people say in a Jitsi meeting. People see the lines in the meeting. When the notes stop, each signed-in person gets a text file in Synaplan under **Sources → Generated**.
 
-Meeting notes turn speech into text for an [openDesk](https://www.opendesk.eu/en/product) installation.
+You already have Jitsi. You start Synaplan's subtitles service and you tell Jitsi where it is. OpenTalk is a different install: [OpenTalk subtitles](OPENTALK_MEETING_NOTES.md). Do not point both at the same service.
 
-- **Jitsi** (the meetings app Nordeck maintains for openDesk) shows live captions.
-- **Element** (Matrix chat) replies to a voice message with the text.
-- The **transcript** is what is kept. Audio is discarded after each window.
+The same steps are on [docs.synaplan.com/meeting-notes](https://docs.synaplan.com/meeting-notes).
 
-Synaplan is the speech-to-text engine. A small sidecar, `sidecars/synaplan-transcriber`, holds the meeting audio. PHP never opens a Jitsi or Matrix socket.
+You need a speech service (Whisper, or one you already use). On openDesk the steps below turn Whisper on.
 
-The detailed plan lives in this repository at `_devextras/planning/20260917-backend-integrations/04_opendesk_audio_transcriber.md`. The private planning checkout named in early notes was not required: the sidecar sits next to the other sidecars, and the Synaplan module only stores text.
+## OpenDesk, with the Helm charts
 
-## Turn it on
+Add this and apply. You do not edit Jitsi by hand. The charts put the **Meeting notes** button into Jitsi and start the service.
 
-The feature is absent until you point Synaplan at the sidecar. No URL means no routes and no Meeting notes row that claims to be installed.
-
-```bash
-# backend/.env
-OPENDESK_STT_URL=http://transcriber:8095
-OPENDESK_STT_PUBLIC_URL=https://notes.example
-OPENDESK_STT_LANGUAGE=auto
-OPENDESK_STT_MODE=opendesk
+```yaml
+apps:
+  synaplanStt:
+    enabled: true
+technical:
+  synaplan:
+    synascriber:
+      enabled: true
+      jitsiRelease: jitsi
+customization:
+  release:
+    jitsi:
+      synascriber: "<synaplan-charts>/helmfile/opendesk/synascriber-jitsi.yaml.gotmpl"
 ```
 
-`OPENDESK_STT_MODE` is `jitsi`, `element`, or `opendesk` (both). Language is `auto`, `de`, `en`, `es`, `fr`, or `tr`. Empty language means auto. On a sovereign install, leave `SYNAPLAN_STT_MODEL` empty so the sidecar uses the local speech-to-text model. A cloud model is opt-in.
+`<synaplan-charts>` is your checkout of [synaplan-charts](https://github.com/metadist/synaplan-charts). That file is the Jitsi install.
 
-Create an API key with only the scope `audio:transcribe`. That key can transcribe and save a finished note. It cannot chat, list notes, or read the operator snippet.
+Also put `helmfile/opendesk/synascriber-client.yaml.gotmpl` into the openDesk environment folder, next to `synaplan-client.yaml.gotmpl`. That lets the button sign people in.
 
-`TRANSCRIBER_AUTH_TOKEN` is required for `jitsi` and `opendesk`. Jicofo sends it as `Authorization: Bearer`. The local Compose port is bound to `127.0.0.1`.
+Apply the Synaplan release and the Jitsi release. In a meeting, click **Meeting notes**, pick a language, and speak.
 
-Start the sidecar (it is not part of a plain `docker compose up`):
+## Without the charts
+
+Invent two long passwords.
+
+**1. Start the service**, where it can reach Synaplan and Jitsi can reach it.
 
 ```bash
-SYNAPLAN_API_KEY=sk_... TRANSCRIBER_AUTH_TOKEN=... docker compose --profile transcriber up -d transcriber
+docker run -d --name synaplan-jitsi \
+  -p 8095:8095 \
+  -e TRANSCRIBER_MODE=jitsi \
+  -e SYNAPLAN_URL=https://your-synaplan.example \
+  -e SYNAPLAN_TRANSCRIBER_SECRET=password-one \
+  -e TRANSCRIBER_AUTH_TOKEN=password-two \
+  ghcr.io/metadist/synaplan-transcriber:latest
 ```
 
-The same variables are listed in `sidecars/synaplan-transcriber/env.example` and, for Helm, in `sidecars/synaplan-transcriber/helm/opendesk-values.example.yaml`.
+**2. In Synaplan**, as an administrator. If Meeting notes is not in the sidebar:
 
-The published image tags are `latest` on the default branch, and `<version>`, `<major>.<minor>` and `<major>` on a release tag. Both `linux/amd64` and `linux/arm64` are in that manifest. Pin a version tag, not a short commit.
+```bash
+php bin/console app:plugin:install-verified-users synascriber
+```
 
-Signed-in operators can read the snippet Synaplan would hand to Jitsi:
+On the plugin page:
 
-`GET /api/v1/opendesk/meeting-notes/connect`
+| Field | What to put |
+| --- | --- |
+| Speech server | The address of Whisper, or of your speech service |
+| Jitsi address | The address people use to join, such as `https://meet.example` |
+| Prosody address | Jitsi's Prosody inside your network. In Docker this is often `http://prosody:5280` |
+| Shared secret with Jitsi | A third password. Prosody needs the same one below |
+| Transcriber secret | `password-one` |
 
-## Jitsi (Nordeck)
+**3. In Jitsi.** Then restart Prosody and Jicofo.
 
-Jitsi Videobridge opens one WebSocket and sends each person’s Opus audio as JSON (`event: media`, base64 payload). The sidecar wraps those packets as Ogg, sends an 8 second window to `POST /v1/audio/transcriptions/sessions`, and writes a `transcription-result` back on the same socket. That is the caption the meeting shows.
+The button, in `head.html`:
 
-In Jicofo:
+```html
+<script defer src="https://your-synaplan.example/api/v1/plugins/synascriber/assets/jitsi/loader.js"
+  data-synaplan="https://your-synaplan.example"
+  data-issuer="https://your-keycloak.example/realms/your-realm"
+  data-client-id="synascriber"></script>
+```
+
+In Keycloak, create a public client named `synascriber`, with no secret. Redirect address:
+
+`https://your-synaplan.example/api/v1/plugins/synascriber/jitsi/silent`
+
+Prosody. Copy `/app/prosody/mod_synascriber.lua` from the subtitles image into Prosody's plugin folder, and set:
+
+```
+XMPP_MODULES=synascriber
+SYNASCRIBER_SECRET=the-third-password
+```
+
+Jicofo. This sends the audio to Synaplan:
 
 ```
 transcription {
-  url-template = "wss://notes.example/transcribe?sessionId={{MEETING_ID}}&sendBack=true"
+  url-template = "ws://synaplan-jitsi:8095/transcribe?sessionId={{MEETING_ID}}"
   http-headers {
-    "Authorization" = "Bearer <TRANSCRIBER_AUTH_TOKEN>"
+    "Authorization" = "Bearer password-two"
   }
 }
 ```
 
-`{{MEETING_ID}}` and `{{REGION}}` are Jicofo’s own placeholders. In `config.js`:
+`synaplan-jitsi` works when Jicofo and the service share a Docker network. Otherwise use the host name of the machine from step 1.
 
-```js
-config.transcription = { enabled: true }
-```
+## It works when
 
-Enable transcription in Prosody the way your Jitsi (or docker-jitsi-meet) release documents it. Do not point this at Jigasi. Jitsi’s own handbook marks Jigasi transcription as deprecated; Nordeck still uses Jigasi for phone dial-in, which is a different job.
-
-In the meeting, a moderator uses Jitsi’s own transcription control. Everyone sees captions. Closing the socket (Stop, or the last person leaving) writes the text and drops the audio.
-
-Captions arrive per window, about every 8 seconds, not word by word.
-
-## Element (Matrix)
-
-Set `MATRIX_HOMESERVER`, `MATRIX_ACCESS_TOKEN`, and `MATRIX_USER_ID` (for example `@synaplan-notes:example`). Invite that account to a room the way you invite a person.
-
-A voice message (`m.audio`, including Element’s voice-message flag) is downloaded and sent to `POST /v1/audio/transcriptions`. The reply is a thread on that message. If there was no speech, the reply is “No speech in this note.”
-
-Encrypted rooms are refused. The sidecar does not break Megolm. The room gets one notice:
-
-> This room is locked. Invite Meeting notes as a member, or turn captions off.
-
-Invite the account as a normal member of an unencrypted room and voice messages work. If the room stays encrypted, this version still cannot read it.
-
-### Element Call
-
-Element Call (MatrixRTC / LiveKit) is how openDesk does 1:1 and small video. Live captions there mean joining the call as a **visible** participant named Meeting notes. Hidden listening is not acceptable, and that join is not in this version.
-
-`GET /element-call` on the sidecar answers with that explanation. Voice messages in the Element room work today. Jitsi meetings work today.
-
-## Where the notes go
-
-After a meeting the sidecar, if you configured them:
-
-1. Saves a copy through Synaplan (`POST /api/v1/opendesk/meeting-notes`). That copy is on the server that received it. There is no Meeting notes screen yet, and a multi-server install should treat Nextcloud as the copy people open.
-2. Writes a Markdown file into Nextcloud (`NEXTCLOUD_URL`, user, app password, `NOTES_NEXTCLOUD_FOLDER`, default `/Meetings`). The file name includes the time, so a second session the same day does not replace the first.
-3. Posts one line in `NOTES_MATRIX_ROOM`, for example “Notes from 10:00 — open in Files /Meetings/2026-09-28-100000-standup.md. Audio was not kept.”
-
-An Element voice message uses the same Nextcloud folder and the same Synaplan copy. The reply in the thread is the text, plus the Files path when that write succeeded.
-
-The sentence at the end says what was saved. A destination that was configured and failed is named. A destination you never configured is left out.
-
-## Stop
-
-- **Stop** in the Jitsi meeting closes the socket. Captions end. Notes already saved stay. Audio was not kept.
-- **Disconnect** means deleting the `audio:transcribe` key in Synaplan, and removing the Matrix access token. The sidecar then cannot transcribe or post.
-
-## What this version does not do
-
-- It does not replace Jitsi or Element.
-- It does not transcribe Element Call live.
-- It does not translate live, keep the audio, or record the video.
-- It does not use Nextcloud Talk. Talk is a different product.
-- OpenTalk subtitles are a separate switch. See [OpenTalk subtitles](OPENTALK_MEETING_NOTES.md).
+Open `http://the-service:8095/health`. The page says `"ok": true`. In a meeting, click **Meeting notes** and say a sentence. The line shows the speaker's name.
 
 ---
 
-> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**  
+> **[Main README](../README.md)** · **[Documentation Index](README.md)** · **Track 4: Channels, Gateways & Integrations (12/12)**
 > **← Previous:** [4.10 Self-Hosted Live Voice Endpoints](LIVE_VOICE_SELF_HOSTED.md) · **Next:** [4.12 OpenTalk subtitles →](OPENTALK_MEETING_NOTES.md)

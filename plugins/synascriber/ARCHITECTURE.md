@@ -2,7 +2,12 @@
 
 Condensed from the planning documents of the former synaScriber repository
 and checked against the code of plugin 0.4.x. The setup is in
-[README.md](README.md).
+[README.md](README.md). The operator guide is
+[docs/OPENDESK_MEETING_NOTES.md](../../docs/OPENDESK_MEETING_NOTES.md).
+
+The diagram and the numbered meeting below are the Jitsi path. OpenTalk uses
+the same plugin and the same window contract, with a different way in. The
+older API-key path does not use this plugin.
 
 ## Overview
 
@@ -154,3 +159,20 @@ language code, so Jitsi shows it to viewers whose subtitle language matches.
 **Captions.** One final caption per window, labelled with the speaker, the
 moment the text returns; previews update the same caption while someone is
 still talking. Captions and transcript are the same text.
+
+## OpenTalk
+
+OpenTalk 26.3 calls the transcriber (`POST /v1/init`). The transcriber opens
+a session on this plugin with the transcriber secret and joins the meeting's
+LiveKit. Windows come back through the same transcriber routes as Jitsi.
+The session is subtitles only: text goes back to OpenTalk as a subtitle
+segment, and no file is written. A missing LiveKit address stops the
+transcriber at startup. The operator steps are in
+[docs/OPENTALK_MEETING_NOTES.md](../../docs/OPENTALK_MEETING_NOTES.md).
+
+## Older path
+
+`OPENDESK_STT_URL` still starts Jitsi captions and Element voice messages
+through `/v1/audio/transcriptions` with an API key. That path does not create
+a session in this plugin. It is documented as the older path in
+[docs/OPENDESK_MEETING_NOTES.md](../../docs/OPENDESK_MEETING_NOTES.md).
