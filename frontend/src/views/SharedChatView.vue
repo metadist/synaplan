@@ -233,25 +233,43 @@
                 :load-passage="loadSharedPassage"
               />
 
-              <!-- File attachments (images, videos) -->
-              <div v-if="message.file" class="mt-3">
+              <!-- Generated media. The storage path is not a URL; the player
+                   needs the public uploads address, the same one the chat uses. -->
+              <div
+                v-if="showsGeneratedMedia(message)"
+                class="mt-3"
+                data-testid="shared-generated-media"
+              >
                 <MessageImage
-                  v-if="message.file.type === 'image'"
-                  :url="message.file.path"
+                  v-if="message.file && isImageFileType(message.file.type, attachmentMime(message))"
+                  :url="buildUploadUrl(message.file.path)"
                   :alt="t('message.imageGenerated')"
                 />
-                <MessageVideo v-if="message.file.type === 'video'" :url="message.file.path" />
+                <MessageVideo
+                  v-else-if="
+                    message.file && isVideoFileType(message.file.type, attachmentMime(message))
+                  "
+                  :url="buildUploadUrl(message.file.path)"
+                />
+                <MessageAudio
+                  v-else-if="
+                    message.file && isAudioFileType(message.file.type, attachmentMime(message))
+                  "
+                  :url="buildUploadUrl(message.file.path)"
+                />
               </div>
 
               <!-- User-uploaded attachments (issue #1175): rendered from the
                    File entity relation via public upload URLs, so shared-chat
-                   viewers see images/PDFs/audio uploaded by the chat owner. -->
+                   viewers see images/PDFs/audio uploaded by the chat owner.
+                   A generated file is already shown above; listing it again
+                   draws a second player that cannot load. -->
               <div
-                v-if="message.files && message.files.length"
+                v-if="sharedAttachments(message).length"
                 class="mt-3 space-y-3"
                 data-testid="section-shared-attachments"
               >
-                <template v-for="file in message.files" :key="file.id">
+                <template v-for="file in sharedAttachments(message)" :key="file.id">
                   <MessageImage
                     v-if="isImageFileType(file.fileType, file.fileMime)"
                     :url="buildUploadUrl(file.filePath)"
@@ -432,6 +450,38 @@ interface Chat {
 
 const chat = ref<Chat | null>(null)
 const messages = ref<Message[]>([])
+
+function storedPath(path: string | null | undefined): string {
+  return (path ?? '')
+    .trim()
+    .replace(/^\/+/, '')
+    .replace(/^api\/v1\/files\/uploads\//, '')
+    .replace(/^up\//, '')
+}
+
+// `webm` is audio when only the extension is known. The attachment MIME
+// decides, so a screen recording is not dropped as a voice note.
+function attachmentMime(message: Message): string | null | undefined {
+  const path = storedPath(message.file?.path)
+  if (path === '') return undefined
+  return (message.files ?? []).find((file) => storedPath(file.filePath) === path)?.fileMime
+}
+
+function showsGeneratedMedia(message: Message): boolean {
+  const file = message.file
+  if (!file?.path) return false
+  const mime = attachmentMime(message)
+  return (
+    isImageFileType(file.type, mime) ||
+    isVideoFileType(file.type, mime) ||
+    isAudioFileType(file.type, mime)
+  )
+}
+
+function sharedAttachments(message: Message): SharedChatFile[] {
+  const shown = showsGeneratedMedia(message) ? storedPath(message.file?.path) : ''
+  return (message.files ?? []).filter((file) => storedPath(file.filePath) !== shown)
+}
 
 // Get token from route (works with both /shared/:token and /shared/:lang/:token)
 const token = computed(() => {
