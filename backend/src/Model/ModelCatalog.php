@@ -511,13 +511,13 @@ class ModelCatalog
         41 => [
             'providerId' => 'tts-1',
             'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-2.5-flash-preview-tts:text2sound',
+            'successor' => 'google:gemini-3.8-flash-tts:text2sound',
             'reason' => 'Deprecated by OpenAI; access ends on 2027-01-06. OpenAI has no /v1/audio/speech successor; migrate to Gemini TTS.',
         ],
         83 => [
             'providerId' => 'tts-1-hd',
             'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-2.5-flash-preview-tts:text2sound',
+            'successor' => 'google:gemini-3.8-flash-tts:text2sound',
             'reason' => 'Deprecated by OpenAI; access ends on 2027-01-06. OpenAI has no /v1/audio/speech successor; migrate to Gemini TTS.',
         ],
 
