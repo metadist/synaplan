@@ -13,6 +13,7 @@ use App\Plug\DependencyInjection\PlugDeclarationCheckPass;
 use App\Plug\Extraction\ContentExtractorInterface;
 use App\Plug\Rerank\RerankProviderInterface;
 use App\Plug\WebSearch\WebSearchProviderInterface;
+use App\Security\AppSecretGuard;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\Compiler\PassConfig;
@@ -36,6 +37,11 @@ class Kernel extends BaseKernel
         $this->getPlugins();
 
         parent::boot();
+
+        if ('prod' === $this->environment) {
+            $secret = $this->getContainer()->getParameter('kernel.secret');
+            AppSecretGuard::assertUsable(\is_string($secret) ? $secret : '');
+        }
     }
 
     protected function configureContainer(ContainerConfigurator $container): void

@@ -57,6 +57,13 @@ be generated for an older install; session cookies are signed with
 [deploy/README.md](../deploy/README.md#generated-secrets-deploydatasecretsenv)
 and [Who can sign in](IDENTITY.md#variables-that-look-like-switches-and-are-not).
 
+With `APP_ENV=prod` the application refuses to start while `APP_SECRET` is
+empty or still an example value (one that starts with `changeme` or
+`change_me`, as in `backend/.env.example`). The container log then says so.
+Set a random value and start again. If the installation already ran with the
+example value, provider keys stored in the database were encrypted with it:
+enter them again afterwards. Everyone signs in again.
+
 See [Configuration Guide](CONFIGURATION.md) for all environment variables.
 
 ### Starting Services
