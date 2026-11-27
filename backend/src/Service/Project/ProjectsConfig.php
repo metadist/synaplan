@@ -17,13 +17,20 @@ final readonly class ProjectsConfig
     public const ENABLED = 'ENABLED';
     public const MAX_SOURCES = 'MAX_SOURCES';
     public const INSTRUCTIONS_MAX_CHARS = 'INSTRUCTIONS_MAX_CHARS';
+    public const BOARD_ENABLED = 'BOARD_ENABLED';
+    public const MAX_ITEMS = 'MAX_ITEMS';
 
     public const DEFAULT_MAX_SOURCES = 50;
     public const DEFAULT_INSTRUCTIONS_MAX_CHARS = 4000;
+    public const DEFAULT_MAX_ITEMS = 1000;
+
+    private const ON = ['1', 'true', 'on', 'yes'];
+    private const OFF = ['0', 'false', 'off', 'no'];
 
     public function __construct(
         private ConfigRepository $configRepository,
         private string $envValue = '',
+        private string $boardEnvValue = '',
     ) {
     }
 
@@ -32,23 +39,30 @@ final readonly class ProjectsConfig
      */
     public function envOverride(): ?bool
     {
-        $env = strtolower(trim($this->envValue));
-        if (\in_array($env, ['1', 'true', 'on', 'yes'], true)) {
-            return true;
-        }
-
-        return \in_array($env, ['0', 'false', 'off', 'no'], true) ? false : null;
+        return $this->pinned($this->envValue);
     }
 
     public function isEnabled(): bool
     {
-        $pinned = $this->envOverride();
-        if (null !== $pinned) {
-            return $pinned;
-        }
-        $stored = $this->configRepository->getValue(0, self::GROUP, self::ENABLED);
+        return $this->pinned($this->envValue) ?? $this->storedOn(self::ENABLED);
+    }
 
-        return null !== $stored && \in_array(strtolower(trim($stored)), ['1', 'true', 'on', 'yes'], true);
+    /**
+     * The project board (items, `PROJECTS.BOARD_ENABLED`). It needs projects:
+     * with projects off the board is off too. PROJECTS_BOARD_ENABLED pins it.
+     */
+    public function isBoardEnabled(): bool
+    {
+        if (!$this->isEnabled()) {
+            return false;
+        }
+
+        return $this->pinned($this->boardEnvValue) ?? $this->storedOn(self::BOARD_ENABLED);
+    }
+
+    public function maxItems(): int
+    {
+        return $this->positiveInt(self::MAX_ITEMS, self::DEFAULT_MAX_ITEMS);
     }
 
     public function maxSources(): int
@@ -59,6 +73,23 @@ final readonly class ProjectsConfig
     public function instructionsMaxChars(): int
     {
         return $this->positiveInt(self::INSTRUCTIONS_MAX_CHARS, self::DEFAULT_INSTRUCTIONS_MAX_CHARS);
+    }
+
+    private function pinned(string $envValue): ?bool
+    {
+        $env = strtolower(trim($envValue));
+        if (\in_array($env, self::ON, true)) {
+            return true;
+        }
+
+        return \in_array($env, self::OFF, true) ? false : null;
+    }
+
+    private function storedOn(string $setting): bool
+    {
+        $stored = $this->configRepository->getValue(0, self::GROUP, $setting);
+
+        return null !== $stored && \in_array(strtolower(trim($stored)), self::ON, true);
     }
 
     private function positiveInt(string $setting, int $default): int

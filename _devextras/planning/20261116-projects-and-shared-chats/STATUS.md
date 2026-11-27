@@ -23,9 +23,54 @@ to them.
 | Plan review | open | — | §0 #96–#111: board without the loop, four kinds, calendar subscription, copy-first mail, DMARC, two watch kinds, push after sharing. See "2026-11-26 — review" below. |
 | Hands-on comparison | merged | #3288 | §0 #112–#119: update instead of append, confirm before write, receipt only, state read at turn start, files stay in the project, reminders said back, quiet watches, one person first. See "2026-11-26 — hands-on comparison" below. |
 | v1 spec | open | — | §0 #120–#130 and `05_v1_spec.md`: three stages, one store with `note`, sharing only in projects with a project budget, households first, success numbers, order. See "2026-11-27 — v1 spec" below. |
+| PJ30 | open | — | Project items through the API, flag off (`PROJECTS.BOARD_ENABLED` = 0). See "2026-11-27 — PJ30" below. |
 | PJ8–PJ47 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
 ---
+
+## 2026-11-27 — PJ30
+
+The owner's answers before the step (2026-11-27):
+
+- **Schema, lean for v1** (§0 #63): `BPROJECTITEMS` with the five kinds of
+  #122, `BPROJECTITEMLOG` with `BSTAGE` and the actions of #129,
+  `BPROJECTS.BTIMEZONE` and `BCURRENCY`. Left for their steps:
+  `BSTATUSTEXT`/`BSTATUSAT` (PJ33), `BMAINCHATID` (PJ32), `BBUDGET`
+  (sharing), the "board opened" counter (PJ32). `BCONTACTMAIL` is not
+  built until a mail can carry it (phase D).
+- **Order:** PJ30 now; PJ7c is parked (not in v1).
+- **PJ29 and PJ33 are decoupled** from PJ8 and PJ9: `ChatArea` is
+  extracted without the run card, which joins it when PJ8 lands. The first
+  plan of PJ33 is a stage-2 proposal from the extraction; the question
+  card follows PJ9.
+- **§0 #96–#119** hold where `05` builds on them. #97, #102 and #107
+  change earlier owner rows and still wait for the owner's tick.
+
+What the step built:
+
+- `POST/GET /projects/{uuid}/items`, `GET/PATCH /projects/{uuid}/items/{itemId}`
+  (`ProjectItemController`, rules in `Service/Project/Item/*`). 404
+  `feature_not_configured` while the board flag or projects are off.
+- An item is looked up only inside a project the caller owns and among the
+  items the caller may see (`private` items only by their author). A
+  parent must be an item of the same project of the one kind it may belong
+  to (task → date, cost → decision).
+- Each kind takes only its own fields; anything else is 422. A time
+  without a zone is read in the project's zone (`BTIMEZONE`, else the
+  owner's profile zone, else UTC) and stored in UTC; a calendar day is an
+  all-day item at midnight UTC, so it never moves across DST. RRULE is
+  limited to FREQ, INTERVAL, BYDAY, COUNT, UNTIL. Amounts are decimal
+  strings, never floats.
+- State changes: proposed → open (`accepted`) or dropped (`rejected`);
+  open → done or dropped; done → open (`restored`) or dropped;
+  dropped → open. A note is never done. Every change writes one log row
+  with the fields before; moving a date moves the due times of its tasks
+  (timed by the exact shift, all-day by whole days) and logs each.
+- Items and their log go with the project and with the account
+  (`ProjectEraser`). `PROJECTS.MAX_ITEMS` (1000) refuses with 422.
+- Not in this step: a hard delete (drop is the removal; Undo needs the
+  row), changing the kind of an item, assignees and "read" members (there
+  are no members before sharing).
 
 ## 2026-11-27 — v1 spec
 
