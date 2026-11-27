@@ -510,7 +510,7 @@ final class XaiProvider implements ChatProviderInterface, ToolCallingChatProvide
 
     public function createVariations(string $imageUrl, int $count = 1): array
     {
-        throw new ProviderException('xAI Grok Imagine has no image-variation endpoint. Use image editing with an explicit prompt instead.', self::PROVIDER_NAME);
+        throw new ProviderException('xAI Grok Imagine has no image-variation endpoint, and image-to-image is not enabled in Synaplan because input-image billing is not tracked.', self::PROVIDER_NAME);
     }
 
     // ==================== VIDEO GENERATION (Grok Imagine) ====================
