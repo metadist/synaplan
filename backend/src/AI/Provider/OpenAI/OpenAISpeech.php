@@ -59,7 +59,13 @@ final class OpenAISpeech
                 'response_format' => 'json',
             ];
             if (\is_string($options['language'] ?? null) && '' !== $options['language']) {
-                $fields['language'] = $options['language'];
+                // GPT Transcribe takes the hint as the `languages` list and
+                // must not get the singular field; older models take `language`.
+                if (str_starts_with($model, self::DEFAULT_TRANSCRIBE_MODEL)) {
+                    $fields[] = ['languages[]' => $options['language']];
+                } else {
+                    $fields['language'] = $options['language'];
+                }
             }
 
             $response = $this->api->postMultipart(self::TRANSCRIBE_ENDPOINT, $fields, $key, self::TRANSCRIBE_TIMEOUT_SECONDS);

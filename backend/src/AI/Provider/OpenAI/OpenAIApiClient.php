@@ -91,9 +91,10 @@ final class OpenAIApiClient
     /**
      * A multipart POST through Symfony's client, for the upload endpoints whose
      * answer the SDK would trim (it drops `usage` and `languages` from a
-     * transcription).
+     * transcription). A list entry of `$fields` is one more field, for a
+     * repeated name such as `languages[]`.
      *
-     * @param array<string, string|DataPart> $fields
+     * @param array<int|string, string|DataPart|array<string, string>> $fields
      */
     public function postMultipart(string $url, array $fields, string $key, int $timeout): ResponseInterface
     {

@@ -1404,8 +1404,8 @@
     "speech.transcribe": {
         "http": [
             {
-                "body": "--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-transcribe\r\n--<boundary>\r\nContent-Type: audio/mpeg\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.mp3\"\r\n\r\nID3-test-audio\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nde\r\n--<boundary>--\r\n",
-                "body_sha1": "05a4f866e9c833e5ee6315f7eb68d7c3d0f1cbf3",
+                "body": "--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-transcribe\r\n--<boundary>\r\nContent-Type: audio/mpeg\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.mp3\"\r\n\r\nID3-test-audio\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"languages[]\"\r\n\r\nde\r\n--<boundary>--\r\n",
+                "body_sha1": "e6f4fb5507d143590ac4a00466ba6e9d55116ad6",
                 "headers": [
                     "Accept: */*",
                     "Authorization: Bearer <secret>",

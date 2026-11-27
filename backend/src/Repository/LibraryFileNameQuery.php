@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\File;
-use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\ParameterType;
 
 /**
  * Names of a user's searchable documents, newest first.
@@ -24,13 +24,15 @@ final readonly class LibraryFileNameQuery
      */
     public function searchableForUser(int $userId): array
     {
-        $rows = $this->connection->executeQuery(
+        $statement = $this->connection->prepare(
             'SELECT BID, BORIGINALNAME, BFILENAME FROM BFILES'
-            .' WHERE BUSERID = :user AND BEPHEMERAL = 0 AND BVECTORSTATE IN (:states)'
+            .' WHERE BUSERID = :user AND BEPHEMERAL = 0 AND BVECTORSTATE IN (:vectorized, :stale)'
             .' ORDER BY BID DESC LIMIT '.self::LIMIT,
-            ['user' => $userId, 'states' => [File::VECTOR_STATE_VECTORIZED, File::VECTOR_STATE_STALE]],
-            ['states' => ArrayParameterType::STRING],
-        )->fetchAllAssociative();
+        );
+        $statement->bindValue('user', $userId, ParameterType::INTEGER);
+        $statement->bindValue('vectorized', File::VECTOR_STATE_VECTORIZED);
+        $statement->bindValue('stale', File::VECTOR_STATE_STALE);
+        $rows = $statement->executeQuery()->fetchAllAssociative();
 
         return array_map(static fn (array $row): array => [
             'id' => (int) $row['BID'],

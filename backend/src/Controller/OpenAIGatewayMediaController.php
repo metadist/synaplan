@@ -107,7 +107,7 @@ final class OpenAIGatewayMediaController extends AbstractController
         content: new OA\JsonContent(
             required: ['prompt'],
             properties: [
-                new OA\Property(property: 'model', type: 'string', example: 'gpt-image-1', description: 'providerId or name of an active image model. Falls back to the default TEXT2PIC model.'),
+                new OA\Property(property: 'model', type: 'string', example: 'gpt-image-2.5-flare', description: 'providerId or name of an active image model. Falls back to the default TEXT2PIC model.'),
                 new OA\Property(property: 'prompt', type: 'string', example: 'A lighthouse at dawn, watercolor'),
                 new OA\Property(property: 'n', type: 'integer', minimum: 1, maximum: 4, example: 1),
                 new OA\Property(property: 'size', type: 'string', example: '1024x1024', description: '"auto" or WIDTHxHEIGHT'),

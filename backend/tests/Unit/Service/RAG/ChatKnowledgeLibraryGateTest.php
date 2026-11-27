@@ -27,6 +27,14 @@ final class ChatKnowledgeLibraryGateTest extends TestCase
         self::assertFalse($this->loader()->shouldSearch(null, 'Wie wird das Wetter morgen?', ['intent' => 'chat'], [], false, 1));
     }
 
+    public function testAGreetingDoesNotLookUpTheLibrary(): void
+    {
+        $names = $this->createMock(LibraryFileNameQuery::class);
+        $names->expects($this->never())->method('searchableForUser');
+
+        self::assertFalse($this->loader($names)->shouldSearch(null, 'Hallo, danke!', ['intent' => 'chat'], [], false, 1));
+    }
+
     public function testAnAssistantKeepsItsOwnScopesAndKnowledgeCanBeTurnedOff(): void
     {
         $emptyScope = [new RagScope(1, '')];
@@ -35,10 +43,12 @@ final class ChatKnowledgeLibraryGateTest extends TestCase
         self::assertFalse($this->loader()->shouldSearch(null, self::QUESTION, [], ['disable_knowledge' => true], false, 1));
     }
 
-    private function loader(): ChatKnowledgeContextLoader
+    private function loader(?LibraryFileNameQuery $names = null): ChatKnowledgeContextLoader
     {
-        $names = $this->createStub(LibraryFileNameQuery::class);
-        $names->method('searchableForUser')->willReturn([['id' => 480, 'name' => 'Änderungsauftrag.PDF']]);
+        if (null === $names) {
+            $names = $this->createStub(LibraryFileNameQuery::class);
+            $names->method('searchableForUser')->willReturn([['id' => 480, 'name' => 'Änderungsauftrag.PDF']]);
+        }
 
         return new ChatKnowledgeContextLoader(
             $this->createStub(VectorSearchService::class),

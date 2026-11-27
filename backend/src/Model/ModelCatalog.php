@@ -1610,9 +1610,8 @@ class ModelCatalog
         // ==================== OPENAI MODELS ====================
         // GPT Transcribe — whisper-1's successor on /v1/audio/transcriptions.
         // $0.0045/min per https://developers.openai.com/api/docs/models/gpt-transcribe
-        // (verified 2026-11-27). It answers in `json` only (no verbose_json, so
-        // no segments or duration) and takes `languages` instead of `language`;
-        // OpenAISpeech shapes the request accordingly.
+        // (verified 2026-11-27). OpenAISpeech asks for `json` (no segments)
+        // and sends a language hint as `languages[]` instead of `language`.
         [
             'id' => 448,
             'service' => 'OpenAI',

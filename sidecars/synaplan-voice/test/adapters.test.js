@@ -351,4 +351,5 @@ test('a long GPT-Live answer goes out as several commentary events under the lim
   assert.equal(/\[\d/.test(chunks.join(' ')), false)
   assert.ok(chunks[0].startsWith('Das Dokument Änderungsauftrag.PDF enthält eine Auftragsbestätigung.'))
   assert.deepEqual(commentaryChunks('Ja, ich bin da.'), ['Ja, ich bin da.'])
+  assert.deepEqual(commentaryChunks('Siehe [die Anleitung](https://example.com/a) [2].'), ['Siehe die Anleitung.'])
 })

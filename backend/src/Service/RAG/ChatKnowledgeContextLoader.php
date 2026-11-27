@@ -10,6 +10,7 @@ use App\Service\File\LibraryFileMentions;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\Message\ProgressCallback;
+use App\Service\Message\WebSearchTopicPolicy;
 use App\Service\RAG\VectorStorage\DTO\RagScope;
 use App\Service\Runtime\RuntimeProfile;
 use Psr\Log\LoggerInterface;
@@ -129,6 +130,10 @@ final readonly class ChatKnowledgeContextLoader
     private function namesLibraryDocument(?array $agentScopes, int $userId, string $text): bool
     {
         if (null !== $agentScopes || null === $this->libraryMentions || $userId <= 0) {
+            return false;
+        }
+        // "Hallo" or "danke" names no document and should not cost a query.
+        if (WebSearchTopicPolicy::isTrivialConversational($text)) {
             return false;
         }
 

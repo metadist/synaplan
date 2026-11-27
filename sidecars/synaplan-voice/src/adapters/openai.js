@@ -223,12 +223,13 @@ export function applyLiveServerEvent(event, state, emit) {
 /**
  * OpenAI takes at most 500 tokens per commentary event and closes the
  * session on a longer one. A full Synaplan answer goes out in pieces on the
- * same delegation. Markdown and citation marks are not spoken.
+ * same delegation. Markdown, link targets and citation marks are not spoken.
  */
 export const COMMENTARY_CHUNK_CHARS = 1200
 
 export function commentaryChunks(text, limit = COMMENTARY_CHUNK_CHARS) {
   const spoken = String(text ?? '')
+    .replace(/!?\[([^\]]*)\]\([^)\s]+\)/g, '$1')
     .replace(/\s*\[\d+(?:\s*,\s*\d+)*\](?:\s*,\s*\[\d+(?:\s*,\s*\d+)*\])*/g, '')
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/^\s*[*-]\s+/gm, '')

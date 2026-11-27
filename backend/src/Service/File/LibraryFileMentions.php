@@ -19,6 +19,7 @@ final readonly class LibraryFileMentions
     private const MIN_NAME_LENGTH = 4;
     private const MIN_WORD_LENGTH = 3;
     private const MAX_MENTIONS = 5;
+    private const MAX_QUOTED_NAME_LENGTH = 160;
 
     public function __construct(private LibraryFileNameQuery $names)
     {
@@ -62,11 +63,22 @@ final readonly class LibraryFileMentions
 
         $lines = '';
         foreach ($names as $name) {
-            $lines .= '- "'.str_replace('"', "'", $name).'"'."\n";
+            $lines .= '- "'.self::quotable($name).'"'."\n";
         }
 
         return "\n\n## Documents in the user's library that this message names\n\n".$lines
             ."They are not attached to this conversation, so \$message.files does not hold them. To answer about them, plan a rag_query step: it searches the user's documents. Never plan file_analysis on \$message.files for them.\n";
+    }
+
+    /**
+     * A file name goes into the planner prompt inside quotes on one line. A
+     * name with a line break or a quote must not start a new instruction.
+     */
+    private static function quotable(string $name): string
+    {
+        $flat = trim((string) preg_replace('/[\p{C}\s]+/u', ' ', str_replace('"', "'", $name)));
+
+        return mb_substr($flat, 0, self::MAX_QUOTED_NAME_LENGTH);
     }
 
     private static function names(string $haystack, string $fileName): bool

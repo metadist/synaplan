@@ -44,10 +44,22 @@ final class OpenAISpeechTest extends TestCase
         self::assertSame(['text' => 'Hallo', 'language' => 'de', 'duration' => 1.5, 'segments' => []], $speech->transcribe('voice.mp3', ['language' => 'de']));
         self::assertSame('https://api.openai.com/v1/audio/transcriptions', $sent['url']);
         self::assertSame(['Authorization: Bearer '.self::KEY], $sent['auth']);
-        foreach (['name="model"', 'gpt-transcribe', 'name="language"', 'name="response_format"', 'json', 'filename="voice.mp3"', 'ID3-voice'] as $part) {
+        foreach (['name="model"', 'gpt-transcribe', 'name="languages[]"', 'name="response_format"', 'json', 'filename="voice.mp3"', 'ID3-voice'] as $part) {
             self::assertStringContainsString($part, $sent['body']);
         }
+        self::assertStringNotContainsString('name="language"', $sent['body']);
         self::assertStringNotContainsString('verbose_json', $sent['body']);
+    }
+
+    public function testAnOlderTranscriptionModelGetsTheSingularLanguageField(): void
+    {
+        $sent = [];
+        $speech = $this->transcriber($sent, new MockResponse('{"text":"Hallo"}'));
+
+        $speech->transcribe('voice.mp3', ['model' => 'gpt-4o-transcribe', 'language' => 'de']);
+
+        self::assertStringContainsString('name="language"', $sent['body']);
+        self::assertStringNotContainsString('name="languages[]"', $sent['body']);
     }
 
     public function testAnUnhintedTranscriptionSendsNoLanguageAndReadsTheDurationField(): void
