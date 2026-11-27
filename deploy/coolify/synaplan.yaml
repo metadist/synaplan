@@ -140,7 +140,7 @@ services:
       start_period: 60s
 
   redis:
-    image: redis:8.10-alpine
+    image: redis:8.12-alpine
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
       - synaplan-redis:/data
