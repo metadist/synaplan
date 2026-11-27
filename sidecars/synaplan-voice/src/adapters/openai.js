@@ -225,9 +225,9 @@ export function applyLiveServerEvent(event, state, emit) {
  * session on a longer one. A full Synaplan answer goes out in pieces on the
  * same delegation. Markdown, link targets and citation marks are not spoken.
  */
-export const COMMENTARY_CHUNK_CHARS = 1200
+export const COMMENTARY_CHUNK_BYTES = 400
 
-export function commentaryChunks(text, limit = COMMENTARY_CHUNK_CHARS) {
+export function commentaryChunks(text, maxBytes = COMMENTARY_CHUNK_BYTES) {
   const spoken = String(text ?? '')
     .replace(/!?\[([^\]]*)\]\([^)\s]+\)/g, '$1')
     .replace(/\s*\[\d+(?:\s*,\s*\d+)*\](?:\s*,\s*\[\d+(?:\s*,\s*\d+)*\])*/g, '')
@@ -241,14 +241,27 @@ export function commentaryChunks(text, limit = COMMENTARY_CHUNK_CHARS) {
 
   const chunks = []
   let current = ''
+  const append = (part) => {
+    const candidate = current === '' ? part : `${current} ${part}`
+    if (Buffer.byteLength(candidate, 'utf8') > maxBytes) {
+      chunks.push(current)
+      current = part
+    } else {
+      current = candidate
+    }
+  }
+
   for (const piece of spoken.split(/(?<=[.!?:;\n])\s+/)) {
-    for (let start = 0; start < piece.length; start += limit) {
-      const part = piece.slice(start, start + limit)
-      if (current !== '' && current.length + 1 + part.length > limit) {
-        chunks.push(current)
-        current = ''
+    let part = ''
+    for (const character of piece) {
+      if (Buffer.byteLength(part + character, 'utf8') > maxBytes) {
+        append(part)
+        part = ''
       }
-      current = current === '' ? part : `${current} ${part}`
+      part += character
+    }
+    if (part !== '') {
+      append(part)
     }
   }
   if (current !== '') chunks.push(current)
