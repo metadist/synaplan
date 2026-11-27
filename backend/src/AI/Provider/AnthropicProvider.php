@@ -80,6 +80,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-haiku-4-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
@@ -112,6 +113,30 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     ];
 
     /**
+     * Models that think when `thinking` is omitted but accept
+     * `thinking.type: disabled` at effort high or below.
+     *
+     * Reasoning off sends `disabled`, so a sorting, planning or vision call
+     * with a small `max_tokens` is not used up by thinking before the answer.
+     * `disabled` next to xhigh or max is a 400, so a chosen xhigh or max keeps
+     * adaptive thinking instead.
+     */
+    private const DISABLED_WHEN_OFF_MODELS = [
+        'claude-haiku-5-5',
+    ];
+
+    /**
+     * Adaptive models that accept effort xhigh and max as well as
+     * low|medium|high. Every other adaptive model clamps those to high.
+     * The descriptor offers the same levels in the UI.
+     */
+    public const EXTENDED_EFFORT_MODELS = [
+        'claude-sonnet-5-5',
+        'claude-fable-5-2',
+        'claude-haiku-5-5',
+    ];
+
+    /**
      * Models whose thinking `display` defaults to `omitted`, so the text
      * between tool calls arrives as an empty thinking block.
      *
@@ -124,6 +149,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5-5',
         'claude-opus-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
@@ -144,6 +170,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
@@ -162,6 +189,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
@@ -360,7 +388,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
             $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
             $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
-            $requestBody = $this->applyBetweenToolsThinking($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyReasoningOffThinking($requestBody, $model, $thinkingEnabled);
 
             $this->logger->info('Anthropic: Chat request', [
                 'model' => $model,
@@ -536,7 +564,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
             $requestBody = $this->applyMinimumThinkingEffort($requestBody, $model, $thinkingEnabled);
             $requestBody = $this->applyChosenEffort($requestBody, $model, $options);
             $requestBody = $this->applyProgressThinkingDisplay($requestBody, $model, $thinkingEnabled);
-            $requestBody = $this->applyBetweenToolsThinking($requestBody, $model, $thinkingEnabled);
+            $requestBody = $this->applyReasoningOffThinking($requestBody, $model, $thinkingEnabled);
 
             // Only accumulate when the request really declares tools. A forced
             // schema tool also streams its `input` as `input_json_delta`, but
@@ -763,6 +791,12 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
                     ],
                 ]],
             ];
+
+            // Haiku 5.5 thinks when `thinking` is omitted, which can use up
+            // the small vision `max_tokens` before any description is written.
+            if ($this->matchesPrefix($model, self::DISABLED_WHEN_OFF_MODELS)) {
+                $requestBody['thinking'] = ['type' => 'disabled'];
+            }
 
             $response = $this->httpClient->request('POST', self::BASE_URL.'/messages', [
                 'headers' => $this->getHeaders(),
@@ -1022,20 +1056,31 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     }
 
     /**
-     * Lowest thinking setting on models that reject `thinking.type: disabled`.
+     * Lowest thinking setting when reasoning is off.
      *
-     * Reasoning off sends `between_tools` and, when the caller picked no
-     * level, effort `low`. `display` is omitted: the API rejects it next to
-     * `between_tools`. xhigh and max are not valid with `between_tools`, so
-     * those stay on adaptive thinking.
+     * Models in {@see self::DISABLED_WHEN_OFF_MODELS} get `disabled`, unless
+     * a chosen effort already turned thinking on or needs it (xhigh, max).
+     *
+     * Models that reject `disabled` get `between_tools` and, when the caller
+     * picked no level, effort `low`. `display` is omitted: the API rejects it
+     * next to `between_tools`. xhigh and max are not valid with
+     * `between_tools`, so those stay on adaptive thinking.
      *
      * @param array<string, mixed> $requestBody
      *
      * @return array<string, mixed>
      */
-    private function applyBetweenToolsThinking(array $requestBody, string $model, bool $thinkingEnabled): array
+    private function applyReasoningOffThinking(array $requestBody, string $model, bool $thinkingEnabled): array
     {
-        if ($thinkingEnabled || !$this->usesBetweenToolsThinking($model)) {
+        if ($thinkingEnabled) {
+            return $requestBody;
+        }
+
+        if ($this->matchesPrefix($model, self::DISABLED_WHEN_OFF_MODELS)) {
+            return $this->applyDisabledThinking($requestBody, $model);
+        }
+
+        if (!$this->usesBetweenToolsThinking($model)) {
             return $requestBody;
         }
 
@@ -1077,12 +1122,43 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     }
 
     /**
-     * xhigh and max pass through on Sonnet 5.5 and Fable 5.2. Every other
-     * adaptive model still clamps them to high.
+     * Turn thinking off on a model that accepts `disabled`.
+     *
+     * A thinking config set earlier (a chosen medium or high) is kept. A
+     * chosen xhigh or max is a 400 next to `disabled`, so it keeps adaptive
+     * thinking instead.
+     *
+     * @param array<string, mixed> $requestBody
+     *
+     * @return array<string, mixed>
+     */
+    private function applyDisabledThinking(array $requestBody, string $model): array
+    {
+        if (isset($requestBody['thinking'])) {
+            return $requestBody;
+        }
+
+        $outputConfig = $requestBody['output_config'] ?? null;
+        $effort = \is_array($outputConfig) ? ($outputConfig['effort'] ?? null) : null;
+        if (\in_array($effort, ['xhigh', 'max'], true)) {
+            $requestBody['thinking'] = $this->buildThinkingConfig($model);
+            unset($requestBody['temperature']);
+
+            return $requestBody;
+        }
+
+        $requestBody['thinking'] = ['type' => 'disabled'];
+
+        return $requestBody;
+    }
+
+    /**
+     * xhigh and max pass through on {@see self::EXTENDED_EFFORT_MODELS}.
+     * Every other adaptive model still clamps them to high.
      */
     private function normalizeEffort(string $model, string $requested): ?string
     {
-        if ($this->usesBetweenToolsThinking($model) || str_starts_with($model, 'claude-fable-5-2')) {
+        if ($this->matchesPrefix($model, self::EXTENDED_EFFORT_MODELS)) {
             return match ($requested) {
                 'low', 'medium', 'high', 'xhigh', 'max' => $requested,
                 default => null,
@@ -1123,6 +1199,20 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     {
         foreach (self::BETWEEN_TOOLS_MODELS as $betweenToolsModel) {
             if (str_starts_with($model, $betweenToolsModel)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $prefixes
+     */
+    private function matchesPrefix(string $model, array $prefixes): bool
+    {
+        foreach ($prefixes as $prefix) {
+            if (str_starts_with($model, $prefix)) {
                 return true;
             }
         }

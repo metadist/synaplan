@@ -359,7 +359,7 @@ class SynaformController extends AbstractController
                 ['service' => 'Anthropic', 'model_id' => 'claude-sonnet-4-6', 'label' => 'Claude Sonnet 4.6', 'reason' => 'Reliable structured JSON, strong field extraction.'],
                 ['service' => 'OpenAI',    'model_id' => 'gpt-5.4',           'label' => 'GPT-5.4',           'reason' => 'Best-in-class accuracy on long documents.'],
                 ['service' => 'Google',    'model_id' => 'gemini-2.5-pro',    'label' => 'Gemini 2.5 Pro',    'reason' => 'Excellent for long context + multilingual sources.'],
-                ['service' => 'Anthropic', 'model_id' => 'claude-haiku-4-5-20251001', 'label' => 'Claude Haiku 4.5', 'reason' => 'Fastest reliable JSON-mode option.'],
+                ['service' => 'Anthropic', 'model_id' => 'claude-haiku-5-5', 'label' => 'Claude Haiku 5.5', 'reason' => 'Fastest reliable JSON-mode option.'],
             ],
             'pic2text', 'vision' => [
                 ['service' => 'Google',    'model_id' => 'gemini-2.5-pro',  'label' => 'Gemini 2.5 Pro (Vision)',    'reason' => 'Best OCR quality, handles complex layouts.'],
