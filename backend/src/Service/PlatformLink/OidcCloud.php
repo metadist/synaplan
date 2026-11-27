@@ -21,6 +21,8 @@ use App\Entity\PlatformInstance;
  * - PLATFORM_LINKS_OIDC_CLOUD_INTERNAL_URL (optional): where Synaplan
  *   reaches the cloud app inside the cluster, without a path; the public
  *   address otherwise
+ * - PLATFORM_LINKS_OIDC_CLOUD_USER_CLAIM (optional): the token claim the
+ *   cloud knows its people by; `sub` otherwise
  *
  * Synaplan notifies the cloud at the app's inbound path, which belongs to
  * the cloud type and changes with the app, not with the configuration.
@@ -37,12 +39,15 @@ final readonly class OidcCloud
         PlatformInstance::CLIENT_NEXTCLOUD => '/index.php/apps/synaplan_integration/api/v1/inbound',
     ];
 
+    public const DEFAULT_USER_CLAIM = 'sub';
+
     public string $client;
     public string $url;
     public string $clientId;
     public string $deliveryUrl;
+    public string $userClaim;
 
-    public function __construct(string $type, string $url, string $clientId, string $internalUrl = '')
+    public function __construct(string $type, string $url, string $clientId, string $internalUrl = '', string $userClaim = '')
     {
         $this->client = strtolower(trim($type));
         $this->url = rtrim(trim($url), '/');
@@ -50,6 +55,7 @@ final readonly class OidcCloud
         $base = '' !== trim($internalUrl) ? rtrim(trim($internalUrl), '/') : $this->url;
         $path = self::INBOUND_PATHS[$this->client] ?? null;
         $this->deliveryUrl = null !== $path && '' !== $base ? $base.$path : '';
+        $this->userClaim = '' !== trim($userClaim) ? trim($userClaim) : self::DEFAULT_USER_CLAIM;
     }
 
     public function isEnabled(): bool
@@ -60,6 +66,15 @@ final readonly class OidcCloud
     public function isThisCloud(PlatformInstance $instance): bool
     {
         return $this->isEnabled() && PlatformInstance::OIDC_CLOUD_ID === $instance->getInstanceId();
+    }
+
+    /**
+     * The token claim that names a person in the given cloud: the configured
+     * one for this cloud, `sub` for any other.
+     */
+    public function userClaimFor(PlatformInstance $instance): string
+    {
+        return $this->isThisCloud($instance) ? $this->userClaim : self::DEFAULT_USER_CLAIM;
     }
 
     /**

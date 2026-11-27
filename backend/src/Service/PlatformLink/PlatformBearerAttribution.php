@@ -17,8 +17,10 @@ use Doctrine\ORM\EntityManagerInterface;
  * When a bearer token's azp is a cloud's people client, that person's link
  * with the cloud is looked up, refused when it is off (D8), and created on
  * first use when there is none yet: with a shared identity provider the
- * token itself says who the person is in the cloud (sub) and which cloud
- * it is (azp), like OpenCloud provisions its own accounts on first login.
+ * token itself says who the person is in the cloud (sub, or the claim
+ * {@see OidcCloud::userClaimFor()} names) and which cloud it is (azp), like
+ * OpenCloud provisions its own accounts on first login. A link created this
+ * way follows the token when that value changes.
  * A link the person or the cloud ended is never re-created this way.
  *
  * A client that is not a cloud's is left alone (C1).
@@ -31,6 +33,7 @@ final readonly class PlatformBearerAttribution
         private EntityManagerInterface $entityManager,
         private LifecycleEffect $effects,
         private AuditLogWriter $audit,
+        private OidcCloud $cloud,
     ) {
     }
 
@@ -72,7 +75,7 @@ final readonly class PlatformBearerAttribution
                 if ($row->isOff()) {
                     continue;
                 }
-                $matched[] = $row;
+                $matched[] = [$instance, $row];
             }
         }
 
@@ -87,7 +90,8 @@ final readonly class PlatformBearerAttribution
             return;
         }
 
-        foreach ($matched as $row) {
+        foreach ($matched as [$instance, $row]) {
+            $this->followToken($user, $instance, $row, $claims);
             $row->touchLastSeen();
         }
         $this->entityManager->flush();
@@ -131,15 +135,15 @@ final readonly class PlatformBearerAttribution
 
     /**
      * The first call of this person through this cloud: link them as the
-     * token's subject. Nothing happens when that cloud account is already
+     * token names them. Nothing happens when that cloud account is already
      * someone else's link.
      *
      * @param array<string, mixed> $claims
      */
     private function provisionOnUse(User $user, PlatformInstance $instance, array $claims): void
     {
-        $externalId = is_string($claims['sub'] ?? null) ? trim($claims['sub']) : '';
-        if ('' === $externalId || strlen($externalId) > PlatformInstanceService::EXTERNAL_ID_MAX_LENGTH) {
+        $externalId = $this->externalId($instance, $claims);
+        if ('' === $externalId) {
             return;
         }
         $existing = $this->identities->findOneByTriple($instance->getClient(), $instance->getInstanceId(), $externalId);
@@ -179,5 +183,62 @@ final readonly class PlatformBearerAttribution
                 'mode' => ExternalIdentity::MODE_SSO,
             ]);
         });
+    }
+
+    /**
+     * A link created on first use names the person as the token did then.
+     * When the token names them differently now (the identity provider
+     * created the account anew, or another claim was configured), the link
+     * takes the new value, so the cloud is told about a person it knows.
+     * Nothing happens when that value is already another link.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function followToken(User $user, PlatformInstance $instance, ExternalIdentity $row, array $claims): void
+    {
+        $externalId = $this->externalId($instance, $claims);
+        $previous = $row->getExternalId();
+        if ('' === $externalId || $externalId === $previous || ExternalIdentity::MODE_SSO !== $row->getMode()) {
+            return;
+        }
+        if ($this->identities->findOneByTriple($instance->getClient(), $instance->getInstanceId(), $externalId) instanceof ExternalIdentity) {
+            return;
+        }
+        // Another request of this same person may have moved the row after
+        // the lookup above: then nothing is left under the previous value,
+        // and that request owns the audit entry.
+        $this->entityManager->wrapInTransaction(function () use ($user, $instance, $previous, $externalId): void {
+            $current = $this->identities->lock($instance->getClient(), $instance->getInstanceId(), $previous);
+            if (
+                !$current instanceof ExternalIdentity
+                || $current->getUserId() !== (int) $user->getId()
+                || $current->isOff()
+                || ExternalIdentity::MODE_SSO !== $current->getMode()
+            ) {
+                return;
+            }
+            $current->setExternalId($externalId);
+            $this->entityManager->flush();
+            $this->audit->record((int) $user->getId(), 'platform_link.rebound', 'platform_link', (string) $current->getId(), [
+                'client' => $instance->getClient(),
+                'host' => $instance->getHost(),
+                'external_id' => $externalId,
+                'previous_external_id' => $previous,
+            ]);
+        });
+    }
+
+    /**
+     * How the token names this person in that cloud. Empty when the token
+     * lacks the claim or the value does not fit an external id.
+     *
+     * @param array<string, mixed> $claims
+     */
+    private function externalId(PlatformInstance $instance, array $claims): string
+    {
+        $value = $claims[$this->cloud->userClaimFor($instance)] ?? null;
+        $externalId = is_string($value) ? trim($value) : '';
+
+        return strlen($externalId) > PlatformInstanceService::EXTERNAL_ID_MAX_LENGTH ? '' : $externalId;
     }
 }
