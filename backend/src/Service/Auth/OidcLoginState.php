@@ -95,7 +95,11 @@ final readonly class OidcLoginState
             }
 
             $stored = $item->get();
-            $this->cache->deleteItem($key);
+            // A failed delete leaves the attempt readable. Handing out the
+            // verifier anyway would let the next callback redeem it too.
+            if (!$this->cache->deleteItem($key)) {
+                return null;
+            }
 
             return $this->payload($stored);
         } finally {

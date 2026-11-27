@@ -141,6 +141,25 @@ final class OidcLoginStateTest extends TestCase
         self::assertNull($rival->consume($state));
     }
 
+    public function testACallbackThatCannotDeleteTheAttemptGetsNothing(): void
+    {
+        $stored = new ArrayAdapter();
+        $cache = $this->createStub(CacheItemPoolInterface::class);
+        $cache->method('getItem')->willReturnCallback(
+            static fn (string $key): CacheItemInterface => $stored->getItem($key),
+        );
+        $cache->method('save')->willReturnCallback(
+            static fn (CacheItemInterface $item): bool => $stored->save($item),
+        );
+        $cache->method('deleteItem')->willReturn(false);
+
+        $service = $this->service($cache);
+        $state = $service->issue(self::VERIFIER, 'openid', false, null);
+
+        self::assertNull($service->consume($state));
+        self::assertTrue($stored->hasItem('oidc_login_'.hash('sha256', $state)));
+    }
+
     private function service(?CacheItemPoolInterface $cache = null, ?LockFactory $locks = null): OidcLoginState
     {
         return new OidcLoginState(
