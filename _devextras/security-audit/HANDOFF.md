@@ -1,6 +1,6 @@
 # Handoff: Synaplan Security-Audit und Fixes
 
-Stand: 2026-11-27, morgens. `main` @ `51d14a636`, letzter Tag `v5.10.4`.
+Stand: 2026-11-27, nachmittags. Letzter Tag `v5.10.5`, laut Owner deployt.
 Einstieg für die nächste Sitzung: Abschnitt 7, dann 6.
 Der Ordner `_devextras/security-audit/` liegt seit dem 26.11.2026 auf
 Entscheidung des Owners vollständig im Repo.
@@ -16,8 +16,8 @@ Abschnitt 5).
 
 ## 2. Was erledigt ist
 
-42 Advisories im Repo: 30 veröffentlicht, 11 Drafts (SYN-26, 27, 34 bis 42,
-seit 26.11.), 1 als Duplikat geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 30 gehören 26 zu diesem Audit
+42 Advisories im Repo: 41 veröffentlicht, kein Draft, 1 als Duplikat
+geschlossen (GHSA-2xmp-mxfh-h3f2). Von den 41 gehören 37 zu diesem Audit
 (Tabelle unten, alle ohne CVE); vier sind ältere, davon unabhängige
 Advisories (GHSA-26f3-684h-hpjh, GHSA-2x6x-8r52-pm58, GHSA-phrw-3wm4-3xcx,
 GHSA-qqg9-qv48-j8m8).
@@ -50,8 +50,17 @@ GHSA-qqg9-qv48-j8m8).
 | SYN-25 Admin-Modell-Import, SQL-Prüfung | GHSA-5vp7-6cp5-3v5g | 5.10.4 | published 26.11. |
 | SYN-30 Medien-Marker setzt Dateipfad | GHSA-grvv-mwcf-vhpm | 5.10.4 | published 26.11. |
 | SYN-31 Generierte Medien unter ratbaren Namen | GHSA-r233-vw39-4hm9 | 5.10.4 | published 26.11. |
-| SYN-26 Compute-Sidecar schreibt über Symlink in `/out` | GHSA-q83r-q9c6-7w9h | nächstes Release | Draft, gemergt 26.11. (`bda0aa748`) |
-| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | nächstes Release | Draft, gemergt 26.11. (`b4447d74f`) |
+| SYN-26 Compute-Sidecar schreibt über Symlink in `/out` | GHSA-q83r-q9c6-7w9h | 5.10.5 | published 27.11. |
+| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | 5.10.5 | published 27.11., als "high" |
+| SYN-34 Ähnlichkeitssuche mit fremder Passage | GHSA-w6cp-38wj-c2q5 | 5.10.5 | published 27.11. |
+| SYN-35 Geteilte Chat-Seite zeigt ersetzte Frage | GHSA-72r7-6r5c-3pjw | 5.10.5 | published 27.11. |
+| SYN-36 Widget-Domainliste umgehbar | GHSA-pfjf-63jr-cxvx | 5.10.5 | published 27.11. |
+| SYN-37 Interne Tool-Prompts lesbar | GHSA-qq99-q777-7r59 | 5.10.5 | published 27.11. |
+| SYN-38 Öffentliche Test-Endpunkte | GHSA-p4gh-mjw5-mjvj | 5.10.5 | published 27.11. |
+| SYN-39 Sidecar-Reads ohne Besitzer, Standard-Token | GHSA-w9qm-gqpq-76f6 | 5.10.5 | published 27.11. |
+| SYN-40 Ein Secret für drei Token-Familien, CBC ohne MAC | GHSA-4xrh-4vmh-x56x | 5.10.5 | published 27.11. |
+| SYN-41 Setup ohne Nachweis | GHSA-9c29-f2f7-5rxc | 5.10.5 | published 27.11. |
+| SYN-42 Formel in der Session-ID des Exports | GHSA-wp5p-q684-hp5r | 5.10.5 | published 27.11. |
 
 Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 #3260, normaler öffentlicher PR ohne Advisory). Offen davon siehe 3b.
@@ -155,6 +164,24 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
   erste fiel im bekannten Flake `ChatWidgetSession.spec.ts`), Playwright
   `@ci` 226 passed / 2 skipped.
 
+**Was am 27.11.2026 danach kam (Sitzung 5, Release 5.10.5)**
+
+- Der Owner hat gemergt: SYN-39 (`30120c29f`), SYN-40 (`38ecb1e0e`),
+  SYN-41 (`c3e9b4283`). Bei SYN-40 ließ die Advisory-Seite die zwei
+  gestapelten PRs nicht zusammen mergen ("These pull requests cannot be
+  merged"), obwohl beide konfliktfrei waren. Abhilfe: PR 1 geschlossen,
+  PR 2 enthielt beide Commits und trug danach die Hinweise beider.
+- Der Owner hat `v5.10.5` geschnitten und laut eigener Aussage deployt (von
+  der KI nicht geprüft). Laut `git tag --contains` enthält der Tag SYN-26,
+  27, 34 bis 43.
+- Auf Wort des Owners: in allen elf Drafts `5.10.5` als gepatchte Version
+  eingetragen (Bereich `<= 5.10.4`), Texte gegen den ausgelieferten Stand
+  gelesen, alle elf veröffentlicht. Kein Draft ist mehr offen.
+- Für jede Installation, die den Compute-Sidecar getrennt vom Backend
+  betreibt: er wird durch den Backend-Deploy nicht aktualisiert.
+  Reihenfolge: erst Backend, dann Sidecar neu bauen; ein neuer Sidecar mit
+  altem Backend lehnt Lese-Aufrufe mit 400 ab.
+
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
@@ -194,6 +221,11 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 7. **SYN-12 Einstufung:** ging als "high" (CVSS 7.1) raus, der Report sagt
    "Medium as demonstrated". Lässt sich auf der Advisory-Seite ändern.
 8. Erledigt: WordPress-Plugin-PR #11 ist gemergt.
+
+9. **SYN-39:** der Owner bestätigt, dass der Compute-Sidecar auf dem Stand
+   von `v5.10.5` läuft (siehe Abschnitt 2, Sitzung 5).
+10. **SYN-41:** die Release-Notizen zu 5.10.5 um den Setup-Token für neue
+    Installationen ergänzen.
 
 ### 3b. Erst nach Entscheidung des Owners ("Ask first" in AGENTS.md)
 
@@ -668,6 +700,12 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 ## 7. Nächster Schritt
 
 Stand 27.11.2026. Erledigtes steht in Abschnitt 2.
+
+**Stand nach dem Release 5.10.5:** die Punkte 1 bis 3 beim Owner und 1 bis 3
+bei der KI sind erledigt, alle Advisories sind veröffentlicht. Betriebsdetails
+aus privaten Repos gehören nicht in diese Datei. Offen sind
+3a Punkt 3, 6, 7, 9 und 10, die Entscheidungen in Punkt 4 und 5 unten und
+die Folgethemen in Punkt 4 bei der KI.
 
 **Beim Owner**
 
