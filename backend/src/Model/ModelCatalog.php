@@ -438,18 +438,14 @@ class ModelCatalog
         170 => [
             'providerId' => 'gemini-2.5-flash',
             'retiredOn' => '2026-11-03',
-            // Google routes this id to gemini-3.5-flash-lite, which left the
-            // catalog on 2026-11-27; the successor is the live 3.6 Flash.
-            'successor' => 'google:gemini-3.6-flash:chat',
-            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01. Migrate to gemini-3.6-flash.',
+            'successor' => 'google:gemini-3.5-flash-lite:chat',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01.',
         ],
         171 => [
             'providerId' => 'gemini-2.5-flash',
             'retiredOn' => '2026-11-03',
-            // Google routes this id to gemini-3.5-flash-lite, which left the
-            // catalog on 2026-11-27; the successor is the live 3.6 Flash.
-            'successor' => 'google:gemini-3.6-flash:pic2text',
-            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01. Migrate to gemini-3.6-flash.',
+            'successor' => 'google:gemini-3.5-flash-lite:pic2text',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01.',
         ],
 
         // --- 2026-10-22 (Gemini API: Veo 3.1 preview shutdown) ---
@@ -617,23 +613,25 @@ class ModelCatalog
         ],
 
         // --- 2026-11-27 (Google catalog refresh) ---
-        // The Google chat offer starts at the 3.6 generation. 3.5 Flash and
-        // 3.7 Flash are off Google's models page and already auto-route to 3.6
-        // and 3.8 Flash; the older rows are still served but are dropped from
-        // the offer. 3.6 Flash is the cheapest live Google chat row left, so it
-        // takes the Flash and Flash-Lite bindings; 3.1 Pro goes to Gemini 4
-        // Carbon at the same price tier.
+        // Every chat row follows the replacement Google names on its models
+        // and deprecations pages. 3.5 Flash and 3.7 Flash are off the models
+        // page and already auto-route to 3.6 and 3.8 Flash. 3.1 Flash-Lite is
+        // deprecated in favour of 3.5 Flash-Lite, and Google points new
+        // projects from 2.5 Flash-Lite (closed to new keys) to it as well, so
+        // the cheap tier stays cheap. 3 Flash Preview goes to the 3.6 Flash
+        // Google names. 3.1 Pro Preview has no named successor; Gemini 4
+        // Carbon is the reasoning model at the same input price.
         226 => [
             'providerId' => 'gemini-2.5-flash-lite',
             'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-3.6-flash:chat',
-            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+            'successor' => 'google:gemini-3.5-flash-lite:chat',
+            'reason' => 'Closed to new Google API keys; Google points new projects to gemini-3.5-flash-lite.',
         ],
         227 => [
             'providerId' => 'gemini-2.5-flash-lite',
             'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-3.6-flash:pic2text',
-            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+            'successor' => 'google:gemini-3.5-flash-lite:pic2text',
+            'reason' => 'Closed to new Google API keys; Google points new projects to gemini-3.5-flash-lite.',
         ],
         224 => [
             'providerId' => 'gemini-3-flash-preview',
@@ -651,25 +649,25 @@ class ModelCatalog
             'providerId' => 'gemini-3.1-pro-preview',
             'retiredOn' => '2026-11-27',
             'successor' => 'google:gemini-4-carbon:chat',
-            'reason' => 'Removed from the Google offer; migrate to Gemini 4 Carbon, the reasoning model at the same price tier.',
+            'reason' => 'Superseded by the Gemini 4 generation; Google names no successor. Migrate to Gemini 4 Carbon, the reasoning model at the same input price.',
         ],
         186 => [
             'providerId' => 'gemini-3.1-pro-preview',
             'retiredOn' => '2026-11-27',
             'successor' => 'google:gemini-4-carbon:pic2text',
-            'reason' => 'Removed from the Google offer; migrate to Gemini 4 Carbon, the reasoning model at the same price tier.',
+            'reason' => 'Superseded by the Gemini 4 generation; Google names no successor. Migrate to Gemini 4 Carbon, the reasoning model at the same input price.',
         ],
         191 => [
             'providerId' => 'gemini-3.1-flash-lite',
             'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-3.6-flash:chat',
-            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+            'successor' => 'google:gemini-3.5-flash-lite:chat',
+            'reason' => 'Deprecated by Google (earliest shutdown 2027-05-07); Google names gemini-3.5-flash-lite as its replacement.',
         ],
         192 => [
             'providerId' => 'gemini-3.1-flash-lite',
             'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-3.6-flash:pic2text',
-            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+            'successor' => 'google:gemini-3.5-flash-lite:pic2text',
+            'reason' => 'Deprecated by Google (earliest shutdown 2027-05-07); Google names gemini-3.5-flash-lite as its replacement.',
         ],
         237 => [
             'providerId' => 'gemini-3.5-flash',
@@ -682,18 +680,6 @@ class ModelCatalog
             'retiredOn' => '2026-11-27',
             'successor' => 'google:gemini-3.6-flash:pic2text',
             'reason' => 'No longer listed by Google; requests already route to gemini-3.6-flash.',
-        ],
-        356 => [
-            'providerId' => 'gemini-3.5-flash-lite',
-            'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-3.6-flash:chat',
-            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
-        ],
-        357 => [
-            'providerId' => 'gemini-3.5-flash-lite',
-            'retiredOn' => '2026-11-27',
-            'successor' => 'google:gemini-3.6-flash:pic2text',
-            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
         ],
         352 => [
             'providerId' => 'gemini-3.7-flash',
@@ -2954,8 +2940,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash TTS',
             'tag' => 'text2sound',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[37].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-flash-preview-tts',
             'priceIn' => 0.000022,
             'inUnit' => 'perChar',
@@ -3146,8 +3133,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Nano Banana (Flash Image)',
             'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[118].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-flash-image',
             'priceIn' => 0,
             'inUnit' => 'perImage',
@@ -3326,8 +3314,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.1 Pro',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[185].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.1-pro-preview',
             'priceIn' => 2.0,
             'inUnit' => 'per1M',
@@ -3349,8 +3338,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.1 Pro (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[186].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.1-pro-preview',
             'priceIn' => 2.0,
             'inUnit' => 'per1M',
@@ -3372,8 +3362,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.1 Flash-Lite',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[191].
+            'selectable' => 0,
+            'active' => 0,
             // Google retired the `-preview` alias once 3.1 Flash-Lite went GA;
             // calling it now returns HTTP 404 "no longer available". Use the
             // stable id so the chat dropdown actually round-trips.
@@ -3400,8 +3391,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.1 Flash-Lite (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[192].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.1-flash-lite',
             'priceIn' => 0.25,
             'inUnit' => 'per1M',
@@ -3437,8 +3429,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.5 Flash',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[237].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.5-flash',
             'priceIn' => 1.50,
             'inUnit' => 'per1M',
@@ -3462,8 +3455,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.5 Flash (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[223].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.5-flash',
             'priceIn' => 1.50,
             'inUnit' => 'per1M',
@@ -3487,8 +3481,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3 Flash',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[224].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3-flash-preview',
             'priceIn' => 0.50,
             'inUnit' => 'per1M',
@@ -3512,8 +3507,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3 Flash (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[225].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3-flash-preview',
             'priceIn' => 0.50,
             'inUnit' => 'per1M',
@@ -3537,8 +3533,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash-Lite',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[226].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-flash-lite',
             'priceIn' => 0.10,
             'inUnit' => 'per1M',
@@ -3562,8 +3559,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 2.5 Flash-Lite (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[227].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-2.5-flash-lite',
             'priceIn' => 0.10,
             'inUnit' => 'per1M',
@@ -3618,8 +3616,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.1 Flash TTS',
             'tag' => 'text2sound',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[229].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.1-flash-tts-preview',
             'priceIn' => 0.0000336,
             'inUnit' => 'perChar',
@@ -4032,8 +4031,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.7 Flash',
             'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[352].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.7-flash',
             'priceIn' => 0.75,
             'inUnit' => 'per1M',
@@ -4055,8 +4055,9 @@ class ModelCatalog
             'service' => 'Google',
             'name' => 'Gemini 3.7 Flash (Vision)',
             'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
+            // Retired 2026-11-27. See ModelCatalog::RETIREMENTS[353].
+            'selectable' => 0,
+            'active' => 0,
             'providerId' => 'gemini-3.7-flash',
             'priceIn' => 0.75,
             'inUnit' => 'per1M',

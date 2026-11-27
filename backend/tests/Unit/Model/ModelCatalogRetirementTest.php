@@ -137,6 +137,29 @@ final class ModelCatalogRetirementTest extends TestCase
     }
 
     /**
+     * Google names gemini-3.5-flash-lite as the replacement for 3.1 Flash-Lite
+     * and for new 2.5 Flash-Lite projects, and routes 2.5 Flash to it. It must
+     * stay live so the cheap Google tier does not jump to 3.6 Flash.
+     */
+    public function testTheGoogleFlashLiteRowsRetireToGemini35FlashLite(): void
+    {
+        self::assertFalse(ModelCatalog::isRetired(356));
+        self::assertFalse(ModelCatalog::isRetired(357));
+
+        foreach ([
+            170 => 'google:gemini-3.5-flash-lite:chat',
+            171 => 'google:gemini-3.5-flash-lite:pic2text',
+            191 => 'google:gemini-3.5-flash-lite:chat',
+            192 => 'google:gemini-3.5-flash-lite:pic2text',
+            226 => 'google:gemini-3.5-flash-lite:chat',
+            227 => 'google:gemini-3.5-flash-lite:pic2text',
+        ] as $bid => $successor) {
+            self::assertSame($successor, ModelCatalog::retirement($bid)['successor'] ?? null, 'BID '.$bid);
+            self::assertSame(ModelCatalog::findBidByKey($successor), ModelCatalog::successorBid($bid));
+        }
+    }
+
+    /**
      * A retirement whose row is still active is worse than no retirement: the
      * registry claims the model is dead while the seeder keeps shipping it as
      * usable. The catalog derives the flags from the registry, so this asserts

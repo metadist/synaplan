@@ -472,8 +472,8 @@ final class GoogleSpeech
 
     /**
      * Recognise the Gemini TTS model family so the catalog can ship new
-     * preview ids (gemini-2.5-flash-preview-tts, gemini-2.5-pro-preview-tts,
-     * gemini-3.1-flash-tts-preview, …) without a code change. We keep the
+     * ids (gemini-3.8-flash-tts, gemini-3.8-flash-lite-tts, …) without a
+     * code change. We keep the
      * shape strict enough that non-TTS Gemini models still get rejected.
      */
     private function isGeminiTtsModelId(string $model): bool
