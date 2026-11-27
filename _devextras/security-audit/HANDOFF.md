@@ -204,6 +204,25 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 - Die Go-Tests des Sidecars bauen nur unter Linux (`syscall.Openat`); lokal
   in einem `golang`-Container laufen lassen, nicht nativ auf macOS.
 
+**Was am 27.11.2026 danach kam (Sitzung 7, zwei Folgethemen zu SYN-40)**
+
+- PR #3312 (`d75649053`, gemergt): `ext-sodium` steht in `composer.json`
+  und im Lockfile. Kein neues Paket; das Image hatte die Erweiterung schon.
+- PR #3313 (`cd27b4d44`, gemergt): mit `APP_ENV=prod` startet der Kernel
+  nicht, solange `APP_SECRET` leer ist oder mit `changeme`, `change_me`
+  oder `change-me` beginnt (`AppSecretGuard`, Aufruf in `Kernel::boot()`).
+  `dev` und `test` sind nicht betroffen. Im Prod-Modus lokal ausprobiert:
+  Beispielwert und leerer Wert abgelehnt, Zufallswert startet.
+- Folge für Betreiber: eine Installation, die in Produktion noch den
+  Beispielwert hat, startet nach dem Update nicht mehr. Vor dem Update
+  einen Zufallswert setzen; danach die gespeicherten Provider-Keys neu
+  eintragen, alle melden sich neu an. Steht in `docs/ADMIN.md` und gehört
+  in die Notizen des nächsten Releases.
+- Gate: `make ci-local` je PR grün (PHPUnit 13374 und 13382). Playwright
+  nicht gelaufen (keine Route, keine Oberfläche; die Prüfung greift nur in
+  `prod`, der E2E-Stack läuft in `test`).
+- In keinem Tag; `main` enthält beide.
+
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
@@ -355,8 +374,9 @@ die Entscheidung des Owners. Offen als PR:
   schreibt `v2:` (XChaCha20-Poly1305, eigener abgeleiteter Schlüssel) und
   liest das alte Format weiter. Nicht gebaut: Umschlüsseln der Altwerte,
   Bindung eines Chiffrats an seine Zeile (der Parameter `context` ist da,
-  kein Aufrufer nutzt ihn), Ablehnen des Beispiel-`APP_SECRET` beim Start,
-  `ext-sodium` in `composer.json` (im Image vorhanden).
+  kein Aufrufer nutzt ihn). Nachgezogen in Sitzung 7: Ablehnen des
+  Beispiel-`APP_SECRET` beim Start (PR #3313), `ext-sodium` in
+  `composer.json` (PR #3312).
 - **SYN-41** (`metadist/synaplan-ghsa-9c29-f2f7-5rxc`, PR 1, Branch
   `fix/setup-token`): der Setup-Assistent legt den ersten Administrator nur
   mit einem Einmal-Token an. Der Entrypoint gibt ihn bei jedem Start ins
@@ -381,11 +401,7 @@ die Entscheidung des Owners. Offen als PR:
   Nachricht `DeleteComputeWorkspaceCommand`, die heute nur die Folder-ID
   trägt; Nachrichten, die beim Deploy unterwegs sind, hätten ihn nicht.
   Deshalb eigener Schritt und nicht Teil dieses PRs.
-- SYN-40: `ext-sodium` steht nicht in `composer.json`, obwohl schon
-  `FederationSigner` auf `main` Sodium benutzt. Der Eintrag wäre richtig,
-  ändert aber das Lockfile ("Ask first"). Ohne die Erweiterung schlägt das
-  Verschlüsseln mit einer Ausnahme fehl, es wird nichts im Klartext
-  gespeichert. Das alte CBC-Format bleibt lesbar: wer in die Datenbank
+- SYN-40: `ext-sodium` steht seit PR #3312 in `composer.json`. Das alte CBC-Format bleibt lesbar: wer in die Datenbank
   schreiben kann, kann einen `v2:`-Wert weiter durch einen alten ersetzen.
   Das endet erst mit dem Umschlüsseln und dem Abschalten des alten Lesewegs.
   Die übrigen HMAC-Stellen (`MediaAccessTokenService`, `WopiTokenService`,
@@ -765,6 +781,4 @@ die Folgethemen in Punkt 4 bei der KI.
    `m4wt down`, sonst startet der nächste Lauf ohne Seed-Konten.
 4. Folgethemen, nicht begonnen und je eine eigene Entscheidung: Altwerte
    auf `v2:` umschlüsseln und Chiffrate an ihre Zeile binden (SYN-40);
-   Beispiel-`APP_SECRET` beim Start ablehnen (SYN-40); Sidecar ohne root
-   und ohne Docker-Socket (SYN-39, SYN-26); `ext-sodium` in `composer.json`
-   (SYN-40).
+   Sidecar ohne root und ohne Docker-Socket (SYN-39, SYN-26).
