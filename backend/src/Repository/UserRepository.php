@@ -286,6 +286,16 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
+     * The account whose legacy BUSERDETAILS.oidc_sub is exactly $sub.
+     * Rows written before BEXTERNALIDENTITIES still store the subject there.
+     * A LIKE would treat "_" and "%" as wildcards, so user_1 could match userA1.
+     */
+    public function findByLegacyOidcSub(string $sub): ?User
+    {
+        return $this->findByTopLevelDetail('oidc_sub', $sub);
+    }
+
+    /**
      * Match a provider identity stored as one top-level BUSERDETAILS key.
      *
      * A text search over the JSON also matches the same text nested inside a
@@ -302,6 +312,7 @@ class UserRepository extends ServiceEntityRepository
         $sql = match ($key) {
             'github_id' => "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.github_id')) = :value LIMIT 1",
             'apple_sub' => "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.apple_sub')) = :value LIMIT 1",
+            'oidc_sub' => "SELECT BID FROM BUSER WHERE JSON_UNQUOTE(JSON_EXTRACT(BUSERDETAILS, '$.oidc_sub')) = :value LIMIT 1",
             default => null,
         };
         if (null === $sql) {

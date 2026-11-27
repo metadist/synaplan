@@ -70,6 +70,17 @@ abstract class PluginTestCase extends TestCase
                 $this->rows[$clean($type)][$clean($key)] = $row;
             },
         );
+        $data->method('update')->willReturnCallback(
+            function (int $user, string $plugin, string $type, string $key, callable $change) use ($clean): array {
+                $this->dataOwners[] = $user;
+                $type = $clean($type);
+                $key = $clean($key);
+                $next = $change($this->rows[$type][$key] ?? null);
+                $this->rows[$type][$key] = $next;
+
+                return $next;
+            },
+        );
         $data->method('list')->willReturnCallback(
             fn (int $user, string $plugin, string $type): array => array_values($this->rows[$type] ?? []),
         );

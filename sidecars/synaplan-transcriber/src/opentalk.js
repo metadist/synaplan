@@ -132,6 +132,7 @@ export function createOpenTalkBridge({
   fetchImpl = fetch,
   log = () => {},
   now = Date.now,
+  sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   lobbyWaitMs = 5000,
 }) {
   const meetings = new Map();
@@ -341,15 +342,52 @@ export function createOpenTalkBridge({
     }
 
     const reported = new Set();
+    const pending = new Map();
+    const retryPausesMs = [200, 800];
+
+    function retryable(error) {
+      const status = error?.status;
+      return status === 429 || status === 503 || status == null;
+    }
+
+    async function deliver(person) {
+      const attempts = retryPausesMs.length + 1;
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        if (attempt > 0) {
+          await sleep(retryPausesMs[attempt - 1]);
+        }
+        try {
+          await plugin.event(ref, {
+            type: "participants",
+            participants: [person],
+          });
+          pending.delete(person.id);
+          reported.add(person.id);
+          return;
+        } catch (error) {
+          if (!retryable(error) || attempt === attempts - 1) {
+            log(
+              `OpenTalk ${room}: ${person.id} was not recorded (${error.message}).`,
+            );
+            return;
+          }
+        }
+      }
+    }
+
+    async function flushPeople() {
+      for (const person of [...pending.values()]) {
+        await deliver(person);
+      }
+    }
+
     function remember(participant) {
       const person = personFrom(participant);
-      if (!person || reported.has(person.id)) {
+      if (!person || reported.has(person.id) || pending.has(person.id)) {
         return;
       }
-      reported.add(person.id);
-      track(
-        plugin.event(ref, { type: "participants", participants: [person] }),
-      );
+      pending.set(person.id, person);
+      track(deliver(person));
     }
 
     function hear(id, frame) {
@@ -409,6 +447,7 @@ export function createOpenTalkBridge({
         media = null;
         await open.close().catch(() => {});
       }
+      await flushPeople();
       await plugin.event(ref, { type: "finished", at: now() }).catch(() => {});
       if (meetings.get(room)?.ready === ready) {
         meetings.delete(room);

@@ -311,6 +311,92 @@ test("a pause does not stretch the next subtitle back across the silence", async
   assert.ok(windows[0].t1Ms - windows[0].t0Ms < 5_000);
 });
 
+test("a participant is recorded only after Synaplan accepts them, and a temporary failure is tried again before the meeting ends", async () => {
+  const events = [];
+  let attempts = 0;
+  const { sockets, openSocket } = socketPair();
+  let onParticipant = null;
+  const bridge = createOpenTalkBridge({
+    controllerUrl: "http://controller",
+    serviceKey,
+    initKey: key,
+    livekitUrl: "http://livekit:7880",
+    now: () => 1_700_000_000_000,
+    sleep: async () => {},
+    plugin: {
+      async create() {
+        return { ref: "Ab3dEf9hJkLmN0pQrStUvW", language: "de" };
+      },
+      async window() {
+        return { text: "" };
+      },
+      async event(_ref, payload) {
+        if (payload.type === "participants") {
+          attempts += 1;
+          if (attempts < 3) {
+            const error = new Error("unavailable");
+            error.status = 503;
+            throw error;
+          }
+        }
+        events.push(payload);
+      },
+    },
+    async connectLiveKit(options) {
+      onParticipant = options.onParticipant;
+      return { async close() {} };
+    },
+    openSocket,
+    async fetchImpl() {
+      return {
+        status: 200,
+        async text() {
+          return JSON.stringify({
+            token: "admit",
+            roomserver_address: "http://room/",
+          });
+        },
+      };
+    },
+  });
+
+  const accepted = await bridge.accept(
+    `Bearer ${signServiceToken(key, 1_700_000_000_000)}`,
+    { room_id: "room-1", language: "de" },
+  );
+  assert.equal(accepted.status, 204);
+  sockets[0].emit(
+    "message",
+    JSON.stringify({
+      namespace: "livekit",
+      payload: { message: "popout_stream_access_token", token: "lk" },
+    }),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  await onParticipant({
+    identity: "ed4c78a1-b1ec-49cf-9c9c-ef43b11cfd10:connection",
+    name: "Ada",
+    metadata: JSON.stringify({ sub: "sub-ada" }),
+  });
+  sockets[0].emit(
+    "message",
+    JSON.stringify({
+      namespace: "transcription",
+      payload: { message: "service_command", command: { kind: "stop" } },
+    }),
+  );
+  for (let turn = 0; turn < 20 && events.at(-1)?.type !== "finished"; turn += 1) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+
+  const recorded = events.filter((event) => event.type === "participants");
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].participants[0].id, "ed4c78a1-b1ec-49cf-9c9c-ef43b11cfd10");
+  assert.equal(attempts, 3);
+  assert.equal(events.at(-1).type, "finished");
+  assert.ok(events.findIndex((event) => event.type === "participants") < events.length - 1);
+});
+
 test("an oversized init is refused before a session starts", async () => {
   const config = loadConfig({
     SYNAPLAN_URL: "http://synaplan",

@@ -239,12 +239,13 @@ class OidcUserService
             }
         }
 
-        $qb = $this->userRepository->createQueryBuilder('u');
-        $qb->where('u.userDetails LIKE :pattern')
-            ->setParameter('pattern', '%"oidc_sub":"'.addcslashes($sub, '"\\').'"%')
-            ->setMaxResults(1);
+        $user = $this->userRepository->findByLegacyOidcSub($sub);
+        if (!$user instanceof User) {
+            return null;
+        }
+        $stored = $user->getUserDetails()['oidc_sub'] ?? null;
 
-        return $qb->getQuery()->getOneOrNullResult();
+        return is_string($stored) && $stored === $sub ? $user : null;
     }
 
     /**

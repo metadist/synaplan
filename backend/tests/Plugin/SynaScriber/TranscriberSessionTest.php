@@ -31,12 +31,14 @@ final class TranscriberSessionTest extends PluginTestCase
     /**
      * @param array<string, string> $settings
      */
-    private function service(array $settings = [], ?WhisperClient $whisper = null, ?TranscriptWriter $writer = null, ?ParticipantResolver $participants = null, array $admins = []): SessionService
+    private function service(array $settings = [], ?WhisperClient $whisper = null, ?TranscriptWriter $writer = null, ?ParticipantResolver $participants = null, array $admins = [], ?ProsodyClient $prosody = null): SessionService
     {
         $config = $this->settings($settings);
         $this->store = new SessionStore($this->pluginData());
-        $prosody = $this->createStub(ProsodyClient::class);
-        $prosody->method('state')->willReturn([]);
+        if (!$prosody instanceof ProsodyClient) {
+            $prosody = $this->createStub(ProsodyClient::class);
+            $prosody->method('state')->willReturn([]);
+        }
         if (!$participants instanceof ParticipantResolver) {
             $participants = $this->createStub(ParticipantResolver::class);
             $participants->method('accounts')->willReturn([]);
@@ -338,6 +340,82 @@ final class TranscriberSessionTest extends PluginTestCase
 
         self::assertSame('Hello', $this->racingSessions->window($this->racingRef, self::window())['text']);
         self::assertSame('en', $this->store->find($this->racingRef)['language'] ?? null);
+    }
+
+    public function testAWindowInFlightDoesNotDropAParticipantRecordedMeanwhile(): void
+    {
+        $whisper = $this->createStub(WhisperClient::class);
+        $whisper->method('recognize')->willReturnCallback(function (): array {
+            $sessions = $this->racingSessions;
+            self::assertInstanceOf(SessionService::class, $sessions);
+            $sessions->event($this->racingRef, ['type' => 'participants', 'participants' => [[
+                'id' => 'ed4c78a1-b1ec-49cf-9c9c-ef43b11cfd10',
+                'name' => 'Ada',
+                'email' => 'ada@example.com',
+                'sub' => 'sub-ada',
+            ]]]);
+
+            return self::recognized(['text' => 'Hello', 'dropped' => null]);
+        });
+        $this->racingSessions = $this->service(['opentalk_enabled' => '1'], $whisper);
+        $this->racingRef = $this->racingSessions->beginOpenTalk('room-1', 'de')['ref'];
+
+        $this->racingSessions->window($this->racingRef, self::window());
+
+        $stored = $this->store->find($this->racingRef);
+        self::assertSame('Ada', $stored['roster']['ed4c78a1-b1ec-49cf-9c9c-ef43b11cfd10'] ?? null);
+        self::assertArrayHasKey('sub-ada', is_array($stored['attendees'] ?? null) ? $stored['attendees'] : []);
+    }
+
+    public function testOpenTalkKeepsEveryParticipantReportedOnItsOwn(): void
+    {
+        $sessions = $this->service(['opentalk_enabled' => '1']);
+        $session = $sessions->beginOpenTalk('room-1', 'de');
+        $sessions->event($session['ref'], ['type' => 'participants', 'participants' => [[
+            'id' => 'ed4c78a1-b1ec-49cf-9c9c-ef43b11cfd10',
+            'name' => 'Ada',
+            'email' => '',
+            'sub' => 'sub-ada',
+        ]]]);
+        $sessions->event($session['ref'], ['type' => 'participants', 'participants' => [[
+            'id' => '6f0c1a22-0a1b-4c3d-8e4f-5061728394ab',
+            'name' => 'Bob',
+            'email' => '',
+            'sub' => 'sub-bob',
+        ]]]);
+
+        $stored = $sessions->forRoom('room-1');
+        self::assertSame('Ada', $stored['roster']['ed4c78a1-b1ec-49cf-9c9c-ef43b11cfd10'] ?? null);
+        self::assertSame('Bob', $stored['roster']['6f0c1a22-0a1b-4c3d-8e4f-5061728394ab'] ?? null);
+        self::assertArrayHasKey('sub-ada', is_array($stored['attendees'] ?? null) ? $stored['attendees'] : []);
+        self::assertArrayHasKey('sub-bob', is_array($stored['attendees'] ?? null) ? $stored['attendees'] : []);
+    }
+
+    public function testOpenTalkDoesNotAskJitsiWhoIsInTheRoom(): void
+    {
+        $prosody = $this->createMock(ProsodyClient::class);
+        $prosody->expects(self::never())->method('state');
+        $prosody->expects(self::never())->method('start');
+        $prosody->expects(self::never())->method('stop');
+        $sessions = $this->service(
+            ['opentalk_enabled' => '1'],
+            $this->whisperAnswering(self::recognized(['text' => 'Guten Tag', 'dropped' => null])),
+            null,
+            null,
+            [],
+            $prosody,
+        );
+        $session = $sessions->beginOpenTalk('same-room', 'de');
+        $sessions->event($session['ref'], ['type' => 'participants', 'participants' => [[
+            'id' => 'ep1',
+            'name' => 'Ada',
+            'email' => 'ada@example.com',
+            'sub' => 'sub-ada',
+        ]]]);
+        $sessions->window($session['ref'], self::window());
+        $sessions->event($session['ref'], ['type' => 'finished', 'at' => 1]);
+
+        self::assertSame('nothing_to_save', $this->store->find($session['ref'])['state'] ?? null);
     }
 
     public function testOpenTalkStaysOffUntilAnAdministratorEnablesIt(): void
