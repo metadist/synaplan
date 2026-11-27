@@ -757,45 +757,6 @@
             }
         ]
     },
-    "image.edit": {
-        "result": "https://example.test/edited.png",
-        "sdk": [
-            {
-                "body": {
-                    "image": {
-                        "bytes": 67,
-                        "filename": "<tmpfile>",
-                        "sha1": "c530c06cf89c410c0355d7852644a73fc3ec8c04"
-                    },
-                    "mask": {
-                        "bytes": 67,
-                        "filename": "<tmpfile>",
-                        "sha1": "c530c06cf89c410c0355d7852644a73fc3ec8c04"
-                    },
-                    "n": "1",
-                    "prompt": "Add a hat",
-                    "size": "1024x1024"
-                },
-                "headers": [
-                    "Authorization: Bearer <secret>",
-                    "Content-Length: 632",
-                    "Content-Type: multipart/form-data; boundary=<boundary>",
-                    "Host: api.openai.com"
-                ],
-                "method": "POST",
-                "url": "https://api.openai.com/v1/images/edits"
-            }
-        ]
-    },
-    "image.edit_missing_file": {
-        "error": {
-            "class": "ProviderException",
-            "context": null,
-            "message": "OpenAI image edit error: Failed to download image or mask",
-            "provider": "openai",
-            "upstream_status": null
-        }
-    },
     "image.gpt_image": {
         "curl": [
             {

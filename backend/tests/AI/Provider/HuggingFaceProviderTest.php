@@ -136,12 +136,6 @@ class HuggingFaceProviderTest extends TestCase
         $this->makeProvider(apiKey: null)->generateVideo('cat', ['model' => 'm']);
     }
 
-    public function testEditImageThrowsExceptionWithoutApiKey(): void
-    {
-        $this->expectExceptionMessageContains('HUGGINGFACE_API_KEY');
-        $this->makeProvider(apiKey: null)->editImage('img.png', 'mask.png', 'edit');
-    }
-
     public function testExplainImageThrowsExceptionWithoutApiKey(): void
     {
         $this->expectExceptionMessageContains('HUGGINGFACE_API_KEY');

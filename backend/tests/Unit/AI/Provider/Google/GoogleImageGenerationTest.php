@@ -17,7 +17,7 @@ final class GoogleImageGenerationTest extends TestCase
 
     public function testAGeminiImageComesBackAsADataUrl(): void
     {
-        $images = new GoogleImageGeneration($this->api([self::json(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => self::PIXEL]]]], 'finishReason' => 'STOP']]])]), new NullLogger(), sys_get_temp_dir());
+        $images = new GoogleImageGeneration($this->api([self::json(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => self::PIXEL]]]], 'finishReason' => 'STOP']]])]), new NullLogger());
 
         $result = $images->generateImage('A red bicycle');
 
@@ -29,7 +29,7 @@ final class GoogleImageGenerationTest extends TestCase
 
     public function testImagenGoesToVertexWithItsOwnToken(): void
     {
-        $images = new GoogleImageGeneration($this->api([self::json(['predictions' => [['bytesBase64Encoded' => self::PIXEL]]])], 'synaplan', self::VERTEX_TOKEN), new NullLogger(), sys_get_temp_dir());
+        $images = new GoogleImageGeneration($this->api([self::json(['predictions' => [['bytesBase64Encoded' => self::PIXEL]]])], 'synaplan', self::VERTEX_TOKEN), new NullLogger());
 
         $images->generateImage('A lighthouse', ['model' => 'imagen-4.0-generate-001']);
 
@@ -41,7 +41,7 @@ final class GoogleImageGenerationTest extends TestCase
 
     public function testAnAnswerInProseIsANoImageExceptionThatKeepsTheText(): void
     {
-        $images = new GoogleImageGeneration($this->api([self::json(['candidates' => [['content' => ['parts' => [['text' => 'It is a cat.']]], 'finishReason' => 'STOP']]])]), new NullLogger(), sys_get_temp_dir());
+        $images = new GoogleImageGeneration($this->api([self::json(['candidates' => [['content' => ['parts' => [['text' => 'It is a cat.']]], 'finishReason' => 'STOP']]])]), new NullLogger());
 
         try {
             $images->generateImage('What is in the photo?', ['model' => 'gemini-2.5-flash-image']);

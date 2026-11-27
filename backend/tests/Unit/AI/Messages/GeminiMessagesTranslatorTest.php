@@ -15,7 +15,7 @@ final class GeminiMessagesTranslatorTest extends TestCase
     {
         $t = new GeminiMessagesTranslator(new MockHttpClient());
         $payload = $t->toGeminiRequest([
-            'model' => 'gemini-2.0-flash',
+            'model' => 'gemini-3.6-flash',
             'max_tokens' => 32,
             'thinking' => ['type' => 'adaptive'],
             'system' => 'Sys',
@@ -113,7 +113,7 @@ final class GeminiMessagesTranslatorTest extends TestCase
     {
         $t = new GeminiMessagesTranslator(new MockHttpClient());
         $payload = $t->toGeminiRequest([
-            'model' => 'gemini-2.0-flash',
+            'model' => 'gemini-3.6-flash',
             'max_tokens' => 32,
             'messages' => [['role' => 'user', 'content' => [
                 ['type' => 'text', 'text' => 'What is on this page?'],
@@ -141,7 +141,7 @@ final class GeminiMessagesTranslatorTest extends TestCase
     {
         $t = new GeminiMessagesTranslator(new MockHttpClient());
         $payload = $t->toGeminiRequest([
-            'model' => 'gemini-2.0-flash',
+            'model' => 'gemini-3.6-flash',
             'max_tokens' => 32,
             'tools' => [['type' => 'web_search_20250305', 'name' => 'web_search', 'max_uses' => 5]],
             'messages' => [['role' => 'user', 'content' => 'hello']],
@@ -169,7 +169,7 @@ final class GeminiMessagesTranslatorTest extends TestCase
                 'promptTokenCount' => 7,
                 'candidatesTokenCount' => 3,
             ],
-        ], ['model' => 'gemini-2.0-flash']);
+        ], ['model' => 'gemini-3.6-flash']);
 
         $this->assertSame('tool_use', $anthropic['stop_reason']);
         $this->assertSame('mcp__2__memory_search', $anthropic['content'][0]['name']);
@@ -330,5 +330,37 @@ final class GeminiMessagesTranslatorTest extends TestCase
         $this->assertSame(1000, $anthropic['usage']['input_tokens']);
         $this->assertSame(100, $anthropic['usage']['output_tokens']);
         $this->assertSame(200, $anthropic['usage']['cache_read_input_tokens']);
+    }
+
+    public function testCompleteWithoutModelIsRefusedWithoutCallingGemini(): void
+    {
+        $http = new MockHttpClient(function (): MockResponse {
+            $this->fail('A request without a model must not reach Gemini.');
+        });
+        $t = new GeminiMessagesTranslator($http);
+
+        $result = $t->complete(['max_tokens' => 16, 'messages' => [['role' => 'user', 'content' => 'hi']]], ['api_key' => 'k', 'upstream_url' => 'https://example.test']);
+
+        $this->assertSame(400, $result['status']);
+        $this->assertSame('invalid_request_error', $result['body']['error']['type']);
+        $this->assertSame(0, $http->getRequestsCount());
+    }
+
+    public function testStreamWithoutModelEmitsAnErrorWithoutCallingGemini(): void
+    {
+        $http = new MockHttpClient(function (): MockResponse {
+            $this->fail('A request without a model must not reach Gemini.');
+        });
+        $t = new GeminiMessagesTranslator($http);
+        $events = [];
+
+        $t->stream(['model' => '', 'messages' => [['role' => 'user', 'content' => 'hi']]], ['api_key' => 'k', 'upstream_url' => 'https://example.test'], static function (string|array $event) use (&$events): void {
+            $events[] = $event;
+        });
+
+        $this->assertCount(1, $events);
+        $this->assertSame('error', $events[0]['event']);
+        $this->assertSame('invalid_request_error', $events[0]['data']['error']['type']);
+        $this->assertSame(0, $http->getRequestsCount());
     }
 }

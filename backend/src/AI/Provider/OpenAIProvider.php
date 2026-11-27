@@ -241,11 +241,6 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
         return $this->images->createVariations($imageUrl, $count);
     }
 
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        return $this->images->editImage($imageUrl, $maskUrl, $prompt);
-    }
-
     // ==================== VISION ====================
 
     public function explainImage(string $imageUrl, string $prompt = '', array $options = []): string

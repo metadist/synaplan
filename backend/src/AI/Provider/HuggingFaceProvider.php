@@ -74,9 +74,6 @@ class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProvi
     private const QUEUE_MAX_POLL_ATTEMPTS = 180;
     private const QUEUE_POLL_LOG_EVERY = 10;
 
-    private const DEFAULT_IMAGE_EDIT_MODEL = 'black-forest-labs/FLUX.1-Kontext-dev';
-    private const DEFAULT_IMAGE_EDIT_GUIDANCE_SCALE = 7.5;
-
     /**
      * Kimi's always-thinking models (K2.7-Code, K3) require these sampling
      * parameters: K2.7-Code rejects deviating requests with an API error, and
@@ -526,51 +523,6 @@ class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProvi
         throw new ProviderException('Image variations not supported by HuggingFace provider', self::PROVIDER_NAME);
     }
 
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        // FLUX-Kontext via fal.ai performs image-to-image edits guided by a text prompt.
-        // The mask URL is currently ignored because the underlying model does not accept
-        // explicit inpaint masks - it derives edit regions from the prompt instead.
-        $this->assertApiKey();
-
-        try {
-            $imageBase64 = $this->loadImageAsBase64($imageUrl);
-
-            $this->logger->info('HuggingFace image edit request', [
-                'model' => self::DEFAULT_IMAGE_EDIT_MODEL,
-                'prompt' => $prompt,
-            ]);
-
-            $url = $this->buildSubProviderModelUrl(self::FAL_PROVIDER, self::DEFAULT_IMAGE_EDIT_MODEL);
-
-            $response = $this->httpClient->request('POST', $url, [
-                'headers' => $this->buildAuthHeaders(),
-                'json' => [
-                    'inputs' => $imageBase64,
-                    'parameters' => [
-                        'prompt' => $prompt,
-                        'guidance_scale' => self::DEFAULT_IMAGE_EDIT_GUIDANCE_SCALE,
-                    ],
-                ],
-                'timeout' => self::TIMEOUT_IMAGE_SECONDS,
-            ]);
-
-            $this->assertNotPaymentRequired($response, 'image edit');
-
-            $relativePath = 'generated/hf_edit_'.bin2hex(random_bytes(8)).'.png';
-            $this->writeUploadedFile($relativePath, $response->getContent());
-
-            return $relativePath;
-        } catch (ProviderException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            $this->logger->error('HuggingFace image edit error', [
-                'error' => $e->getMessage(),
-            ]);
-            throw new ProviderException('HuggingFace image edit error: '.$e->getMessage(), self::PROVIDER_NAME, null, 0, $e);
-        }
-    }
-
     // ==================== VIDEO GENERATION ====================
 
     /**
@@ -1012,11 +964,6 @@ class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProvi
         return $contents;
     }
 
-    private function loadImageAsBase64(string $relativePath): string
-    {
-        return base64_encode($this->readUploadedFile($relativePath));
-    }
-
     private function loadImageAsDataUrl(string $relativePath): string
     {
         $contents = $this->readUploadedFile($relativePath);
@@ -1024,20 +971,6 @@ class HuggingFaceProvider implements ChatProviderInterface, ToolCallingChatProvi
         $mimeType = (false !== $realPath ? mime_content_type($realPath) : false) ?: 'image/png';
 
         return sprintf('data:%s;base64,%s', $mimeType, base64_encode($contents));
-    }
-
-    private function writeUploadedFile(string $relativePath, string $contents): void
-    {
-        $fullPath = $this->uploadDir.'/'.ltrim($relativePath, '/');
-        $dir = dirname($fullPath);
-
-        if (!is_dir($dir) && !mkdir($dir, 0755, true) && !is_dir($dir)) {
-            throw new \RuntimeException(sprintf('Failed to create directory "%s".', $dir));
-        }
-
-        if (false === file_put_contents($fullPath, $contents)) {
-            throw new \RuntimeException(sprintf('Failed to write file to "%s".', $fullPath));
-        }
     }
 
     // ==================== VIDEO HELPERS ====================
