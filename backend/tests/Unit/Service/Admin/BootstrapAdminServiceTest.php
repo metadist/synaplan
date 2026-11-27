@@ -9,6 +9,7 @@ use App\Repository\ConfigRepository;
 use App\Repository\UserRepository;
 use App\Service\Admin\BootstrapAdminService;
 use App\Service\Iam\UserLifecycleService;
+use App\Service\Plugin\DefaultUserPluginProvisioner;
 use App\Service\Setup\FirstAdminCreator;
 use App\Service\Setup\FreshInstallDefaults;
 use App\Service\Setup\SetupStateService;
@@ -40,6 +41,7 @@ final class BootstrapAdminServiceTest extends TestCase
     private SharedLockInterface&MockObject $lock;
     private SetupStateService&MockObject $setupState;
     private LoggerInterface&MockObject $logger;
+    private DefaultUserPluginProvisioner&MockObject $plugins;
     private BootstrapAdminService $service;
     private bool $lockAcquired = true;
 
@@ -54,13 +56,18 @@ final class BootstrapAdminServiceTest extends TestCase
         $this->lock = $this->createMock(SharedLockInterface::class);
         $this->setupState = $this->createMock(SetupStateService::class);
         $this->logger = $this->createMock(LoggerInterface::class);
+        $this->plugins = $this->createMock(DefaultUserPluginProvisioner::class);
 
         $this->lockFactory->method('createLock')->willReturn($this->lock);
         $this->lock->method('acquire')->willReturnCallback(fn (): bool => $this->lockAcquired);
 
         $this->service = new BootstrapAdminService(
             $this->userRepository,
-            new FirstAdminCreator($this->userLifecycleService, new FreshInstallDefaults($this->configRepository)),
+            new FirstAdminCreator(
+                $this->userLifecycleService,
+                new FreshInstallDefaults($this->configRepository),
+                $this->plugins,
+            ),
             $this->entityManager,
             $this->passwordHasher,
             $this->lockFactory,
@@ -197,6 +204,7 @@ final class BootstrapAdminServiceTest extends TestCase
             ->willReturn('new-hash');
         $this->entityManager->expects($this->once())->method('flush');
         $this->userLifecycleService->expects($this->never())->method('createUser');
+        $this->plugins->expects($this->never())->method('provisionNewUser');
         $this->logger->expects($this->once())
             ->method('notice')
             ->with(
@@ -238,6 +246,7 @@ final class BootstrapAdminServiceTest extends TestCase
             ->willReturn($createdUser);
         $this->passwordHasher->expects($this->never())->method('hashPassword');
         $this->entityManager->expects($this->never())->method('flush');
+        $this->plugins->expects($this->once())->method('provisionNewUser')->with($createdUser);
         $this->logger->expects($this->once())
             ->method('notice')
             ->with(

@@ -21,9 +21,11 @@ use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
  * plugin symlink the menu reads.
  *
  * Insert-if-missing only. An account whose `enabled` row is `0` is left
- * off. A row of `1` with a missing symlink is installed again so the menu
- * and the API agree. A database reset that keeps the upload files (the
- * symlink is still there, the `enabled` row is gone) is installed again.
+ * off. A row of `1` with a missing or broken symlink is installed again so
+ * the menu and the API agree. A database reset that keeps the upload files
+ * (the symlink is still there, the `enabled` row is gone) is installed again.
+ * One account's failure is logged and the remaining accounts still run.
+ * The step then fails, so the next start retries what did not finish.
  */
 #[AsTaggedItem(priority: 15)]
 final readonly class BundledPluginSeeder implements SeederInterface
@@ -58,6 +60,7 @@ final readonly class BundledPluginSeeder implements SeederInterface
         $inserted = 0;
         $skipped = 0;
         $userIds = null;
+        $failures = [];
 
         foreach (BundledPlugins::NAMES as $name) {
             if (!isset($available[$name])) {
@@ -74,9 +77,22 @@ final readonly class BundledPluginSeeder implements SeederInterface
                     continue;
                 }
 
-                $this->plugins->installPlugin($userId, $name);
-                ++$inserted;
+                try {
+                    $this->plugins->installPlugin($userId, $name);
+                    ++$inserted;
+                } catch (\Throwable $e) {
+                    $failures[] = $userId.'/'.$name;
+                    $this->logger->error('Bundled plugin install failed', [
+                        'user_id' => $userId,
+                        'plugin' => $name,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
             }
+        }
+
+        if ([] !== $failures) {
+            throw new \RuntimeException(sprintf('Bundled plugin install failed for %s', implode(', ', $failures)));
         }
 
         return new SeedResult('bundled_plugins', inserted: $inserted, skipped: $skipped);

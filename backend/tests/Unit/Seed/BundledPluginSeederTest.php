@@ -46,6 +46,53 @@ final class BundledPluginSeederTest extends TestCase
         self::assertSame([[1, 'synaform'], [1, 'synamail']], $installed);
     }
 
+    public function testOneFailureDoesNotStopTheRemainingInstalls(): void
+    {
+        $installed = [];
+        $plugins = $this->createStub(PluginManager::class);
+        $plugins->method('listAvailablePlugins')->willReturn([
+            new PluginManifest('synaform', '4.4.3', 'Forms'),
+            new PluginManifest('synamail', '1.0.0', 'Mail profiles'),
+        ]);
+        $plugins->method('configGroup')->willReturnCallback(
+            static fn (string $name): string => 'P_'.$name,
+        );
+        $plugins->method('isInstalled')->willReturn(false);
+        $plugins->method('installPlugin')->willReturnCallback(
+            static function (int $userId, string $name) use (&$installed): void {
+                if (1 === $userId && 'synaform' === $name) {
+                    throw new \RuntimeException('disk full');
+                }
+                $installed[] = [$userId, $name];
+            },
+        );
+
+        $connection = $this->createStub(Connection::class);
+        $connection->method('fetchFirstColumn')->willReturn([1, 2]);
+
+        $config = $this->createStub(ConfigRepository::class);
+        $config->method('getValue')->willReturn(null);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects($this->once())->method('error')->with(
+            'Bundled plugin install failed',
+            $this->callback(static fn (array $context): bool => 1 === $context['user_id']
+                && 'synaform' === $context['plugin']
+                && 'disk full' === $context['error']),
+        );
+
+        $seeder = new BundledPluginSeeder($connection, $config, $plugins, $logger);
+
+        try {
+            $seeder->seed();
+            self::fail('A failed install must fail the seed step after the other accounts run.');
+        } catch (\RuntimeException $e) {
+            self::assertSame('Bundled plugin install failed for 1/synaform', $e->getMessage());
+        }
+
+        self::assertSame([[2, 'synaform'], [1, 'synamail'], [2, 'synamail']], $installed);
+    }
+
     public function testSkipsAPluginThatIsNotInTheImage(): void
     {
         $plugins = $this->createMock(PluginManager::class);

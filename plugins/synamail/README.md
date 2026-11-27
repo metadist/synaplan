@@ -21,7 +21,7 @@ The stored narrative and that one email go to the user's chat model. Nothing is 
 
 ## Install
 
-The directory ships in the Synaplan image. `app:seed` installs it for every verified account that does not have it yet, including the demo users on a fresh database. An account that already has `enabled` set to `0` stays off.
+The directory ships in the Synaplan image. The first administrator gets it when the account is created. `app:seed` installs it for every other verified account that does not have it yet, including the demo users on a fresh database. An account that already has `enabled` set to `0` stays off.
 
 ```bash
 docker compose exec backend php bin/console app:plugin:install <userId> synamail

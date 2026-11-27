@@ -21,9 +21,10 @@ Seven directories ship in the image:
 | `serper_search` | Reference `web_search` plug adapter, no page  | —                  | —                                                             |
 | `hello_world`   | Smallest page and route, for plugin authors   | `locales/`, five   | —                                                             |
 
-`synaform` and `synamail` are installed for every verified account by
-`app:seed` (every container start, after demo users exist). An account
-whose `enabled` setting is already `0` is left off. Any other plugin is
+`synaform` and `synamail` are installed when the first administrator is
+created (setup wizard or `BOOTSTRAP_ADMIN_*`) and, for every other verified
+account, by `app:seed` (every container start, after demo users exist). An
+account whose `enabled` setting is already `0` is left off. Any other plugin is
 installed per user with `app:plugin:install <userId> <id>`, or for new
 signups by naming it in `DEFAULT_USER_PLUGINS`. The page, the Apps card
 and the menu entry show the manifest's `displayName`, or the id in words
