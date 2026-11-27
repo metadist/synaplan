@@ -31,18 +31,21 @@ final class TranscriberSessionTest extends PluginTestCase
     /**
      * @param array<string, string> $settings
      */
-    private function service(array $settings = [], ?WhisperClient $whisper = null, ?TranscriptWriter $writer = null): SessionService
+    private function service(array $settings = [], ?WhisperClient $whisper = null, ?TranscriptWriter $writer = null, ?ParticipantResolver $participants = null, array $admins = []): SessionService
     {
         $config = $this->settings($settings);
         $this->store = new SessionStore($this->pluginData());
         $prosody = $this->createStub(ProsodyClient::class);
         $prosody->method('state')->willReturn([]);
-        $participants = $this->createStub(ParticipantResolver::class);
-        $participants->method('accounts')->willReturn([]);
+        if (!$participants instanceof ParticipantResolver) {
+            $participants = $this->createStub(ParticipantResolver::class);
+            $participants->method('accounts')->willReturn([]);
+        }
         $starter = $this->createStub(User::class);
         $starter->method('getId')->willReturn(2);
         $users = $this->createStub(UserRepository::class);
-        $users->method('find')->willReturn($starter);
+        $users->method('find')->willReturnCallback(static fn (mixed $id): ?User => (int) $id > 0 ? $starter : null);
+        $users->method('findAdministrators')->willReturn($admins);
 
         return new SessionService(
             $this->store,
@@ -244,23 +247,65 @@ final class TranscriberSessionTest extends PluginTestCase
         self::assertSame('nothing_to_save', $this->store->find(self::REF)['state'] ?? null);
     }
 
-    public function testOpenTalkSubtitlesAreRecognisedAndNotStored(): void
+    public function testOpenTalkKeepsTheTranscriptAndGivesItToAMatchedPerson(): void
+    {
+        $person = $this->createStub(User::class);
+        $person->method('getId')->willReturn(4);
+        $whisper = $this->whisperAnswering(self::recognized(['text' => 'Guten Tag', 'dropped' => null]));
+        $writer = $this->createMock(TranscriptWriter::class);
+        $writer->expects(self::once())->method('write')->with($person)->willReturn(40);
+        $participants = $this->createStub(ParticipantResolver::class);
+        $participants->method('accounts')->willReturn([4 => $person]);
+        $sessions = $this->service(['opentalk_enabled' => '1'], $whisper, $writer, $participants);
+
+        $session = $sessions->beginOpenTalk('d7f813a4-b294-45f4-b560-86467c8c4be7', 'de');
+        $sessions->event($session['ref'], ['type' => 'participants', 'participants' => [[
+            'id' => 'ep1',
+            'name' => 'Ada',
+            'email' => 'ada@example.com',
+            'sub' => 'sub-ada',
+        ]]]);
+        $sessions->window($session['ref'], self::window());
+        self::assertSame('Guten Tag', $this->store->segments($session['ref'])[0]['text'] ?? null);
+
+        $sessions->event($session['ref'], ['type' => 'finished', 'at' => 1]);
+        $saved = $this->store->find($session['ref']);
+        self::assertSame('saved', $saved['state'] ?? null);
+        self::assertSame(40, $saved['fileId'] ?? null);
+        self::assertSame([], $this->store->segments($session['ref']));
+    }
+
+    public function testOpenTalkGivesTheTranscriptToAnAdministratorWhenNobodyMatches(): void
+    {
+        $admin = $this->createStub(User::class);
+        $admin->method('getId')->willReturn(8);
+        $whisper = $this->whisperAnswering(self::recognized(['text' => 'Guten Tag', 'dropped' => null]));
+        $writer = $this->createMock(TranscriptWriter::class);
+        $writer->expects(self::once())->method('write')->with($admin)->willReturn(41);
+        $sessions = $this->service(['opentalk_enabled' => '1'], $whisper, $writer, null, [$admin]);
+
+        $session = $sessions->beginOpenTalk('room-1', 'de');
+        $sessions->window($session['ref'], self::window());
+        $sessions->event($session['ref'], ['type' => 'finished', 'at' => 1]);
+
+        self::assertSame('saved', $this->store->find($session['ref'])['state'] ?? null);
+        self::assertSame(41, $this->store->find($session['ref'])['fileId'] ?? null);
+    }
+
+    public function testOpenTalkDropsTheTextWhenThereIsNobodyToGiveItTo(): void
     {
         $whisper = $this->whisperAnswering(self::recognized(['text' => 'Guten Tag', 'dropped' => null]));
         $writer = $this->createMock(TranscriptWriter::class);
         $writer->expects(self::never())->method('write');
         $sessions = $this->service(['opentalk_enabled' => '1'], $whisper, $writer);
 
-        $session = $sessions->beginOpenTalk('d7f813a4-b294-45f4-b560-86467c8c4be7', 'de');
-        $again = $sessions->beginOpenTalk('d7f813a4-b294-45f4-b560-86467c8c4be7', 'de');
-        self::assertSame($session['ref'], $again['ref']);
-
-        $answer = $sessions->window($session['ref'], self::window());
-        self::assertSame('Guten Tag', $answer['text']);
-        self::assertSame([], $this->store->segments($session['ref']));
-
+        $session = $sessions->beginOpenTalk('room-1', 'de');
+        $sessions->window($session['ref'], self::window());
         $sessions->event($session['ref'], ['type' => 'finished', 'at' => 1]);
+
         self::assertSame('nothing_to_save', $this->store->find($session['ref'])['state'] ?? null);
+        self::assertSame('no_recipient', $this->store->find($session['ref'])['endReason'] ?? null);
+        self::assertSame([], $this->store->segments($session['ref']));
     }
 
     public function testOpenTalkLanguageChangeIsWhatTheNextWindowUses(): void

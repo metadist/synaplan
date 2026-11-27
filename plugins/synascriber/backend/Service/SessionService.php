@@ -98,9 +98,10 @@ final readonly class SessionService
     }
 
     /**
-     * OpenTalk asked for subtitles. The transcriber joins the meeting; this
-     * session only turns the audio windows into text. Nothing is stored,
-     * because OpenTalk's own notice does not say that a transcript is kept.
+     * OpenTalk asked for subtitles. The transcriber joins the meeting and
+     * the spoken lines are kept. When the meeting stops, each person we can
+     * match to a Synaplan account gets the transcript. When nobody matches,
+     * every administrator gets it, so the meeting is not lost.
      *
      * A second request for a meeting that already has subtitles returns that
      * session, so a retry does not start a second one.
@@ -136,7 +137,7 @@ final readonly class SessionService
         $session = [
             'ref' => rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '='),
             'source' => 'opentalk',
-            'keep' => false,
+            'keep' => true,
             'room' => $room,
             'starterId' => 0,
             'starterName' => '',
@@ -334,6 +335,12 @@ final readonly class SessionService
 
             return;
         }
+        if ('participants' === $type && in_array($session['state'], self::ACTIVE, true)) {
+            $session = $this->absorb($session, ['participants' => $event['participants'] ?? []]);
+            $this->store->save($session);
+
+            return;
+        }
         if ('language' === $type) {
             $language = (string) ($event['language'] ?? '');
             if (!in_array($language, $this->settings->languages(), true)) {
@@ -463,12 +470,23 @@ final readonly class SessionService
         $session['fileName'] = $filename;
         $session['segmentCount'] = count($segments);
         $session['deliveryFailures'] = $failures;
-        if (!isset($files[(int) $session['starterId']])) {
+        $starterId = (int) $session['starterId'];
+        if ($starterId > 0 && !isset($files[$starterId])) {
             return $this->fail($session, 'file_not_saved');
+        }
+        if ([] === $files) {
+            if ($failures > 0) {
+                return $this->fail($session, 'file_not_saved');
+            }
+            $this->store->deleteSegments($ref);
+            $session['state'] = 'nothing_to_save';
+            $session['endReason'] = 'no_recipient';
+
+            return $this->close($session);
         }
 
         $session['state'] = 'saved';
-        $session['fileId'] = $files[(int) $session['starterId']];
+        $session['fileId'] = $files[$starterId] ?? reset($files);
         $this->store->deleteSegments($ref);
         $this->logger->info('synascriber: transcript saved', ['ref' => $ref, 'recipients' => count($files), 'failed' => $failures, 'segments' => count($segments)]);
 
@@ -490,9 +508,16 @@ final readonly class SessionService
         if ($starter instanceof User) {
             $recipients[(int) $starter->getId()] = $starter;
         }
-        if ($this->settings->shareWithParticipants()) {
+        if ($this->settings->shareWithParticipants() || 'opentalk' === ($session['source'] ?? '')) {
             $attendees = is_array($session['attendees'] ?? null) ? $session['attendees'] : [];
             $recipients += $this->participants->accounts($attendees);
+        }
+        if ([] === $recipients && 'opentalk' === ($session['source'] ?? '')) {
+            foreach ($this->users->findAdministrators() as $admin) {
+                if (null !== $admin->getId()) {
+                    $recipients[(int) $admin->getId()] = $admin;
+                }
+            }
         }
 
         return $recipients;
@@ -661,13 +686,18 @@ final readonly class SessionService
             return $identities;
         }
         foreach ($participants as $participant) {
-            if (!is_array($participant) || !is_string($participant['sub'] ?? null) || !is_string($participant['email'] ?? null)) {
+            if (!is_array($participant)) {
                 continue;
             }
-            $identities[$participant['sub']] = [
+            $sub = is_string($participant['sub'] ?? null) ? trim($participant['sub']) : '';
+            $email = is_string($participant['email'] ?? null) ? trim($participant['email']) : '';
+            if ('' === $sub) {
+                continue;
+            }
+            $identities[$sub] = [
                 'name' => mb_substr(trim((string) ($participant['name'] ?? '')), 0, 80),
-                'email' => mb_substr(trim($participant['email']), 0, 200),
-                'sub' => mb_substr(trim($participant['sub']), 0, 80),
+                'email' => mb_substr($email, 0, 200),
+                'sub' => mb_substr($sub, 0, 80),
             ];
         }
 

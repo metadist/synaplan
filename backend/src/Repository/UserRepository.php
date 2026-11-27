@@ -162,6 +162,14 @@ class UserRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<User>
+     */
+    public function findAdministrators(): array
+    {
+        return $this->findBy(['userLevel' => 'ADMIN'], ['id' => 'ASC']);
+    }
+
+    /**
      * Every BUSER row, deliberately without a BUSERLEVEL filter — anonymous
      * channel users (email/WhatsApp webhooks, widget sessions) count too.
      *

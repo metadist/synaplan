@@ -205,6 +205,15 @@ class OidcUserService
     }
 
     /**
+     * The account already linked to this identity-provider subject.
+     * Unknown subjects are not created.
+     */
+    public function findExistingBySubject(string $sub): ?User
+    {
+        return $this->findBySub(['sub' => $sub]);
+    }
+
+    /**
      * Resolve by the configured issuer first so a colliding `sub` from another
      * IdP cannot log into the wrong local account. Legacy JSON `oidc_sub` is
      * the fallback for rows written before BEXTERNALIDENTITIES existed.

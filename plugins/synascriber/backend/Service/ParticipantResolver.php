@@ -40,7 +40,14 @@ final readonly class ParticipantResolver
         foreach ($attendees as $attendee) {
             $email = trim((string) ($attendee['email'] ?? ''));
             $sub = trim((string) ($attendee['sub'] ?? ''));
-            if ('' === $email || '' === $sub) {
+            if ('' === $sub) {
+                continue;
+            }
+            if ('' === $email) {
+                $user = $this->oidcUsers->findExistingBySubject($sub);
+                if ($user instanceof User && null !== $user->getId()) {
+                    $accounts[(int) $user->getId()] = $user;
+                }
                 continue;
             }
 

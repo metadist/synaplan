@@ -1,10 +1,10 @@
-import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
-import { WebSocket } from 'ws'
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { WebSocket } from "ws";
 
-const SAMPLE_RATE = 16000
-const FLUSH_SAMPLES = SAMPLE_RATE * 4
-const SILENCE_RMS = 400
-const SILENCE_FLUSH_SAMPLES = Math.round(SAMPLE_RATE * 0.8)
+const SAMPLE_RATE = 16000;
+const FLUSH_SAMPLES = SAMPLE_RATE * 4;
+const SILENCE_RMS = 400;
+const SILENCE_FLUSH_SAMPLES = Math.round(SAMPLE_RATE * 0.8);
 
 /**
  * HS256 token in the shape OpenTalk's service keys use: `kid` is the key
@@ -12,99 +12,108 @@ const SILENCE_FLUSH_SAMPLES = Math.round(SAMPLE_RATE * 0.8)
  */
 export function signServiceToken(key, now = Date.now()) {
   const header = {
-    alg: 'HS256',
+    alg: "HS256",
     kid: key.id,
-    nonce: randomBytes(12).toString('base64url').replace(/[^A-Za-z0-9]/g, 'a').slice(0, 16),
-  }
-  const issued = Math.floor(now / 1000)
-  const body = { iat: issued, exp: issued + 60 }
-  const data = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(body))}`
-  return `${data}.${createHmac('sha256', key.secret).update(data).digest('base64url')}`
+    nonce: randomBytes(12)
+      .toString("base64url")
+      .replace(/[^A-Za-z0-9]/g, "a")
+      .slice(0, 16),
+  };
+  const issued = Math.floor(now / 1000);
+  const body = { iat: issued, exp: issued + 60 };
+  const data = `${b64url(JSON.stringify(header))}.${b64url(JSON.stringify(body))}`;
+  return `${data}.${createHmac("sha256", key.secret).update(data).digest("base64url")}`;
 }
 
 /** True when the token was signed with this key and has not expired. */
 export function tokenMatches(token, key, now = Date.now()) {
-  const parts = String(token || '').split('.')
+  const parts = String(token || "").split(".");
   if (parts.length !== 3) {
-    return false
+    return false;
   }
-  let header
-  let body
+  let header;
+  let body;
   try {
-    header = JSON.parse(Buffer.from(parts[0], 'base64url').toString('utf8'))
-    body = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))
+    header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
+    body = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
   } catch {
-    return false
+    return false;
   }
-  if (header?.alg !== 'HS256' || header?.kid !== key.id) {
-    return false
+  if (header?.alg !== "HS256" || header?.kid !== key.id) {
+    return false;
   }
-  const expected = createHmac('sha256', key.secret).update(`${parts[0]}.${parts[1]}`).digest()
-  const given = Buffer.from(parts[2], 'base64url')
+  const expected = createHmac("sha256", key.secret)
+    .update(`${parts[0]}.${parts[1]}`)
+    .digest();
+  const given = Buffer.from(parts[2], "base64url");
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) {
-    return false
+    return false;
   }
-  return Number(body?.exp) * 1000 > now
+  return Number(body?.exp) * 1000 > now;
 }
 
 export function wavFromPcm(samples, sampleRate = SAMPLE_RATE) {
-  const data = Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength)
-  const header = Buffer.alloc(44)
-  header.write('RIFF', 0)
-  header.writeUInt32LE(36 + data.length, 4)
-  header.write('WAVE', 8)
-  header.write('fmt ', 12)
-  header.writeUInt32LE(16, 16)
-  header.writeUInt16LE(1, 20)
-  header.writeUInt16LE(1, 22)
-  header.writeUInt32LE(sampleRate, 24)
-  header.writeUInt32LE(sampleRate * 2, 28)
-  header.writeUInt16LE(2, 32)
-  header.writeUInt16LE(16, 34)
-  header.write('data', 36)
-  header.writeUInt32LE(data.length, 40)
-  return Buffer.concat([header, data])
+  const data = Buffer.from(
+    samples.buffer,
+    samples.byteOffset,
+    samples.byteLength,
+  );
+  const header = Buffer.alloc(44);
+  header.write("RIFF", 0);
+  header.writeUInt32LE(36 + data.length, 4);
+  header.write("WAVE", 8);
+  header.write("fmt ", 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20);
+  header.writeUInt16LE(1, 22);
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(sampleRate * 2, 28);
+  header.writeUInt16LE(2, 32);
+  header.writeUInt16LE(16, 34);
+  header.write("data", 36);
+  header.writeUInt32LE(data.length, 40);
+  return Buffer.concat([header, data]);
 }
 
 function b64url(text) {
-  return Buffer.from(text).toString('base64url')
+  return Buffer.from(text).toString("base64url");
 }
 
 function rms(samples) {
   if (samples.length === 0) {
-    return 0
+    return 0;
   }
-  let sum = 0
+  let sum = 0;
   for (const sample of samples) {
-    sum += sample * sample
+    sum += sample * sample;
   }
-  return Math.sqrt(sum / samples.length)
+  return Math.sqrt(sum / samples.length);
 }
 
 function deferred() {
-  let resolve
-  let reject
+  let resolve;
+  let reject;
   const promise = new Promise((ok, fail) => {
-    resolve = ok
-    reject = fail
-  })
+    resolve = ok;
+    reject = fail;
+  });
   // A failed start rejects this even when nobody else is waiting on it.
-  promise.catch(() => {})
-  return { promise, resolve, reject }
+  promise.catch(() => {});
+  return { promise, resolve, reject };
 }
 
 function send(socket, message) {
-  const body = JSON.stringify(message)
+  const body = JSON.stringify(message);
   const write = () => {
     if (socket.readyState === 1) {
-      socket.send(body)
+      socket.send(body);
     }
-  }
+  };
   if (socket.readyState === 1) {
-    write()
-    return
+    write();
+    return;
   }
-  socket.once?.('open', write)
+  socket.once?.("open", write);
 }
 
 /**
@@ -117,7 +126,7 @@ export function createOpenTalkBridge({
   serviceKey,
   initKey,
   plugin,
-  livekitUrl = '',
+  livekitUrl = "",
   connectLiveKit,
   openSocket = (url) => new WebSocket(url),
   fetchImpl = fetch,
@@ -125,99 +134,146 @@ export function createOpenTalkBridge({
   now = Date.now,
   lobbyWaitMs = 5000,
 }) {
-  const meetings = new Map()
+  const meetings = new Map();
 
   async function accept(authorization, body) {
-    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
+    const token = authorization.startsWith("Bearer ")
+      ? authorization.slice(7)
+      : "";
     if (!tokenMatches(token, initKey, now())) {
-      return { status: 401, body: { error: 'not_allowed', message: 'The transcription key was not accepted.' } }
+      return {
+        status: 401,
+        body: {
+          error: "not_allowed",
+          message: "The transcription key was not accepted.",
+        },
+      };
     }
-    const room = String(body?.room_id || '')
+    const room = String(body?.room_id || "");
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(room)) {
-      return { status: 422, body: { error: 'invalid_room', message: 'This is not a meeting this service can join.' } }
+      return {
+        status: 422,
+        body: {
+          error: "invalid_room",
+          message: "This is not a meeting this service can join.",
+        },
+      };
     }
     if (body?.breakout_room != null) {
-      return { status: 422, body: { error: 'breakout_unsupported', message: 'Subtitles for a breakout room are not available yet.' } }
+      return {
+        status: 422,
+        body: {
+          error: "breakout_unsupported",
+          message: "Subtitles for a breakout room are not available yet.",
+        },
+      };
     }
-    const current = meetings.get(room)
+    const current = meetings.get(room);
     if (current) {
       try {
-        await current.ready
-        return { status: 204, body: {} }
+        await current.ready;
+        return { status: 204, body: {} };
       } catch {
-        return { status: 503, body: { error: 'not_ready', message: 'Subtitles could not be started.' } }
+        return {
+          status: 503,
+          body: {
+            error: "not_ready",
+            message: "Subtitles could not be started.",
+          },
+        };
       }
     }
-    const gate = deferred()
-    const reserved = { ready: gate.promise, abort: async () => {} }
-    meetings.set(room, reserved)
-    let session
+    const gate = deferred();
+    const reserved = { ready: gate.promise, abort: async () => {} };
+    meetings.set(room, reserved);
+    let session;
     try {
-      session = await plugin.create(room, body?.language || '')
+      session = await plugin.create(room, body?.language || "");
     } catch (error) {
-      meetings.delete(room)
-      gate.reject(error)
-      log(`OpenTalk ${room}: the plugin did not open a session (${error.message}).`)
-      return { status: 503, body: { error: 'not_ready', message: 'Subtitles could not be started.' } }
+      meetings.delete(room);
+      gate.reject(error);
+      log(
+        `OpenTalk ${room}: the plugin did not open a session (${error.message}).`,
+      );
+      return {
+        status: 503,
+        body: {
+          error: "not_ready",
+          message: "Subtitles could not be started.",
+        },
+      };
     }
-    const meeting = startMeeting({ room, language: session.language || body?.language || 'de', ref: session.ref, ready: gate.promise })
-    meetings.set(room, meeting)
+    const meeting = startMeeting({
+      room,
+      language: session.language || body?.language || "de",
+      ref: session.ref,
+      ready: gate.promise,
+    });
+    meetings.set(room, meeting);
     try {
-      await meeting.join()
+      await meeting.join();
     } catch (error) {
       if (meetings.get(room) === meeting) {
-        meetings.delete(room)
+        meetings.delete(room);
       }
-      await meeting.abort().catch(() => {})
-      gate.reject(error)
-      log(`OpenTalk ${room}: ${error.message}`)
-      return { status: 502, body: { error: 'not_joined', message: 'The meeting could not be joined.' } }
+      await meeting.abort().catch(() => {});
+      gate.reject(error);
+      log(`OpenTalk ${room}: ${error.message}`);
+      return {
+        status: 502,
+        body: {
+          error: "not_joined",
+          message: "The meeting could not be joined.",
+        },
+      };
     }
-    gate.resolve()
-    return { status: 204, body: {} }
+    gate.resolve();
+    return { status: 204, body: {} };
   }
 
   function startMeeting({ room, language, ref, ready }) {
-    const speakers = new Map()
-    const inflight = new Set()
-    let socket
-    let media = null
-    let connecting = null
-    let stopped = false
-    let sequence = 0
-    let spoken = language
-    const startedAt = now()
+    const speakers = new Map();
+    const inflight = new Set();
+    let socket;
+    let media = null;
+    let connecting = null;
+    let stopped = false;
+    let sequence = 0;
+    let spoken = language;
+    const startedAt = now();
 
     function track(work) {
-      const promise = work.catch(() => {})
-      inflight.add(promise)
-      promise.finally(() => inflight.delete(promise))
+      const promise = work.catch(() => {});
+      inflight.add(promise);
+      promise.finally(() => inflight.delete(promise));
     }
 
     function speaker(id) {
-      let entry = speakers.get(id)
+      let entry = speakers.get(id);
       if (!entry) {
-        entry = { samples: [], seq: 0, from: now() }
-        speakers.set(id, entry)
+        entry = { samples: [], seq: 0, from: now() };
+        speakers.set(id, entry);
       }
-      return entry
+      return entry;
     }
 
     async function flush(id, cut) {
-      const entry = speakers.get(id)
+      const entry = speakers.get(id);
       if (!entry || entry.samples.length === 0) {
-        return
+        return;
       }
-      const samples = Int16Array.from(entry.samples)
-      entry.samples = []
-      log(`OpenTalk ${room}: ${cut} window from ${id}, ${(samples.length / SAMPLE_RATE).toFixed(1)}s.`)
-      const from = entry.from
-      const end = now()
-      entry.from = end
-      entry.seq += 1
-      const t0 = Math.max(0, from - startedAt)
-      const t1 = Math.max(t0 + 1, end - startedAt)
-      let text = ''
+      const samples = Int16Array.from(entry.samples);
+      entry.samples = [];
+      log(
+        `OpenTalk ${room}: ${cut} window from ${id}, ${(samples.length / SAMPLE_RATE).toFixed(1)}s.`,
+      );
+      const from = entry.from;
+      const end = now();
+      entry.from = end;
+      entry.seq += 1;
+      const t0 = Math.max(0, from - startedAt);
+      const t1 = Math.max(t0 + 1, end - startedAt);
+      let text = "";
       try {
         const result = await plugin.window(ref, {
           endpointId: id,
@@ -226,20 +282,26 @@ export function createOpenTalkBridge({
           t1Ms: t1,
           cut,
           audio: wavFromPcm(samples),
-        })
-        text = result.text || ''
-        log(text ? `OpenTalk ${room}: subtitle, ${text.length} characters.` : `OpenTalk ${room}: the window had no words.`)
+        });
+        text = result.text || "";
+        log(
+          text
+            ? `OpenTalk ${room}: subtitle, ${text.length} characters.`
+            : `OpenTalk ${room}: the window had no words.`,
+        );
       } catch (error) {
-        log(`OpenTalk ${room}: a window was not recognised (${error.message}).`)
+        log(
+          `OpenTalk ${room}: a window was not recognised (${error.message}).`,
+        );
       }
       if (text && socket) {
-        sequence += 1
+        sequence += 1;
         send(socket, {
-          namespace: 'transcription',
+          namespace: "transcription",
           payload: {
-            action: 'transcription_service_event',
+            action: "transcription_service_event",
             event: {
-              kind: 'segment',
+              kind: "segment",
               participant_id: id,
               track_id: `mic-${id}`,
               starts_at: new Date(from).toISOString(),
@@ -247,206 +309,309 @@ export function createOpenTalkBridge({
               text,
             },
           },
-        })
+        });
       }
+    }
+
+    function personFrom(participant) {
+      const identity = String(participant?.identity || "").split(":")[0];
+      if (!/^[A-Za-z0-9_-]{1,80}$/.test(identity)) {
+        return null;
+      }
+      let meta = {};
+      if (
+        typeof participant.metadata === "string" &&
+        participant.metadata !== ""
+      ) {
+        try {
+          const parsed = JSON.parse(participant.metadata);
+          if (parsed && typeof parsed === "object") {
+            meta = parsed;
+          }
+        } catch {
+          meta = {};
+        }
+      }
+      return {
+        id: identity,
+        name: String(participant.name || meta.name || ""),
+        email: typeof meta.email === "string" ? meta.email : "",
+        sub: typeof meta.sub === "string" ? meta.sub : "",
+      };
+    }
+
+    const reported = new Set();
+    function remember(participant) {
+      const person = personFrom(participant);
+      if (!person || reported.has(person.id)) {
+        return;
+      }
+      reported.add(person.id);
+      track(
+        plugin.event(ref, { type: "participants", participants: [person] }),
+      );
     }
 
     function hear(id, frame) {
       // LiveKit names an OpenTalk participant "<id>:<connection>".
-      const speakerId = String(id || '').split(':')[0]
+      const speakerId = String(id || "").split(":")[0];
       if (stopped || !/^[A-Za-z0-9_-]{1,80}$/.test(speakerId)) {
-        return
+        return;
       }
-      const entry = speaker(speakerId)
+      const entry = speaker(speakerId);
       if (rms(frame) < SILENCE_RMS) {
         if (entry.samples.length >= SILENCE_FLUSH_SAMPLES) {
-          track(flush(speakerId, 'pause'))
+          track(flush(speakerId, "pause"));
         }
-        return
+        return;
       }
       if (entry.samples.length === 0) {
-        entry.from = now()
+        entry.from = now();
       }
       for (const sample of frame) {
-        entry.samples.push(sample)
+        entry.samples.push(sample);
       }
       if (entry.samples.length >= FLUSH_SAMPLES) {
-        track(flush(speakerId, 'hard'))
+        track(flush(speakerId, "hard"));
       }
     }
 
     async function finish(reason) {
       if (stopped) {
-        return
+        return;
       }
-      stopped = true
-      await Promise.all([...inflight])
+      stopped = true;
+      await Promise.all([...inflight]);
       for (const id of speakers.keys()) {
-        await flush(id, 'stop')
+        await flush(id, "stop");
       }
       if (socket) {
         send(socket, {
-          namespace: 'transcription',
-          payload: { action: 'transcription_service_event', event: { kind: 'stopped' } },
-        })
-        socket.close()
-        socket = null
+          namespace: "transcription",
+          payload: {
+            action: "transcription_service_event",
+            event: { kind: "stopped" },
+          },
+        });
+        socket.close();
+        socket = null;
       }
-      const pending = connecting
-      connecting = null
+      const pending = connecting;
+      connecting = null;
       if (pending) {
-        const opened = await pending.catch(() => null)
+        const opened = await pending.catch(() => null);
         if (opened && opened !== media) {
-          await opened.close().catch(() => {})
+          await opened.close().catch(() => {});
         }
       }
       if (media) {
-        const open = media
-        media = null
-        await open.close().catch(() => {})
+        const open = media;
+        media = null;
+        await open.close().catch(() => {});
       }
-      await plugin.event(ref, { type: 'finished', at: now() }).catch(() => {})
+      await plugin.event(ref, { type: "finished", at: now() }).catch(() => {});
       if (meetings.get(room)?.ready === ready) {
-        meetings.delete(room)
+        meetings.delete(room);
       }
-      log(`OpenTalk ${room}: subtitles stopped (${reason}) after ${sequence} lines.`)
+      log(
+        `OpenTalk ${room}: subtitles stopped (${reason}) after ${sequence} lines.`,
+      );
     }
 
     async function openMedia(url, token) {
       if (stopped || media || connecting) {
-        return
+        return;
       }
-      const pending = connectLiveKit({ url, token, onFrame: hear, log })
-      connecting = pending
+      const pending = connectLiveKit({
+        url,
+        token,
+        onFrame: hear,
+        onParticipant: remember,
+        log,
+      });
+      connecting = pending;
       try {
-        const opened = await pending
+        const opened = await pending;
         if (stopped || media) {
-          await opened.close().catch(() => {})
-          return
+          await opened.close().catch(() => {});
+          return;
         }
-        media = opened
+        media = opened;
       } finally {
         if (connecting === pending) {
-          connecting = null
+          connecting = null;
         }
       }
     }
 
     async function onMessage(raw) {
-      let message
+      let message;
       try {
-        message = JSON.parse(raw.toString())
+        message = JSON.parse(raw.toString());
       } catch {
-        return
+        return;
       }
-      const payload = message?.payload || {}
-      if (message?.namespace === 'core' && payload.message === 'error') {
-        log(`OpenTalk ${room}: the meeting refused a step (${payload.error || 'unknown'}).`)
+      const payload = message?.payload || {};
+      if (message?.namespace === "core" && payload.message === "error") {
+        log(
+          `OpenTalk ${room}: the meeting refused a step (${payload.error || "unknown"}).`,
+        );
       }
-      if (message?.namespace === 'core' && payload.message === 'join_success') {
-        log(`OpenTalk ${room}: in the meeting.`)
+      if (message?.namespace === "core" && payload.message === "join_success") {
+        log(`OpenTalk ${room}: in the meeting.`);
       }
-      if (message?.namespace === 'transcription' && payload.message === 'service_command') {
-        if (payload.command?.kind === 'stop') {
-          await finish('stopped')
+      if (
+        message?.namespace === "transcription" &&
+        payload.message === "service_command"
+      ) {
+        if (payload.command?.kind === "stop") {
+          await finish("stopped");
         }
-        if (payload.command?.kind === 'change_language' && payload.command.language) {
-          const next = String(payload.command.language)
+        if (
+          payload.command?.kind === "change_language" &&
+          payload.command.language
+        ) {
+          const next = String(payload.command.language);
           try {
-            await plugin.event(ref, { type: 'language', language: next })
-            spoken = next
+            await plugin.event(ref, { type: "language", language: next });
+            spoken = next;
             send(socket, {
-              namespace: 'transcription',
-              payload: { action: 'transcription_service_event', event: { kind: 'updated', language: spoken } },
-            })
+              namespace: "transcription",
+              payload: {
+                action: "transcription_service_event",
+                event: { kind: "updated", language: spoken },
+              },
+            });
           } catch (error) {
-            log(`OpenTalk ${room}: the language was not changed (${error.message}).`)
+            log(
+              `OpenTalk ${room}: the language was not changed (${error.message}).`,
+            );
           }
         }
       }
-      if (message?.namespace === 'livekit' && payload.message === 'popout_stream_access_token' && payload.token) {
-        await openMedia(payload.service_url || payload.public_url || livekitUrl, payload.token)
+      if (
+        message?.namespace === "livekit" &&
+        payload.message === "popout_stream_access_token" &&
+        payload.token
+      ) {
+        await openMedia(
+          payload.service_url || payload.public_url || livekitUrl,
+          payload.token,
+        );
       }
-      if (message?.namespace === 'livekit' && payload.message === 'credentials' && payload.token) {
-        await openMedia(payload.service_url || payload.public_url, payload.token)
+      if (
+        message?.namespace === "livekit" &&
+        payload.message === "credentials" &&
+        payload.token
+      ) {
+        await openMedia(
+          payload.service_url || payload.public_url,
+          payload.token,
+        );
       }
     }
 
     return {
       ready,
       hear,
-      abort: () => finish('not_joined'),
+      abort: () => finish("not_joined"),
       async join() {
-        const start = await fetchImpl(`${controllerUrl}/internal/transcription/start`, {
-          method: 'POST',
-          headers: {
-            authorization: `Bearer ${signServiceToken(serviceKey, now())}`,
-            'content-type': 'application/json',
+        const start = await fetchImpl(
+          `${controllerUrl}/internal/transcription/start`,
+          {
+            method: "POST",
+            headers: {
+              authorization: `Bearer ${signServiceToken(serviceKey, now())}`,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ room_id: room, breakout_room: null }),
           },
-          body: JSON.stringify({ room_id: room, breakout_room: null }),
-        })
-        const text = await start.text()
+        );
+        const text = await start.text();
         if (start.status < 200 || start.status >= 300) {
-          throw new Error(`the meeting did not admit subtitles (${start.status})`)
+          throw new Error(
+            `the meeting did not admit subtitles (${start.status})`,
+          );
         }
-        const admitted = JSON.parse(text)
-        const address = String(admitted.roomserver_address || '').replace(/^http/, 'ws')
-        socket = openSocket(new URL(`v1/signaling/${admitted.token}`, address).toString())
+        const admitted = JSON.parse(text);
+        const address = String(admitted.roomserver_address || "").replace(
+          /^http/,
+          "ws",
+        );
+        socket = openSocket(
+          new URL(`v1/signaling/${admitted.token}`, address).toString(),
+        );
         await new Promise((resolve, reject) => {
-          let settled = false
-          const timer = setTimeout(() => fail(new Error('the meeting did not answer')), lobbyWaitMs)
+          let settled = false;
+          const timer = setTimeout(
+            () => fail(new Error("the meeting did not answer")),
+            lobbyWaitMs,
+          );
           const fail = (error) => {
             if (settled) {
-              return
+              return;
             }
-            settled = true
-            clearTimeout(timer)
-            reject(error)
-          }
+            settled = true;
+            clearTimeout(timer);
+            reject(error);
+          };
           const succeed = () => {
             if (settled) {
-              return
+              return;
             }
-            settled = true
-            clearTimeout(timer)
-            resolve()
-          }
-          socket.on('message', (data) => {
-            onMessage(data).catch((error) => log(`OpenTalk ${room}: ${error.message}`))
-          })
-          socket.on('close', () => {
-            finish('disconnected').catch(() => {})
-            fail(new Error('the meeting closed'))
-          })
-          socket.on('error', () => {})
+            settled = true;
+            clearTimeout(timer);
+            resolve();
+          };
+          socket.on("message", (data) => {
+            onMessage(data).catch((error) =>
+              log(`OpenTalk ${room}: ${error.message}`),
+            );
+          });
+          socket.on("close", () => {
+            finish("disconnected").catch(() => {});
+            fail(new Error("the meeting closed"));
+          });
+          socket.on("error", () => {});
           const wait = (data) => {
-            let message
+            let message;
             try {
-              message = JSON.parse(data.toString())
+              message = JSON.parse(data.toString());
             } catch {
-              return
+              return;
             }
-            if (message?.payload?.message === 'joined_lobby') {
-              clearTimeout(timer)
-              socket.removeListener('message', wait)
-              const canEnter = message.payload.can_enter !== false
-              log(`OpenTalk ${room}: in the lobby (can enter: ${canEnter}, socket ${socket.readyState}).`)
+            if (message?.payload?.message === "joined_lobby") {
+              clearTimeout(timer);
+              socket.removeListener("message", wait);
+              const canEnter = message.payload.can_enter !== false;
+              log(
+                `OpenTalk ${room}: in the lobby (can enter: ${canEnter}, socket ${socket.readyState}).`,
+              );
               if (canEnter) {
-                send(socket, { namespace: 'core', payload: { action: 'enter_room', display_name: 'Synaplan' } })
-                send(socket, { namespace: 'livekit', payload: { action: 'request_popout_stream_access_token' } })
                 send(socket, {
-                  namespace: 'transcription',
-                  payload: { action: 'transcription_service_event', event: { kind: 'started', language: spoken } },
-                })
+                  namespace: "core",
+                  payload: { action: "enter_room", display_name: "Synaplan" },
+                });
+                send(socket, {
+                  namespace: "livekit",
+                  payload: { action: "request_popout_stream_access_token" },
+                });
+                send(socket, {
+                  namespace: "transcription",
+                  payload: {
+                    action: "transcription_service_event",
+                    event: { kind: "started", language: spoken },
+                  },
+                });
               }
-              succeed()
+              succeed();
             }
-          }
-          socket.on('message', wait)
-        })
+          };
+          socket.on("message", wait);
+        });
       },
-    }
+    };
   }
 
-  return { accept }
+  return { accept };
 }
