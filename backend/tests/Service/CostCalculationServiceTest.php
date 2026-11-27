@@ -70,8 +70,8 @@ class CostCalculationServiceTest extends TestCase
 
     public function testCalculateCostAppliesLongContextTierAboveThreshold(): void
     {
-        // gemini-3.1-pro-preview: base 2/12 per 1M, above-200k tier 4/18.
-        $model = $this->createModelMock(20, 'Google', 2.0, 12.0, 'per1M', 'per1M', [], 'gemini-3.1-pro-preview');
+        // grok-4.7: base 2/6 per 1M, at-or-above-200k tier 4/12.
+        $model = $this->createModelMock(20, 'xAI', 2.0, 6.0, 'per1M', 'per1M', [], 'grok-4.7');
 
         $this->modelRepository->expects(self::any())->method('find')->with(20)->willReturn($model);
         $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
@@ -81,7 +81,7 @@ class CostCalculationServiceTest extends TestCase
         $result = $this->service->calculateCost($promptTokens, $completionTokens, 0, 0, 20);
 
         $expectedInput = $promptTokens * (4.0 / 1_000_000);
-        $expectedOutput = $completionTokens * (18.0 / 1_000_000);
+        $expectedOutput = $completionTokens * (12.0 / 1_000_000);
 
         $this->assertSame(number_format($expectedInput, 6, '.', ''), $result->inputCost);
         $this->assertSame(number_format($expectedOutput, 6, '.', ''), $result->outputCost);

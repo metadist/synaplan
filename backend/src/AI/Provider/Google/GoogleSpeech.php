@@ -213,11 +213,11 @@ final class GoogleSpeech
 
         try {
             // Accept any Gemini TTS variant Google ships so newer catalog rows
-            // (e.g. gemini-3.1-flash-tts-preview) reach the API instead of
-            // being silently downgraded to the 2.5 fallback. We still gate on
+            // (e.g. gemini-3.8-flash-lite-tts) reach the API instead of
+            // being silently downgraded to the default. We still gate on
             // the "gemini-...-tts*" shape so a typo or non-TTS model can never
             // reach :generateContent with audio modality enabled.
-            $defaultTtsModel = 'gemini-2.5-flash-preview-tts';
+            $defaultTtsModel = 'gemini-3.8-flash-tts';
             $model = $options['model'] ?? $defaultTtsModel;
             if (!is_string($model) || !$this->isGeminiTtsModelId($model)) {
                 $model = $defaultTtsModel;

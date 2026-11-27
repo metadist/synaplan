@@ -872,7 +872,7 @@
                 "max_duration": 300,
                 "method": "POST",
                 "timeout": 240,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent"
             }
         ]
     },
@@ -913,7 +913,7 @@
                 "max_duration": 300,
                 "method": "POST",
                 "timeout": 240,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent"
             }
         ],
         "result": {
@@ -967,7 +967,7 @@
                 "max_duration": 300,
                 "method": "POST",
                 "timeout": 240,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent"
             }
         ]
     },
@@ -1055,7 +1055,7 @@
                 "max_duration": 300,
                 "method": "POST",
                 "timeout": 240,
-                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent"
+                "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash-tts:generateContent"
             }
         ],
         "result": {

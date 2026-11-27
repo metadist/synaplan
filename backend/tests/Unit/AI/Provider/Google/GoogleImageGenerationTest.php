@@ -27,6 +27,17 @@ final class GoogleImageGenerationTest extends TestCase
         self::assertSame(['TEXT', 'IMAGE'], $request['body']['generationConfig']['responseModalities']);
     }
 
+    public function testNanoBananaWithoutTheImageSuffixUsesTheGeminiPath(): void
+    {
+        $images = new GoogleImageGeneration($this->api([self::json(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'image/png', 'data' => self::PIXEL]]]], 'finishReason' => 'STOP']]])]), new NullLogger());
+
+        $images->generateImage('A red bicycle', ['model' => 'gemini-nano-banana-2.1']);
+
+        $request = $this->requests()[0];
+        self::assertStringEndsWith('/models/gemini-nano-banana-2.1:generateContent', $request['url']);
+        self::assertSame(['TEXT', 'IMAGE'], $request['body']['generationConfig']['responseModalities']);
+    }
+
     public function testImagenGoesToVertexWithItsOwnToken(): void
     {
         $images = new GoogleImageGeneration($this->api([self::json(['predictions' => [['bytesBase64Encoded' => self::PIXEL]]])], 'synaplan', self::VERTEX_TOKEN), new NullLogger());

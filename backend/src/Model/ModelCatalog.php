@@ -438,14 +438,18 @@ class ModelCatalog
         170 => [
             'providerId' => 'gemini-2.5-flash',
             'retiredOn' => '2026-11-03',
-            'successor' => 'google:gemini-3.5-flash-lite:chat',
-            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01.',
+            // Google routes this id to gemini-3.5-flash-lite, which left the
+            // catalog on 2026-11-27; the successor is the live 3.6 Flash.
+            'successor' => 'google:gemini-3.6-flash:chat',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01. Migrate to gemini-3.6-flash.',
         ],
         171 => [
             'providerId' => 'gemini-2.5-flash',
             'retiredOn' => '2026-11-03',
-            'successor' => 'google:gemini-3.5-flash-lite:pic2text',
-            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01.',
+            // Google routes this id to gemini-3.5-flash-lite, which left the
+            // catalog on 2026-11-27; the successor is the live 3.6 Flash.
+            'successor' => 'google:gemini-3.6-flash:pic2text',
+            'reason' => 'Deprecated by Google; requests route to gemini-3.5-flash-lite on 2026-12-01. Migrate to gemini-3.6-flash.',
         ],
 
         // --- 2026-10-22 (Gemini API: Veo 3.1 preview shutdown) ---
@@ -612,6 +616,122 @@ class ModelCatalog
             'reason' => 'Superseded by GPT-6 Luna.',
         ],
 
+        // --- 2026-11-27 (Google catalog refresh) ---
+        // The Google chat offer starts at the 3.6 generation. 3.5 Flash and
+        // 3.7 Flash are off Google's models page and already auto-route to 3.6
+        // and 3.8 Flash; the older rows are still served but are dropped from
+        // the offer. 3.6 Flash is the cheapest live Google chat row left, so it
+        // takes the Flash and Flash-Lite bindings; 3.1 Pro goes to Gemini 4
+        // Carbon at the same price tier.
+        226 => [
+            'providerId' => 'gemini-2.5-flash-lite',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:chat',
+            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+        ],
+        227 => [
+            'providerId' => 'gemini-2.5-flash-lite',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:pic2text',
+            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+        ],
+        224 => [
+            'providerId' => 'gemini-3-flash-preview',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:chat',
+            'reason' => 'Legacy preview; Google names gemini-3.6-flash as its replacement.',
+        ],
+        225 => [
+            'providerId' => 'gemini-3-flash-preview',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:pic2text',
+            'reason' => 'Legacy preview; Google names gemini-3.6-flash as its replacement.',
+        ],
+        185 => [
+            'providerId' => 'gemini-3.1-pro-preview',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-4-carbon:chat',
+            'reason' => 'Removed from the Google offer; migrate to Gemini 4 Carbon, the reasoning model at the same price tier.',
+        ],
+        186 => [
+            'providerId' => 'gemini-3.1-pro-preview',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-4-carbon:pic2text',
+            'reason' => 'Removed from the Google offer; migrate to Gemini 4 Carbon, the reasoning model at the same price tier.',
+        ],
+        191 => [
+            'providerId' => 'gemini-3.1-flash-lite',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:chat',
+            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+        ],
+        192 => [
+            'providerId' => 'gemini-3.1-flash-lite',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:pic2text',
+            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+        ],
+        237 => [
+            'providerId' => 'gemini-3.5-flash',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:chat',
+            'reason' => 'No longer listed by Google; requests already route to gemini-3.6-flash.',
+        ],
+        223 => [
+            'providerId' => 'gemini-3.5-flash',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:pic2text',
+            'reason' => 'No longer listed by Google; requests already route to gemini-3.6-flash.',
+        ],
+        356 => [
+            'providerId' => 'gemini-3.5-flash-lite',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:chat',
+            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+        ],
+        357 => [
+            'providerId' => 'gemini-3.5-flash-lite',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.6-flash:pic2text',
+            'reason' => 'Removed from the Google offer; older than the 3.6 generation. Migrate to gemini-3.6-flash.',
+        ],
+        352 => [
+            'providerId' => 'gemini-3.7-flash',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.8-flash:chat',
+            'reason' => 'No longer listed by Google; requests already route to gemini-3.8-flash.',
+        ],
+        353 => [
+            'providerId' => 'gemini-3.7-flash',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.8-flash:pic2text',
+            'reason' => 'No longer listed by Google; requests already route to gemini-3.8-flash.',
+        ],
+
+        // Nano Banana (gemini-2.5-flash-image) is scheduled for shutdown on
+        // 2027-03-15; Google names Nano Banana 2 Lite as its replacement.
+        118 => [
+            'providerId' => 'gemini-2.5-flash-image',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.1-flash-lite-image:text2pic',
+            'reason' => 'Google shuts it down from 2027-03-15; migrate to Nano Banana 2 Lite (gemini-3.1-flash-lite-image).',
+        ],
+
+        // Both TTS previews shut down on 2026-12-18; the 3.8 Flash TTS models
+        // replace them on the same generateContent speech path.
+        37 => [
+            'providerId' => 'gemini-2.5-flash-preview-tts',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.8-flash-tts:text2sound',
+            'reason' => 'Google shuts it down on 2026-12-18; migrate to Gemini 3.8 Flash TTS.',
+        ],
+        229 => [
+            'providerId' => 'gemini-3.1-flash-tts-preview',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-3.8-flash-tts:text2sound',
+            'reason' => 'Google shuts it down on 2026-12-18; migrate to Gemini 3.8 Flash TTS.',
+        ],
+
         // --- 2026-11-27 (Claude Haiku 5.5 replaces Claude Haiku 4.5) ---
         // Anthropic still serves Haiku 4.5 (retirement not before 2026-10-15),
         // so this is our retirement, not a shutdown. Haiku 5.5 (BIDs 448/449)
@@ -697,7 +817,6 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-24: base $0.10/$0.50, >272k is 2x input
         // and 1.5x output (https://developers.openai.com/api/docs/models/gpt-6-luna).
         'gpt-6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.20, 'price_out_above' => 0.75, 'cache_price_in_above' => 0.02],
-        'gemini-3.1-pro-preview' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
         'grok-4.5' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 0.60],
         'grok-4.6' => ['threshold_tokens' => 200000, 'price_in_above' => 4.0, 'price_out_above' => 12.0, 'cache_price_in_above' => 1.00],
         // Official xAI Text API pricing 2026-09-24: >=200k is 2x input/output
@@ -3127,6 +3246,29 @@ class ModelCatalog
             ],
         ],
         [
+            'id' => 450,
+            'service' => 'Google',
+            'name' => 'Nano Banana 2.1',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-nano-banana-2.1',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.0336,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'Google Nano Banana 2.1 (gemini-nano-banana-2.1) - newest Gemini image model for generation and editing, with enhanced text rendering. 1K image is $0.0336; 2K $0.0504; 4K $0.113.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.0336],
+                'params' => ['model' => 'gemini-nano-banana-2.1'],
+                'features' => ['image', 'pic2pic', 'text_rendering'],
+                'meta' => ['max_reference_images' => 14],
+            ],
+        ],
+        [
             // Retired: Google redirects this id to gemini-3.5-flash-lite on
             // 2026-12-01. See ModelCatalog::RETIREMENTS[170]. A chat that
             // still points here follows that successor.
@@ -3495,6 +3637,62 @@ class ModelCatalog
                 'pricing_mode' => 'per_character',
                 'mode_prices' => ['input_cost_per_character' => 0.0000336],
                 'params' => ['model' => 'gemini-3.1-flash-tts-preview', 'voice' => 'Kore'],
+                'features' => ['tts', 'audio'],
+            ],
+        ],
+        [
+            'id' => 451,
+            'service' => 'Google',
+            'name' => 'Gemini 3.8 Flash TTS',
+            'tag' => 'text2sound',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.8-flash-tts',
+            'priceIn' => 0.000015,
+            'inUnit' => 'perChar',
+            'priceOut' => 0,
+            'outUnit' => 'perChar',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                // Google bills TTS by audio-output tokens ($9/1M audio tokens
+                // through 2026-12-31, $18/1M from 2027-01-01; 25 tokens/sec).
+                // The TTS path meters INPUT characters, so the rate is converted
+                // per character: ~25 audio tok/sec ÷ ~15 chars/sec of speech ×
+                // $9/1M = $0.000015/char. Re-check on 2027-01-01, see
+                // docs/PRICING_MAINTENANCE.md "Time-boxed / reminders".
+                'description' => 'Google Gemini 3.8 Flash TTS - flagship speech generation in 130 languages with 30 prebuilt voices, expressive audio tags and natural prosody.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => ['input_cost_per_character' => 0.000015],
+                'params' => ['model' => 'gemini-3.8-flash-tts', 'voice' => 'Kore'],
+                'features' => ['tts', 'audio'],
+            ],
+        ],
+        [
+            'id' => 452,
+            'service' => 'Google',
+            'name' => 'Gemini 3.8 Flash-Lite TTS',
+            'tag' => 'text2sound',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gemini-3.8-flash-lite-tts',
+            'priceIn' => 0.00001,
+            'inUnit' => 'perChar',
+            'priceOut' => 0,
+            'outUnit' => 'perChar',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                // Google bills TTS by audio-output tokens ($6/1M audio tokens
+                // through 2026-12-31, $12/1M from 2027-01-01; 25 tokens/sec).
+                // The TTS path meters INPUT characters, so the rate is converted
+                // per character: ~25 audio tok/sec ÷ ~15 chars/sec of speech ×
+                // $6/1M = $0.00001/char. Re-check on 2027-01-01, see
+                // docs/PRICING_MAINTENANCE.md "Time-boxed / reminders".
+                'description' => 'Google Gemini 3.8 Flash-Lite TTS - cost-efficient speech generation in 101 languages with the same voices and API as 3.8 Flash TTS.',
+                'pricing_mode' => 'per_character',
+                'mode_prices' => ['input_cost_per_character' => 0.00001],
+                'params' => ['model' => 'gemini-3.8-flash-lite-tts', 'voice' => 'Kore'],
                 'features' => ['tts', 'audio'],
             ],
         ],

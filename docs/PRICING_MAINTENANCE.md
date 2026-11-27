@@ -303,8 +303,8 @@ Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations)
 | --- | ----- | ------------ | --------- |
 | 61 | Gemini 2.5 Pro | `gemini-2.5-pro` | `google:gemini-3.8-flash:chat` (BID 350) |
 | 65 | Gemini 2.5 Pro (Vision) | `gemini-2.5-pro` | `google:gemini-3.8-flash:pic2text` (BID 351) |
-| 170 | Gemini 2.5 Flash | `gemini-2.5-flash` | `google:gemini-3.5-flash-lite:chat` (BID 356) |
-| 171 | Gemini 2.5 Flash (Vision) | `gemini-2.5-flash` | `google:gemini-3.5-flash-lite:pic2text` (BID 357) |
+| 170 | Gemini 2.5 Flash | `gemini-2.5-flash` | `google:gemini-3.6-flash:chat` (BID 354; was 3.5 Flash-Lite until 2026-11-27) |
+| 171 | Gemini 2.5 Flash (Vision) | `gemini-2.5-flash` | `google:gemini-3.6-flash:pic2text` (BID 355; was 3.5 Flash-Lite until 2026-11-27) |
 
 Retired ahead of the redirect, via the registry, no migration. A stored binding follows `BSUCCESSORID`. The long-context tier for `gemini-2.5-pro` left `CONTEXT_PRICING` with the last live row. A request that already ran keeps the cost stored on its usage row; new requests follow the successor. The image-comparison fallback in `GoogleVision` moved to `gemini-3.8-flash`.
 
@@ -604,6 +604,7 @@ You can run the same check locally: `docker compose exec -T backend php bin/cons
 ## Time-boxed / reminders
 
 - **GPT-5.6 Sol — re-verify on/after 2026-11-22 (#1561).** OpenAI's 2026-08-21 cut to $4/$20 (long-context $8/$30, cached $0.40) is labelled promotional "at least through 2026-11-21"; OpenAI has published no rate for after that, and third-party trackers flag a possible lapse back to $5/$30. On or after 2026-11-22, re-check the [official pricing page](https://openai.com/api/pricing/): if it reverted, roll the old rate back into `ModelCatalog.php` (rows 251/252 + `CONTEXT_PRICING`) + a data migration; if the promo was extended/made permanent, just refresh this note. The daily drift check is blind to a time-boxed revert (it only diffs against LiteLLM), so this reminder is the only guard.
+- **Gemini 3.8 TTS — raise the rate on 2027-01-01.** Google lists `gemini-3.8-flash-tts` at $9 and `gemini-3.8-flash-lite-tts` at $6 per 1M audio tokens through 2026-12-31, then $18 and $12. The catalog carries the 2026 rate ($0.000015 and $0.00001 per character, BIDs 451 / 452). On 2027-01-01 double both in `ModelCatalog.php` (row and `mode_prices`) and ship a data migration with a refreshed fingerprint (see "Production rollout to existing installs"). The drift check does not see a dated price step.
 - _(cancelled)_ — the Claude Sonnet 5 "revert to $3/$15 after 2026-08-31" reminder was **cancelled** on 2026-08-12 (Anthropic made the $2/$10 rate permanent; see the drift-log note below). Do not reintroduce it.
 
 ## Anthropic catalog generations (snapshot 2026-09-24; Sonnet 5.5 cache read verified 2026-10-08)
@@ -667,6 +668,35 @@ Comparing the production catalog (`GET /api/v1/admin/models`) against `ModelCata
 `ModelCatalogTest::testNoCatalogPriceIsAuthoredUnderAUnitThatNormalisesToZero()` now fails the build if a catalog row is ever authored this way again. Note that `per_generation` (Higgsfield video, BIDs 302–308) is *not* this bug — unknown units fall through as per-1, which is what a flat per-clip fee needs.
 
 > **Removing a model from the catalog is only half a retirement.** `ModelSeeder` never deletes or deactivates rows, so a model dropped from `ModelCatalog.php` on its own stays `BACTIVE=1, BSELECTABLE=1` in every existing database — still pickable in the UI and still billed at whatever price the stale row holds. That is how Opus 4.1/4.5 survived several releases. Since #1515 the second half is a data entry rather than a migration; see [Retiring a model](#retiring-a-model) below.
+
+### Google catalog refresh (2026-11-27)
+
+Checked against Google's [models](https://aistudio.google.com/docs/models), [deprecations](https://aistudio.google.com/docs/deprecations) and [pricing](https://aistudio.google.com/docs/pricing) pages on 2026-11-27. The Google chat offer now starts at the 3.6 generation. `gemini-3.5-flash` and `gemini-3.7-flash` are off the models page and already auto-route to 3.6 and 3.8 Flash. The older chat rows are still served by Google but are dropped from the offer. Retired via the registry, no migration:
+
+| BIDs | `providerId` | Successor |
+| ---- | ------------ | --------- |
+| 226 / 227 | `gemini-2.5-flash-lite` | `gemini-3.6-flash` (354 / 355) |
+| 224 / 225 | `gemini-3-flash-preview` | `gemini-3.6-flash` (354 / 355) |
+| 185 / 186 | `gemini-3.1-pro-preview` | `gemini-4-carbon` (433 / 434) |
+| 191 / 192 | `gemini-3.1-flash-lite` | `gemini-3.6-flash` (354 / 355) |
+| 237 / 223 | `gemini-3.5-flash` | `gemini-3.6-flash` (354 / 355) |
+| 356 / 357 | `gemini-3.5-flash-lite` | `gemini-3.6-flash` (354 / 355) |
+| 352 / 353 | `gemini-3.7-flash` | `gemini-3.8-flash` (350 / 351) |
+| 118 | `gemini-2.5-flash-image` (shutdown from 2027-03-15) | `gemini-3.1-flash-lite-image` (358) |
+| 37 | `gemini-2.5-flash-preview-tts` (shutdown 2026-12-18) | `gemini-3.8-flash-tts` (451) |
+| 229 | `gemini-3.1-flash-tts-preview` (shutdown 2026-12-18) | `gemini-3.8-flash-tts` (451) |
+
+3.6 Flash ($0.75 / $3.75) is now the cheapest live Google chat row, so `GoogleProvider`'s SORT, PLAN and SUMMARIZE bindings moved there from 3.1 Flash-Lite ($0.25 / $1.50). The long-context tier for `gemini-3.1-pro-preview` left `CONTEXT_PRICING` with its last live row.
+
+Added:
+
+| BID | Model | `providerId` | Price |
+| --- | ----- | ------------ | ----- |
+| 450 | Nano Banana 2.1 | `gemini-nano-banana-2.1` | $0.0336 per 1K image (2K $0.0504, 4K $0.113) |
+| 451 | Gemini 3.8 Flash TTS | `gemini-3.8-flash-tts` | $9 / 1M audio tokens through 2026-12-31, then $18 → $0.000015 / char |
+| 452 | Gemini 3.8 Flash-Lite TTS | `gemini-3.8-flash-lite-tts` | $6 / 1M audio tokens through 2026-12-31, then $12 → $0.00001 / char |
+
+`gemini-nano-banana-2.1` has no `-image` suffix, so `GoogleImageGeneration` also routes `gemini-nano-banana-*` ids to the native Gemini image path. The TTS per-character rate uses the same 25 audio tokens/sec ÷ ~15 chars/sec conversion as the 3.1 preview.
 
 ## Retiring a model
 
