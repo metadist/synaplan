@@ -23,6 +23,7 @@ final readonly class CloudCallerResolver
     public function __construct(
         private SourceInstanceResolver $sources,
         private PlatformInstanceRepository $instances,
+        private OidcCloud $cloud,
     ) {
     }
 
@@ -48,9 +49,11 @@ final readonly class CloudCallerResolver
 
     /**
      * The platform user id a person may bind or ask about: one of their own
-     * token's claims (`sub`, or `preferred_username` for a cloud that names
-     * people by login), never a value the caller picks freely. Empty means
-     * the subject.
+     * token's claims (`sub`, `preferred_username` for a cloud that names
+     * people by login, or the claim the configured cloud names its people by,
+     * {@see OidcCloud::$userClaim}), never a value the caller picks freely.
+     * Empty means the value of that configured claim, which is the subject
+     * unless another claim is set.
      */
     public function externalId(Request $request, string $requested): string
     {
@@ -59,12 +62,17 @@ final readonly class CloudCallerResolver
         if ('' === $subject) {
             throw new CloudDeliveryException(Response::HTTP_UNAUTHORIZED, 'unauthorized');
         }
+        $configured = OidcCloud::claimValue($claims, $this->cloud->userClaim);
         $requested = trim($requested);
         if ('' === $requested) {
-            return $subject;
+            if ('' === $configured) {
+                throw new CloudDeliveryException(Response::HTTP_UNAUTHORIZED, 'unauthorized');
+            }
+
+            return $configured;
         }
         $login = is_string($claims['preferred_username'] ?? null) ? $claims['preferred_username'] : '';
-        if ($requested !== $subject && $requested !== $login) {
+        if ($requested !== $subject && $requested !== $login && $requested !== $configured) {
             throw new CloudDeliveryException(Response::HTTP_FORBIDDEN, 'external_id_mismatch');
         }
 

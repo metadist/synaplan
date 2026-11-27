@@ -6,6 +6,7 @@ use App\Entity\User;
 use App\Repository\ExternalIdentityRepository;
 use App\Repository\UserRepository;
 use App\Security\AccountAccess;
+use App\Service\Auth\OidcAccessDenialReason;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcAccessPolicy;
 use App\Service\Auth\OidcClaimResolver;
@@ -68,7 +69,8 @@ class OidcUserService
      * @param string|null          $refreshToken   Keycloak refresh token (only set during browser login)
      * @param string|null          $signupLanguage UI language for a brand-new account (de, en, es, fr, tr)
      *
-     * @throws OidcAccessDeniedException when no account exists and OIDC provisioning is turned off
+     * @throws OidcAccessDeniedException when no account exists and OIDC provisioning is turned off,
+     *                                   or an unknown subject names an account by an unverified mail address
      */
     public function findOrCreateFromClaims(array $claims, ?string $refreshToken = null, ?string $signupLanguage = null): User
     {
@@ -80,7 +82,7 @@ class OidcUserService
             throw new \RuntimeException('OIDC claims missing subject (sub)');
         }
 
-        $user = $this->findBySub($claims) ?? $this->findByEmail($email);
+        $user = $this->findBySub($claims) ?? $this->findByVerifiedEmail($claims);
         $isNewUser = false;
 
         if ($user) {
@@ -276,6 +278,37 @@ class OidcUserService
     private function oidcSource(array $claims): string
     {
         return 'oidc:'.$this->claimResolver->issuer($claims, $this->oidcDiscoveryUrl);
+    }
+
+    /**
+     * The account an unknown subject signs in to by its mail address: an
+     * identity provider recreates an account with a new `sub`, or the row
+     * predates the subject lookup. Refused when the provider says the
+     * address is not verified, since then it is whatever the person typed
+     * in, possibly someone else's. A provider that sends no
+     * `email_verified` at all is trusted as before.
+     *
+     * @param array<string, mixed> $claims
+     *
+     * @throws OidcAccessDeniedException
+     */
+    private function findByVerifiedEmail(array $claims): ?User
+    {
+        $email = $claims['email'] ?? null;
+        $user = $this->findByEmail(is_string($email) ? $email : null);
+        if (!$user instanceof User) {
+            return null;
+        }
+        $verified = filter_var($claims['email_verified'] ?? true, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        if (false === $verified) {
+            $this->logger->warning('OIDC sign-in by an unverified mail address refused', [
+                'user_id' => $user->getId(),
+                'sub' => $claims['sub'] ?? null,
+            ]);
+            throw new OidcAccessDeniedException(OidcAccessDenialReason::EmailNotVerified);
+        }
+
+        return $user;
     }
 
     private function findByEmail(?string $email): ?User

@@ -163,6 +163,7 @@ Accounts that existed before grants were introduced have no rows yet. `php bin/c
 | What you see | What is going on |
 | --- | --- |
 | Registration is off, and a first OIDC sign-in still creates an account | The directory follows `OIDC_ALLOW_USER_PROVISIONING`, not `REGISTRATION_ENABLED`. |
+| A person whose identity-provider account was recreated cannot sign in (`oidc_not_authorized`, log reason `email_not_verified`) | Their new account has a new `sub`, so Synaplan finds them by mail address. It refuses that when the token says `email_verified: false`, because an unverified address may be someone else's. Verify the address in the identity provider; the next sign-in works. |
 | Google says there is no account, and the person already has one | The social door found no account for that address, or sign-up is closed. An existing account signs in with the method that created it. Nothing new was stored. |
 | Every visitor hits the sign-up limit together | `SYMFONY_TRUSTED_PROXIES` does not name the ingress, so every request shares the proxy's address. |
 | You rotated `TOKEN_SECRET` and sessions did not change | Session cookies are signed with `APP_SECRET`. `TOKEN_SECRET` is not read. Realtime tokens use `REALTIME_TOKEN_SECRET`. |

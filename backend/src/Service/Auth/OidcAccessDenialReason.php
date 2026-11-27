@@ -16,4 +16,5 @@ enum OidcAccessDenialReason: string
     case PermissionMissing = 'permission_missing';
     case OpaqueToken = 'opaque_token';
     case ProvisioningDisabled = 'provisioning_disabled';
+    case EmailNotVerified = 'email_not_verified';
 }
