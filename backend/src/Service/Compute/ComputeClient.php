@@ -101,9 +101,9 @@ final readonly class ComputeClient
         return $response->getContent();
     }
 
-    public function cancel(string $runId): void
+    public function cancel(string $owner, string $runId): void
     {
-        $this->request('DELETE', '/v1/runs/'.rawurlencode($runId), ['timeout' => 10]);
+        $this->forOwner('DELETE', $owner, '/v1/runs/'.rawurlencode($runId), ['timeout' => 10]);
     }
 
     public function createWorkspace(ComputeWorkspaceCreate $create): ComputeWorkspaceCreated
@@ -159,9 +159,9 @@ final readonly class ComputeClient
         ];
     }
 
-    public function deleteWorkspace(string $workspaceId): void
+    public function deleteWorkspace(string $owner, string $workspaceId): void
     {
-        $this->request('DELETE', '/v1/workspaces/'.rawurlencode($workspaceId), ['timeout' => 15]);
+        $this->forOwner('DELETE', $owner, '/v1/workspaces/'.rawurlencode($workspaceId), ['timeout' => 15]);
     }
 
     /**
@@ -259,6 +259,17 @@ final readonly class ComputeClient
      */
     private function read(string $owner, string $path, array $options = []): ResponseInterface
     {
+        return $this->forOwner('GET', $owner, $path, $options);
+    }
+
+    /**
+     * A request on one run or folder by id. The sidecar hands it over, cancels
+     * it or deletes it only for the owner it was created with.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function forOwner(string $method, string $owner, string $path, array $options = []): ResponseInterface
+    {
         if ('' === $owner) {
             throw new ComputeRefusedException('missing_owner', 'owner is required');
         }
@@ -267,7 +278,7 @@ final readonly class ComputeClient
             [self::OWNER_HEADER => $owner],
         );
 
-        return $this->request('GET', $path, $options);
+        return $this->request($method, $path, $options);
     }
 
     /**

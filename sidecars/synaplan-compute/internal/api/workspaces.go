@@ -117,7 +117,10 @@ func (s *Server) mimeAllowed(m string) bool {
 }
 
 func (s *Server) handleDeleteWorkspace(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, ok := s.ownedWorkspace(w, r)
+	if !ok {
+		return
+	}
 	s.mu.Lock()
 	if _, held := s.busyWs[id]; held {
 		s.mu.Unlock()

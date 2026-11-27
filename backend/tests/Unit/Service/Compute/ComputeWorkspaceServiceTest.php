@@ -109,7 +109,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
         $created = new ComputeWorkspaceCreated('01ARZ3NDEKTSV4RRFFQ69G5FAV', 256);
         $client = $this->createMock(ComputeClient::class);
         $client->method('createWorkspace')->willReturn($created);
-        $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->expects($this->once())->method('deleteWorkspace')->with('user:7', '01ARZ3NDEKTSV4RRFFQ69G5FAV');
 
         $repo = $this->createMock(ComputeWorkspaceRepository::class);
         $repo->method('findAccessibleForUser')->willReturn(null);
@@ -134,7 +134,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
     {
         $client = $this->createMock(ComputeClient::class);
         $client->method('createWorkspace')->willReturn(new ComputeWorkspaceCreated('01ARZ3NDEKTSV4RRFFQ69G5FAV', 256));
-        $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->expects($this->once())->method('deleteWorkspace')->with('user:7', '01ARZ3NDEKTSV4RRFFQ69G5FAV');
         $repo = $this->createStub(ComputeWorkspaceRepository::class);
         $repo->method('findAccessibleForUser')->willReturn(null);
         $repo->method('saveForExistingOwner')->willReturn(false);
@@ -161,7 +161,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
         $repo->expects($this->once())->method('saveForExistingOwner')->willReturn(true);
 
         $client = $this->createMock(ComputeClient::class);
-        $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->expects($this->once())->method('deleteWorkspace')->with('user:7', '01ARZ3NDEKTSV4RRFFQ69G5FAV');
         $client->method('createWorkspace')->willReturn(new ComputeWorkspaceCreated('01BX5ZZKBKACTAV9WEVGEMMVRY', 256));
 
         $limits = $this->createStub(RateLimitService::class);
@@ -246,7 +246,7 @@ final class ComputeWorkspaceServiceTest extends TestCase
         $repo->expects($this->once())->method('remove')->with($due);
 
         $client = $this->createMock(ComputeClient::class);
-        $client->expects($this->once())->method('deleteWorkspace')->with('01ARZ3NDEKTSV4RRFFQ69G5FAV');
+        $client->expects($this->once())->method('deleteWorkspace')->with('user:7', '01ARZ3NDEKTSV4RRFFQ69G5FAV');
 
         $user = $this->createStub(User::class);
         $user->method('getId')->willReturn(7);

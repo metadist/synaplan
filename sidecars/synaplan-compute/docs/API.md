@@ -18,7 +18,7 @@ Unknown JSON fields are rejected (`json.Decoder.DisallowUnknownFields`). `image`
 | `invalid_json` | 400 | Body is not valid JSON, has the wrong types, or the multipart form is malformed / lacks `request.json` |
 | `unknown_field` | 400 | A JSON field the contract does not define |
 | `invalid_protocol` | 400 | `protocol` is not `1` |
-| `missing_owner` | 400 | `owner` is empty |
+| `missing_owner` | 400 | `owner` is empty, or a by-id `GET` / `DELETE` carries no `X-Compute-Owner` |
 | `unknown_image` · `program_not_allowed` | 400 | Image key or program not in the allow-list |
 | `limits_exceed_caps` | 400 | A limit is above the instance cap or not positive; `details: {field, requested, cap}` names the first violation |
 | `bad_file_name` | 400 | Unsafe file name, duplicate part, or a multipart part that is not declared in `files` |
@@ -47,7 +47,7 @@ The run is queued until a concurrency slot (`COMPUTE_MAX_CONCURRENT`) is free; a
 
 ## `GET /v1/runs/{id}`
 
-Every `GET` on a run or a workspace by id carries `X-Compute-Owner: <owner>`, the value the run or workspace was created with. Without the header the answer is 400 `missing_owner`. A run of another owner answers 404 `run_not_found`, a workspace of another owner 403 `workspace_not_owned`. `DELETE` does not check the owner.
+Every `GET` and every `DELETE` on a run or a workspace by id carries `X-Compute-Owner: <owner>`, the value the run or workspace was created with. Without the header the answer is 400 `missing_owner`. A run of another owner answers 404 `run_not_found`, a workspace of another owner 403 `workspace_not_owned`; neither is cancelled or deleted.
 
 Status enum: `queued` \| `running` \| `succeeded` \| `failed` \| `cancelled`.  
 Reason enum: `timeout` \| `oom` \| `pids_limit` \| `output_limit` \| `program_error` \| `cancelled`; service-side failures use `docker_unavailable` or `internal_error`.

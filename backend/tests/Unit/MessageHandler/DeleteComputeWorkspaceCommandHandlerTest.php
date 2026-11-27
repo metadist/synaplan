@@ -21,14 +21,14 @@ final class DeleteComputeWorkspaceCommandHandlerTest extends TestCase
     {
         $attempts = 0;
         $client = $this->createMock(ComputeClient::class);
-        $client->expects(self::exactly(2))->method('deleteWorkspace')->with('01JLIVE')
+        $client->expects(self::exactly(2))->method('deleteWorkspace')->with('user:42', '01JLIVE')
             ->willReturnCallback(static function () use (&$attempts): void {
                 if (1 === ++$attempts) {
                     throw new ComputeRefusedException('workspace_busy', 'A run is using this folder.', httpStatus: 409);
                 }
             });
         $handler = new DeleteComputeWorkspaceCommandHandler($client);
-        $command = new DeleteComputeWorkspaceCommand('01JLIVE');
+        $command = new DeleteComputeWorkspaceCommand('user:42', '01JLIVE');
 
         try {
             $handler($command);
@@ -45,6 +45,6 @@ final class DeleteComputeWorkspaceCommandHandlerTest extends TestCase
         $client->expects(self::once())->method('deleteWorkspace')
             ->willThrowException(new ComputeRefusedException('workspace_not_found', 'No such workspace.', httpStatus: 404));
 
-        (new DeleteComputeWorkspaceCommandHandler($client))(new DeleteComputeWorkspaceCommand('01JGONE'));
+        (new DeleteComputeWorkspaceCommandHandler($client))(new DeleteComputeWorkspaceCommand('user:42', '01JGONE'));
     }
 }

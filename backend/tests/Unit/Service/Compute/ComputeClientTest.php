@@ -81,6 +81,46 @@ final class ComputeClientTest extends TestCase
         }
     }
 
+    public function testACancelAndAFolderDeleteNameTheOwner(): void
+    {
+        $seen = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $headers = $options['normalized_headers'] ?? [];
+            $seen[] = [$method, (string) parse_url($url, \PHP_URL_PATH), $headers['x-compute-owner'][0] ?? null];
+
+            return new MockResponse('', ['http_code' => 204]);
+        });
+        $client = new ComputeClient($http, $this->config());
+
+        $client->cancel('user:42', 'run1');
+        $client->deleteWorkspace('user:42', 'ws1');
+
+        $this->assertSame([
+            ['DELETE', '/v1/runs/run1', 'X-Compute-Owner: user:42'],
+            ['DELETE', '/v1/workspaces/ws1', 'X-Compute-Owner: user:42'],
+        ], $seen);
+    }
+
+    public function testADeleteWithoutAnOwnerNeverLeavesTheBackend(): void
+    {
+        $http = new MockHttpClient(static function (): MockResponse {
+            self::fail('No request may be sent without an owner.');
+        });
+        $client = new ComputeClient($http, $this->config());
+
+        foreach ([
+            static fn () => $client->cancel('', 'run1'),
+            static fn () => $client->deleteWorkspace('', 'ws1'),
+        ] as $call) {
+            try {
+                $call();
+                self::fail('A delete without an owner must be refused.');
+            } catch (ComputeRefusedException $e) {
+                $this->assertSame('missing_owner', $e->errorCode());
+            }
+        }
+    }
+
     public function testAReadWithoutAnOwnerNeverLeavesTheBackend(): void
     {
         $http = new MockHttpClient(static function (): MockResponse {
