@@ -234,6 +234,7 @@ parameters:
     env(CHAT_ARTIFACTS_ENABLED): ''
     # Projects (sources and instructions). Empty = the admin row decides, off by default.
     env(PROJECTS_ENABLED): ''
+    env(PROJECTS_BOARD_ENABLED): ''
     # Research runs. Empty = off. Set to 1 to pin research on.
     env(RESEARCH_ENABLED): ''
     # Chat loop (a chat turn as a run). Empty = the admin row decides, off by default.
@@ -1434,6 +1435,7 @@ services:
     App\Service\Project\ProjectsConfig:
         arguments:
             $envValue: '%env(PROJECTS_ENABLED)%'
+            $boardEnvValue: '%env(PROJECTS_BOARD_ENABLED)%'
 
     App\Service\Chat\ChatArtifactsConfig:
         arguments:

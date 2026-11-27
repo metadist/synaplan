@@ -610,10 +610,13 @@
             "details": [],
             "configured_by": {
                 "env": [
-                    "PROJECTS_ENABLED"
+                    "PROJECTS_ENABLED",
+                    "PROJECTS_BOARD_ENABLED"
                 ],
                 "bconfig": [
-                    "PROJECTS.ENABLED"
+                    "PROJECTS.ENABLED",
+                    "PROJECTS.BOARD_ENABLED",
+                    "PROJECTS.MAX_ITEMS"
                 ],
                 "providers": [],
                 "plugs": []

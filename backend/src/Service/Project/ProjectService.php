@@ -7,9 +7,11 @@ namespace App\Service\Project;
 use App\Entity\Chat;
 use App\Entity\Project;
 use App\Repository\ChatRepository;
+use App\Repository\ProjectItemRepository;
 use App\Repository\ProjectRepository;
 use App\Service\Chat\ChatDeletionService;
 use App\Service\File\FileGroupDeletionService;
+use App\Service\Project\Item\ProjectZone;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -25,6 +27,7 @@ final readonly class ProjectService
 
     public function __construct(
         private ProjectRepository $projects,
+        private ProjectItemRepository $items,
         private ChatRepository $chats,
         private ChatDeletionService $chatDeletion,
         private FileGroupDeletionService $folders,
@@ -66,8 +69,8 @@ final readonly class ProjectService
     }
 
     /**
-     * Only the fields the caller sends are changed (name, description, instructions, pinned). An empty description or
-     * instructions text clears the field.
+     * Only the fields the caller sends are changed (name, description, instructions, pinned, timezone, currency). An
+     * empty description or instructions text clears the field; a null time zone falls back to the owner's.
      *
      * @param array<string, mixed> $changes
      */
@@ -88,6 +91,12 @@ final readonly class ProjectService
                 throw ProjectException::invalid('pinned must be true or false');
             }
             $project->pin($changes['pinned']);
+        }
+        if (\array_key_exists('timezone', $changes)) {
+            $project->setTimezone($this->zone($changes['timezone']));
+        }
+        if (\array_key_exists('currency', $changes)) {
+            $project->setCurrency($this->currency($changes['currency']));
         }
         $this->em->flush();
 
@@ -117,9 +126,34 @@ final readonly class ProjectService
         }
         $this->em->flush();
 
+        $this->items->deleteByProject($projectId);
         $this->folders->deleteGroup($userId, $project->getGroupKey());
         $this->em->remove($project);
         $this->em->flush();
+    }
+
+    private function zone(mixed $value): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+        if (!\is_string($value) || !ProjectZone::isValid($value)) {
+            throw ProjectException::invalid('timezone must be an IANA time zone such as Europe/Berlin');
+        }
+
+        return $value;
+    }
+
+    private function currency(mixed $value): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+        if (!\is_string($value) || 1 !== preg_match('/^[A-Z]{3}$/', $value)) {
+            throw ProjectException::invalid('currency must be an ISO 4217 code such as EUR');
+        }
+
+        return $value;
     }
 
     private function cleanName(string $name): string

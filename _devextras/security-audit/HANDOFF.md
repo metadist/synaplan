@@ -1,6 +1,7 @@
 # Handoff: Synaplan Security-Audit und Fixes
 
-Stand: 2026-11-27, nachmittags. Letzter Tag `v5.10.5`, laut Owner deployt.
+Stand: 2026-11-27, abends. Letzter Tag `v5.10.5`; laut Owner läuft `main`
+mit PR #3305 auf Produktion.
 Einstieg für die nächste Sitzung: Abschnitt 7, dann 6.
 Der Ordner `_devextras/security-audit/` liegt seit dem 26.11.2026 auf
 Entscheidung des Owners vollständig im Repo.
@@ -51,7 +52,7 @@ GHSA-qqg9-qv48-j8m8).
 | SYN-30 Medien-Marker setzt Dateipfad | GHSA-grvv-mwcf-vhpm | 5.10.4 | published 26.11. |
 | SYN-31 Generierte Medien unter ratbaren Namen | GHSA-r233-vw39-4hm9 | 5.10.4 | published 26.11. |
 | SYN-26 Compute-Sidecar schreibt über Symlink in `/out` | GHSA-q83r-q9c6-7w9h | 5.10.5 | published 27.11. |
-| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | 5.10.5 | published 27.11., als "high" |
+| SYN-27 Dev-Stack auf allen Interfaces | GHSA-fxch-839f-35j4 | 5.10.5 | published 27.11., seit 27.11. "medium" |
 | SYN-34 Ähnlichkeitssuche mit fremder Passage | GHSA-w6cp-38wj-c2q5 | 5.10.5 | published 27.11. |
 | SYN-35 Geteilte Chat-Seite zeigt ersetzte Frage | GHSA-72r7-6r5c-3pjw | 5.10.5 | published 27.11. |
 | SYN-36 Widget-Domainliste umgehbar | GHSA-pfjf-63jr-cxvx | 5.10.5 | published 27.11. |
@@ -182,6 +183,27 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
   Reihenfolge: erst Backend, dann Sidecar neu bauen; ein neuer Sidecar mit
   altem Backend lehnt Lese-Aufrufe mit 400 ab.
 
+**Was am 27.11.2026 danach kam (Sitzung 6, Besitzerprüfung beim Löschen)**
+
+- PR #3305 (`586a33a1f`, gemergt, normaler öffentlicher PR, weil das
+  Advisory zu SYN-39 schon veröffentlicht war): `DELETE /v1/runs/{id}` und
+  `DELETE /v1/workspaces/{id}` verlangen `X-Compute-Owner`. Ohne Header 400,
+  fremder Run 404, fremder Ordner 403. Das Backend schickt den Besitzer in
+  allen Aufrufern mit; `DeleteComputeWorkspaceCommand` trägt ihn. Eine
+  Nachricht, die vor dem Deploy in der Queue lag, hat keinen Besitzer und
+  landet in `failed`.
+- Gate: `make ci-local` grün (PHPUnit 13323, Vitest 3827), Go-Tests des
+  Sidecars grün. Playwright nicht gelaufen (keine Route, keine Oberfläche).
+- In keinem Tag; `main` enthält den Fix. Laut Owner auf Produktion deployt,
+  erst Backend, dann Sidecar, und dort geprüft: `DELETE` ohne Header 400,
+  mit Header 404 für eine unbekannte ID, Löschen in der App funktioniert.
+  Damit läuft dort auch der Sidecar-Stand von SYN-39.
+- Auf Wort des Owners: GHSA-fxch-839f-35j4 (SYN-27) von "high" auf "medium"
+  gesetzt, ohne CVSS-Vektor. Die Release-Notizen zu 5.10.5 haben einen
+  Abschnitt "Security" mit dem Setup-Token bekommen.
+- Die Go-Tests des Sidecars bauen nur unter Linux (`syscall.Openat`); lokal
+  in einem `golang`-Container laufen lassen, nicht nativ auf macOS.
+
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
@@ -222,10 +244,11 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
    "Medium as demonstrated". Lässt sich auf der Advisory-Seite ändern.
 8. Erledigt: WordPress-Plugin-PR #11 ist gemergt.
 
-9. **SYN-39:** der Owner bestätigt, dass der Compute-Sidecar auf dem Stand
-   von `v5.10.5` läuft (siehe Abschnitt 2, Sitzung 5).
-10. **SYN-41:** die Release-Notizen zu 5.10.5 um den Setup-Token für neue
-    Installationen ergänzen.
+9. Erledigt: der Compute-Sidecar läuft laut Owner auf dem Stand von `main`
+   nach PR #3305 (siehe Abschnitt 2, Sitzung 6).
+10. Erledigt: die Release-Notizen zu 5.10.5 nennen den Setup-Token.
+11. Mit dem nächsten Release geht PR #3305 an Selbst-Hoster. In den
+    Release-Notizen die Reihenfolge nennen: erst Backend, dann Sidecar.
 
 ### 3b. Erst nach Entscheidung des Owners ("Ask first" in AGENTS.md)
 
@@ -322,7 +345,7 @@ die Entscheidung des Owners. Offen als PR:
   Installation, die den Standard-Token außerhalb des Dev-Stacks nutzt,
   startet den Sidecar nicht mehr. Nicht gebaut (Vorgabe des Owners): eigenes
   Netz, Socket-Proxy, Sidecar ohne root. Die `DELETE`-Routen prüfen den
-  Besitzer nicht.
+  Besitzer seit PR #3305.
 - **SYN-40** (`metadist/synaplan-ghsa-4xrh-4vmh-x56x`), zwei PRs, in dieser
   Reihenfolge mergen. PR 1 (`fix/purpose-keys`): Access-Token, OAuth-State
   und Native-Handoff signieren je mit einem aus `APP_SECRET` abgeleiteten
@@ -353,7 +376,7 @@ die Entscheidung des Owners. Offen als PR:
 
 **Nachprüfung 27.11. (Anmerkungen zu den offenen Fixes, nichts davon gebaut):**
 
-- SYN-39: Die Besitzerprüfung auf den beiden `DELETE`-Routen fehlt weiter.
+- SYN-39 (erledigt mit PR #3305): Die Besitzerprüfung auf den beiden `DELETE`-Routen fehlte.
   Sie braucht den Besitzer in sieben Aufrufern, darunter die asynchrone
   Nachricht `DeleteComputeWorkspaceCommand`, die heute nur die Folder-ID
   trägt; Nachrichten, die beim Deploy unterwegs sind, hätten ihn nicht.
@@ -375,8 +398,8 @@ die Entscheidung des Owners. Offen als PR:
   aber mit dem Beispiel-`APP_SECRET` vorhersagbar; deshalb bleibt er
   zufällig. Der Token läuft nicht nach Zeit ab, nur durch Neustart, neuen
   Token oder Abschluss.
-- GHSA-fxch-839f-35j4 (SYN-27) steht als Draft auf "high"; der Report führt
-  SYN-27 als Medium. Vor dem Veröffentlichen entscheidet der Owner.
+- GHSA-fxch-839f-35j4 (SYN-27) stand auf "high"; der Report führt SYN-27
+  als Medium. Erledigt: auf Wort des Owners auf "medium" gesetzt.
 
 **SYN-32, Entwurf (nicht gebaut, Owner: "noch nicht"):**
 
@@ -704,7 +727,7 @@ Stand 27.11.2026. Erledigtes steht in Abschnitt 2.
 **Stand nach dem Release 5.10.5:** die Punkte 1 bis 3 beim Owner und 1 bis 3
 bei der KI sind erledigt, alle Advisories sind veröffentlicht. Betriebsdetails
 aus privaten Repos gehören nicht in diese Datei. Offen sind
-3a Punkt 3, 6, 7, 9 und 10, die Entscheidungen in Punkt 4 und 5 unten und
+3a Punkt 3, 6, 7 und 11, die Entscheidungen in Punkt 4 und 5 unten und
 die Folgethemen in Punkt 4 bei der KI.
 
 **Beim Owner**
@@ -742,7 +765,6 @@ die Folgethemen in Punkt 4 bei der KI.
    `m4wt down`, sonst startet der nächste Lauf ohne Seed-Konten.
 4. Folgethemen, nicht begonnen und je eine eigene Entscheidung: Altwerte
    auf `v2:` umschlüsseln und Chiffrate an ihre Zeile binden (SYN-40);
-   Beispiel-`APP_SECRET` beim Start ablehnen (SYN-40); Besitzerprüfung auf
-   den `DELETE`-Routen des Sidecars, Sidecar ohne root und ohne
-   Docker-Socket (SYN-39, SYN-26); `ext-sodium` in `composer.json`
+   Beispiel-`APP_SECRET` beim Start ablehnen (SYN-40); Sidecar ohne root
+   und ohne Docker-Socket (SYN-39, SYN-26); `ext-sodium` in `composer.json`
    (SYN-40).

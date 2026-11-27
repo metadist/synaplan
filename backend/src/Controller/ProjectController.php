@@ -136,7 +136,7 @@ final class ProjectController extends AbstractController
     #[Route('/{uuid}', name: 'update', methods: ['PATCH'], requirements: ['uuid' => '[0-9a-fA-F-]{36}'])]
     #[OA\Patch(
         path: '/api/v1/projects/{uuid}',
-        summary: 'Change a project\'s name, description, instructions or pin',
+        summary: 'Change a project\'s name, description, instructions, pin, time zone or currency',
         tags: ['Projects'],
         parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(properties: [
@@ -144,6 +144,8 @@ final class ProjectController extends AbstractController
             new OA\Property(property: 'description', type: 'string', maxLength: 500, nullable: true),
             new OA\Property(property: 'instructions', type: 'string', nullable: true, description: 'Goes into the system prompt of the project\'s chats. Cut at PROJECTS.INSTRUCTIONS_MAX_CHARS.'),
             new OA\Property(property: 'pinned', type: 'boolean', description: 'Pinned projects are listed first.'),
+            new OA\Property(property: 'timezone', type: 'string', nullable: true, example: 'Europe/Berlin', description: 'IANA zone for board times without a zone; null falls back to the owner\'s zone.'),
+            new OA\Property(property: 'currency', type: 'string', nullable: true, example: 'EUR', description: 'ISO 4217 code of the board\'s costs.'),
         ])),
         responses: [
             new OA\Response(response: 200, description: 'The changed project', content: new OA\JsonContent(
