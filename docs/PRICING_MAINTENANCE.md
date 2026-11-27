@@ -228,6 +228,17 @@ TrustedTokens no longer serves `zai-org/GLM-5.2`. GLM-5.3 is the same family on 
 
 Retired via the registry, no migration. `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` and switches the row off on deploy. A stored binding (a user's or the platform's `DEFAULTMODEL`, a task prompt's pinned model, an "Again" pick) follows `BSUCCESSORID` to GLM-5.3, so existing chats keep working without a settings change. The TrustedTokens provider defaults (`CHAT`, `TOOLS`, `ANALYZE`) and the provider's fallback chat model moved to GLM-5.3.
 
+### Claude Haiku 4.5 replaced by Claude Haiku 5.5 (2026-11-27)
+
+Claude Haiku 5.5 is the current small Anthropic model: $0.10 / $0.50 per 1M (Haiku 4.5 was $1 / $5), 1M context, 128K output, adaptive thinking and tools. Prompts over 100K input tokens (cache reads and writes included) bill at $0.50 / $2.50, cache reads $0.05, through `CONTEXT_PRICING`.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 162 | Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | `anthropic:claude-haiku-5-5:chat` (BID 448) |
+| 235 | Claude Haiku 4.5 (Vision) | `claude-haiku-4-5-20251001` | `anthropic:claude-haiku-5-5:pic2text` (BID 449) |
+
+Retired via the registry, no migration. Claude 3 Haiku (BID 92) now points straight at Haiku 5.5. The Anthropic provider defaults (`SORT`, `PLAN`, `SUMMARIZE`) moved to Haiku 5.5. Omitting `thinking` runs adaptive thinking on this model, so reasoning off sends `thinking.type: disabled`; a classifier call with a small `max_tokens` would otherwise spend it on thinking. Effort is low, medium or high.
+
 ### OpenAI deprecation notice (2026-10-02, shutdown 2027-04-01)
 
 OpenAI announced by email on 2026-10-02 that `gpt-5.4-nano`, `gpt-5.1` and `gpt-5.3-codex` stop being served on **2027-04-01**. Only `gpt-5.4-nano` was ever in the catalog; `gpt-5.1` and `gpt-5.3-codex` have no `BMODELS` row (the retired BIDs 193/194 are `gpt-5.3`, a different id).
@@ -575,7 +586,7 @@ Source: https://platform.claude.com/docs/en/about-claude/models/overview · pric
 | Claude Sonnet 5.5 | 379 / 380 | $2 / $10 | $0.10 (0.05x base — override, see below) |
 | Claude Sonnet 5 | 249 / 250 (+ 222 MEM) | $2 / $10 (permanent — see 2026-08-12 note) | $0.20 (0.1x base — Anthropic-wide default) |
 | Claude Opus 4.8 | 238 / 239 | $5 / $25 | $0.50 (0.1x base — Anthropic-wide default) |
-| Claude Haiku 4.5 | 162 / 235 | $1 / $5 | $0.10 (0.1x base — Anthropic-wide default) |
+| Claude Haiku 5.5 | 448 / 449 | $0.10 / $0.50 (above 100K input: $0.50 / $2.50) | $0.01 (0.1x base — Anthropic-wide default; $0.05 above 100K) |
 
 Claude Opus 5.5 (released 2026-09-22) sits between Opus 5 and Sonnet 5 on price ($4/$20). Cache reads are 0.05x base input ($0.20/1M), not the Anthropic-wide 0.1x — the catalog rows (BIDs 373/374) carry an explicit `cache_read_price_per_1M: 0.20` override. Adaptive thinking is always on (cannot be disabled); default effort is `medium`. Like Claude Fable 5.1, it rejects forced `tool_choice` (`{"type": "any"}` / `{"type": "tool", ...}`) with a 400 — see `AnthropicProvider` / `StructuredOutputCapability`.
 
@@ -593,7 +604,7 @@ Anthropic bills prompt-cache **writes** at two different multipliers of the base
 | 1-hour cache write (opt-in, `cache_control: {"type": "ephemeral", "ttl": "1h"}`, needs the client `anthropic-beta: extended-cache-ttl-2025-04-11` header) | 2.0x | `CACHE_WRITE_MULTIPLIER_ANTHROPIC_1H` |
 | Cache read (hit) | 0.1x base (0.025x on Claude Fable 5.1 / Claude Mythos 5.1; 0.05x on Claude Opus 5.5 and Claude Sonnet 5.5, see above) | `CACHE_READ_DISCOUNT_ANTHROPIC` |
 
-Both multipliers are **provider-wide constants**, not per-model catalog fields — Anthropic's pricing page confirms every current model (Fable 5.1, Fable 5, Opus 5.5, Opus 5, Opus 4.8, Sonnet 5.5, Sonnet 5, Haiku 4.5) uses the same 1.25x / 2.0x cache-write split; only cache-*read* pricing varies per model.
+Both multipliers are **provider-wide constants**, not per-model catalog fields — Anthropic's pricing page confirms every current model (Fable 5.1, Fable 5, Opus 5.5, Opus 5, Opus 4.8, Sonnet 5.5, Sonnet 5, Haiku 5.5) uses the same 1.25x / 2.0x cache-write split; only cache-*read* pricing varies per model.
 
 Before this fix, `CostCalculationService` applied the 1.25x multiplier to **every** cache-creation token regardless of TTL, under-billing any 1-hour-TTL write by 37.5% (2.0x actual vs. 1.25x charged). Anthropic's `usage` response breaks the aggregate `cache_creation_input_tokens` down by TTL in a nested `cache_creation: {ephemeral_5m_input_tokens, ephemeral_1h_input_tokens}` object; `MessagesUsage::extractCacheCreation1hTokens()` is the single parsing helper shared by every Anthropic usage-parsing call site (`AnthropicProvider` chat + stream, `AnthropicPassthroughTranslator` complete + both stream paths, `GatewayToolLoop`'s tool-loop stream collector), so the 1h slice flows through to `CostCalculationService::calculateCost()`'s new `$cacheCreation1hTokens` parameter and gets billed at 2.0x while the remainder stays at 1.25x. No `BUSELOG` schema change was needed — only the token *aggregate* is persisted (`BCACHE_CREATION_TOKENS`), and the row's `BCOST` now reflects the correctly blended multiplier.
 

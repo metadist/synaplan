@@ -791,8 +791,8 @@ class ModelCatalogTest extends TestCase
 
     /**
      * Every provider that raises input and output above a context threshold
-     * raises the cached-input rate with it, always to exactly 2x the short-context
-     * rate.
+     * raises the cached-input rate with it, by the same factor as the input rate
+     * (2x on most tiers, 5x on Claude Haiku 5.5).
      *
      * Both halves are required. A tiered row that authors no base cache rate
      * silently falls back to the 50% default discount, and a tier that omits
@@ -826,11 +826,12 @@ class ModelCatalogTest extends TestCase
                 $tier,
                 sprintf('%s caches reads but its long-context tier does not raise the cache rate', $providerId),
             );
+            $factor = $tier['price_in_above'] / (float) $rows[0]['priceIn'];
             $this->assertEqualsWithDelta(
-                2 * (float) $baseCache,
+                $factor * (float) $baseCache,
                 $tier['cache_price_in_above'],
                 1e-9,
-                sprintf('%s long-context cache rate should be 2x the short-context rate', $providerId),
+                sprintf('%s long-context cache rate should rise by the input factor (%sx)', $providerId, $factor),
             );
             ++$checked;
         }

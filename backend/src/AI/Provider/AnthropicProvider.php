@@ -80,6 +80,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-haiku-4-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
@@ -112,6 +113,19 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     ];
 
     /**
+     * Models that think when `thinking` is omitted but accept
+     * `thinking.type: disabled` at effort high or below.
+     *
+     * Reasoning off sends `disabled`, so a sorting or planning call with a
+     * small `max_tokens` is not used up by thinking before the answer.
+     * Effort never exceeds high here: {@see self::normalizeEffort()} clamps
+     * xhigh and max for these models.
+     */
+    private const DISABLED_WHEN_OFF_MODELS = [
+        'claude-haiku-5-5',
+    ];
+
+    /**
      * Models whose thinking `display` defaults to `omitted`, so the text
      * between tool calls arrives as an empty thinking block.
      *
@@ -124,6 +138,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5-5',
         'claude-opus-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
@@ -144,6 +159,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
@@ -162,6 +178,7 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
         'claude-opus-5',
         'claude-opus-5-5',
         'claude-sonnet-5',
+        'claude-haiku-5-5',
         'claude-fable-5-2',
         'claude-fable-5-1',
         'claude-fable-5',
@@ -1022,12 +1039,15 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     }
 
     /**
-     * Lowest thinking setting on models that reject `thinking.type: disabled`.
+     * Lowest thinking setting when reasoning is off.
      *
-     * Reasoning off sends `between_tools` and, when the caller picked no
-     * level, effort `low`. `display` is omitted: the API rejects it next to
-     * `between_tools`. xhigh and max are not valid with `between_tools`, so
-     * those stay on adaptive thinking.
+     * Models in {@see self::DISABLED_WHEN_OFF_MODELS} get `disabled`, unless
+     * a chosen effort already turned thinking on.
+     *
+     * Models that reject `disabled` get `between_tools` and, when the caller
+     * picked no level, effort `low`. `display` is omitted: the API rejects it
+     * next to `between_tools`. xhigh and max are not valid with
+     * `between_tools`, so those stay on adaptive thinking.
      *
      * @param array<string, mixed> $requestBody
      *
@@ -1035,7 +1055,19 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
      */
     private function applyBetweenToolsThinking(array $requestBody, string $model, bool $thinkingEnabled): array
     {
-        if ($thinkingEnabled || !$this->usesBetweenToolsThinking($model)) {
+        if ($thinkingEnabled) {
+            return $requestBody;
+        }
+
+        if ($this->matchesPrefix($model, self::DISABLED_WHEN_OFF_MODELS)) {
+            if (!isset($requestBody['thinking'])) {
+                $requestBody['thinking'] = ['type' => 'disabled'];
+            }
+
+            return $requestBody;
+        }
+
+        if (!$this->usesBetweenToolsThinking($model)) {
             return $requestBody;
         }
 
@@ -1123,6 +1155,20 @@ class AnthropicProvider implements ChatProviderInterface, ToolCallingChatProvide
     {
         foreach (self::BETWEEN_TOOLS_MODELS as $betweenToolsModel) {
             if (str_starts_with($model, $betweenToolsModel)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $prefixes
+     */
+    private function matchesPrefix(string $model, array $prefixes): bool
+    {
+        foreach ($prefixes as $prefix) {
+            if (str_starts_with($model, $prefix)) {
                 return true;
             }
         }

@@ -435,6 +435,7 @@ final class ProviderCatalogParityTest extends KernelTestCase
         ['anthropic', 'claude-fable-5-2', ['low', 'medium', 'high', 'xhigh', 'max']],
         ['anthropic', 'claude-fable-5-1', ['low', 'medium', 'high']],
         ['anthropic', 'claude-fable-5', ['low', 'medium', 'high']],
+        ['anthropic', 'claude-haiku-5-5', ['low', 'medium', 'high']],
         ['anthropic', 'claude-haiku-4-5-20251001', null],
         ['meta', 'muse-spark-1.3', ['minimal', 'low', 'medium', 'high', 'xhigh', 'max']],
         ['huggingface', 'moonshotai/Kimi-K3', ['low', 'high', 'max']],

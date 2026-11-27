@@ -1713,7 +1713,7 @@ const handleKeydown = (event: KeyboardEvent) => {
  * Issue #261: dedupe the table so each model surfaces ONCE with all its
  * purposes listed as selectable chips. The backend returns models indexed
  * by purpose so the same model shows up in multiple buckets — e.g.
- * Claude Haiku 4.5 appears under SORT, CHAT and ANALYZE. That made the
+ * Claude Haiku 5.5 appears under SORT, CHAT and ANALYZE. That made the
  * list painful to scan: 11 purposes × N models meant hundreds of rows
  * that all referred to the same handful of models.
  *

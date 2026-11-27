@@ -115,6 +115,72 @@ final class AnthropicProviderReasoningEffortTest extends TestCase
         self::assertArrayNotHasKey('output_config', $captured['body']);
     }
 
+    public function testReasoningOffDisablesThinkingForHaiku55(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', ['temperature' => 0.2]);
+
+        // Omitting `thinking` would run adaptive thinking on this model.
+        self::assertSame(['type' => 'disabled'], $captured['body']['thinking'] ?? null);
+        self::assertArrayNotHasKey('output_config', $captured['body']);
+        self::assertArrayNotHasKey('temperature', $captured['body']);
+        self::assertArrayNotHasKey('anthropic-beta', $captured['headers']);
+    }
+
+    public function testStreamingReasoningOffDisablesThinkingForHaiku55(): void
+    {
+        $captured = [];
+        $sse = "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n";
+        $client = new MockHttpClient(function (string $method, string $url, array $requestOptions) use (&$captured, $sse): MockResponse {
+            $captured = $this->captureRequest($requestOptions);
+
+            return new MockResponse($sse, [
+                'response_headers' => ['content-type' => 'text/event-stream'],
+            ]);
+        });
+
+        (new AnthropicProvider($client, new NullLogger(), 'test-key'))->chatStream(
+            [['role' => 'user', 'content' => 'Hello']],
+            static function (): void {},
+            ['model' => 'claude-haiku-5-5'],
+        );
+
+        self::assertSame(['type' => 'disabled'], $captured['body']['thinking'] ?? null);
+    }
+
+    public function testReasoningOnUsesAdaptiveThinkingForHaiku55(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', ['reasoning' => true]);
+
+        self::assertSame(
+            ['type' => 'adaptive', 'display' => 'summarized'],
+            $captured['body']['thinking'] ?? null,
+        );
+    }
+
+    public function testChosenMaxEffortOnHaiku55ClampsToHighWithThinking(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', [
+            'reasoning' => false,
+            'reasoning_effort' => 'max',
+        ]);
+
+        // `disabled` next to xhigh or max is a 400, so the level stays at high
+        // and the chosen level turns thinking on.
+        self::assertSame('high', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame('adaptive', $captured['body']['thinking']['type'] ?? null);
+    }
+
+    public function testChosenLowEffortOnHaiku55KeepsThinkingOffWhenReasoningIsOff(): void
+    {
+        $captured = $this->captureChat('claude-haiku-5-5', [
+            'reasoning' => false,
+            'reasoning_effort' => 'low',
+        ]);
+
+        self::assertSame('low', $captured['body']['output_config']['effort'] ?? null);
+        self::assertSame(['type' => 'disabled'], $captured['body']['thinking'] ?? null);
+    }
+
     public function testReasoningOffSendsBetweenToolsForSonnet55(): void
     {
         $captured = $this->captureChat('claude-sonnet-5-5', []);
