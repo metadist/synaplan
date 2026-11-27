@@ -20,12 +20,14 @@ use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 final class KeycloakLoginStateTest extends TestCase
 {
     public function testTheAuthorizeRedirectCarriesAShortStateAndNotTheVerifier(): void
     {
-        $state = new OidcLoginState(new ArrayAdapter());
+        $state = new OidcLoginState(new ArrayAdapter(), new LockFactory(new InMemoryStore()));
         $controller = $this->controller($state, new MockHttpClient([
             new MockResponse(json_encode([
                 'authorization_endpoint' => 'https://idp.example/auth',

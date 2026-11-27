@@ -6,6 +6,7 @@ namespace App\Service\Auth;
 
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Lock\LockFactory;
 
 /**
  * The OIDC login attempt behind the short state sent to the identity provider.
@@ -18,8 +19,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * The URL therefore carries only a random id. The verifier and the rest of
  * the attempt wait in the shared cache for ten minutes, the same lifetime the
  * signed state used to have, and are spent on the first callback. The cache
- * has to be the shared one: the callback may be served by a different web
- * node than the login that started the attempt.
+ * and the lock have to be the shared ones: the callback may be served by a
+ * different web node than the login that started the attempt.
  */
 final readonly class OidcLoginState
 {
@@ -32,6 +33,7 @@ final readonly class OidcLoginState
     public function __construct(
         #[Autowire(service: 'cache.app')]
         private CacheItemPoolInterface $cache,
+        private LockFactory $lockFactory,
     ) {
     }
 
@@ -79,15 +81,26 @@ final readonly class OidcLoginState
         }
 
         $key = $this->cacheKey($state);
-        $item = $this->cache->getItem($key);
-        if (!$item->isHit()) {
+        // Do not block. The other callback is already redeeming this attempt,
+        // and reading the verifier beside it would hand the same secret out twice.
+        $lock = $this->lockFactory->createLock($key, 30.0);
+        if (!$lock->acquire(false)) {
             return null;
         }
 
-        $stored = $item->get();
-        $this->cache->deleteItem($key);
+        try {
+            $item = $this->cache->getItem($key);
+            if (!$item->isHit()) {
+                return null;
+            }
 
-        return $this->payload($stored);
+            $stored = $item->get();
+            $this->cache->deleteItem($key);
+
+            return $this->payload($stored);
+        } finally {
+            $lock->release();
+        }
     }
 
     private function cacheKey(string $state): string

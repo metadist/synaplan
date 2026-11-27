@@ -9,6 +9,8 @@ use PHPUnit\Framework\TestCase;
 use Psr\Cache\CacheItemInterface;
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
 
 final class OidcLoginStateTest extends TestCase
 {
@@ -16,7 +18,7 @@ final class OidcLoginStateTest extends TestCase
 
     public function testIssueReturnsAShortIdAndKeepsTheVerifierInTheCache(): void
     {
-        $service = new OidcLoginState(new ArrayAdapter());
+        $service = $this->service();
 
         $state = $service->issue(self::VERIFIER, 'openid email profile', true, 'de');
 
@@ -36,7 +38,7 @@ final class OidcLoginStateTest extends TestCase
 
     public function testParallelAttemptsStayIndependent(): void
     {
-        $service = new OidcLoginState(new ArrayAdapter());
+        $service = $this->service();
 
         $first = $service->issue(self::VERIFIER, 'openid', false, null);
         $second = $service->issue(str_repeat('b', 43), 'openid profile', false, null);
@@ -52,7 +54,7 @@ final class OidcLoginStateTest extends TestCase
 
     public function testConsumeRejectsAnythingThatIsNotAnIssuedId(): void
     {
-        $service = new OidcLoginState(new ArrayAdapter());
+        $service = $this->service();
 
         self::assertNull($service->consume(''));
         self::assertNull($service->consume('not-a-state'));
@@ -62,7 +64,7 @@ final class OidcLoginStateTest extends TestCase
 
     public function testALanguageThatIsNotACodeIsDropped(): void
     {
-        $service = new OidcLoginState(new ArrayAdapter());
+        $service = $this->service();
 
         $state = $service->issue(self::VERIFIER, 'openid', false, 'deutsch');
 
@@ -75,7 +77,7 @@ final class OidcLoginStateTest extends TestCase
     {
         $cache = $this->createMock(CacheItemPoolInterface::class);
         $cache->expects(self::never())->method('getItem');
-        $service = new OidcLoginState($cache);
+        $service = $this->service($cache);
 
         try {
             $service->issue('short', 'openid', false, null);
@@ -100,7 +102,7 @@ final class OidcLoginStateTest extends TestCase
         $cache->method('getItem')->willReturn($item);
         $cache->method('save')->willReturn(true);
 
-        $state = (new OidcLoginState($cache))->issue(self::VERIFIER, 'openid', false, null);
+        $state = $this->service($cache)->issue(self::VERIFIER, 'openid', false, null);
 
         self::assertSame(32, strlen($state));
     }
@@ -116,6 +118,34 @@ final class OidcLoginStateTest extends TestCase
         $cache->method('save')->willReturn(false);
 
         $this->expectException(\RuntimeException::class);
-        (new OidcLoginState($cache))->issue(self::VERIFIER, 'openid', false, null);
+        $this->service($cache)->issue(self::VERIFIER, 'openid', false, null);
+    }
+
+    public function testACallbackThatArrivesWhileTheAttemptIsBeingRedeemedGetsNothing(): void
+    {
+        $cache = new ArrayAdapter();
+        $locks = new LockFactory(new InMemoryStore());
+        $service = $this->service($cache, $locks);
+        $state = $service->issue(self::VERIFIER, 'openid', false, null);
+
+        $held = $locks->createLock('oidc_login_'.hash('sha256', $state), 30.0);
+        self::assertTrue($held->acquire(false));
+
+        $rival = $this->service($cache, $locks);
+        self::assertNull($rival->consume($state));
+
+        $held->release();
+        $attempt = $service->consume($state);
+        self::assertIsArray($attempt);
+        self::assertSame(self::VERIFIER, $attempt['pkce_verifier']);
+        self::assertNull($rival->consume($state));
+    }
+
+    private function service(?CacheItemPoolInterface $cache = null, ?LockFactory $locks = null): OidcLoginState
+    {
+        return new OidcLoginState(
+            $cache ?? new ArrayAdapter(),
+            $locks ?? new LockFactory(new InMemoryStore()),
+        );
     }
 }
