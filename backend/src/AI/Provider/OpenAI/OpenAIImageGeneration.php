@@ -3,6 +3,7 @@
 namespace App\AI\Provider\OpenAI;
 
 use App\AI\Exception\ProviderException;
+use App\Model\ImageTokenUsage;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -155,7 +156,7 @@ final class OpenAIImageGeneration
                 throw new ProviderException($model.' returned no images. Response format may have changed.', 'openai');
             }
 
-            return $images;
+            return $this->withTokenUsage($images, ImageTokenUsage::fromImagesApi($response['usage'] ?? null), $model);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
@@ -277,12 +278,35 @@ final class OpenAIImageGeneration
                 throw $exception;
             }
 
-            return $images;
+            return $this->withTokenUsage($images, ImageTokenUsage::fromResponses($response, $responsesModel), $model);
         } catch (ProviderException $e) {
             throw $e;
         } catch (\Exception $e) {
             throw new ProviderException('OpenAI Responses API pic2pic error: '.$e->getMessage(), 'openai');
         }
+    }
+
+    /**
+     * The request's token usage rides on the first image: OpenAI reports it
+     * once per request, and the billing sites read it from there. A missing
+     * usage leaves the per-image fallback price, worth a warning because that
+     * price is an estimate.
+     *
+     * @param list<array<string, mixed>> $images
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function withTokenUsage(array $images, ?ImageTokenUsage $usage, string $model): array
+    {
+        if (null === $usage) {
+            $this->logger->warning('OpenAI '.$model.': no token usage in the image response, billing falls back to the per-image price');
+
+            return $images;
+        }
+
+        $images[0]['token_usage'] = $usage->toArray();
+
+        return $images;
     }
 
     /**
@@ -375,7 +399,7 @@ final class OpenAIImageGeneration
 
     /**
      * Quality values the Images API accepts for this gpt-image model.
-     * GPT Image 2.5 adds `xhigh` / `max`; earlier rows only accept
+     * GPT Image 2.5 and 2.6 add `xhigh` / `max`; earlier rows only accept
      * low / medium / high / auto. Sending a 2.5-only tier to gpt-image-1
      * is a provider 400, so those stay off the older allow-list.
      *
@@ -383,7 +407,7 @@ final class OpenAIImageGeneration
      */
     private function allowedGptImageQualities(string $model): array
     {
-        if (str_starts_with($model, 'gpt-image-2.5')) {
+        if (str_starts_with($model, 'gpt-image-2.5') || str_starts_with($model, 'gpt-image-2.6')) {
             return ['low', 'medium', 'high', 'xhigh', 'max', 'auto'];
         }
 

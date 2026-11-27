@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Media;
 
 use App\AI\Service\AiFacade;
+use App\Model\ImageTokenUsage;
 use App\Service\File\FileHelper;
 use App\Service\File\UserUploadPathBuilder;
 use Psr\Log\LoggerInterface;
@@ -118,8 +119,7 @@ final readonly class SyncMediaJobGenerator
             throw new \RuntimeException('Failed to save generated image to disk');
         }
 
-        $renderedSize = $images[0]['size'] ?? null;
-        $this->billRenderedSize($job, is_string($renderedSize) ? $renderedSize : null);
+        $this->billRendered($job, $images);
 
         return [
             'file' => [
@@ -134,18 +134,25 @@ final readonly class SyncMediaJobGenerator
 
     /**
      * The usage payload was stashed when the job was detached, before the
-     * model chose the output size of an edit. Bill the size it rendered; the
-     * job is saved with its result when it is marked completed.
+     * model chose the output size of an edit and before OpenAI reported the
+     * tokens. Bill the size it rendered and the tokens it spent; the job is
+     * saved with its result when it is marked completed.
+     *
+     * @param array<mixed> $images
      */
-    private function billRenderedSize(MediaJob $job, ?string $renderedSize): void
+    private function billRendered(MediaJob $job, array $images): void
     {
-        $billedSize = RenderedImageSize::billingKey($renderedSize);
         $options = $job->getOptions();
-        if (null === $billedSize || !is_array($options['media_usage'] ?? null)) {
+        if (!is_array($options['media_usage'] ?? null)) {
             return;
         }
 
-        $options['media_usage']['size'] = $billedSize;
+        $renderedSize = is_array($images[0] ?? null) ? ($images[0]['size'] ?? null) : null;
+        $billedSize = RenderedImageSize::billingKey(is_string($renderedSize) ? $renderedSize : null);
+        if (null !== $billedSize) {
+            $options['media_usage']['size'] = $billedSize;
+        }
+        $options['media_usage'] = ImageTokenUsage::mediaUsageOf($images) + $options['media_usage'];
         $job->setOptions($options);
     }
 

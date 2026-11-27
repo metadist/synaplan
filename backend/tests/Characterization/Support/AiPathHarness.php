@@ -146,7 +146,6 @@ use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
 use GuzzleHttp\Psr7\Response;
-use OpenAI\Responses\Audio\TranscriptionResponse;
 use OpenAI\Responses\Embeddings\CreateResponse as EmbeddingResponse;
 use OpenAI\Responses\Images\CreateResponse as ImageResponse;
 use OpenAI\Testing\Enums\OverrideStrategy;
@@ -197,7 +196,7 @@ final class AiPathHarness
         21 => ['OpenAI', 'text-embedding-3-small', 'Text Embedding 3 Small', 'vectorize', 0.02, 'per1M', 0.00, 'per1M', ['vector_dim' => 1024]],
         41 => ['OpenAI', 'dall-e-3', 'DALL-E 3', 'text2pic', 0.00, 'per1M', 0.04, 'perpic', ['pricing_mode' => 'per_image']],
         45 => ['OpenAI', 'tts-1', 'TTS 1', 'text2sound', 15.00, 'per1M', 0.00, 'per1M', ['pricing_mode' => 'per_character']],
-        51 => ['OpenAI', 'whisper-1', 'Whisper 1', 'sound2text', 0.006, 'persec', 0.00, 'persec', ['pricing_mode' => 'per_second']],
+        51 => ['OpenAI', 'gpt-transcribe', 'GPT Transcribe', 'sound2text', 0.0045, 'persec', 0.00, 'persec', ['pricing_mode' => 'per_second']],
     ];
 
     /** @var list<array<string, mixed>> */
@@ -1032,21 +1031,15 @@ final class AiPathHarness
      */
     private function transcription(): array
     {
-        $sdk = new OpenAISdkRecorder([
-            OpenAIFixtures::json(TranscriptionResponse::fake([
-                'task' => 'transcribe',
-                'language' => 'de',
-                'duration' => 3.5,
-                'text' => 'Hallo Synaplan',
-                'segments' => [],
-            ], null, OverrideStrategy::Replace)->toArray()),
+        $sdk = new OpenAISdkRecorder([], [self::SECRET]);
+        $http = new ProviderHttpRecorder([
+            new MockResponse((string) json_encode(['text' => 'Hallo Synaplan', 'language' => 'de', 'usage' => ['type' => 'duration', 'seconds' => 3.5]])),
         ], [self::SECRET]);
-        $http = new ProviderHttpRecorder([], [self::SECRET]);
         [$facade] = $this->buildSpine($sdk, $http);
 
         $result = $facade->transcribe('voice.mp3', self::USER_ID, [
             'provider' => 'openai',
-            'model' => 'whisper-1',
+            'model' => 'gpt-transcribe',
             'model_id' => 51,
             'language' => 'de',
         ]);
@@ -1721,7 +1714,7 @@ final class AiPathHarness
         ]);
         $config->method('resolveSttDefault')->willReturn([
             'provider' => 'openai',
-            'model' => 'whisper-1',
+            'model' => 'gpt-transcribe',
             'model_id' => 51,
         ]);
 

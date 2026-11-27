@@ -30,7 +30,7 @@ Living playbook for keeping Synaplan's model prices correct **and** billed the w
 | ---- | ---- |
 | Authored baseline (structure, units, `pricing_mode`, `resolution_prices`, and the price a release ships) | `backend/src/Model/ModelCatalog.php` |
 | Live per-token price after `app:sync-model-prices` | `BMODELS`, owned by LiteLLM until the catalog price changes or the row is `pricePinned` — see §"Who owns a per-token price" |
-| Cost calc (per_token / per_character / per_image / per_second, cache discount) | `backend/src/Service/CostCalculationService.php` |
+| Cost calc (per_token / per_character / per_image / per_second, cache discount, GPT Image tokens) | `backend/src/Service/Usage/CostCalculationService.php` |
 | Charge = raw × (1+markup) | `backend/src/Service/RateLimitService.php` |
 | Auto price pull from LiteLLM | `backend/src/Command/SyncModelPricesCommand.php` (`app:sync-model-prices`, `--dry-run`) |
 | Verified LiteLLM errors (silenced in the drift check) | `ModelCatalog::LITELLM_DEVIATIONS` — see §"Known LiteLLM deviations" |
@@ -39,7 +39,7 @@ Living playbook for keeping Synaplan's model prices correct **and** billed the w
 | DB sync from catalog | `app:model:seed` |
 | Model lab and where it runs (`meta.family`, `meta.jurisdiction`) | `backend/src/Model/ModelCatalog.php`, on the chat rows a research preset may use. `family` is the lab (`anthropic`, `openai`, `google`, `xai`, `meta`, `mistral`, `alibaba`, `zhipu`, …), not the host. `jurisdiction` is `US`, `EU`, `DE`, `CN` or `local`. Fill a missing one in the same edit as a new preset candidate. The price sync does not write these fields |
 
-Units (`inUnit`/`outUnit` in the catalog): the tokens `CostCalculationService::normaliseToPerUnit()` understands are — `per1m`/`per1mchars`/`per1mtokens` (÷1e6), `per1k`/`per1000`/`per1000chars` (÷1e3), `permin` (÷60), `perhour` (÷3600), `per1`/`perchar`/`perpic`/`perimage`/`persec`/`persecond` (as-is), and `-`/``/`free` (→ 0). Time-based media bills on **seconds**, so `permin`/`perhour` are converted down to per-second (fixed in #1314). Anything else falls through unchanged (per-1), so never author a unit that isn't in this list. `pricing_mode` is one of `per_token` (default), `per_image`, `per_character`, `per_second`, `per_audio_token`. `per_audio_token` is live voice only: text uses `priceIn`/`priceOut`, audio uses `audio_price_in_per_1M` / `audio_price_out_per_1M` / `audio_cache_in_per_1M` in the row JSON. A `per_second` live-voice row may also set `text_item_price` (Grok Voice). The price sync does not write either mode.
+Units (`inUnit`/`outUnit` in the catalog): the tokens `CostCalculationService::normaliseToPerUnit()` understands are — `per1m`/`per1mchars`/`per1mtokens` (÷1e6), `per1k`/`per1000`/`per1000chars` (÷1e3), `permin` (÷60), `perhour` (÷3600), `per1`/`perchar`/`perpic`/`perimage`/`persec`/`persecond` (as-is), and `-`/``/`free` (→ 0). Time-based media bills on **seconds**, so `permin`/`perhour` are converted down to per-second (fixed in #1314). Anything else falls through unchanged (per-1), so never author a unit that isn't in this list. `pricing_mode` is one of `per_token` (default), `per_image`, `per_character`, `per_second`, `per_audio_token`. `per_audio_token` is live voice only: text uses `priceIn`/`priceOut`, audio uses `audio_price_in_per_1M` / `audio_price_out_per_1M` / `audio_cache_in_per_1M` in the row JSON. A `per_second` live-voice row may also set `text_item_price` (Grok Voice) and `standby_price_in` (GPT-Live). The price sync does not write either mode.
 
 ## Verification playbook (do this for EVERY model)
 
@@ -251,6 +251,23 @@ The OpenAI image guide ([image prompting](https://developers.openai.com/api/docs
 
 **Retired ahead of the shutdown**, for the same reason as BID 234: the availability check only reports a model once OpenAI stops serving it. Flare is the same provider and key on the same Responses API edit path, ranks above both on the public image-edit boards (LMArena image edit 2026-10-06: Flare 1481, `gpt-image-1.5` 1370, `gpt-image-1` 1139) and is cheaper per image (`quality_prices.high` 1024²: $0.05268 vs $0.133 / $0.167). Retired via the registry, no migration: `ModelRetirementSeeder` stamps `BRETIREDON`/`BSUCCESSORID` and switches both rows off on deploy, and any stored binding (`DEFAULTMODEL`, a task prompt's pinned `aiModel`, an "Again" pick in chat, an explicit `modelId` on the media API) follows `BSUCCESSORID` to Flare at resolution time (`ModelConfigService::replacementForRetiredModel()`). When neither the successor nor any capability default can serve, the request is refused instead of reaching the shut-down id. No shipped `DEFAULTMODEL` binding or `ProviderDefaultsService` recommendation names either BID. The edit path's fallback model id in `OpenAIProvider` moved to `gpt-image-2.5-flare`.
 
+### OpenAI deprecations page (read 2026-11-27)
+
+OpenAI's [deprecations page](https://developers.openai.com/api/docs/deprecations) lists four catalog models as deprecated: `gpt-4o-mini` (shutdown **2027-01-14**), `tts-1` and `tts-1-hd` (**2027-01-06**) and `whisper-1` (**2027-02-26**).
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 73 | gpt-4o-mini | `gpt-4o-mini` | `openai:gpt-6-luna:chat` (GPT-6 Luna, BID 377) |
+| 82 | whisper-1 | `whisper-1` | `openai:gpt-transcribe:sound2text` (GPT Transcribe, BID 448) |
+| 41 | tts-1 with Nova | `tts-1` | `google:gemini-2.5-flash-preview-tts:text2sound` (BID 37) |
+| 83 | tts-1-hd | `tts-1-hd` | `google:gemini-2.5-flash-preview-tts:text2sound` (BID 37) |
+
+Retired ahead of each shutdown, for the same reason as BID 234, via the registry, no migration. GPT-6 Luna and GPT Transcribe are the replacements OpenAI names. OpenAI has no `/v1/audio/speech` model left: its suggested `tts-1` replacement, `gpt-realtime-2.1-mini`, speaks only over the Realtime API. The two TTS rows therefore follow the shipped `TEXT2SOUND` default, which needs a Google key. The OpenAI provider default `SOUND2TEXT` moved to GPT Transcribe, the OpenAI speed-config mix no longer sets a sound model, and `OpenAISpeech` no longer falls back to `whisper-1` or `tts-1`.
+
+GPT Transcribe answers in `json` only (no `verbose_json`, so no segments) and reports the audio length as a `usage` object of type `duration`. `OpenAISpeech::transcribe()` therefore posts the multipart request itself instead of through the SDK, which drops `usage` and `languages`, and bills from `usage.seconds`. If OpenAI ever reports token usage instead, the duration is 0, and `TranscriptionUsageRecorder` logs the unbilled call instead of hiding it.
+
+The retired OpenAI rows (BIDs 29, 41, 73, 82, 83, 151 and 234) left the catalog. Their `RETIREMENTS` entries stay, and existing installs keep the switched-off database rows.
+
 ### Gemini 2.5 Pro and 2.5 Flash (redirect 2026-12-01)
 
 Google's [deprecations page](https://ai.google.dev/gemini-api/docs/deprecations) (read 2026-11-03) deprecates `gemini-2.5-pro` and `gemini-2.5-flash`. They are no longer selectable in AI Studio. On **2026-12-01** API requests to `gemini-2.5-pro` route to `gemini-3.8-flash`, and requests to `gemini-2.5-flash` route to `gemini-3.5-flash-lite`, billed at the replacement's rates. `gemini-2.5-flash-lite`, the image models and the TTS preview are not this notice.
@@ -344,7 +361,7 @@ The **> 200k long-context tier doubles the whole request**, so it lives in `Mode
 - **The voice rows MUST keep their `pricing_mode`.** BID 320 needs `pricing_mode: per_character` and BID 321 needs `per_second`; without it the cost path falls through to per-token and records $0.00 for every call (issue #886b). BID 321 is authored in `$/hour`, which `CostCalculationService` normalises to per-second, so the clip length must never be pre-divided.
 - **Only the REST transcription rate is reachable.** xAI charges $0.20/hour for the streaming STT WebSocket, but `XaiProvider` implements the `POST /v1/stt` REST path only, so no request can be billed at the higher rate. If streaming STT is ever added it needs its own catalog row.
 - **TTS has no per-request cap beyond the character limit.** `/v1/tts` rejects text over 15,000 characters, and the provider checks that locally so the user gets a readable message instead of a 400. Longer texts must be split by the caller — each chunk is billed separately.
-- **Live speech-to-speech is a catalog capability, not a chat model.** `gpt-live-1` (BID 389) is `pricing_mode: per_second` at $0.05/min. `gpt-realtime-2.1` (BID 391) and `gpt-realtime-2.1-mini` (BID 392) are `per_audio_token` (audio $32/$64 and $10/$20 per 1M, cached audio $0.40 and $0.30). `gemini-3.8-live` (BID 390) and `gemini-3.8-live-extended-thinking` (BID 393) are `per_audio_token` (audio $3 / $12 per 1M, text $0.75 / $4.50 per 1M). `grok-voice-3.0` (BID 394, display name Grok Voice 3) is `per_second` at $0.08/min plus `text_item_price` $0.004. xAI prices Grok Voice 3.0 the same as Grok Voice 2.0 ($0.08/min, $4.80/hr, plus $0.004 per text input; verified 2026-10-15 at https://docs.x.ai/developers/pricing). The row pins `grok-voice-3.0`; `grok-voice-latest` is an alias that moves. `CostCalculationService::calculateVoiceLiveCost()` prices the voice part. The chat model's answers are added onto the same `VOICE_LIVE` usage row and share the monthly cost budget. There is no minutes quota. The price sync does not auto-write `per_audio_token`.
+- **Live speech-to-speech is a catalog capability, not a chat model.** `gpt-live-1` (BID 389) and `gpt-live-1.1` (BID 453) are `pricing_mode: per_second` at $0.05/min active and $0.02/min on standby (`standby_price_in`, same unit as `priceIn`). The sidecar opens GPT-Live WebRTC sessions with `wake_policy: speech` and `idle_timeout_s: 30`: the session pauses after 30 s without a transcript and wakes when the person speaks. OpenAI's `usage.seconds` covers active time only (measured 2026-11-27: 119 s wall clock, 36 s paused, 88 s reported). The sidecar times the stretches between the sideband's `session.paused` and `session.resumed` and posts them as `standbySeconds`; `calculateVoiceLiveCost()` bills `seconds` at the active rate and `standbySeconds` on top at the standby rate. A session does not start paused. A transcript during a pause ends the stretch, and a second pause without a resume restarts it. Relay (WebSocket) sessions never pause. `gpt-realtime-2.1` (BID 391) and `gpt-realtime-2.1-mini` (BID 392) are `per_audio_token` (audio $32/$64 and $10/$20 per 1M, cached audio $0.40 and $0.30). `gemini-3.8-live` (BID 390) and `gemini-3.8-live-extended-thinking` (BID 393) are `per_audio_token` (audio $3 / $12 per 1M, text $0.75 / $4.50 per 1M). `grok-voice-3.0` (BID 394, display name Grok Voice 3) is `per_second` at $0.08/min plus `text_item_price` $0.004. xAI prices Grok Voice 3.0 the same as Grok Voice 2.0 ($0.08/min, $4.80/hr, plus $0.004 per text input; verified 2026-10-15 at https://docs.x.ai/developers/pricing). The row pins `grok-voice-3.0`; `grok-voice-latest` is an alias that moves. `CostCalculationService::calculateVoiceLiveCost()` prices the voice part. The chat model's answers are added onto the same `VOICE_LIVE` usage row and share the monthly cost budget. There is no minutes quota. The price sync does not auto-write `per_audio_token`.
 - **Embeddings and the server-side tools** (web search, X search, code execution) are intentionally not wired up: xAI publishes no price for `/v1/embeddings`, and without a price there can be no correct usage accounting.
 
 ### TrustedTokens (verified 2026-09-17)
@@ -501,7 +518,7 @@ Dry-run baseline 2026-07-13: **70 unchanged (per-token + same-mode media, no dri
 | tts-1 / tts-1-hd | per_character | per_character | **checked** (same-mode) |
 | veo-3.1 / fast / lite | per_second | per_second | **checked** (same-mode) |
 | imagen-4.0 / fast / ultra | per_image | per_image | **checked** (same-mode) |
-| gpt-image-1 / 1.5 / 2.5-flare / 2.5-sunburst | per_image | per_token | mode-mismatch (manual) |
+| gpt-image-2.5 / 2.6 flare + sunburst | per_image (token-billed) | per_token | mode-mismatch (manual) |
 | gemini-2.5/3.1-flash-image | per_image | per_token | mode-mismatch (manual) |
 | gemini-2.5-flash-preview-tts | per_character | per_token | mode-mismatch (manual) |
 
@@ -732,6 +749,25 @@ gpt-image bills a different per-image price per quality × size (e.g. gpt-image-
 
 GPT Image 2.5 Flare and Sunburst share OpenAI's token rates ($5/1M text in, $8/1M image in, $30/1M image out) and the same calculator token counts. `xhigh` / `max` are 2.5-only. Official source: [image generation guide](https://developers.openai.com/api/docs/guides/image-generation) calculator (output tokens × $30/1M; excludes prompt/input-image tokens).
 
+### GPT Image 2.5 / 2.6: billed from the reported tokens
+
+OpenAI bills GPT Image per token, and every answer reports the tokens, so these four rows (BID 348, 349, 451, 452) are billed exactly; the quality × size table above is only the fallback.
+
+- **Images API** (`/v1/images/generations`, text2pic): `usage.input_tokens_details.{text_tokens,image_tokens}` and `usage.output_tokens`. No cached tokens on this endpoint.
+- **Responses API** (pic2pic with the image tool): `tool_usage.image_gen` carries the same fields plus `cached_tokens_details.{cached_text_tokens,cached_image_tokens}`. The mainline model that calls the tool (`gpt-5.6-terra`, `OpenAIImageGeneration::pickResponsesModel()`) is reported separately in `usage` and billed at its own chat row.
+
+`OpenAIImageGeneration` puts the parsed usage (`App\Model\ImageTokenUsage`) on the first returned image as `token_usage`. Every image billing site copies it into `media_usage.tokens` (`MediaTurnBilling`, `SyncMediaJobGenerator` for detached jobs, `AiUsageSpecBuilder`, `OpenAiImageGenerationService`, `MediaGenerationService`). `CostCalculationService::calculateMediaUsageCost()` then bills, at the rates in the row's `meta` (`ImageTokenRates`):
+
+| Tokens | Rate per 1M |
+| ------ | ----------- |
+| text input, not cached | `text_input_price_per_1M` ($5) |
+| text input, cached | `text_cached_input_price_per_1M` ($1.25) |
+| image input, not cached | `image_input_price_per_1M` ($8) |
+| image input, cached | `image_cached_input_price_per_1M` ($2) |
+| output | `image_output_price_per_1M` ($30) |
+
+OpenAI publishes no text-output rate for these models, so all output tokens are billed at the image output rate. A missing cached rate bills cached tokens at the full input rate. The price snapshot of the usage row says `pricing_mode: per_image_token` and keeps the token counts. An answer without a usage split is logged as a warning and billed from `quality_prices`, which for 2.6 reuses the 2.5 token budgets (no per-image prices are published for 2.6).
+
 > Rollout caveat: catalog price/JSON changes reach the DB via `ModelSeeder` only for rows still matching their seeded fingerprint. Fresh installs get the correct values; rows an admin edited in the UI are **preserved** and must be updated by a data migration — see §"Production rollout to existing installs".
 
 ## Long-context tiers — #1319
@@ -751,6 +787,7 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 | gpt-6-astra | 272k | 10.00 / 50 (1.00) | 20.00 / 75 (2.00) |
 | gpt-6-sol | 272k | 2.00 / 10 (0.20) | 4.00 / 15 (0.40) |
 | gpt-6.1-sol | 272k | 2.00 / 10 (0.10) | 4.00 / 15 (0.20) |
+| gpt-6.1-terra | 272k | 1.00 / 5 (0.05) | 2.00 / 7.5 (0.10) |
 | gpt-6.2-astra | 272k | 8.00 / 40 (0.40) | 16.00 / 60 (0.80) |
 | gpt-6.2-sol | 272k | 2.00 / 10 (0.10) | 4.00 / 15 (0.20) |
 | gpt-6-luna | 272k | 0.10 / 0.50 (0.01) | 0.20 / 0.75 (0.02) |

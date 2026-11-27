@@ -1402,69 +1402,54 @@
         ]
     },
     "speech.transcribe": {
+        "http": [
+            {
+                "body": "--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-transcribe\r\n--<boundary>\r\nContent-Type: audio/mpeg\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.mp3\"\r\n\r\nID3-test-audio\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"language\"\r\n\r\nde\r\n--<boundary>--\r\n",
+                "body_sha1": "05a4f866e9c833e5ee6315f7eb68d7c3d0f1cbf3",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: multipart/form-data; boundary=<boundary>"
+                ],
+                "method": "POST",
+                "timeout": 300,
+                "url": "https://api.openai.com/v1/audio/transcriptions"
+            }
+        ],
         "result": {
             "duration": 2.5,
             "language": "german",
             "segments": [],
             "text": "Hallo Welt"
-        },
-        "sdk": [
-            {
-                "body": {
-                    "file": {
-                        "bytes": 14,
-                        "filename": "voice.mp3",
-                        "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
-                    },
-                    "language": "de",
-                    "model": "whisper-1",
-                    "response_format": "verbose_json"
-                },
-                "headers": [
-                    "Authorization: Bearer <secret>",
-                    "Content-Length: 434",
-                    "Content-Type: multipart/form-data; boundary=<boundary>",
-                    "Host: api.openai.com"
-                ],
-                "method": "POST",
-                "url": "https://api.openai.com/v1/audio/transcriptions"
-            }
-        ]
+        }
     },
     "speech.transcribe_absolute_path": {
-        "result": {
-            "duration": 1,
-            "language": "english",
-            "segments": [],
-            "text": "Hello"
-        },
-        "sdk": [
+        "http": [
             {
-                "body": {
-                    "file": {
-                        "bytes": 14,
-                        "filename": "voice.mp3",
-                        "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
-                    },
-                    "model": "gpt-4o-transcribe",
-                    "response_format": "verbose_json"
-                },
+                "body": "--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-4o-transcribe\r\n--<boundary>\r\nContent-Type: audio/mpeg\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.mp3\"\r\n\r\nID3-test-audio\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n--<boundary>--\r\n",
+                "body_sha1": "399dcd06e2d0eb8f2d652f7403ce98e07242a187",
                 "headers": [
+                    "Accept: */*",
                     "Authorization: Bearer <secret>",
-                    "Content-Length: 360",
-                    "Content-Type: multipart/form-data; boundary=<boundary>",
-                    "Host: api.openai.com"
+                    "Content-Type: multipart/form-data; boundary=<boundary>"
                 ],
                 "method": "POST",
+                "timeout": 300,
                 "url": "https://api.openai.com/v1/audio/transcriptions"
             }
-        ]
+        ],
+        "result": {
+            "duration": 1,
+            "language": "unknown",
+            "segments": [],
+            "text": "Hello"
+        }
     },
     "speech.transcribe_missing_file": {
         "error": {
             "class": "ProviderException",
             "context": null,
-            "message": "OpenAI transcription error: Audio file not found: <uploads>/missing.mp3",
+            "message": "OpenAI transcription error: Audio file not found: missing.mp3",
             "provider": "openai",
             "upstream_status": null
         }

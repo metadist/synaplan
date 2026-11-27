@@ -18,11 +18,14 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  * byte that changes is caught) and time limits, with the given secrets
  * masked. A request beyond the queue is answered with an error status and
  * fails the test, and so does a queued response nobody asked for, so a
- * request can neither appear nor vanish unnoticed.
+ * request can neither appear nor vanish unnoticed. A streamed body (a
+ * multipart upload) is read in full, and its random boundary is replaced so
+ * the snapshot stays stable.
  */
 final class ProviderHttpRecorder
 {
     public const SECRET = '<secret>';
+    private const BOUNDARY = '<boundary>';
 
     /** @var list<array<string, mixed>> */
     private array $requests = [];
@@ -71,15 +74,19 @@ final class ProviderHttpRecorder
      */
     private function describe(string $method, string $url, array $options): array
     {
+        $boundary = null;
         $headers = [];
         foreach ($options['normalized_headers'] ?? [] as $lines) {
             foreach ($lines as $line) {
-                $headers[] = $this->mask($line);
+                if (null === $boundary && 1 === preg_match('/boundary=([^;\s]+)/i', $line, $match)) {
+                    $boundary = $match[1];
+                }
+                $headers[] = $this->mask($this->unbound($line, $boundary));
             }
         }
         sort($headers);
 
-        $body = \is_string($options['body'] ?? null) ? $options['body'] : '';
+        $body = $this->unbound(self::read($options['body'] ?? null), $boundary);
         $decoded = '' === $body ? null : json_decode($body, true);
 
         return array_filter([
@@ -91,6 +98,28 @@ final class ProviderHttpRecorder
             'timeout' => $options['timeout'] ?? null,
             'max_duration' => ($options['max_duration'] ?? 0) > 0 ? $options['max_duration'] : null,
         ], static fn (mixed $value): bool => null !== $value);
+    }
+
+    private static function read(mixed $body): string
+    {
+        if (\is_string($body)) {
+            return $body;
+        }
+        if (!$body instanceof \Closure) {
+            return '';
+        }
+
+        $read = '';
+        while ('' !== $chunk = (string) $body(8192)) {
+            $read .= $chunk;
+        }
+
+        return $read;
+    }
+
+    private function unbound(string $text, ?string $boundary): string
+    {
+        return null === $boundary ? $text : str_replace($boundary, self::BOUNDARY, $text);
     }
 
     private function mask(string $text): string

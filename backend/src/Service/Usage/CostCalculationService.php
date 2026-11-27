@@ -6,6 +6,7 @@ namespace App\Service\Usage;
 
 use App\DTO\CostResult;
 use App\Entity\Model;
+use App\Model\ImageTokenUsage;
 use App\Model\ModelCatalog;
 use App\Repository\ModelPriceHistoryRepository;
 use App\Repository\ModelRepository;
@@ -309,6 +310,89 @@ final readonly class CostCalculationService
     }
 
     /**
+     * Cost of a `media_usage` payload for a model that is not billed per
+     * token. The usage row writers (RateLimitService, AiUsageSpecBuilder)
+     * share it so the quantities are read from the payload in one place.
+     *
+     * A GPT Image request that carries the tokens OpenAI reported
+     * (`media_usage.tokens`) is billed at the model's token rates; the
+     * quality × size price is the fallback for an answer without usage.
+     *
+     * @param array<mixed> $mediaUsage
+     */
+    public function calculateMediaUsageCost(?int $modelId, string $pricingMode, array $mediaUsage, ?int $timestamp = null): CostResult
+    {
+        $tokens = 'per_image' === $pricingMode ? ImageTokenUsage::fromArray($mediaUsage['tokens'] ?? null) : null;
+        $tokenCost = null !== $tokens ? $this->calculateImageTokenCost($modelId, $tokens, $timestamp) : null;
+        if (null !== $tokenCost) {
+            return $tokenCost;
+        }
+
+        $inputQty = match ($pricingMode) {
+            'per_character' => (float) ($mediaUsage['characters'] ?? 0),
+            'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
+            'per_request' => (float) ($mediaUsage['requests'] ?? 1),
+            default => 0.0,
+        };
+        $outputQty = match ($pricingMode) {
+            'per_image' => (float) ($mediaUsage['images'] ?? 0),
+            'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
+            // Flat per-clip billing (#1317): one generation = one clip.
+            // Providers that ever return a multi-clip batch can pass `clips`.
+            'per_generation' => (float) ($mediaUsage['clips'] ?? 1),
+            default => 0.0,
+        };
+        $text = static fn (string $key): ?string => \is_string($mediaUsage[$key] ?? null) ? $mediaUsage[$key] : null;
+
+        return $this->calculateMediaCost($modelId, $inputQty, $outputQty, $timestamp, $text('resolution'), $text('quality'), $text('size'));
+    }
+
+    /**
+     * The image tokens at the model's token rates, plus the mainline model
+     * that called the image tool on the Responses API at its chat rates.
+     * Null when the model has no token rates.
+     */
+    private function calculateImageTokenCost(?int $modelId, ImageTokenUsage $tokens, ?int $timestamp): ?CostResult
+    {
+        $model = null !== $modelId ? $this->modelRepository->find($modelId) : null;
+        $rates = null !== $model ? ImageTokenRates::fromModelJson($model->getJson()) : null;
+        if (null === $model || null === $rates) {
+            return null;
+        }
+
+        $inputCost = $rates->inputCost($tokens);
+        $outputCost = $rates->outputCost($tokens);
+        $billedInput = $tokens->textIn + $tokens->imageIn;
+        $snapshot = ['pricing_mode' => 'per_image_token', 'price_known' => true] + $rates->snapshot() + ['image_tokens' => $tokens->toArray()];
+
+        if (null !== $tokens->wrapperModel) {
+            $wrapperId = $this->modelRepository->findChatIdByProvider($model->getService(), $tokens->wrapperModel);
+            if (null === $wrapperId) {
+                $this->logger->warning('CostCalculation: the model that called the image tool has no catalog row, its tokens are not billed', [
+                    'model_id' => $modelId,
+                    'wrapper_model' => $tokens->wrapperModel,
+                ]);
+            } else {
+                $wrapper = $this->calculateCost($tokens->wrapperIn, $tokens->wrapperOut, $tokens->wrapperCachedIn, 0, $wrapperId, $timestamp);
+                $inputCost += (float) $wrapper->inputCost;
+                $outputCost += (float) $wrapper->outputCost;
+                $billedInput += $wrapper->billedInputTokens;
+                $snapshot['wrapper_model_id'] = $wrapperId;
+                $snapshot['wrapper_cost'] = $wrapper->totalCost;
+            }
+        }
+
+        return new CostResult(
+            totalCost: number_format($inputCost + $outputCost, 6, '.', ''),
+            inputCost: number_format($inputCost, 6, '.', ''),
+            outputCost: number_format($outputCost, 6, '.', ''),
+            cacheSavings: '0.000000',
+            priceSnapshot: $snapshot,
+            billedInputTokens: $billedInput,
+        );
+    }
+
+    /**
      * Convert a catalog price authored in `inUnit` / `outUnit` into a
      * "per single billable unit" price (per 1 character, per 1 image, per
      * 1 second). Unknown units fall through unchanged so existing data
@@ -536,7 +620,10 @@ final readonly class CostCalculationService
 
         $mode = $model->getJson()['pricing_mode'] ?? 'per_token';
         if ('per_second' === $mode) {
-            return $this->withTextItems($this->calculateMediaCost($modelId, $meter->seconds, 0.0, $timestamp), $model, $meter);
+            // OpenAI's seconds leave the paused stretches out; those come on top.
+            $result = $this->withStandby($this->calculateMediaCost($modelId, $meter->seconds, 0.0, $timestamp), $model, max(0.0, $meter->standbySeconds));
+
+            return $this->withTextItems($result, $model, $meter);
         }
 
         if ('per_audio_token' !== $mode) {
@@ -570,6 +657,36 @@ final readonly class CostCalculationService
             cacheSavings: '0.000000',
             priceSnapshot: $priceSnapshot,
             billedInputTokens: $meter->textInTokens + $meter->audioInTokens,
+        );
+    }
+
+    /**
+     * Seconds of a GPT-Live WebRTC session with inference paused, on top of
+     * the active seconds, at the row's `standby_price_in` (authored in the row's `inUnit`). A row
+     * without a standby rate bills them at the active rate.
+     */
+    private function withStandby(CostResult $result, Model $model, float $standbySeconds): CostResult
+    {
+        if ($standbySeconds <= 0.0) {
+            return $result;
+        }
+
+        $rate = $model->getJson()['standby_price_in'] ?? null;
+        $perSecond = is_numeric($rate)
+            ? self::normaliseToPerUnit((float) $rate, $model->getInUnit())
+            : self::normaliseToPerUnit($model->getPriceIn(), $model->getInUnit());
+        $extra = $standbySeconds * $perSecond;
+        $snapshot = $result->priceSnapshot;
+        $snapshot['standby_seconds'] = round($standbySeconds, 3);
+        $snapshot['standby_price_in'] = number_format(is_numeric($rate) ? (float) $rate : $model->getPriceIn(), 6, '.', '');
+
+        return new CostResult(
+            totalCost: number_format((float) $result->totalCost + $extra, 6, '.', ''),
+            inputCost: number_format((float) $result->inputCost + $extra, 6, '.', ''),
+            outputCost: $result->outputCost,
+            cacheSavings: $result->cacheSavings,
+            priceSnapshot: $snapshot,
+            billedInputTokens: $result->billedInputTokens,
         );
     }
 

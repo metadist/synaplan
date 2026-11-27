@@ -4,6 +4,8 @@ namespace App\AI\Provider\OpenAI;
 
 use App\AI\Credential\ProviderKeyStore;
 use OpenAI;
+use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\ResponseInterface;
 use Symfony\Contracts\HttpClient\ResponseStreamInterface;
@@ -84,6 +86,25 @@ final class OpenAIApiClient
             'headers' => ['Authorization' => 'Bearer '.$key] + $headers,
             'json' => $body,
         ] + $options + ['timeout' => $timeout]);
+    }
+
+    /**
+     * A multipart POST through Symfony's client, for the upload endpoints whose
+     * answer the SDK would trim (it drops `usage` and `languages` from a
+     * transcription).
+     *
+     * @param array<string, string|DataPart> $fields
+     */
+    public function postMultipart(string $url, array $fields, string $key, int $timeout): ResponseInterface
+    {
+        $form = new FormDataPart($fields);
+
+        return $this->httpClient->request('POST', $url, [
+            'auth_bearer' => $key,
+            'headers' => $form->getPreparedHeaders()->toArray(),
+            'body' => $form->bodyToIterable(),
+            'timeout' => $timeout,
+        ]);
     }
 
     public function getBytes(string $url): string

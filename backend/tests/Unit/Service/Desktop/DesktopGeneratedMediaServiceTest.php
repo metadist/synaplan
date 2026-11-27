@@ -32,7 +32,7 @@ final class DesktopGeneratedMediaServiceTest extends TestCase
     public function testKnownImageCatalogKeyResolvesToBid(): void
     {
         $svc = $this->service();
-        self::assertSame(29, $svc->resolveModelId('openai:gpt-image-1:text2pic'));
+        self::assertSame(348, $svc->resolveModelId('openai:gpt-image-2.5-flare:text2pic'));
     }
 
     public function testGenerateRequiresACatalogKey(): void
@@ -72,7 +72,7 @@ final class DesktopGeneratedMediaServiceTest extends TestCase
         $media = $this->createMock(MediaGenerationServiceInterface::class);
         $media->expects($this->once())
             ->method('generate')
-            ->with($user, 'a cat', 'image', 29)
+            ->with($user, 'a cat', 'image', 348)
             ->willReturn([
                 'success' => true,
                 'file' => [
@@ -81,11 +81,11 @@ final class DesktopGeneratedMediaServiceTest extends TestCase
                     'mimeType' => 'image/png',
                 ],
                 'provider' => 'openai',
-                'model' => 'gpt-image-1',
+                'model' => 'gpt-image-2.5-flare',
             ]);
 
         $svc = $this->service($media, $em);
-        $out = $svc->generate($user, 'a cat', 'image', 'openai:gpt-image-1:text2pic');
+        $out = $svc->generate($user, 'a cat', 'image', 'openai:gpt-image-2.5-flare:text2pic');
 
         self::assertSame(77, $out['file']['id']);
         self::assertSame('/api/v1/files/uploads/01/000/x.png', $out['file']['url']);

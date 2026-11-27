@@ -126,7 +126,7 @@ class OpenAIProvider implements ChatProviderInterface, ToolCallingChatProviderIn
                 'PLAN' => 'openai:gpt-5.4-mini:chat',
                 'SUMMARIZE' => 'openai:gpt-5.4-mini:chat',
                 'PIC2TEXT' => 'openai:gpt-5.5:pic2text',
-                'SOUND2TEXT' => 'openai:whisper-1:sound2text',
+                'SOUND2TEXT' => 'openai:gpt-transcribe:sound2text',
             ], preferenceRank: 2),
             pricing: ProviderPricing::litellm(['openai'], ['openai']),
             liveVoiceSessions: 50,

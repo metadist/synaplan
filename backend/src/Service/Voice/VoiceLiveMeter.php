@@ -10,6 +10,9 @@ namespace App\Service\Voice;
  * Audio input tokens are the uncached ones. Cached audio is `audioCacheTokens`
  * and is priced on its own, so it must not also be included in `audioInTokens`.
  * Text output includes thinking tokens where the provider bills them as text.
+ * Standby seconds are the time with inference paused (GPT-Live over WebRTC).
+ * They are not part of `seconds`, which OpenAI reports for active time only,
+ * and are billed on top at the model's standby rate.
  */
 final readonly class VoiceLiveMeter
 {
@@ -21,6 +24,7 @@ final readonly class VoiceLiveMeter
         public int $textInTokens = 0,
         public int $textOutTokens = 0,
         public int $textItems = 0,
+        public float $standbySeconds = 0.0,
     ) {
     }
 }

@@ -46,7 +46,30 @@ final readonly class ConversationFileCatalog
     public function __construct(
         private FileRepository $fileRepository,
         private string $uploadDir,
+        private ?LibraryFileMentions $libraryMentions = null,
     ) {
+    }
+
+    /**
+     * Library documents the message names that are not in this conversation.
+     *
+     * @param list<ConversationFile> $catalog
+     */
+    public function renderLibraryMentions(Message $message, array $catalog): string
+    {
+        $userId = $message->getUserId();
+        if (null === $this->libraryMentions || $userId <= 0) {
+            return '';
+        }
+
+        $inConversation = [];
+        foreach ($catalog as $file) {
+            if (null !== $file->fileId) {
+                $inConversation[$file->fileId] = true;
+            }
+        }
+
+        return $this->libraryMentions->renderPlannerBlock($userId, $message->getText(), $inConversation);
     }
 
     /**

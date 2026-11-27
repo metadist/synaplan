@@ -6,6 +6,7 @@ namespace App\Service\Api;
 
 use App\AI\Service\AiFacade;
 use App\Entity\User;
+use App\Model\ImageTokenUsage;
 use App\Service\RateLimitService;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -67,7 +68,7 @@ final readonly class OpenAiImageGenerationService
         }
         $images = \is_array($result['images'] ?? null) ? array_values($result['images']) : [];
         if ([] !== $images) {
-            $this->recordUsage($user, $provider, $model->getProviderId(), (int) $model->getId(), \count($images), $options);
+            $this->recordUsage($user, $provider, $model->getProviderId(), (int) $model->getId(), $images, $options);
         }
 
         try {
@@ -147,9 +148,10 @@ final readonly class OpenAiImageGenerationService
     }
 
     /**
+     * @param list<mixed>          $images
      * @param array<string, mixed> $options
      */
-    private function recordUsage(User $user, string $provider, string $modelName, int $modelId, int $count, array $options): void
+    private function recordUsage(User $user, string $provider, string $modelName, int $modelId, array $images, array $options): void
     {
         try {
             \App\Service\Usage\LegacyUsageWriter::record($this->rateLimitService, $user, 'IMAGES', [
@@ -157,10 +159,10 @@ final readonly class OpenAiImageGenerationService
                 'model' => $modelName,
                 'model_id' => $modelId,
                 'media_usage' => array_filter([
-                    'images' => (float) $count,
+                    'images' => (float) \count($images),
                     'quality' => $options['quality'] ?? null,
                     'size' => $options['size'],
-                ], static fn ($value) => null !== $value),
+                ], static fn ($value) => null !== $value) + ImageTokenUsage::mediaUsageOf($images),
                 'source' => 'OPENAI_API',
             ]);
         } catch (\Throwable $e) {

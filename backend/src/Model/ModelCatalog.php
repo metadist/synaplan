@@ -480,6 +480,44 @@ class ModelCatalog
             'successor' => 'trustedtokens:zai-org/GLM-5.3:chat',
             'reason' => 'TrustedTokens no longer serves zai-org/GLM-5.2; migrate to GLM-5.3.',
         ],
+
+        // --- 2026-11-27 (OpenAI deprecations page) ---
+        // Retired ahead of each shutdown, like BID 234: OpenAI still serves
+        // these ids, so the availability check would only notice once every
+        // binding already fails.
+        //
+        // gpt-4o-mini shuts down on 2027-01-14; OpenAI names GPT-6 Luna as the
+        // replacement (same provider and key, Responses API, tools and vision).
+        73 => [
+            'providerId' => 'gpt-4o-mini',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6-luna:chat',
+            'reason' => 'Deprecated by OpenAI; access ends on 2027-01-14. Migrate to GPT-6 Luna.',
+        ],
+        // whisper-1 shuts down on 2027-02-26; GPT Transcribe is OpenAI's file
+        // transcription replacement on the same /v1/audio/transcriptions path.
+        82 => [
+            'providerId' => 'whisper-1',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-transcribe:sound2text',
+            'reason' => 'Deprecated by OpenAI; access ends on 2027-02-26. Migrate to GPT Transcribe.',
+        ],
+        // tts-1 and tts-1-hd shut down on 2027-01-06. OpenAI's suggested
+        // replacement (gpt-realtime-2.1-mini) only speaks over the Realtime API,
+        // not /v1/audio/speech, so OpenAI has no drop-in text-to-speech model
+        // left. Bindings follow the shipped TEXT2SOUND default instead.
+        41 => [
+            'providerId' => 'tts-1',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-2.5-flash-preview-tts:text2sound',
+            'reason' => 'Deprecated by OpenAI; access ends on 2027-01-06. OpenAI has no /v1/audio/speech successor; migrate to Gemini TTS.',
+        ],
+        83 => [
+            'providerId' => 'tts-1-hd',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'google:gemini-2.5-flash-preview-tts:text2sound',
+            'reason' => 'Deprecated by OpenAI; access ends on 2027-01-06. OpenAI has no /v1/audio/speech successor; migrate to Gemini TTS.',
+        ],
     ];
 
     /**
@@ -544,6 +582,9 @@ class ModelCatalog
         // Official OpenAI pricing 2026-09-30: base $2/$10, cache $0.10; >272k is
         // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.1-sol).
         'gpt-6.1-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 15.0, 'cache_price_in_above' => 0.20],
+        // Official OpenAI pricing 2026-11-27: base $1/$5, cache $0.05; >272k is
+        // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.1-terra).
+        'gpt-6.1-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 2.0, 'price_out_above' => 7.5, 'cache_price_in_above' => 0.10],
         // Official OpenAI pricing 2026-11-18: base $8/$40, cache $0.40; >272k is
         // 2x input and cache, 1.5x output (https://developers.openai.com/api/docs/models/gpt-6.2-astra).
         'gpt-6.2-astra' => ['threshold_tokens' => 272000, 'price_in_above' => 16.0, 'price_out_above' => 60.0, 'cache_price_in_above' => 0.80],
@@ -1567,136 +1608,31 @@ class ModelCatalog
             ],
         ],
         // ==================== OPENAI MODELS ====================
+        // GPT Transcribe — whisper-1's successor on /v1/audio/transcriptions.
+        // $0.0045/min per https://developers.openai.com/api/docs/models/gpt-transcribe
+        // (verified 2026-11-27). It answers in `json` only (no verbose_json, so
+        // no segments or duration) and takes `languages` instead of `language`;
+        // OpenAISpeech shapes the request accordingly.
         [
-            // Retired 2026-10-08 ahead of OpenAI's 2026-10-23 shutdown; see
-            // RETIREMENTS[29] (successor GPT Image 2.5 Flare).
-            'id' => 29,
+            'id' => 448,
             'service' => 'OpenAI',
-            'name' => 'gpt-image-1',
-            'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-image-1',
-            'priceIn' => 0,
-            'inUnit' => 'perImage',
-            'priceOut' => 0.042,
-            'outUnit' => 'perImage',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                // The image-generation path does not capture per-image token
-                // usage from OpenAI, so a per-token model bills $0. Bill per
-                // image instead: medium-quality 1024x1024 = $0.042/image
-                // (per OpenAI image pricing) so the IMAGES BUSELOG row carries
-                // the real cost.
-                'description' => 'OpenAI image generation model.',
-                'pricing_mode' => 'per_image',
-                // Flat fallback = medium 1024² (the headline rate). The exact
-                // per-image price is picked from quality_prices below (#1315).
-                'mode_prices' => ['output_cost_per_image' => 0.042],
-                'default_quality' => 'medium',
-                'default_size' => '1024x1024',
-                // OpenAI gpt-image-1 per-image prices by quality × size.
-                'quality_prices' => [
-                    'low' => ['1024x1024' => 0.011, '1024x1536' => 0.016, '1536x1024' => 0.016],
-                    'medium' => ['1024x1024' => 0.042, '1024x1536' => 0.063, '1536x1024' => 0.063],
-                    'high' => ['1024x1024' => 0.167, '1024x1536' => 0.25, '1536x1024' => 0.25],
-                ],
-                'params' => ['model' => 'gpt-image-1'],
-            ],
-        ],
-        [
-            'id' => 41,
-            'service' => 'OpenAI',
-            'name' => 'tts-1 with Nova',
-            'tag' => 'text2sound',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'tts-1',
-            // OpenAI tts-1 is flat $0.015 per 1000 characters → $0.000015
-            // per character. Mirrors live BMODELS BID 41.
-            'priceIn' => 0.000015,
-            'inUnit' => 'perChar',
-            'priceOut' => 0,
-            'outUnit' => 'perChar',
-            'quality' => 8,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI\'s text to speech, defaulting on voice NOVA.',
-                'pricing_mode' => 'per_character',
-                'mode_prices' => [
-                    'input_cost_per_character' => 0.000015,
-                ],
-                'params' => ['model' => 'tts-1', 'voice' => 'nova'],
-            ],
-        ],
-        [
-            'id' => 73,
-            'service' => 'OpenAI',
-            'name' => 'gpt-4o-mini',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-4o-mini',
-            'priceIn' => 0.15,
-            'inUnit' => 'per1M',
-            'priceOut' => 0.6,
-            'outUnit' => 'per1M',
-            'quality' => 8,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI lightweight GPT-4o-mini model for fast and cost-efficient chat tasks. Optimized for lower latency and cheaper throughput.',
-                'max_tokens' => 16384,
-                'params' => ['model' => 'gpt-4o-mini'],
-                'meta' => ['context_window' => '128000', 'max_output' => '16384'],
-                'features' => ['tool_use'],
-            ],
-        ],
-        [
-            'id' => 82,
-            'service' => 'OpenAI',
-            'name' => 'whisper-1',
+            'name' => 'GPT Transcribe',
             'tag' => 'sound2text',
             'selectable' => 1,
             'active' => 1,
-            'providerId' => 'whisper-1',
-            'priceIn' => 0.006,
+            'providerId' => 'gpt-transcribe',
+            'priceIn' => 0.0045,
             'inUnit' => 'permin',
             'priceOut' => 0,
             'outUnit' => '-',
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'OpenAI Whisper model for audio transcription. Supports 50+ languages.',
+                'description' => 'OpenAI GPT Transcribe - high-accuracy speech-to-text for uploaded audio. Detects the spoken language automatically.',
                 // Billed on audio duration (permin → per-second at bill time, #1314).
                 'pricing_mode' => 'per_second',
-                'params' => ['model' => 'whisper-1', 'response_format' => 'verbose_json'],
-                'features' => ['multilingual', 'translation'],
-            ],
-        ],
-        [
-            'id' => 83,
-            'service' => 'OpenAI',
-            'name' => 'tts-1-hd',
-            'tag' => 'text2sound',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'tts-1-hd',
-            // OpenAI tts-1-hd is flat $0.03 per 1000 characters → $0.00003
-            // per character. Mirrors live BMODELS BID 83.
-            'priceIn' => 0.00003,
-            'inUnit' => 'perChar',
-            'priceOut' => 0,
-            'outUnit' => 'perChar',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI high-quality text-to-speech.',
-                'pricing_mode' => 'per_character',
-                'mode_prices' => [
-                    'input_cost_per_character' => 0.00003,
-                ],
-                'params' => ['model' => 'tts-1-hd'],
+                'params' => ['model' => 'gpt-transcribe', 'response_format' => 'json'],
+                'features' => ['multilingual'],
             ],
         ],
         [
@@ -2331,6 +2267,79 @@ class ModelCatalog
             ],
         ],
         // ----------------------------------------------------------------
+        // GPT-6.1 Terra — fast, efficient GPT-6.1 tier for visual reasoning,
+        // computer use and writing. Responses API (tool calling needs it);
+        // image input; reasoning.effort supports none / low / medium / high /
+        // xhigh / max. Pricing per 1M tokens from
+        // https://developers.openai.com/api/docs/models/gpt-6.1-terra
+        // (verified 2026-11-27): $1 in / $5 out, cached input $0.05,
+        // cache writes $1.25. Long-context (>272k) in CONTEXT_PRICING.
+        // ----------------------------------------------------------------
+        [
+            'id' => 449,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.1 Terra',
+            'tag' => 'chat',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.1-terra',
+            'priceIn' => 1,
+            'inUnit' => 'per1M',
+            'priceOut' => 5,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.1 Terra - fast, efficient model for visual reasoning, precise computer use and clear, natural writing. Very large context window and configurable thinking depth.',
+                'max_tokens' => 128000,
+                'params' => ['model' => 'gpt-6.1-terra'],
+                'features' => ['reasoning', 'vision', 'tool_use'],
+                // Official cached-input rate is $0.05/1M (0.05x); without it the
+                // non-Anthropic CostCalculationService fallback bills 50%.
+                'cache_read_price_per_1M' => 0.05,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'family' => 'openai',
+                    'jurisdiction' => 'US',
+                    'api' => 'responses',
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-06-01',
+                    'reasoning_effort_default' => 'medium',
+                ],
+            ],
+        ],
+        [
+            'id' => 450,
+            'service' => 'OpenAI',
+            'name' => 'GPT-6.1 Terra (Vision)',
+            'tag' => 'pic2text',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-6.1-terra',
+            'priceIn' => 1,
+            'inUnit' => 'per1M',
+            'priceOut' => 5,
+            'outUnit' => 'per1M',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-6.1 Terra for image analysis and vision tasks.',
+                'prompt' => 'Describe the image in detail. Extract any text you see.',
+                'params' => ['model' => 'gpt-6.1-terra'],
+                'features' => ['reasoning', 'vision'],
+                'cache_read_price_per_1M' => 0.05,
+                'cache_write_multiplier' => 1.25,
+                'meta' => [
+                    'api' => 'responses',
+                    'supports_images' => true,
+                    'context_window' => '1050000',
+                    'max_output' => '128000',
+                    'knowledge_cutoff' => '2026-06-01',
+                ],
+            ],
+        ],
+        // ----------------------------------------------------------------
         // GPT-6.2 Astra — OpenAI's most capable model for long-running
         // software, computer-use and document work. Responses API (Chat
         // Completions is also offered upstream); image input; the API rejects
@@ -2550,52 +2559,14 @@ class ModelCatalog
                 ],
             ],
         ],
-        [
-            // Retired 2026-10-08 ahead of OpenAI's 2026-12-01 shutdown; see
-            // RETIREMENTS[151] (successor GPT Image 2.5 Flare).
-            'id' => 151,
-            'service' => 'OpenAI',
-            'name' => 'gpt-image-1.5',
-            'tag' => 'text2pic',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-image-1.5',
-            'priceIn' => 0,
-            'inUnit' => 'perImage',
-            'priceOut' => 0.034,
-            'outUnit' => 'perImage',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                // The image path does not capture per-image token usage, so a
-                // per-token model bills $0. Bill per image instead; the exact
-                // price is picked from quality_prices by quality × size (#1315).
-                // Flat fallback = medium 1024² = $0.034 (OpenAI GPT Image 1.5).
-                'description' => 'OpenAI GPT Image 1.5 - state-of-the-art image generation and editing. Supports pic2pic via Responses API.',
-                'pricing_mode' => 'per_image',
-                'mode_prices' => ['output_cost_per_image' => 0.034],
-                'default_quality' => 'medium',
-                'default_size' => '1024x1024',
-                // OpenAI gpt-image-1.5 per-image prices by quality × size
-                // (~20% cheaper than gpt-image-1).
-                'quality_prices' => [
-                    'low' => ['1024x1024' => 0.009, '1024x1536' => 0.013, '1536x1024' => 0.013],
-                    'medium' => ['1024x1024' => 0.034, '1024x1536' => 0.05, '1536x1024' => 0.05],
-                    'high' => ['1024x1024' => 0.133, '1024x1536' => 0.20, '1536x1024' => 0.20],
-                ],
-                'params' => ['model' => 'gpt-image-1.5'],
-                'features' => ['image', 'pic2pic'],
-                'meta' => ['api' => 'responses'],
-            ],
-        ],
-        // GPT Image 2.5 (snapshot 2026-09-08). Official billing is per token
-        // ($5/1M text in, $8/1M image in, $30/1M image out — same rates as
-        // GPT Image 2). The image path does not capture usage tokens, so a
-        // per-token row would bill $0; we keep per_image and price each
-        // quality × size from OpenAI's GPT Image 2.5 output-token calculator
+        // GPT Image 2.5 (snapshot 2026-09-08). OpenAI bills per token: $5/1M
+        // text in ($1.25 cached), $8/1M image in ($2 cached), $30/1M image out.
+        // Each request is billed from the tokens OpenAI reports in the answer
+        // (ImageTokenUsage, at the `meta` rates below; the Responses API also
+        // bills the mainline model that called the image tool). The
+        // quality × size prices are the fallback for an answer without usage,
+        // taken from OpenAI's GPT Image 2.5 output-token calculator
         // (https://developers.openai.com/api/docs/guides/image-generation).
-        // Flare and Sunburst share the calculator; cost differs only if a
-        // request actually spends more tokens (higher quality / more retries).
         [
             'id' => 348,
             'service' => 'OpenAI',
@@ -2635,7 +2606,9 @@ class ModelCatalog
                     'snapshot' => 'gpt-image-2.5-flare-2026-09-08',
                     'image_output_price_per_1M' => 30,
                     'image_input_price_per_1M' => 8,
+                    'image_cached_input_price_per_1M' => 2,
                     'text_input_price_per_1M' => 5,
+                    'text_cached_input_price_per_1M' => 1.25,
                 ],
             ],
         ],
@@ -2673,12 +2646,100 @@ class ModelCatalog
                     'snapshot' => 'gpt-image-2.5-sunburst-2026-09-08',
                     'image_output_price_per_1M' => 30,
                     'image_input_price_per_1M' => 8,
+                    'image_cached_input_price_per_1M' => 2,
                     'text_input_price_per_1M' => 5,
+                    'text_cached_input_price_per_1M' => 1.25,
+                ],
+            ],
+        ],
+        // GPT Image 2.6 Flare / Sunburst. OpenAI bills them at the GPT Image 2.5
+        // token rates ($5/1M text in, $1.25 cached; $8/1M image in, $2 cached;
+        // $30/1M image out; no Batch), verified 2026-11-27 on the model pages
+        // (https://developers.openai.com/api/docs/models/gpt-image-2.6-flare,
+        // .../gpt-image-2.6-sunburst) and the pricing page. Requests are billed
+        // from the tokens OpenAI reports, as for GPT Image 2.5. The per-image
+        // prices are only the fallback for an answer without usage; no page
+        // gives them for 2.6, so they reuse the GPT Image 2.5 token budgets.
+        [
+            'id' => 451,
+            'service' => 'OpenAI',
+            'name' => 'GPT Image 2.6 Flare',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-image-2.6-flare',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.01317,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT Image 2.6 Flare - image generation and editing for fast iteration. Supports pic2pic via the Images and Responses APIs.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01317],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.00588, '1024x1536' => 0.00474, '1536x1024' => 0.00474],
+                    'medium' => ['1024x1024' => 0.01317, '1024x1536' => 0.01029, '1536x1024' => 0.01029],
+                    'high' => ['1024x1024' => 0.05268, '1024x1536' => 0.04116, '1536x1024' => 0.04116],
+                    'xhigh' => ['1024x1024' => 0.09366, '1024x1536' => 0.07377, '1536x1024' => 0.07377],
+                    'max' => ['1024x1024' => 0.21072, '1024x1536' => 0.16464, '1536x1024' => 0.16464],
+                ],
+                'params' => ['model' => 'gpt-image-2.6-flare'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => [
+                    'api' => 'responses',
+                    'image_output_price_per_1M' => 30,
+                    'image_input_price_per_1M' => 8,
+                    'image_cached_input_price_per_1M' => 2,
+                    'text_input_price_per_1M' => 5,
+                    'text_cached_input_price_per_1M' => 1.25,
+                ],
+            ],
+        ],
+        [
+            'id' => 452,
+            'service' => 'OpenAI',
+            'name' => 'GPT Image 2.6 Sunburst',
+            'tag' => 'text2pic',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-image-2.6-sunburst',
+            'priceIn' => 0,
+            'inUnit' => 'perImage',
+            'priceOut' => 0.01317,
+            'outUnit' => 'perImage',
+            'quality' => 10,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT Image 2.6 Sunburst - image generation and editing for detailed visual work. Same token rates as Flare; pick this when detail matters more than latency.',
+                'pricing_mode' => 'per_image',
+                'mode_prices' => ['output_cost_per_image' => 0.01317],
+                'default_quality' => 'medium',
+                'default_size' => '1024x1024',
+                'quality_prices' => [
+                    'low' => ['1024x1024' => 0.00588, '1024x1536' => 0.00474, '1536x1024' => 0.00474],
+                    'medium' => ['1024x1024' => 0.01317, '1024x1536' => 0.01029, '1536x1024' => 0.01029],
+                    'high' => ['1024x1024' => 0.05268, '1024x1536' => 0.04116, '1536x1024' => 0.04116],
+                    'xhigh' => ['1024x1024' => 0.09366, '1024x1536' => 0.07377, '1536x1024' => 0.07377],
+                    'max' => ['1024x1024' => 0.21072, '1024x1536' => 0.16464, '1536x1024' => 0.16464],
+                ],
+                'params' => ['model' => 'gpt-image-2.6-sunburst'],
+                'features' => ['image', 'pic2pic'],
+                'meta' => [
+                    'api' => 'responses',
+                    'image_output_price_per_1M' => 30,
+                    'image_input_price_per_1M' => 8,
+                    'image_cached_input_price_per_1M' => 2,
+                    'text_input_price_per_1M' => 5,
+                    'text_cached_input_price_per_1M' => 1.25,
                 ],
             ],
         ],
         // ----------------------------------------------------------------
-        // GPT-5.4 mini / nano (snapshot 2026-05-27, probed live before
+        // GPT-5.4 mini (snapshot 2026-05-27, probed live before
         // seeding via https://developers.openai.com/api/docs/models).
         // ----------------------------------------------------------------
         [
@@ -2734,34 +2795,6 @@ class ModelCatalog
                     'supports_images' => true,
                     'context_window' => '400000',
                     'max_output' => '128000',
-                ],
-            ],
-        ],
-        [
-            'id' => 234,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4 nano',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4-nano',
-            'priceIn' => 0.20,
-            'inUnit' => 'per1M',
-            'priceOut' => 1.25,
-            'outUnit' => 'per1M',
-            'quality' => 7,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 nano - lowest-latency, lowest-cost OpenAI tier for narrow, well-defined tasks.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.4-nano'],
-                'features' => ['reasoning', 'tool_use'],
-                'cache_read_price_per_1M' => 0.02,
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '400000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-08-31',
                 ],
             ],
         ],
@@ -6652,6 +6685,11 @@ class ModelCatalog
         // ==================== LIVE VOICE (speech-to-speech) ====================
         // Prices verified 2026-10-12. Voice cost shares the user's monthly
         // budget; there is no minutes quota. See the live-voice plan.
+        // GPT-Live bills $0.05/min active and $0.02/min on standby. The sidecar
+        // opens WebRTC sessions with a speech wake policy. OpenAI's usage
+        // seconds cover active time only; the seconds with inference paused
+        // are metered apart and billed on top at `standby_price_in` (same
+        // unit as priceIn). Relay sessions never pause.
         [
             'id' => 389,
             'service' => 'OpenAI',
@@ -6667,9 +6705,37 @@ class ModelCatalog
             'quality' => 9,
             'rating' => 1,
             'json' => [
-                'description' => 'OpenAI GPT-Live. Full-duplex speech-to-speech. Billed per second of the session ($0.05/min). Answers still come from the user\'s chat model.',
+                'description' => 'OpenAI GPT-Live. Full-duplex speech-to-speech. Billed per second of the session ($0.05/min active, $0.02/min on standby). Answers still come from the user\'s chat model.',
                 'pricing_mode' => 'per_second',
+                'standby_price_in' => 0.02,
                 'params' => ['model' => 'gpt-live-1'],
+                'voices' => LiveVoiceRosters::GPT_LIVE,
+                'features' => ['live_voice'],
+            ],
+        ],
+        // GPT-Live 1.1: same Live sessions endpoint, context events and
+        // per-minute price as GPT-Live, with more accurate transcription and a
+        // steadier voice across languages
+        // (https://developers.openai.com/api/docs/models/gpt-live-1.1, verified 2026-11-27).
+        [
+            'id' => 453,
+            'service' => 'OpenAI',
+            'name' => 'GPT-Live 1.1',
+            'tag' => 'voice2voice',
+            'selectable' => 1,
+            'active' => 1,
+            'providerId' => 'gpt-live-1.1',
+            'priceIn' => 0.05,
+            'inUnit' => 'permin',
+            'priceOut' => 0,
+            'outUnit' => '-',
+            'quality' => 9,
+            'rating' => 1,
+            'json' => [
+                'description' => 'OpenAI GPT-Live 1.1. Full-duplex speech-to-speech for multilingual conversations, with more accurate transcription than GPT-Live. Billed per second of the session ($0.05/min active, $0.02/min on standby). Answers still come from the user\'s chat model.',
+                'pricing_mode' => 'per_second',
+                'standby_price_in' => 0.02,
+                'params' => ['model' => 'gpt-live-1.1'],
                 'voices' => LiveVoiceRosters::GPT_LIVE,
                 'features' => ['live_voice'],
             ],

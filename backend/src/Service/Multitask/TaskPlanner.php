@@ -414,12 +414,13 @@ final readonly class TaskPlanner
             ));
         }
 
+        $library = $this->conversationFiles->renderLibraryMentions($message, $catalog);
         $block = $this->conversationFiles->renderInventoryBlock($catalog);
         if ('' === $block) {
-            return '';
+            return $library;
         }
 
-        return $block.'If the user asks about a file listed above, plan a file_analysis or rag_query step even when this turn has no new attachment. When they want file work on one of those files, set code_run params.inputFileNames to its quoted name. A follow-up that changes what a listed image shows (pose, subjects, style, background, text painted into the scene) is image_generation, never code_run. Pixel-exact stamp/crop/resize of an unchanged picture stays code_run. Do not invent an id, and do not turn on the shared workspace only because the file is listed here.'."\n";
+        return $library.$block.'If the user asks about a file listed above, plan a file_analysis or rag_query step even when this turn has no new attachment. When they want file work on one of those files, set code_run params.inputFileNames to its quoted name. A follow-up that changes what a listed image shows (pose, subjects, style, background, text painted into the scene) is image_generation, never code_run. Pixel-exact stamp/crop/resize of an unchanged picture stays code_run. Do not invent an id, and do not turn on the shared workspace only because the file is listed here.'."\n";
     }
 
     /**

@@ -103,28 +103,54 @@ describe('resolveModelMix', () => {
     expect(resolved.defaults.TEXT2PIC).toBeUndefined()
   })
 
-  it('prefers GPT Image 2.5 Flare over 1.5 when the installation serves both', () => {
+  it('keeps the shipped GPT Image 2.5 Flare default ahead of GPT Image 2.6 Flare', () => {
     const flare = model({
       id: 348,
       service: 'OpenAI',
       providerId: 'gpt-image-2.5-flare',
       name: 'GPT Image 2.5 Flare',
     })
-    const image15 = model({
-      id: 151,
+    const flare26 = model({
+      id: 451,
       service: 'OpenAI',
-      providerId: 'gpt-image-1.5',
-      name: 'gpt-image-1.5',
+      providerId: 'gpt-image-2.6-flare',
+      name: 'GPT Image 2.6 Flare',
     })
     const models: Partial<Record<Capability, AIModel[]>> = {
-      TEXT2PIC: [image15, flare],
-      PIC2PIC: [image15, flare],
+      TEXT2PIC: [flare26, flare],
+      PIC2PIC: [flare26, flare],
     }
 
     const resolved = resolveModelMix(mixDefinition('openai'), models)
 
     expect(resolved.defaults.TEXT2PIC).toBe(348)
     expect(resolved.defaults.PIC2PIC).toBe(348)
+  })
+
+  it('falls back to GPT Image 2.6 Flare and leaves the sound slot alone', () => {
+    const models: Partial<Record<Capability, AIModel[]>> = {
+      TEXT2PIC: [
+        model({
+          id: 451,
+          service: 'OpenAI',
+          providerId: 'gpt-image-2.6-flare',
+          name: 'GPT Image 2.6 Flare',
+        }),
+      ],
+      TEXT2SOUND: [
+        model({
+          id: 37,
+          service: 'Google',
+          providerId: 'gemini-2.5-flash-preview-tts',
+          name: 'Gemini TTS',
+        }),
+      ],
+    }
+
+    const resolved = resolveModelMix(mixDefinition('openai'), models)
+
+    expect(resolved.defaults.TEXT2PIC).toBe(451)
+    expect(resolved.defaults.TEXT2SOUND).toBeUndefined()
   })
 
   it('prefers GPT-6 Astra over GPT-5.6 Sol when the installation serves both', () => {

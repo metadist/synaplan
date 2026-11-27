@@ -1845,14 +1845,14 @@
         "buselog": [
             {
                 "action": "TRANSCRIPTION",
-                "cost": "0.021000",
+                "cost": "0.015750",
                 "error": "",
                 "metadata": {
                     "language": "de",
-                    "model": "whisper-1",
+                    "model": "gpt-transcribe",
                     "provider": "openai"
                 },
-                "model": "whisper-1",
+                "model": "gpt-transcribe",
                 "model_id": 51,
                 "provider": "openai",
                 "status": "success",
@@ -1875,31 +1875,24 @@
         "model_health": [
             {
                 "capability": "speech_to_text",
-                "model": "whisper-1",
+                "model": "gpt-transcribe",
                 "model_id": 51,
                 "outcome": "success",
                 "provider": "openai"
             }
         ],
         "provider_requests": {
-            "sdk": [
+            "http": [
                 {
-                    "body": {
-                        "file": {
-                            "bytes": 14,
-                            "filename": "voice.mp3",
-                            "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
-                        },
-                        "model": "whisper-1",
-                        "response_format": "verbose_json"
-                    },
+                    "body": "--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-transcribe\r\n--<boundary>\r\nContent-Type: audio/mpeg\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.mp3\"\r\n\r\nID3-test-audio\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n--<boundary>--\r\n",
+                    "body_sha1": "4818277986061eac75d6964828658ef5618a1ffc",
                     "headers": [
+                        "Accept: */*",
                         "Authorization: Bearer <secret>",
-                        "Content-Length: 352",
-                        "Content-Type: multipart/form-data; boundary=<boundary>",
-                        "Host: api.openai.com"
+                        "Content-Type: multipart/form-data; boundary=<boundary>"
                     ],
                     "method": "POST",
+                    "timeout": 300,
                     "url": "https://api.openai.com/v1/audio/transcriptions"
                 }
             ]
@@ -1908,15 +1901,15 @@
         "result": {
             "duration": 3.5,
             "language": "de",
-            "model": "whisper-1",
+            "model": "gpt-transcribe",
             "model_id": 51,
             "provider": "openai",
             "text": "Hallo Synaplan",
             "transcription_usage": {
                 "completionTokens": 0,
-                "cost": "0.023100",
+                "cost": "0.017325",
                 "kind": "TRANSCRIPTION",
-                "modelKey": "openai:whisper-1",
+                "modelKey": "openai:gpt-transcribe",
                 "priceKnown": true,
                 "promptTokens": 0,
                 "totalTokens": 0

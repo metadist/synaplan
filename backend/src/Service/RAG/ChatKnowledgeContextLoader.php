@@ -6,6 +6,7 @@ namespace App\Service\RAG;
 
 use App\Entity\Message;
 use App\Entity\User;
+use App\Service\File\LibraryFileMentions;
 use App\Service\Infrastructure\PerfTimer;
 use App\Service\Knowledge\KnowledgeContextFormatter;
 use App\Service\Message\ProgressCallback;
@@ -24,6 +25,7 @@ final readonly class ChatKnowledgeContextLoader
         private VectorSearchService $vectorSearchService,
         private KnowledgeContextFormatter $knowledgeContextFormatter,
         private LoggerInterface $logger,
+        private ?LibraryFileMentions $libraryMentions = null,
     ) {
     }
 
@@ -103,6 +105,7 @@ final readonly class ChatKnowledgeContextLoader
         array $classification,
         array $options,
         bool $isRagQuery,
+        int $userId = 0,
     ): bool {
         if (!empty($options['disable_knowledge'])) {
             return false;
@@ -112,8 +115,24 @@ final readonly class ChatKnowledgeContextLoader
         return \App\Service\Agent\AgentKnowledgeSearchGate::shouldSearch(
             $agentScopes,
             $text,
-            (is_string($explicit) && '' !== $explicit) || $isRagQuery,
+            (is_string($explicit) && '' !== $explicit) || $isRagQuery || $this->namesLibraryDocument($agentScopes, $userId, $text),
         );
+    }
+
+    /**
+     * The sorter does not know the library. A question that names one of the
+     * user's documents searches it even when the sorter picked a plain chat.
+     * An assistant keeps its own scopes.
+     *
+     * @param list<RagScope>|null $agentScopes
+     */
+    private function namesLibraryDocument(?array $agentScopes, int $userId, string $text): bool
+    {
+        if (null !== $agentScopes || null === $this->libraryMentions || $userId <= 0) {
+            return false;
+        }
+
+        return [] !== $this->libraryMentions->mentioned($userId, $text);
     }
 
     /**

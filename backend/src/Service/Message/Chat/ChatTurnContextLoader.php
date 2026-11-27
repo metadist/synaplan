@@ -77,6 +77,7 @@ final readonly class ChatTurnContextLoader
             $classification,
             $options,
             $isRagQuery,
+            $message->getUserId(),
         );
         $knowledge = ['context' => '', 'sources' => []];
         if ($searchKnowledge) {
@@ -155,6 +156,7 @@ final readonly class ChatTurnContextLoader
             $classification,
             $options,
             $isRagQuery,
+            $message->getUserId(),
         );
         $knowledge = $this->knowledge->loadForStream(
             $message,

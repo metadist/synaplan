@@ -110,16 +110,17 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
       TEXT2PIC: [
         openai('gpt-image-2.5-flare'),
         openai('gpt-image-2.5-sunburst'),
-        openai('gpt-image-1.5'),
-        openai('gpt-image-1'),
+        openai('gpt-image-2.6-flare'),
+        openai('gpt-image-2.6-sunburst'),
       ],
       PIC2PIC: [
         openai('gpt-image-2.5-flare'),
         openai('gpt-image-2.5-sunburst'),
-        openai('gpt-image-1.5'),
-        openai('gpt-image-1'),
+        openai('gpt-image-2.6-flare'),
+        openai('gpt-image-2.6-sunburst'),
       ],
-      TEXT2SOUND: [openai('tts-1-hd'), openai('tts-1')],
+      // OpenAI has no text-to-speech model left on /v1/audio/speech, so the
+      // sound slot keeps the user's current setting.
       // OpenAI has no video model; Grok Imagine is the mix's stand-in.
       TEXT2VID: [xai('grok-imagine-video')],
     },

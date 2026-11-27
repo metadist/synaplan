@@ -521,6 +521,7 @@ final readonly class VoiceLiveSessionService
             textInTokens: $this->intOf($meter['textInTokens'] ?? 0),
             textOutTokens: $this->intOf($meter['textOutTokens'] ?? 0),
             textItems: $this->intOf($meter['textItems'] ?? 0),
+            standbySeconds: $this->floatOf($meter['standbySeconds'] ?? 0),
         );
     }
 

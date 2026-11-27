@@ -35,6 +35,8 @@ final class OpenAiReasoningEffort
         'gpt-6-luna' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
         // 6.1 Sol dropped the `none` tier that 6 Sol still accepts.
         'gpt-6.1-sol' => ['low', 'medium', 'high', 'xhigh', 'max'],
+        // 6.1 Terra keeps the `none` tier that 6.1 Sol dropped.
+        'gpt-6.1-terra' => ['none', 'low', 'medium', 'high', 'xhigh', 'max'],
         // 6.2 Astra and 6.2 Sol reject `none` too; `low` is the cheapest accepted tier.
         'gpt-6.2-sol' => ['low', 'medium', 'high', 'xhigh', 'max'],
         'gpt-6.2-astra' => ['low', 'medium', 'high', 'xhigh', 'max'],
