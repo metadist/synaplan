@@ -122,6 +122,83 @@ describe('SharedChatView generated media', () => {
       '/api/v1/files/uploads/02/000/notes.pdf'
     )
   })
+
+  it('plays a webm recording as video when the attachment says video/webm', async () => {
+    const recording = {
+      success: true,
+      chat: { title: 'Recording', createdAt: '2026-11-26T20:10:35+00:00' },
+      messages: [
+        {
+          id: 3,
+          text: '',
+          direction: 'OUT' as const,
+          timestamp: 1_700_000_000,
+          file: { path: '02/000/screen.webm', type: 'webm' },
+          files: [
+            {
+              id: 11,
+              filename: 'screen.webm',
+              fileType: 'webm',
+              filePath: '02/000/screen.webm',
+              fileSize: 100,
+              fileMime: 'video/webm',
+            },
+          ],
+        },
+        {
+          id: 4,
+          text: '',
+          direction: 'IN' as const,
+          timestamp: 1_700_000_001,
+          file: { path: '02/000/note.webm', type: 'webm' },
+          files: [
+            {
+              id: 12,
+              filename: 'note.webm',
+              fileType: 'webm',
+              filePath: '02/000/note.webm',
+              fileSize: 40,
+              fileMime: 'audio/webm',
+            },
+          ],
+        },
+      ],
+    }
+    vi.mocked(httpClient).mockResolvedValue(GetSharedChatResponseSchema.parse(recording))
+
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/shared/:lang/:token', component: SharedChatView },
+        { path: '/register', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/shared/en/public-token')
+    await router.isReady()
+
+    const wrapper = mount(SharedChatView, {
+      global: {
+        plugins: [router],
+        stubs: {
+          MessageText: { template: '<p>{{ content }}</p>', props: ['content'] },
+          MessageImage: { props: ['url'], template: '<img :src="url" />' },
+          MessageVideo: { props: ['url'], template: '<video :src="url" />' },
+          MessageAudio: { props: ['url'], template: '<audio :src="url" />' },
+          MessageCode: true,
+          MessageJson: true,
+          BrandAttribution: true,
+        },
+      },
+    })
+    await flushPromises()
+
+    const videos = wrapper.findAll('video')
+    const audios = wrapper.findAll('audio')
+    expect(videos).toHaveLength(1)
+    expect(videos[0]?.attributes('src')).toBe('/api/v1/files/uploads/02/000/screen.webm')
+    expect(audios).toHaveLength(1)
+    expect(audios[0]?.attributes('src')).toBe('/api/v1/files/uploads/02/000/note.webm')
+  })
 })
 
 describe('SharedChatView knowledge sources', () => {

@@ -241,16 +241,20 @@
                 data-testid="shared-generated-media"
               >
                 <MessageImage
-                  v-if="message.file && isImageFileType(message.file.type)"
+                  v-if="message.file && isImageFileType(message.file.type, attachmentMime(message))"
                   :url="buildUploadUrl(message.file.path)"
                   :alt="t('message.imageGenerated')"
                 />
                 <MessageVideo
-                  v-else-if="message.file && isVideoFileType(message.file.type)"
+                  v-else-if="
+                    message.file && isVideoFileType(message.file.type, attachmentMime(message))
+                  "
                   :url="buildUploadUrl(message.file.path)"
                 />
                 <MessageAudio
-                  v-else-if="message.file && isAudioFileType(message.file.type)"
+                  v-else-if="
+                    message.file && isAudioFileType(message.file.type, attachmentMime(message))
+                  "
                   :url="buildUploadUrl(message.file.path)"
                 />
               </div>
@@ -455,10 +459,23 @@ function storedPath(path: string | null | undefined): string {
     .replace(/^up\//, '')
 }
 
+// `webm` is audio when only the extension is known. The attachment MIME
+// decides, so a screen recording is not dropped as a voice note.
+function attachmentMime(message: Message): string | null | undefined {
+  const path = storedPath(message.file?.path)
+  if (path === '') return undefined
+  return (message.files ?? []).find((file) => storedPath(file.filePath) === path)?.fileMime
+}
+
 function showsGeneratedMedia(message: Message): boolean {
   const file = message.file
   if (!file?.path) return false
-  return isImageFileType(file.type) || isVideoFileType(file.type) || isAudioFileType(file.type)
+  const mime = attachmentMime(message)
+  return (
+    isImageFileType(file.type, mime) ||
+    isVideoFileType(file.type, mime) ||
+    isAudioFileType(file.type, mime)
+  )
 }
 
 function sharedAttachments(message: Message): SharedChatFile[] {
