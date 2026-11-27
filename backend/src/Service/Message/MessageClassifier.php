@@ -6,6 +6,7 @@ use App\Entity\Message;
 use App\Service\Message\Classification\AgainOverride;
 use App\Service\Message\Classification\AgentPinRoute;
 use App\Service\Message\Classification\AttachmentIntent;
+use App\Service\Message\Classification\ConfidentLanguage;
 use App\Service\Message\Classification\EmbeddingRoute;
 use App\Service\Message\Classification\FastPathClassifier;
 use App\Service\Message\Classification\RoutingDeferral;
@@ -85,16 +86,16 @@ final readonly class MessageClassifier
         // and only overlay force_web_search / rag_query.
         $slash = $this->slashCommands->resolve($message);
         if (null !== $slash->answer) {
-            return $slash->answer;
+            return $this->answerInTheMessagesLanguage($message, $slash->answer);
         }
         $text = $message->getText();
 
         $pinned = $this->agentPinRoute->pin($message, $options, $conversationHistory, $slash->forceWebSearch || !empty($options['web_search_requested']));
         if (null !== $pinned) {
-            return $this->slashCommands->withOverlays($pinned, $slash);
+            return $this->answerInTheMessagesLanguage($message, $this->slashCommands->withOverlays($pinned, $slash));
         }
         if ($slash->docs) {
-            return $this->slashCommands->docsRoute($message);
+            return $this->answerInTheMessagesLanguage($message, $this->slashCommands->docsRoute($message));
         }
 
         $this->logger->info('MessageClassifier: Starting classification', [
@@ -108,7 +109,7 @@ final readonly class MessageClassifier
             ?? $this->againOverride->route($message)
             ?? $this->attachments->route($message, $text);
         if (null !== $decided) {
-            return $decided;
+            return $this->answerInTheMessagesLanguage($message, $decided);
         }
 
         // Produce-a-file turns (#2047, #2049) and spoken answers need the
@@ -119,12 +120,35 @@ final readonly class MessageClassifier
 
         $embedding = $this->embedding->match($message, $text, $overrideModelId, $produceFileWork || $spokenOutput, $slash->forceWebSearch);
         if (null !== $embedding->classification) {
-            return $embedding->classification;
+            return $this->answerInTheMessagesLanguage($message, $embedding->classification);
         }
 
         $mayDefer = $allowRoutingDeferral && !$produceFileWork && !$spokenOutput && !$embedding->declinedForLanguage;
 
-        return $this->deferral->defer($message, $text, $overrideModelId, $mayDefer, $slash->forceWebSearch)
-            ?? $this->sorter->classify($message, $text, $conversationHistory, $overrideModelId, $slash->forceWebSearch, $spokenOutput);
+        return $this->answerInTheMessagesLanguage(
+            $message,
+            $this->deferral->defer($message, $text, $overrideModelId, $mayDefer, $slash->forceWebSearch)
+                ?? $this->sorter->classify($message, $text, $conversationHistory, $overrideModelId, $slash->forceWebSearch, $spokenOutput),
+        );
+    }
+
+    /**
+     * A clear language in the text wins over the interface language the
+     * message was seeded with. An unclear text keeps that seed.
+     *
+     * @param array<string, mixed> $classification
+     *
+     * @return array<string, mixed>
+     */
+    private function answerInTheMessagesLanguage(Message $message, array $classification): array
+    {
+        $language = $classification['language'] ?? null;
+        if (!is_string($language) || '' === $language) {
+            return $classification;
+        }
+
+        $classification['language'] = ConfidentLanguage::preferText($message->getText(), $language);
+
+        return $classification;
     }
 }

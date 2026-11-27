@@ -29,7 +29,7 @@ class LanguageDirectiveBuilderTest extends TestCase
     {
         $directive = LanguageDirectiveBuilder::buildAutoDirective();
 
-        $this->assertStringContainsString('same language the user writes in', $directive);
+        $this->assertStringContainsString('same language as the latest user message', $directive);
         $this->assertAntiEchoClausePresent($directive);
         $this->assertDoesNotContainBracketedAnnotation($directive);
     }
@@ -47,9 +47,9 @@ class LanguageDirectiveBuilderTest extends TestCase
     {
         $directive = LanguageDirectiveBuilder::buildForLanguage('en');
 
-        $this->assertStringContainsString('same language the user writes in', $directive);
-        $this->assertStringContainsString('looks like English', $directive);
-        $this->assertStringContainsString('unless that message is clearly in another language', $directive);
+        $this->assertStringContainsString('same language as the latest user message', $directive);
+        $this->assertStringContainsString('no clear language', $directive);
+        $this->assertStringContainsString('answer in English', $directive);
         $this->assertStringNotContainsString("the user's current message is in English", $directive);
         $this->assertAntiEchoClausePresent($directive);
     }

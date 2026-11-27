@@ -30,6 +30,16 @@ final class ConfidentLanguageTest extends TestCase
         yield 'no signal' => ['ok', null];
     }
 
+    public function testAClearMessageWinsOverTheInterfaceLanguage(): void
+    {
+        self::assertSame(
+            'en',
+            ConfidentLanguage::preferText('Hi Synaplan, whats up. What could you help me with today?', 'de'),
+        );
+        self::assertSame('de', ConfidentLanguage::preferText('wer bist du?', 'en'));
+        self::assertSame('de', ConfidentLanguage::preferText('ok', 'de'));
+    }
+
     public function testWithoutASignalThePinnedLanguageAnswersButNeverAnUnknownOne(): void
     {
         self::assertSame(

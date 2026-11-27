@@ -95,7 +95,7 @@ final class LanguageDirectiveBuilder
      * results and these instructions. A wrong `en` classification used to
      * emit "Respond in English" and lock a German conversation into English.
      */
-    private const MATCH_LATEST_MESSAGE = 'Respond in the same language the user writes in. Detect it from the latest user message and match it exactly. If they write in German, answer in German — even if earlier turns, search results, or these instructions are in English.';
+    private const MATCH_LATEST_MESSAGE = 'Respond in the same language as the latest user message. An English message gets an English answer and a German message gets a German answer, even when the interface, memories, earlier turns, search results, or these instructions are in the other language.';
 
     /**
      * Build a directive when the language is detected automatically per-message.
@@ -112,8 +112,8 @@ final class LanguageDirectiveBuilder
     /**
      * Build a directive when a specific language has been detected/selected.
      *
-     * The classified language is a hint, not a hard claim: a false `en`
-     * (UI-locale seed, sorter default) must not override a German message.
+     * The classified language is only the fallback: a clear message in
+     * another language wins, so a German interface does not answer English.
      * Accepts both ISO-639 codes ('de') and full names already resolved by
      * the caller; unknown codes fall back to the raw value, mirroring the
      * previous inline behaviour.
@@ -123,7 +123,7 @@ final class LanguageDirectiveBuilder
         $languageName = self::nameFor($language);
 
         return "\n\nLanguage: ".self::MATCH_LATEST_MESSAGE
-            ." The latest message looks like {$languageName}; prefer {$languageName} unless that message is clearly in another language.\n"
+            ." Only when that message has no clear language, answer in {$languageName}.\n"
             .self::ANTI_ECHO_CLAUSE;
     }
 
