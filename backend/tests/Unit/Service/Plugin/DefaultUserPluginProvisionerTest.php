@@ -75,14 +75,41 @@ final class DefaultUserPluginProvisionerTest extends TestCase
         $this->pluginManager->expects($this->never())
             ->method('installPlugin');
 
-        $this->logger->expects($this->once())
+        $seen = [];
+        $this->logger->expects($this->exactly(3))
             ->method('debug')
-            ->with(
-                $this->stringContains('plugin is not available'),
-                $this->callback(static fn (array $context): bool => 9 === $context['user_id'] && 'marketeer' === $context['plugin'])
-            );
+            ->willReturnCallback(static function (string $message, array $context) use (&$seen): void {
+                self::assertStringContainsString('not available', $message);
+                $seen[] = $context['plugin'];
+            });
 
         $service->provisionNewUser($user);
+
+        self::assertSame(['synaform', 'synamail', 'marketeer'], $seen);
+    }
+
+    public function testProvisionNewUserInstallsBundledPluginsWhenEnvListIsEmpty(): void
+    {
+        $user = $this->createUser(4);
+        $service = $this->createService([]);
+
+        $this->pluginManager->expects($this->once())
+            ->method('listAvailablePlugins')
+            ->willReturn([
+                new PluginManifest('synaform', '4.4.3', 'Forms'),
+                new PluginManifest('synamail', '1.0.0', 'Mail profiles'),
+            ]);
+
+        $installed = [];
+        $this->pluginManager->expects($this->exactly(2))
+            ->method('installPlugin')
+            ->willReturnCallback(static function (int $userId, string $pluginName) use (&$installed): void {
+                $installed[] = [$userId, $pluginName];
+            });
+
+        $service->provisionNewUser($user);
+
+        self::assertSame([[4, 'synaform'], [4, 'synamail']], $installed);
     }
 
     /**

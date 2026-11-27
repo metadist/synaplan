@@ -193,8 +193,7 @@ final readonly class PluginManager
             return;
         }
 
-        $pluginSlug = $this->slugify($pluginName);
-        $group = 'P_'.substr($pluginSlug, 0, 62);
+        $group = $this->configGroup($pluginName);
 
         $sqlFiles = glob($migrationsDir.'/*.sql');
         if (!$sqlFiles) {
@@ -219,6 +218,61 @@ final readonly class PluginManager
                 'group' => $group,
             ]);
         }
+    }
+
+    /**
+     * BCONFIG group for this plugin's per-user settings (`P_` plus the slug).
+     */
+    public function configGroup(string $pluginName): string
+    {
+        return 'P_'.substr($this->slugify($this->requireValidPluginName($pluginName)), 0, 62);
+    }
+
+    /**
+     * True when this user's install has the links `installPlugin()` creates.
+     *
+     * A directory alone is not enough. A restore that fails while linking
+     * leaves an empty or partial directory, and the `enabled` row from the
+     * previous install stays `1`. Treating that directory as installed would
+     * skip the repair forever. The sidebar lists plugins from this directory.
+     * The `enabled` row in BCONFIG is a separate gate and can be missing
+     * after the database is recreated while the files remain.
+     */
+    public function isInstalled(int $userId, string $pluginName): bool
+    {
+        $pluginName = $this->requireValidPluginName($pluginName);
+        $pluginPath = $this->pluginsDir.'/'.$pluginName;
+        $targetDir = $this->fileStorageService->getUserBaseAbsolutePath($userId).'/plugins/'.$pluginName;
+
+        if (!is_dir($pluginPath) || !is_dir($targetDir)) {
+            return false;
+        }
+
+        if (is_dir($pluginPath.'/backend') && !$this->linkResolvesTo($targetDir.'/backend', $pluginPath.'/backend')) {
+            return false;
+        }
+        if (is_dir($pluginPath.'/frontend') && !$this->linkResolvesTo($targetDir.'/frontend', $pluginPath.'/frontend')) {
+            return false;
+        }
+
+        $up = $targetDir.'/up';
+
+        return is_link($up) && is_dir($up);
+    }
+
+    /**
+     * The per-user link must be a symlink whose target is the central copy.
+     */
+    private function linkResolvesTo(string $link, string $expected): bool
+    {
+        if (!is_link($link)) {
+            return false;
+        }
+
+        $resolved = realpath($link);
+        $expectedPath = realpath($expected);
+
+        return false !== $resolved && false !== $expectedPath && $resolved === $expectedPath;
     }
 
     /**
