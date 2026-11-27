@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Credential;
 
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
@@ -106,13 +107,13 @@ final class HiggsfieldCredentialResolver
             $userId,
             self::CONFIG_GROUP,
             self::SETTING_API_KEY,
-            $this->encryption->encrypt($apiKey),
+            $this->encryption->encrypt($apiKey, SecretPlace::config($userId, self::CONFIG_GROUP, self::SETTING_API_KEY)),
         );
         $this->configRepository->setValue(
             $userId,
             self::CONFIG_GROUP,
             self::SETTING_API_SECRET,
-            $this->encryption->encrypt($apiSecret),
+            $this->encryption->encrypt($apiSecret, SecretPlace::config($userId, self::CONFIG_GROUP, self::SETTING_API_SECRET)),
         );
     }
 
@@ -167,8 +168,8 @@ final class HiggsfieldCredentialResolver
         }
 
         try {
-            $apiKey = $this->encryption->decrypt($keyCipher);
-            $apiSecret = $this->encryption->decrypt($secretCipher);
+            $apiKey = $this->encryption->decrypt($keyCipher, SecretPlace::config($userId, self::CONFIG_GROUP, self::SETTING_API_KEY));
+            $apiSecret = $this->encryption->decrypt($secretCipher, SecretPlace::config($userId, self::CONFIG_GROUP, self::SETTING_API_SECRET));
         } catch (\Throwable $e) {
             // A decrypt failure most often means APP_SECRET changed since the
             // value was written. Treat it as "not configured" rather than

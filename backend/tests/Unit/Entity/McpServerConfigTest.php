@@ -106,7 +106,7 @@ final class McpServerConfigTest extends TestCase
 
     private function bearer(string $url): McpServerConfig
     {
-        $server = (new McpServerConfig())->setUrl($url)->setAuthHeader('Authorization');
+        $server = (new McpServerConfig())->setUserId(7)->setUrl($url)->setAuthHeader('Authorization');
         $server->setDecryptedAuthToken('secret', $this->encryption);
 
         return $server;
@@ -114,7 +114,7 @@ final class McpServerConfigTest extends TestCase
 
     private function oauth(string $url): McpServerConfig
     {
-        $server = (new McpServerConfig())->setUrl($url)->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
+        $server = (new McpServerConfig())->setUserId(7)->setUrl($url)->setAuthMode(McpServerConfig::AUTH_MODE_OAUTH);
         $server->setDecryptedOAuthState(new McpOAuthState(
             resource: $url,
             authorizationEndpoint: 'https://mcp.example.com/authorize',

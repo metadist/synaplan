@@ -6,6 +6,7 @@ namespace App\AI\Credential;
 
 use App\AI\Catalog\ProviderCatalog;
 use App\AI\Catalog\ProviderDescriptor;
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
@@ -99,7 +100,7 @@ final class UserProviderKeyResolver
             $userId,
             self::CONFIG_GROUP,
             $provider,
-            $this->encryption->encrypt($apiKey),
+            $this->encryption->encrypt($apiKey, SecretPlace::config($userId, self::CONFIG_GROUP, $provider)),
         );
     }
 
@@ -133,7 +134,7 @@ final class UserProviderKeyResolver
         }
 
         try {
-            $key = $this->encryption->decrypt($cipher);
+            $key = $this->encryption->decrypt($cipher, SecretPlace::config($userId, self::CONFIG_GROUP, $provider));
         } catch (\Throwable $e) {
             $this->logger->error('UserProviderKeyResolver: decrypt failed, treating as unset', [
                 'user_id' => $userId,

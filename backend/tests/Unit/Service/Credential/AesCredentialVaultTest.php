@@ -70,7 +70,7 @@ final class AesCredentialVaultTest extends TestCase
         $this->repository->expects($this->once())->method('save');
 
         $this->vault->rotate(3, 7, 'new-secret');
-        $this->assertSame('new-secret', $this->encryption->decrypt($credential->getSecret()));
+        $this->assertSame('new-secret', $this->encryption->decrypt($credential->getSecret(), Credential::secretPlace(7)));
     }
 
     public function testForgetRemovesRow(): void

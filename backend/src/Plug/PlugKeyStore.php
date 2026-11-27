@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Plug;
 
 use App\AI\Credential\SecretValueGuard;
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
@@ -107,7 +108,7 @@ final class PlugKeyStore
         }
 
         $payload = json_encode(['key' => $key, 'origin' => $origin], JSON_THROW_ON_ERROR);
-        $this->configRepository->setValue(0, self::CONFIG_GROUP, $provider, $this->encryption->encrypt($payload));
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, $provider, $this->encryption->encrypt($payload, SecretPlace::config(0, self::CONFIG_GROUP, $provider)));
         unset($this->memo[$provider]);
 
         $this->logger->info('Plug API key saved', [
@@ -237,7 +238,7 @@ final class PlugKeyStore
         }
 
         try {
-            $decoded = json_decode($this->encryption->decrypt($cipher), true, 8, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($this->encryption->decrypt($cipher, SecretPlace::config(0, self::CONFIG_GROUP, $provider)), true, 8, JSON_THROW_ON_ERROR);
         } catch (\Throwable $e) {
             $this->logger->error('Plug API key decrypt failed, treating as not configured', [
                 'provider' => $provider,

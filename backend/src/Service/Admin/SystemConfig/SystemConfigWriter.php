@@ -6,6 +6,7 @@ namespace App\Service\Admin\SystemConfig;
 
 use App\AI\Credential\SecretValueGuard;
 use App\Bundle\BundleConfig;
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Agent\AgentConfig;
 use App\Service\Config\LayeredConfigResolver;
@@ -150,7 +151,7 @@ final readonly class SystemConfigWriter
         // Encrypted fields hold a real credential; clearing one means storing
         // an empty row, not an empty ciphertext nobody can distinguish.
         $stored = $field->isEncrypted() && '' !== $value
-            ? $this->encryption->encrypt($value)
+            ? $this->encryption->encrypt($value, SecretPlace::config(DatabaseRow::OWNER, $group, $setting))
             : $value;
 
         try {

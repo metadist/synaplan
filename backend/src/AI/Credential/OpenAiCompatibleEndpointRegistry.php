@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\AI\Credential;
 
 use App\AI\Import\ListedModelPrice;
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Repository\ModelRepository;
 use App\Service\Security\EncryptionService;
@@ -57,7 +58,7 @@ final class OpenAiCompatibleEndpointRegistry
     /** Env flag: refuse upstreams on private networks (hosted / multi-tenant installs). */
     public const ENV_PUBLIC_ONLY = 'OPENAI_COMPATIBLE_PUBLIC_UPSTREAMS_ONLY';
 
-    private const SETTING_PREFIX = 'endpoint.';
+    public const SETTING_PREFIX = 'endpoint.';
 
     private const NAME_PATTERN = '/^[a-z0-9][a-z0-9_-]{0,62}$/';
 
@@ -374,7 +375,8 @@ final class OpenAiCompatibleEndpointRegistry
         ];
 
         $json = json_encode($payload, JSON_THROW_ON_ERROR);
-        $this->configRepository->setValue(0, self::CONFIG_GROUP, self::SETTING_PREFIX.$name, $this->encryption->encrypt($json));
+        $setting = self::SETTING_PREFIX.$name;
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, $setting, $this->encryption->encrypt($json, SecretPlace::config(0, self::CONFIG_GROUP, $setting)));
 
         $this->logger->info('OpenAI-compatible endpoint saved', [
             'name' => $name,
@@ -462,7 +464,7 @@ final class OpenAiCompatibleEndpointRegistry
             }
 
             try {
-                $decoded = json_decode($this->encryption->decrypt($cipher), true, 512, JSON_THROW_ON_ERROR);
+                $decoded = json_decode($this->encryption->decrypt($cipher, SecretPlace::config(0, self::CONFIG_GROUP, $setting)), true, 512, JSON_THROW_ON_ERROR);
             } catch (\Throwable $e) {
                 // A decrypt/decode failure usually means APP_SECRET changed
                 // since the row was written. Skip it rather than break every

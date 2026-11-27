@@ -113,7 +113,7 @@ final readonly class McpOAuthConsentService
             status: $existing->status,
             supportsRefresh: $supportsRefresh,
         );
-        $encrypted = McpServerConfig::encryptOAuthState($state, $this->encryption);
+        $encrypted = McpServerConfig::encryptOAuthState($state, $this->encryption, $server->getUserId());
         if (!$this->servers->storeOAuthStateAt($server, $startUrl, $encrypted, startingSignIn: true)) {
             throw new McpOAuthException(self::ADDRESS_CHANGED, McpOAuthFailure::ServerChanged);
         }
@@ -203,7 +203,7 @@ final readonly class McpOAuthConsentService
         }
 
         // The exchange is a network call: an edit that landed meanwhile wins.
-        $encrypted = McpServerConfig::encryptOAuthState($updated, $this->encryption);
+        $encrypted = McpServerConfig::encryptOAuthState($updated, $this->encryption, $server->getUserId());
         if (!$this->servers->storeOAuthStateAt($server, $pending['server_url'], $encrypted)) {
             throw new McpOAuthException(self::ADDRESS_CHANGED, McpOAuthFailure::ServerChanged);
         }
