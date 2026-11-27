@@ -57,13 +57,20 @@ describe('MessageMemories', () => {
     expect(wrapper.find('[data-testid="btn-used-memory-delete"]').exists()).toBe(false)
   })
 
-  it('expands and selects the memory a pill names', async () => {
+  it('expands the memory this answer focuses', async () => {
     const wrapper = mountList()
-    window.dispatchEvent(new CustomEvent('memory-ref-clicked', { detail: { memoryId: 42 } }))
+    await wrapper.setProps({ memoryFocus: { id: 42, token: 1 } })
     await flushPromises()
 
     const row = wrapper.get('[data-testid="item-used-memory"]')
     expect(row.classes()).toContain('ring-brand')
     expect(wrapper.find('[data-testid="btn-used-memory-edit"]').exists()).toBe(true)
+  })
+
+  it('does not expand a memory this answer did not use', async () => {
+    const wrapper = mountList()
+    await wrapper.setProps({ memoryFocus: { id: 99, token: 1 } })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="item-used-memory"]').exists()).toBe(false)
   })
 })

@@ -467,6 +467,7 @@
             v-if="role === 'assistant' && memories"
             :memories="memories"
             :editable="!foreignMemory && !isGuestMode"
+            :memory-focus="memoryFocus"
             @click-memory="(memory) => emit('click-memory', memory)"
             @edit-memory="(memory) => emit('edit-memory', memory)"
             @delete-memory="(memory) => emit('delete-memory', memory)"
@@ -1112,7 +1113,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
+import {
+  ref,
+  computed,
+  watch,
+  onMounted,
+  onUnmounted,
+  nextTick,
+  provide,
+  defineAsyncComponent,
+} from 'vue'
 import { useRouter } from 'vue-router'
 import { TOOL_RESULT_MARKER } from '@/utils/apiToolTurn'
 import { useI18n } from 'vue-i18n'
@@ -1159,6 +1169,7 @@ import ResearchTurn from '@/components/research/ResearchTurn.vue'
 import { useResearchTurn } from '@/composables/useResearchTurn'
 import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'
 import MessageMemories from './MessageMemories.vue'
+import { focusUsedMemoryKey } from '@/components/chat/focusUsedMemory'
 import MessageFeedbacks from './MessageFeedbacks.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
@@ -1585,6 +1596,12 @@ const memories = computed(() => {
 
   return resolved.length > 0 ? resolved : null
 })
+
+const memoryFocus = ref<{ id: number; token: number } | null>(null)
+function focusUsedMemory(memoryId: number): void {
+  memoryFocus.value = { id: memoryId, token: (memoryFocus.value?.token ?? 0) + 1 }
+}
+provide(focusUsedMemoryKey, focusUsedMemory)
 
 const feedbacks = computed(() => {
   if (!props.feedbackIds || props.feedbackIds.length === 0) {

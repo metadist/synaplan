@@ -652,6 +652,7 @@
       :available-categories="availableMemoryCategories"
       @close="closeMemoryEditDialog"
       @save="handleMemoryEditSave"
+      @save-multiple="handleMemoryEasySave"
     />
 
     <MemoryDeleteDialog
@@ -814,6 +815,7 @@ import {
 } from '@/utils/messageMapper'
 import { chatErrorSuggestsOtherModel } from '@/utils/chatErrorDisplay'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import { applyParsedMemoryActions, type ParsedMemoryAction } from '@/utils/applyParsedMemoryActions'
 import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
 import MemoryToast from '@/components/MemoryToast.vue'
@@ -3939,6 +3941,20 @@ async function handleMemoryEditSave(memoryData: {
   } catch {
     // Store shows error notification
   }
+}
+
+async function handleMemoryEasySave(actions: ParsedMemoryAction[]): Promise<void> {
+  const { saved, failed } = await applyParsedMemoryActions(actions, memoriesStore)
+  if (saved > 0 && failed === 0) {
+    showSuccessToast(
+      saved === 1 ? t('memories.editSuccess') : t('memories.multipleSuccess', { count: saved })
+    )
+  } else if (saved > 0) {
+    notifyWarning(t('memories.multipleSuccess', { count: saved }))
+  } else if (failed > 0) {
+    showErrorToast(t('memories.editError'))
+  }
+  closeMemoryEditDialog()
 }
 
 // Opens the Memories page; browser Back returns to this chat.

@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue'
 import morphdom from 'morphdom'
 import { useI18n } from 'vue-i18n'
 import { useMarkdown } from '@/composables/useMarkdown'
@@ -52,6 +52,7 @@ import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
 import { completeInlineMarkdown } from '@/utils/partialMarkdown'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { renderDocRefPill, type PlatformDocRef } from '@/components/chat/refs/DocRefPill'
+import { focusUsedMemoryKey } from '@/components/chat/focusUsedMemory'
 
 interface Props {
   content: string
@@ -68,6 +69,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const focusUsedMemory = inject(focusUsedMemoryKey, null)
 const { t } = useI18n()
 const { render, renderAsync } = useMarkdown()
 const { theme } = useTheme()
@@ -418,10 +420,13 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
         props.memories?.find((m) => m.id === memoryId) ||
         memoriesStore.memories.find((m) => m.id === memoryId)
 
-      // A memory this answer used expands in the message, where it can be
-      // edited or deleted. Anything else opens that line on the Memories page.
+      // A memory this answer used expands only in this answer. Anything else
+      // opens that line on the Memories page.
       const listedOnMessage = (props.memories ?? []).some((entry) => entry.id === memoryId)
-      window.dispatchEvent(new CustomEvent('memory-ref-clicked', { detail: { memoryId } }))
+      if (listedOnMessage && focusUsedMemory) {
+        focusUsedMemory(memoryId)
+        return
+      }
       if (memory && !listedOnMessage) {
         window.dispatchEvent(new CustomEvent('open-memory-dialog', { detail: { memory } }))
       }

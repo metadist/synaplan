@@ -76,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
@@ -85,6 +85,8 @@ interface Props {
   memories: UserMemory[]
   /** Shared and guest chats can read the rows. They cannot change the owner's memories. */
   editable?: boolean
+  /** Set by the answer that owns the clicked memory pill. */
+  memoryFocus?: { id: number; token: number } | null
 }
 
 interface Emits {
@@ -95,6 +97,7 @@ interface Emits {
 
 const props = withDefaults(defineProps<Props>(), {
   editable: true,
+  memoryFocus: null,
 })
 const emit = defineEmits<Emits>()
 
@@ -121,42 +124,34 @@ const navigateToMemory = (memory: UserMemory) => {
   emit('click-memory', memory)
 }
 
-const MEMORY_REF_CLICKED = 'memory-ref-clicked'
+let highlightTimer: number | null = null
 
-// Listen for memory reference clicks from the message text
-const handleMemoryRefClick = (event: Event) => {
-  if (!(event instanceof CustomEvent)) return
-  const { memoryId } = event.detail as { memoryId: number }
-  const memoryIndex = props.memories.findIndex((m) => m.id === memoryId)
-  if (memoryIndex >= 0) {
-    highlightedMemory.value = memoryIndex
-
-    // Auto-expand if collapsed
-    if (!isExpanded.value) {
-      isExpanded.value = true
-    }
-
-    // Scroll to the memory after expansion
-    setTimeout(() => {
-      const memoryEl = memoryRefs.value[memoryIndex]
-      if (memoryEl) {
-        memoryEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
-    }, 300)
-
-    // Remove highlight after 2 seconds
-    setTimeout(() => {
-      highlightedMemory.value = null
-    }, 2000)
-  }
+function revealMemory(memoryId: number): void {
+  const memoryIndex = props.memories.findIndex((memory) => memory.id === memoryId)
+  if (memoryIndex < 0) return
+  highlightedMemory.value = memoryIndex
+  isExpanded.value = true
+  void nextTick(() => {
+    memoryRefs.value[memoryIndex]?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  })
+  if (highlightTimer !== null) window.clearTimeout(highlightTimer)
+  highlightTimer = window.setTimeout(() => {
+    highlightedMemory.value = null
+    highlightTimer = null
+  }, 2000)
 }
 
-onMounted(() => {
-  window.addEventListener(MEMORY_REF_CLICKED, handleMemoryRefClick as EventListener)
-})
+watch(
+  () => props.memoryFocus?.token,
+  () => {
+    const memoryId = props.memoryFocus?.id
+    if (memoryId == null) return
+    revealMemory(memoryId)
+  }
+)
 
 onUnmounted(() => {
-  window.removeEventListener(MEMORY_REF_CLICKED, handleMemoryRefClick as EventListener)
+  if (highlightTimer !== null) window.clearTimeout(highlightTimer)
 })
 </script>
 

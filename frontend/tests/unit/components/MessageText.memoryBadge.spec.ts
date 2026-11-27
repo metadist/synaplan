@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import MessageText from '@/components/MessageText.vue'
+import { focusUsedMemoryKey } from '@/components/chat/focusUsedMemory'
 import { useMemoriesStore } from '@/stores/userMemories'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 
@@ -22,37 +23,32 @@ function messageTextEl(wrapper: ReturnType<typeof mount>): HTMLElement {
 
 describe('MessageText memory badge click', () => {
   const opened: Array<{ memory: UserMemory }> = []
-  const expanded: Array<{ memoryId: number }> = []
+  const focus = vi.fn()
 
   function onOpen(event: Event) {
     opened.push((event as CustomEvent<{ memory: UserMemory }>).detail)
   }
 
-  function onExpand(event: Event) {
-    expanded.push((event as CustomEvent<{ memoryId: number }>).detail)
-  }
-
   beforeEach(() => {
     setActivePinia(createPinia())
     opened.length = 0
-    expanded.length = 0
+    focus.mockClear()
     useMemoriesStore().memories = [memory]
     window.addEventListener('open-memory-dialog', onOpen)
-    window.addEventListener('memory-ref-clicked', onExpand)
   })
 
   afterEach(() => {
     window.removeEventListener('open-memory-dialog', onOpen)
-    window.removeEventListener('memory-ref-clicked', onExpand)
     vi.restoreAllMocks()
   })
 
-  async function clickBadge(memories?: UserMemory[]) {
+  async function clickBadge(memories: UserMemory[] | undefined, withFocus: boolean) {
     const wrapper = mount(MessageText, {
       props: {
         content: 'You like [Memory:42].',
         memories,
       },
+      global: withFocus ? { provide: { [focusUsedMemoryKey as symbol]: focus } } : {},
     })
     await wrapper.vm.$nextTick()
     await flushPromises()
@@ -63,14 +59,14 @@ describe('MessageText memory badge click', () => {
   }
 
   it('expands a memory this answer used and stays in the chat', async () => {
-    await clickBadge([memory])
-    expect(expanded).toEqual([{ memoryId: 42 }])
+    await clickBadge([memory], true)
+    expect(focus).toHaveBeenCalledWith(42)
     expect(opened).toEqual([])
   })
 
   it('opens the memories page when the answer did not list that memory', async () => {
-    await clickBadge([])
-    expect(expanded).toEqual([{ memoryId: 42 }])
+    await clickBadge([], true)
+    expect(focus).not.toHaveBeenCalled()
     expect(opened).toEqual([{ memory }])
   })
 })
