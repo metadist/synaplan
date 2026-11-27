@@ -21,12 +21,6 @@ use App\Service\Usage\AiChatUsageMeter;
  */
 final readonly class ChatRequestOptions
 {
-    /**
-     * The live voice speaks this answer aloud while the person waits, so the
-     * whole reply has to be generated before a single word is heard.
-     */
-    private const LIVE_VOICE_MAX_TOKENS = 600;
-
     private const DEFAULT_TEMPERATURE = 0.7;
 
     public function __construct(
@@ -59,7 +53,6 @@ final readonly class ChatRequestOptions
         $aiOptions = self::withTokenCeiling($aiOptions, [
             $this->planMaxTokens($turn),
             $model->maxTokens(),
-            $turn->isLiveVoice() ? self::LIVE_VOICE_MAX_TOKENS : null,
         ]);
 
         return $this->tuned($aiOptions, $turn, $model, $options);

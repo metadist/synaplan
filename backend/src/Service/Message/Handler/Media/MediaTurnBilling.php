@@ -3,6 +3,7 @@
 namespace App\Service\Message\Handler\Media;
 
 use App\Entity\User;
+use App\Model\ImageTokenUsage;
 use App\Service\Media\RenderedImageSize;
 use App\Service\RateLimitService;
 use App\Service\Usage\RecordedUsage;
@@ -43,6 +44,8 @@ final readonly class MediaTurnBilling
             $mediaUsage['quality'] = $options['quality'] ?? ($request->references->isPic2Pic() ? 'high' : 'standard');
             $mediaUsage['size'] = RenderedImageSize::billingKey($media[0]['size'] ?? null)
                 ?? $options['size'] ?? '1024x1024';
+            // The tokens OpenAI reported bill the exact price of a GPT Image.
+            $mediaUsage += ImageTokenUsage::mediaUsageOf($media);
         } elseif ('video' === $request->mediaType) {
             $requestedDuration = $options['duration'] ?? $request->classification['duration'] ?? 8;
             $duration = $result['duration_seconds'] ?? null;

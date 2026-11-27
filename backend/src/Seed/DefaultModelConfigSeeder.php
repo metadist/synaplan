@@ -197,7 +197,7 @@ final readonly class DefaultModelConfigSeeder implements SeederInterface
      * restores exactly the same bindings that a fresh deployment receives.
      * Throws if any key cannot be resolved (catalog/binding mismatch).
      *
-     * @return array<string, int> e.g. ['CHAT' => 180, 'TOOLS' => 180, ...]
+     * @return array<string, int> e.g. ['CHAT' => 439, 'TOOLS' => 439, ...]
      */
     public static function getRecommendedDefaults(): array
     {

@@ -9,6 +9,7 @@ use App\AI\Pipeline\AiCall;
 use App\AI\Pipeline\AiCallResult;
 use App\AI\Pipeline\AiCapability;
 use App\AI\Vision\VisionReply;
+use App\Model\ImageTokenUsage;
 use App\Repository\ModelRepository;
 use App\Service\RateLimitService;
 
@@ -149,27 +150,7 @@ final readonly class AiUsageSpecBuilder
             $rawCost = 0.0;
             $priceKnown = true;
         } elseif ('per_token' !== $pricingMode && [] !== $mediaUsage) {
-            $inputQty = match ($pricingMode) {
-                'per_character' => (float) ($mediaUsage['characters'] ?? 0),
-                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
-                'per_request' => (float) ($mediaUsage['requests'] ?? 1),
-                default => 0.0,
-            };
-            $outputQty = match ($pricingMode) {
-                'per_image' => (float) ($mediaUsage['images'] ?? 0),
-                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
-                'per_generation' => (float) ($mediaUsage['clips'] ?? 1),
-                default => 0.0,
-            };
-            $costResult = $this->costCalculationService->calculateMediaCost(
-                $modelId,
-                $inputQty,
-                $outputQty,
-                $timestamp,
-                \is_string($mediaUsage['resolution'] ?? null) ? $mediaUsage['resolution'] : null,
-                \is_string($mediaUsage['quality'] ?? null) ? $mediaUsage['quality'] : null,
-                \is_string($mediaUsage['size'] ?? null) ? $mediaUsage['size'] : null,
-            );
+            $costResult = $this->costCalculationService->calculateMediaUsageCost($modelId, $pricingMode, $mediaUsage, $timestamp);
             $rawCost = (float) $costResult->totalCost;
             $priceKnown = false !== ($costResult->priceSnapshot['price_known'] ?? true);
         } else {
@@ -329,7 +310,7 @@ final readonly class AiUsageSpecBuilder
                     'images' => (float) \count($value),
                     'quality' => $opts['quality'] ?? 'standard',
                     'size' => $opts['size'] ?? '1024x1024',
-                ]),
+                ]) + ImageTokenUsage::mediaUsageOf($value),
             ];
             if (null !== $source) {
                 $metadata['source'] = $source;

@@ -397,43 +397,7 @@ final class RateLimitService implements ResetInterface
                 billedInputTokens: (int) $promptTokens,
             );
         } elseif ('per_token' !== $pricingMode && !empty($mediaUsage)) {
-            $inputQty = match ($pricingMode) {
-                'per_character' => (float) ($mediaUsage['characters'] ?? 0),
-                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
-                'per_request' => (float) ($mediaUsage['requests'] ?? 1),
-                default => 0.0,
-            };
-            $outputQty = match ($pricingMode) {
-                'per_image' => (float) ($mediaUsage['images'] ?? 0),
-                'per_second' => (float) ($mediaUsage['duration_seconds'] ?? 0),
-                // Flat per-clip billing (#1317): one generation = one clip.
-                // Providers that ever return a multi-clip batch can pass `clips`.
-                'per_generation' => (float) ($mediaUsage['clips'] ?? 1),
-                default => 0.0,
-            };
-
-            $resolution = isset($mediaUsage['resolution']) && is_string($mediaUsage['resolution'])
-                ? $mediaUsage['resolution']
-                : null;
-
-            // Image quality/size tier (gpt-image, #1315). Carried through so the
-            // exact per-image price is billed instead of a flat rate.
-            $quality = isset($mediaUsage['quality']) && is_string($mediaUsage['quality'])
-                ? $mediaUsage['quality']
-                : null;
-            $size = isset($mediaUsage['size']) && is_string($mediaUsage['size'])
-                ? $mediaUsage['size']
-                : null;
-
-            $costResult = $this->costCalculationService->calculateMediaCost(
-                $modelId,
-                $inputQty,
-                $outputQty,
-                $timestamp,
-                $resolution,
-                $quality,
-                $size,
-            );
+            $costResult = $this->costCalculationService->calculateMediaUsageCost($modelId, $pricingMode, $mediaUsage, $timestamp);
         } else {
             $costResult = $this->costCalculationService->calculateCost(
                 $promptTokens,

@@ -35,44 +35,44 @@ describe('resolveModelMix', () => {
   it('picks the first candidate the installation serves', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
       CHAT: [
-        model({ id: 251, service: 'OpenAI', providerId: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' }),
-        model({ id: 204, service: 'OpenAI', providerId: 'gpt-5.5', name: 'GPT-5.5' }),
+        model({ id: 439, service: 'OpenAI', providerId: 'gpt-6.2-sol', name: 'GPT-6.2 Sol' }),
+        model({ id: 381, service: 'OpenAI', providerId: 'gpt-6.1-sol', name: 'GPT-6.1 Sol' }),
       ],
     }
 
     const resolved = resolveModelMix(mixDefinition('openai'), models)
 
-    expect(resolved.defaults.CHAT).toBe(251)
+    expect(resolved.defaults.CHAT).toBe(439)
     expect(resolved.available).toBe(true)
   })
 
   it('falls back to a later candidate when the first is not offered', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
-      CHAT: [model({ id: 204, service: 'OpenAI', providerId: 'gpt-5.5', name: 'GPT-5.5' })],
+      CHAT: [model({ id: 381, service: 'OpenAI', providerId: 'gpt-6.1-sol', name: 'GPT-6.1 Sol' })],
     }
 
     const resolved = resolveModelMix(mixDefinition('openai'), models)
 
-    expect(resolved.defaults.CHAT).toBe(204)
+    expect(resolved.defaults.CHAT).toBe(381)
   })
 
   it('never resolves a model the backend marked unavailable', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
       CHAT: [
         model({
-          id: 251,
+          id: 439,
           service: 'OpenAI',
-          providerId: 'gpt-5.6-sol',
-          name: 'GPT-5.6 Sol',
+          providerId: 'gpt-6.2-sol',
+          name: 'GPT-6.2 Sol',
           available: false,
         }),
-        model({ id: 204, service: 'OpenAI', providerId: 'gpt-5.5', name: 'GPT-5.5' }),
+        model({ id: 381, service: 'OpenAI', providerId: 'gpt-6.1-sol', name: 'GPT-6.1 Sol' }),
       ],
     }
 
     const resolved = resolveModelMix(mixDefinition('openai'), models)
 
-    expect(resolved.defaults.CHAT).toBe(204)
+    expect(resolved.defaults.CHAT).toBe(381)
   })
 
   it('leaves capabilities the provider family cannot cover unset', () => {
@@ -103,22 +103,22 @@ describe('resolveModelMix', () => {
     expect(resolved.defaults.TEXT2PIC).toBeUndefined()
   })
 
-  it('prefers GPT Image 2.5 Flare over 1.5 when the installation serves both', () => {
+  it('keeps the shipped GPT Image 2.5 Flare default ahead of GPT Image 2.6 Flare', () => {
     const flare = model({
       id: 348,
       service: 'OpenAI',
       providerId: 'gpt-image-2.5-flare',
       name: 'GPT Image 2.5 Flare',
     })
-    const image15 = model({
-      id: 151,
+    const flare26 = model({
+      id: 457,
       service: 'OpenAI',
-      providerId: 'gpt-image-1.5',
-      name: 'gpt-image-1.5',
+      providerId: 'gpt-image-2.6-flare',
+      name: 'GPT Image 2.6 Flare',
     })
     const models: Partial<Record<Capability, AIModel[]>> = {
-      TEXT2PIC: [image15, flare],
-      PIC2PIC: [image15, flare],
+      TEXT2PIC: [flare26, flare],
+      PIC2PIC: [flare26, flare],
     }
 
     const resolved = resolveModelMix(mixDefinition('openai'), models)
@@ -127,10 +127,36 @@ describe('resolveModelMix', () => {
     expect(resolved.defaults.PIC2PIC).toBe(348)
   })
 
-  it('prefers GPT-6 Astra over GPT-5.6 Sol when the installation serves both', () => {
+  it('falls back to GPT Image 2.6 Flare and leaves the sound slot alone', () => {
+    const models: Partial<Record<Capability, AIModel[]>> = {
+      TEXT2PIC: [
+        model({
+          id: 457,
+          service: 'OpenAI',
+          providerId: 'gpt-image-2.6-flare',
+          name: 'GPT Image 2.6 Flare',
+        }),
+      ],
+      TEXT2SOUND: [
+        model({
+          id: 37,
+          service: 'Google',
+          providerId: 'gemini-2.5-flash-preview-tts',
+          name: 'Gemini TTS',
+        }),
+      ],
+    }
+
+    const resolved = resolveModelMix(mixDefinition('openai'), models)
+
+    expect(resolved.defaults.TEXT2PIC).toBe(457)
+    expect(resolved.defaults.TEXT2SOUND).toBeUndefined()
+  })
+
+  it('prefers GPT-6 Astra over GPT-6.2 Sol when the installation serves both', () => {
     const models: Partial<Record<Capability, AIModel[]>> = {
       CHAT: [
-        model({ id: 251, service: 'OpenAI', providerId: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' }),
+        model({ id: 439, service: 'OpenAI', providerId: 'gpt-6.2-sol', name: 'GPT-6.2 Sol' }),
         model({ id: 340, service: 'OpenAI', providerId: 'gpt-6-astra', name: 'GPT-6 Astra' }),
       ],
     }
@@ -188,7 +214,7 @@ describe('resolveModelMix', () => {
 
   it('marks a mix without a resolvable chat model as unavailable', () => {
     const resolved = resolveModelMix(mixDefinition('europe'), {
-      CHAT: [model({ id: 251, service: 'OpenAI', providerId: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' })],
+      CHAT: [model({ id: 439, service: 'OpenAI', providerId: 'gpt-6.2-sol', name: 'GPT-6.2 Sol' })],
     })
 
     expect(resolved.available).toBe(false)
@@ -306,7 +332,7 @@ describe('resolveModelMix', () => {
     expect(withA2.defaults.PIC2TEXT).toBe(366)
 
     const withoutA2 = resolveModelMix(mixDefinition('a2agent'), {
-      CHAT: [model({ id: 204, service: 'OpenAI', providerId: 'gpt-5.5', name: 'GPT-5.5' })],
+      CHAT: [model({ id: 381, service: 'OpenAI', providerId: 'gpt-6.1-sol', name: 'GPT-6.1 Sol' })],
     })
     expect(withoutA2.available).toBe(false)
   })

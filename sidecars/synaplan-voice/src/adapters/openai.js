@@ -94,7 +94,9 @@ export function createOpenAiAdapter({
         send({ type: 'session.thinking.append', delegation_id: payload.delegationId, content: payload.text })
         return
       }
-      send({ type: 'session.commentary.append', delegation_id: payload.delegationId, content: payload.text })
+      for (const content of commentaryChunks(payload.text)) {
+        send({ type: 'session.commentary.append', delegation_id: payload.delegationId, content })
+      }
     },
     async close() {
       const wait = Date.now() - lastInjectAt < 500 ? 500 - (Date.now() - lastInjectAt) : 0
@@ -170,7 +172,9 @@ export function createLiveSideband({ apiKey, url, WebSocketImpl = WebSocket } = 
         send({ type: 'session.thinking.append', delegation_id: payload.delegationId, content: payload.text })
         return
       }
-      send({ type: 'session.commentary.append', delegation_id: payload.delegationId, content: payload.text })
+      for (const content of commentaryChunks(payload.text)) {
+        send({ type: 'session.commentary.append', delegation_id: payload.delegationId, content })
+      }
     },
     async close() {
       const wait = Date.now() - lastInjectAt < 500 ? 500 - (Date.now() - lastInjectAt) : 0
@@ -202,16 +206,74 @@ export function applyLiveServerEvent(event, state, emit) {
     emit('delegate', { id: event.delegation.id, question: turns.text('user') || String(event.delegation.task ?? '') })
   }
   if (event.type === 'session.usage.updated') emit('usage', mapOpenAiUsage(event.usage))
+  if (event.type === 'session.paused') emit('standby', true)
+  if (event.type === 'session.resumed') emit('standby', false)
   if (event.type === 'session.interrupted') {
     turns.commit('assistant')
     emit('interrupted')
   }
-  if (event.type === 'error') emit('error', new Error('provider_error'))
+  if (event.type === 'error') emit('error', providerError(event.error))
   if (event.type === 'session.closed') {
     turns.commitAll()
     if (event.usage) emit('usage', mapOpenAiUsage(event.usage))
     emit('closed')
   }
+}
+
+/**
+ * OpenAI takes at most 500 tokens per commentary event and closes the
+ * session on a longer one. A full Synaplan answer goes out in pieces on the
+ * same delegation. Markdown, link targets and citation marks are not spoken.
+ */
+export const COMMENTARY_CHUNK_BYTES = 400
+
+export function commentaryChunks(text, maxBytes = COMMENTARY_CHUNK_BYTES) {
+  const spoken = String(text ?? '')
+    .replace(/!?\[([^\]]*)\]\([^)\s]+\)/g, '$1')
+    .replace(/\s*\[\d+(?:\s*,\s*\d+)*\](?:\s*,\s*\[\d+(?:\s*,\s*\d+)*\])*/g, '')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[*-]\s+/gm, '')
+    .replace(/[*_`]+/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ +([.,;:!?])/g, '$1')
+    .trim()
+  if (spoken === '') return ['']
+
+  const chunks = []
+  let current = ''
+  const append = (part) => {
+    const candidate = current === '' ? part : `${current} ${part}`
+    if (Buffer.byteLength(candidate, 'utf8') > maxBytes) {
+      chunks.push(current)
+      current = part
+    } else {
+      current = candidate
+    }
+  }
+
+  for (const piece of spoken.split(/(?<=[.!?:;\n])\s+/)) {
+    let part = ''
+    for (const character of piece) {
+      if (Buffer.byteLength(part + character, 'utf8') > maxBytes) {
+        append(part)
+        part = ''
+      }
+      part += character
+    }
+    if (part !== '') {
+      append(part)
+    }
+  }
+  if (current !== '') chunks.push(current)
+
+  return chunks
+}
+
+function providerError(detail = {}) {
+  const error = new Error('provider_error')
+  error.code = String(detail?.code ?? detail?.type ?? '')
+  error.detail = String(detail?.message ?? '').slice(0, 300)
+  return error
 }
 
 export function mapOpenAiUsage(usage = {}) {

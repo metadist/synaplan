@@ -4,7 +4,7 @@ import { WebSocketServer } from 'ws'
 import { compatibleHeaders, createCompatibleAdapter } from '../src/adapters/compatible.js'
 import { createGeminiAdapter } from '../src/adapters/gemini.js'
 import { adapterKind } from '../src/adapters/index.js'
-import { applyLiveServerEvent, createOpenAiAdapter, mapOpenAiUsage } from '../src/adapters/openai.js'
+import { applyLiveServerEvent, commentaryChunks, COMMENTARY_CHUNK_BYTES, createOpenAiAdapter, mapOpenAiUsage } from '../src/adapters/openai.js'
 import { createOpenAiRealtimeAdapter } from '../src/adapters/realtime.js'
 import { createXaiAdapter } from '../src/adapters/xai.js'
 import { mapGeminiUsage } from '../src/adapters/gemini.js'
@@ -340,3 +340,25 @@ async function waitFor(predicate) {
     await new Promise((resolve) => setTimeout(resolve, 15))
   }
 }
+
+test('a long GPT-Live answer goes out as several commentary events under the limit', () => {
+  const answer = 'Das Dokument **Änderungsauftrag.PDF** enthält eine Auftragsbestätigung [3], [4].\n### Positionen\n* Pos. 1: Geräteschrankumbau [13]. '.repeat(40)
+  const chunks = commentaryChunks(answer)
+
+  assert.ok(chunks.length > 1)
+  assert.ok(chunks.every((chunk) => Buffer.byteLength(chunk, 'utf8') <= COMMENTARY_CHUNK_BYTES))
+  assert.equal(chunks.join(' ').includes('**'), false)
+  assert.equal(/\[\d/.test(chunks.join(' ')), false)
+  assert.ok(chunks[0].startsWith('Das Dokument Änderungsauftrag.PDF enthält eine Auftragsbestätigung.'))
+  assert.deepEqual(commentaryChunks('Ja, ich bin da.'), ['Ja, ich bin da.'])
+  assert.deepEqual(commentaryChunks('Siehe [die Anleitung](https://example.com/a) [2].'), ['Siehe die Anleitung.'])
+})
+
+test('GPT-Live commentary chunks stay within the byte limit for dense Unicode', () => {
+  const answer = Array.from({ length: 1000 }, (_, index) => String.fromCodePoint(0x800 + index)).join('')
+  const chunks = commentaryChunks(answer)
+
+  assert.ok(chunks.length > 1)
+  assert.ok(chunks.every((chunk) => Buffer.byteLength(chunk, 'utf8') <= COMMENTARY_CHUNK_BYTES))
+  assert.equal(chunks.join('').replaceAll(' ', ''), answer)
+})

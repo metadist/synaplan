@@ -691,7 +691,8 @@ class ChatHandlerTest extends TestCase
         $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification, null, ['source' => 'live_voice']);
         $this->handler->handle($this->plainMessage('Wie spät ist es?'), [], $classification);
 
-        $this->assertSame(600, $calls[0]['options']['max_tokens'] ?? null);
+        // The prompt keeps it short; the output limit is the same as typed chat.
+        $this->assertArrayNotHasKey('max_tokens', $calls[0]['options']);
         $this->assertStringContainsString('spoken aloud', (string) $calls[0]['messages'][0]['content']);
         $this->assertArrayNotHasKey('max_tokens', $calls[1]['options']);
         $this->assertStringNotContainsString('spoken aloud', (string) json_encode($calls[1]['messages']));
@@ -723,6 +724,40 @@ class ChatHandlerTest extends TestCase
         $this->assertIsArray($seen);
         $this->assertNotSame(600, $seen['options']['max_tokens'] ?? null);
         $this->assertStringNotContainsString('spoken aloud', (string) json_encode($seen['messages']));
+    }
+
+    public function testASpokenQuestionToAThinkingModelKeepsTheFullOutputLimitAndItsOwnLevel(): void
+    {
+        $this->promptRepository->method('findOneBy')->willReturn(null);
+        $this->modelConfigService->method('getDefaultModel')->willReturn(40);
+        $this->modelConfigService->method('getProviderForModel')->willReturn('google');
+        $this->modelConfigService->method('getModelName')->willReturn('gemini-4-neon');
+
+        $model = $this->createMock(Model::class);
+        $model->method('getService')->willReturn('Google');
+        $model->method('getProviderId')->willReturn('gemini-4-neon');
+        $model->method('getFeatures')->willReturn(['reasoning']);
+        $model->method('getMaxTokens')->willReturn(65536);
+        $model->method('getJson')->willReturn(['meta' => ['reasoning_effort_default' => 'high']]);
+        $this->modelRepository->method('find')->willReturn($model);
+
+        $seen = null;
+        $this->aiFacade
+            ->expects($this->once())
+            ->method('chat')
+            ->willReturnCallback(function (array $messages, ?int $userId, array $options) use (&$seen): array {
+                $seen = $options;
+
+                return ['content' => 'Fine.', 'provider' => 'google', 'model' => 'gemini-4-neon'];
+            });
+
+        $this->handler->handle($this->plainMessage('Was steht im Dokument?'), [], ['topic' => 'CHAT', 'language' => 'de'], null, ['source' => 'live_voice']);
+
+        $this->assertIsArray($seen);
+        // Thinking counts against the output limit, so a spoken answer gets the
+        // model's full limit, and the level is the one typed chat would use.
+        $this->assertSame(65536, $seen['max_tokens'] ?? null);
+        $this->assertArrayNotHasKey('reasoning_effort', $seen);
     }
 
     public function testHandleStripsALeadingEchoedTimestamp(): void

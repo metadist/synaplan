@@ -1088,20 +1088,20 @@ class SyncModelPricesCommandTest extends TestCase
 
     public function testLongContextTierPriceMismatchIsDetected(): void
     {
-        // gpt-5.4 has CONTEXT_PRICING: above 272k in=5.0. LiteLLM says 4.0 → drift.
-        $model = $this->createModelMock('OpenAI', 'gpt-5.4', 2.5, 15.0, id: 250, json: [
-            'cache_read_price_per_1M' => 0.25,
+        // gpt-6.2-sol has CONTEXT_PRICING: above 272k in=4.0. LiteLLM says 3.0 → drift.
+        $model = $this->createModelMock('OpenAI', 'gpt-6.2-sol', 2.0, 10.0, id: 250, json: [
+            'cache_read_price_per_1M' => 0.10,
         ]);
 
         $this->mockLiteLLMResponse([
-            'gpt-5.4' => [
+            'gpt-6.2-sol' => [
                 'mode' => 'chat',
-                'input_cost_per_token' => 0.0000025,
-                'output_cost_per_token' => 0.000015,
-                'cache_read_input_token_cost' => 0.00000025,
-                'input_cost_per_token_above_272k_tokens' => 0.000004,
-                'output_cost_per_token_above_272k_tokens' => 0.0000225,
-                'cache_read_input_token_cost_above_272k_tokens' => 0.0000005,
+                'input_cost_per_token' => 0.000002,
+                'output_cost_per_token' => 0.00001,
+                'cache_read_input_token_cost' => 0.0000001,
+                'input_cost_per_token_above_272k_tokens' => 0.000003,
+                'output_cost_per_token_above_272k_tokens' => 0.000015,
+                'cache_read_input_token_cost_above_272k_tokens' => 0.0000002,
             ],
         ]);
 
@@ -1113,7 +1113,7 @@ class SyncModelPricesCommandTest extends TestCase
         $this->commandTester->execute(['--dry-run' => true, '--fail-on-drift' => true]);
 
         $this->assertSame(2, $this->commandTester->getStatusCode());
-        $this->assertStringContainsString('long-context in (above_272k_tokens): catalog 5.000000 vs litellm 4.000000', $this->commandTester->getDisplay());
+        $this->assertStringContainsString('long-context in (above_272k_tokens): catalog 4.000000 vs litellm 3.000000', $this->commandTester->getDisplay());
     }
 
     public function testMissingLongContextTierIsDrift(): void
@@ -1170,16 +1170,16 @@ class SyncModelPricesCommandTest extends TestCase
 
     public function testCatalogTierWithoutLiteLLMTierIsNotDrift(): void
     {
-        $model = $this->createModelMock('OpenAI', 'gpt-5.4', 2.5, 15.0, id: 250, json: [
-            'cache_read_price_per_1M' => 0.25,
+        $model = $this->createModelMock('OpenAI', 'gpt-6.2-sol', 2.0, 10.0, id: 250, json: [
+            'cache_read_price_per_1M' => 0.10,
         ]);
 
         $this->mockLiteLLMResponse([
-            'gpt-5.4' => [
+            'gpt-6.2-sol' => [
                 'mode' => 'chat',
-                'input_cost_per_token' => 0.0000025,
-                'output_cost_per_token' => 0.000015,
-                'cache_read_input_token_cost' => 0.00000025,
+                'input_cost_per_token' => 0.000002,
+                'output_cost_per_token' => 0.00001,
+                'cache_read_input_token_cost' => 0.0000001,
                 // No above_272k fields — catalog tier LiteLLM lacks is informational only.
             ],
         ]);

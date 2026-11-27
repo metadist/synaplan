@@ -459,18 +459,18 @@ class ModelCatalogTest extends TestCase
 
     public function testFindBidByKeyResolvesUniqueMatch(): void
     {
-        $bid = ModelCatalog::findBidByKey('openai:gpt-5.4:chat');
+        $bid = ModelCatalog::findBidByKey('openai:gpt-6.2-sol:chat');
 
         $this->assertNotNull($bid);
-        $found = ModelCatalog::find('openai:gpt-5.4:chat');
+        $found = ModelCatalog::find('openai:gpt-6.2-sol:chat');
         $this->assertSame((int) $found[0]['id'], $bid);
     }
 
     public function testFindBidByKeyReturnsNullForAmbiguousKey(): void
     {
-        // Bare service:providerId for openai:gpt-5.4 matches both chat + pic2text variants,
+        // Bare service:providerId for openai:gpt-6.2-sol matches both chat + pic2text variants,
         // so it intentionally cannot resolve to a single BID — callers must add the tag suffix.
-        $this->assertNull(ModelCatalog::findBidByKey('openai:gpt-5.4'));
+        $this->assertNull(ModelCatalog::findBidByKey('openai:gpt-6.2-sol'));
     }
 
     public function testFindBidByKeyReturnsNullForUnknownKey(): void
@@ -578,6 +578,69 @@ class ModelCatalogTest extends TestCase
         $this->assertEqualsWithDelta(4.0, $tier['price_in_above'], 1e-9);
         $this->assertEqualsWithDelta(15.0, $tier['price_out_above'], 1e-9);
         $this->assertEqualsWithDelta(0.20, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * GPT-6.1 Terra — $1/$5 per 1M, cached input $0.05 (0.05x), and the same
+     * 272k long-context tier as the rest of GPT-6.1.
+     */
+    public function testGpt61TerraModelsAreAvailableWithExpectedApiIds(): void
+    {
+        $terra = ModelCatalog::find('openai:gpt-6.1-terra');
+
+        $this->assertCount(2, $terra, 'Expected gpt-6.1-terra chat + vision variants');
+        $this->assertSame(['chat', 'pic2text'], array_column($terra, 'tag'));
+        $this->assertSame(455, ModelCatalog::findBidByKey('openai:gpt-6.1-terra:chat'));
+        $this->assertSame(456, ModelCatalog::findBidByKey('openai:gpt-6.1-terra:pic2text'));
+
+        foreach ($terra as $variant) {
+            $this->assertSame('OpenAI', $variant['service']);
+            $this->assertSame('gpt-6.1-terra', $variant['json']['params']['model'] ?? null);
+            $this->assertEqualsWithDelta(1.0, (float) $variant['priceIn'], 1e-9);
+            $this->assertEqualsWithDelta(5.0, (float) $variant['priceOut'], 1e-9);
+            $this->assertEqualsWithDelta(0.05, (float) ($variant['json']['cache_read_price_per_1M'] ?? 0.0), 1e-9);
+            $this->assertSame('responses', $variant['json']['meta']['api'] ?? null);
+        }
+
+        $tier = ModelCatalog::contextPricing('gpt-6.1-terra');
+        $this->assertNotNull($tier);
+        $this->assertSame(272000, $tier['threshold_tokens']);
+        $this->assertEqualsWithDelta(2.0, $tier['price_in_above'], 1e-9);
+        $this->assertEqualsWithDelta(7.5, $tier['price_out_above'], 1e-9);
+        $this->assertEqualsWithDelta(0.10, $tier['cache_price_in_above'] ?? 0.0, 1e-9);
+    }
+
+    /**
+     * GPT Image 2.6, GPT-Live 1.1 and GPT Transcribe join the catalog as
+     * plain rows of capabilities that already exist, each on its own BID.
+     */
+    public function testNewOpenAiImageVoiceAndTranscriptionRowsAreSelectable(): void
+    {
+        $expected = [
+            'openai:gpt-image-2.6-flare:text2pic' => 457,
+            'openai:gpt-image-2.6-sunburst:text2pic' => 458,
+            'openai:gpt-live-1.1:voice2voice' => 459,
+            'openai:gpt-transcribe:sound2text' => 454,
+        ];
+
+        foreach ($expected as $key => $bid) {
+            $this->assertSame($bid, ModelCatalog::findBidByKey($key), $key);
+            $row = ModelCatalog::find($key)[0];
+            $this->assertSame(1, $row['active'], $key);
+            $this->assertSame(1, $row['selectable'], $key);
+            $this->assertFalse(ModelCatalog::isRetired($bid), $key);
+        }
+
+        foreach (['gpt-image-2.6-flare', 'gpt-image-2.6-sunburst'] as $image) {
+            $row = ModelCatalog::find('openai:'.$image.':text2pic')[0];
+            $this->assertSame('per_image', $row['json']['pricing_mode'] ?? null);
+            $this->assertSame(['low', 'medium', 'high', 'xhigh', 'max'], array_keys($row['json']['quality_prices'] ?? []));
+        }
+
+        $transcribe = ModelCatalog::find('openai:gpt-transcribe:sound2text')[0];
+        $this->assertSame('per_second', $transcribe['json']['pricing_mode'] ?? null);
+        $this->assertEqualsWithDelta(0.0045, (float) $transcribe['priceIn'], 1e-9);
+        $this->assertSame('permin', $transcribe['inUnit']);
     }
 
     /**
@@ -742,16 +805,10 @@ class ModelCatalogTest extends TestCase
             'gpt-6-astra' => ['openai:gpt-6-astra', 1.00],
             'gpt-6-sol' => ['openai:gpt-6-sol', 0.20],
             'gpt-6.1-sol' => ['openai:gpt-6.1-sol', 0.10],
+            'gpt-6.1-terra' => ['openai:gpt-6.1-terra', 0.05],
             'gpt-6.2-astra' => ['openai:gpt-6.2-astra', 0.40],
             'gpt-6.2-sol' => ['openai:gpt-6.2-sol', 0.10],
             'gpt-6-luna' => ['openai:gpt-6-luna', 0.01],
-            'gpt-5.6-sol' => ['openai:gpt-5.6-sol', 0.40],
-            'gpt-5.6-terra' => ['openai:gpt-5.6-terra', 0.20],
-            'gpt-5.6-luna' => ['openai:gpt-5.6-luna', 0.02],
-            'gpt-5.5' => ['openai:gpt-5.5', 0.50],
-            'gpt-5.4' => ['openai:gpt-5.4', 0.25],
-            'gpt-5.4-mini' => ['openai:gpt-5.4-mini', 0.075],
-            'gpt-5.4-nano' => ['openai:gpt-5.4-nano', 0.02],
             'gemini-2.5-pro' => ['google:gemini-2.5-pro', 0.125],
             'gemini-3.1-pro' => ['google:gemini-3.1-pro-preview', 0.20],
             'gemini-2.5-flash' => ['google:gemini-2.5-flash', 0.03],
@@ -797,8 +854,8 @@ class ModelCatalogTest extends TestCase
      * Both halves are required. A tiered row that authors no base cache rate
      * silently falls back to the 50% default discount, and a tier that omits
      * `cache_price_in_above` keeps charging the short-context cache rate on a
-     * long-context request. Models without a cached-input discount (gpt-5.5-pro)
-     * satisfy this by stating their plain input rate on both sides.
+     * long-context request. A model without a cached-input discount satisfies
+     * this by stating its plain input rate on both sides.
      */
     public function testLongContextTiersDoubleTheCachedInputRate(): void
     {
@@ -840,39 +897,13 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * gpt-5.5-pro is the one catalog model OpenAI ships without a cached-input
-     * discount. "No discount" is expressed as the FULL input rate on every row
-     * and at the long-context tier, never as a missing key: an absent rate hands
-     * billing to CostCalculationService's 50% fallback, which would halve the
-     * bill on any payload that reports cached tokens.
-     */
-    public function testGpt55ProAuthorsCachedInputAtTheFullRate(): void
-    {
-        $rows = ModelCatalog::find('openai:gpt-5.5-pro');
-        $this->assertCount(2, $rows, 'Expected gpt-5.5-pro chat + vision variants');
-
-        foreach ($rows as $row) {
-            $this->assertEqualsWithDelta(
-                (float) $row['priceIn'],
-                (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0),
-                1e-9,
-                sprintf('gpt-5.5-pro (%s) must bill cached tokens at the plain input rate', $row['tag']),
-            );
-        }
-
-        $tier = ModelCatalog::contextPricing('gpt-5.5-pro');
-        $this->assertNotNull($tier);
-        $this->assertEqualsWithDelta($tier['price_in_above'], $tier['cache_price_in_above'] ?? 0.0, 1e-9);
-    }
-
-    /**
      * The 1.25x cache-write charge starts with GPT-5.6; GPT-5.5 and earlier incur
      * "no additional cache-write charge". Authoring the multiplier on the wrong
      * row silently over-bills, so pin which rows carry it.
      */
     public function testCacheWriteMultiplierIsAuthoredOnlyForChargingFamilies(): void
     {
-        $charging = ['gpt-6-astra', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
+        $charging = ['gpt-6-astra', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-luna'];
 
         foreach (ModelCatalog::all() as $row) {
             $authored = $row['json']['cache_write_multiplier'] ?? null;
@@ -891,27 +922,6 @@ class ModelCatalogTest extends TestCase
                 $row['providerId'],
                 $row['tag'],
             ));
-        }
-    }
-
-    public function testGpt55ModelsAreAvailableWithExpectedApiIds(): void
-    {
-        $gpt55 = ModelCatalog::find('openai:gpt-5.5');
-        $gpt55Pro = ModelCatalog::find('openai:gpt-5.5-pro');
-
-        $this->assertCount(2, $gpt55, 'Expected gpt-5.5 chat + vision variants');
-        $this->assertCount(2, $gpt55Pro, 'Expected gpt-5.5-pro chat + vision variants');
-        $this->assertSame(['chat', 'pic2text'], array_column($gpt55, 'tag'));
-        $this->assertSame(['chat', 'pic2text'], array_column($gpt55Pro, 'tag'));
-
-        // Both variants of each family must talk to the same upstream OpenAI model id.
-        foreach ($gpt55 as $variant) {
-            $this->assertSame('gpt-5.5', $variant['providerId']);
-            $this->assertSame('gpt-5.5', $variant['json']['params']['model'] ?? null);
-        }
-        foreach ($gpt55Pro as $variant) {
-            $this->assertSame('gpt-5.5-pro', $variant['providerId']);
-            $this->assertSame('gpt-5.5-pro', $variant['json']['params']['model'] ?? null);
         }
     }
 
@@ -1653,15 +1663,6 @@ class ModelCatalogTest extends TestCase
         }
     }
 
-    public function testGpt55ProModelsAreMarkedAsNonStreaming(): void
-    {
-        $chat = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
-        $vision = ModelCatalog::find('openai:gpt-5.5-pro:pic2text')[0];
-
-        $this->assertFalse($chat['json']['supportsStreaming']);
-        $this->assertFalse($vision['json']['supportsStreaming']);
-    }
-
     /**
      * A non-zero price authored under a unit that normalises to 0 is silently free:
      * `normaliseToPerUnit()` maps '-', '' and 'free' to 0.0, so the price is stored,
@@ -1824,41 +1825,19 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * Regression test for issue #886b: TTS models that the upstream
-     * provider bills as a flat per-character fee MUST set
-     * `pricing_mode: per_character` so the media-cost path runs. Live
-     * prod BMODELS confirms exactly two such rows in the current catalog
-     * — OpenAI tts-1 (BID 41) and tts-1-hd (BID 83). Google Gemini 2.5
-     * Flash TTS bills as tokens (per_token default); Piper is operator-
-     * hosted with an effectively free price.
-     *
-     * Pinning the explicit allow-list here (rather than "every text2sound")
-     * stops a future contributor from blanket-flagging providers whose
-     * upstream billing is actually token-based — which would re-introduce
-     * the catastrophic-overbill class of bug Copilot flagged on PR #933.
+     * OpenAI has no /v1/audio/speech model left once tts-1 and tts-1-hd shut
+     * down on 2027-01-06. Both rows left the catalog; their retirements send a
+     * stored binding to the shipped TEXT2SOUND default rather than to nothing.
      */
-    public function testOpenAiTtsModelsHavePerCharacterPricingMode(): void
+    public function testOpenAiTtsRowsAreRetiredToTheShippedTextToSpeechDefault(): void
     {
-        $expected = [
-            'tts-1' => 0.000015,
-            'tts-1-hd' => 0.00003,
-        ];
+        $gemini = ModelCatalog::findBidByKey('google:gemini-2.5-flash-preview-tts:text2sound');
+        $this->assertNotNull($gemini);
 
-        foreach ($expected as $providerId => $expectedPriceIn) {
-            $rows = array_values(array_filter(
-                ModelCatalog::all(),
-                static fn (array $m): bool => $providerId === ($m['providerId'] ?? null),
-            ));
-
-            $this->assertCount(1, $rows, sprintf('Catalog must contain exactly one %s entry.', $providerId));
-            $this->assertSame('per_character', $rows[0]['json']['pricing_mode'] ?? null);
-            $this->assertSame('perChar', $rows[0]['inUnit'] ?? null);
-            $this->assertEqualsWithDelta(
-                $expectedPriceIn,
-                (float) ($rows[0]['priceIn'] ?? 0.0),
-                1e-9,
-                sprintf('%s priceIn must be authored per-character (matches live BMODELS).', $providerId),
-            );
+        foreach ([41 => 'tts-1', 83 => 'tts-1-hd'] as $bid => $providerId) {
+            $this->assertSame([], ModelCatalog::find('openai:'.$providerId), $providerId.' must have left the catalog');
+            $this->assertSame($providerId, ModelCatalog::retirement($bid)['providerId'] ?? null);
+            $this->assertSame($gemini, ModelCatalog::successorBid($bid));
         }
     }
 

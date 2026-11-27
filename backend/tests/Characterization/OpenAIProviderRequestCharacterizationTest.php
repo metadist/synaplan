@@ -14,7 +14,6 @@ use App\Tests\Characterization\Support\OpenAIFixtures;
 use App\Tests\Characterization\Support\OpenAISdkRecorder;
 use App\Tests\Characterization\Support\ProviderHttpRecorder;
 use GuzzleHttp\Psr7\Response;
-use OpenAI\Responses\Audio\TranscriptionResponse;
 use OpenAI\Responses\Audio\TranslationResponse;
 use OpenAI\Responses\Chat\CreateResponse as ChatResponse;
 use OpenAI\Responses\Embeddings\CreateResponse as EmbeddingResponse;
@@ -387,11 +386,11 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
     {
         return [
             'speech.transcribe' => [
-                'sdk' => [OpenAIFixtures::json(TranscriptionResponse::fake(['task' => 'transcribe', 'language' => 'german', 'duration' => 2.5, 'text' => 'Hallo Welt', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
+                'http' => [new MockResponse((string) json_encode(['text' => 'Hallo Welt', 'language' => 'german', 'usage' => ['type' => 'duration', 'seconds' => 2.5]]))],
                 'call' => static fn (OpenAIProvider $p): array => $p->transcribe('voice.mp3', ['language' => 'de']),
             ],
             'speech.transcribe_absolute_path' => [
-                'sdk' => [OpenAIFixtures::json(TranscriptionResponse::fake(['task' => 'transcribe', 'language' => 'english', 'duration' => 1.0, 'text' => 'Hello', 'segments' => []], null, OverrideStrategy::Replace)->toArray())],
+                'http' => [new MockResponse((string) json_encode(['text' => 'Hello', 'duration' => 1.0]))],
                 'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): array => $p->transcribe($uploads.'/voice.mp3', ['model' => 'gpt-4o-transcribe']),
             ],
             'speech.transcribe_missing_file' => [
@@ -407,19 +406,19 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
             ],
             'speech.synthesize_error' => [
                 'sdk' => [OpenAIFixtures::error(401, 'Incorrect API key provided.', 'invalid_request_error', 'invalid_api_key')],
-                'call' => static fn (OpenAIProvider $p): string => $p->synthesize('Hallo Welt'),
+                'call' => static fn (OpenAIProvider $p): string => $p->synthesize('Hallo Welt', ['model' => 'tts-1']),
             ],
             'speech.synthesize_stream' => [
                 'http' => [new MockResponse(['ID3-', 'streamed'], ['response_headers' => ['content-type' => 'audio/mpeg']])],
-                'call' => static fn (OpenAIProvider $p): array => iterator_to_array($p->synthesizeStream('Hallo Welt', ['voice' => 'echo', 'format' => 'aac']), false),
+                'call' => static fn (OpenAIProvider $p): array => iterator_to_array($p->synthesizeStream('Hallo Welt', ['voice' => 'echo', 'format' => 'aac', 'model' => 'tts-1']), false),
             ],
             'speech.synthesize_stream_error' => [
                 'http' => [new MockResponse((string) json_encode(['error' => ['message' => 'Incorrect API key provided.']]), ['http_code' => 401, 'response_headers' => ['content-type' => 'application/json']])],
-                'call' => static fn (OpenAIProvider $p): array => iterator_to_array($p->synthesizeStream('Hallo Welt'), false),
+                'call' => static fn (OpenAIProvider $p): array => iterator_to_array($p->synthesizeStream('Hallo Welt', ['model' => 'tts-1']), false),
             ],
             'speech.no_key' => [
                 'provider' => 'none',
-                'call' => static fn (OpenAIProvider $p): array => iterator_to_array($p->synthesizeStream('Hallo Welt'), false),
+                'call' => static fn (OpenAIProvider $p): array => iterator_to_array($p->synthesizeStream('Hallo Welt', ['model' => 'tts-1']), false),
             ],
         ];
     }

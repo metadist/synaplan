@@ -1055,6 +1055,42 @@ class CostCalculationServiceTest extends TestCase
         $this->assertSame('0.050000', $result->totalCost);
     }
 
+    public function testGptLiveBillsStandbySecondsAtTheStandbyRate(): void
+    {
+        $model = $this->createModelMock('OpenAI', 0.05, 0.0, 'permin', '-', [
+            'pricing_mode' => 'per_second',
+            'standby_price_in' => 0.02,
+        ]);
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        // OpenAI reports the active seconds only; standby comes on top.
+        // 60 s active at $0.05/min + 120 s standby at $0.02/min.
+        $result = $this->service->calculateVoiceLiveCost(389, new VoiceLiveMeter(seconds: 60, standbySeconds: 120));
+
+        $this->assertSame('0.090000', $result->totalCost);
+        $this->assertSame(120.0, $result->priceSnapshot['standby_seconds']);
+        // A measured session: 88 s active, 36 s paused.
+        $this->assertSame('0.085333', $this->service->calculateVoiceLiveCost(389, new VoiceLiveMeter(seconds: 88, standbySeconds: 36))->totalCost);
+    }
+
+    public function testStandbyWithoutAStandbyRateBillsTheActiveRate(): void
+    {
+        $model = $this->createModelMock('OpenAI', 0.05, 0.0, 'permin', '-', [
+            'pricing_mode' => 'per_second',
+        ]);
+        // @phpstan-ignore-next-line
+        $this->modelRepository->method('find')->willReturn($model);
+        // @phpstan-ignore-next-line
+        $this->priceHistoryRepository->method('findPriceAtTimestamp')->willReturn(null);
+
+        $result = $this->service->calculateVoiceLiveCost(389, new VoiceLiveMeter(seconds: 60, standbySeconds: 30));
+
+        $this->assertSame('0.075000', $result->totalCost);
+    }
+
     #[\PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations]
     public function testVoiceLivePerSecondAddsTextItems(): void
     {

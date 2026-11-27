@@ -190,6 +190,28 @@ final class VoiceLiveUsageServiceIntegrationTest extends KernelTestCase
         return new VoiceLiveUsageService($em, $sessions, $costs, $limits, $gate, $config);
     }
 
+    public function testStandbySecondsOfAWebrtcSessionAreBilledAtTheStandbyRate(): void
+    {
+        self::bootKernel();
+        $em = static::getContainer()->get('doctrine')->getManager();
+        \assert($em instanceof EntityManagerInterface);
+
+        $usage = $this->usage($em);
+        $session = $usage->open($this->user($em, 'live-voice-standby-'.uniqid('', true).'@synaplan.internal'), $this->model($em), null, 'web', false, 'webrtc');
+        $usage->tick($session, new VoiceLiveMeter(seconds: 60, standbySeconds: 60), 0);
+        // A later tick that reports less standby never lowers what was metered.
+        $usage->tick($session, new VoiceLiveMeter(seconds: 60, standbySeconds: 30), 0);
+
+        $meta = json_decode((string) $em->getConnection()->fetchOne(
+            'SELECT BMETADATA FROM BUSELOG WHERE BID = :id',
+            ['id' => $session->getUseLogId()],
+        ), true);
+        self::assertIsArray($meta);
+        // 60 s active at $0.05/min + 60 s standby at $0.02/min.
+        self::assertSame('0.070000', $meta['voice_cost']);
+        self::assertEquals(60.0, $meta['voice_meter']['standby_seconds']);
+    }
+
     public function testOpenStoresDirectTransportWhenAsked(): void
     {
         self::bootKernel();
@@ -230,8 +252,12 @@ final class VoiceLiveUsageServiceIntegrationTest extends KernelTestCase
 
     private function model(EntityManagerInterface $em): Model
     {
+        $json = ['pricing_mode' => 'per_second', 'standby_price_in' => 0.02];
         $existing = $em->getRepository(Model::class)->findOneBy(['providerId' => 'gpt-live-test']);
         if ($existing instanceof Model) {
+            $existing->setJson($json);
+            $em->flush();
+
             return $existing;
         }
 
@@ -248,7 +274,7 @@ final class VoiceLiveUsageServiceIntegrationTest extends KernelTestCase
             ->setOutUnit('-')
             ->setQuality(9)
             ->setRating(1)
-            ->setJson(['pricing_mode' => 'per_second']);
+            ->setJson($json);
         $em->persist($model);
         $em->flush();
 

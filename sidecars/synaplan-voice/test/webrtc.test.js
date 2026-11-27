@@ -4,7 +4,7 @@ import test from 'node:test'
 import { WebSocket, WebSocketServer } from 'ws'
 import { mapOpenAiUsage } from '../src/adapters/openai.js'
 import { createServer } from '../src/server.js'
-import { exchangeSdp, liveCreateBody } from '../src/webrtc.js'
+import { exchangeSdp, LIVE_IDLE_TIMEOUT_S, liveCreateBody } from '../src/webrtc.js'
 
 test('GPT-Live SDP exchange forbids every client event', async () => {
   let seen = null
@@ -26,10 +26,10 @@ test('GPT-Live SDP exchange forbids every client event', async () => {
     { model: 'gpt-live-1', instructions: 'Be brief.', voice: 'marin' },
     'offer-sdp',
   ))
-  assert.deepEqual(seen.client.data_channel.allowed_client_events, [])
+  assert.deepEqual(seen.session.client.data_channel.allowed_client_events, [])
   assert.equal(result.answer, 'answer-sdp')
   assert.equal(result.dialect, 'live')
-  assert.equal(result.sidebandUrl, 'wss://api.openai.com/v1/live/sessions/sess_1/sideband')
+  assert.equal(result.sidebandUrl, 'wss://api.openai.com/v1/live/sessions/sess_1/attach')
 })
 
 test('GPT-Realtime SDP exchange keeps the key on the server and skips PCM', async () => {
@@ -63,13 +63,85 @@ test('a WebRTC sideband bills the same meter as the relay mapper and closes on s
     input_tokens: 2,
     output_tokens: 3,
   }
+  const run = await webrtcSession((ws) => {
+    ws.send(JSON.stringify({ type: 'session.resumed' }))
+    ws.send(JSON.stringify({ type: 'session.usage.updated', usage }))
+  })
+
+  assert.equal(run.answer.sdp, 'v=answer')
+  assert.equal(run.usageBodies.length, 1)
+  const posted = run.usageBodies[0].meter
+  const expected = mapOpenAiUsage(usage)
+  assert.equal(posted.seconds, expected.seconds)
+  assert.equal(posted.audioInTokens, expected.audioInTokens)
+  assert.equal(posted.audioOutTokens, expected.audioOutTokens)
+  assert.equal(posted.audioCacheTokens, expected.audioCacheTokens)
+  assert.equal(posted.textInTokens, expected.textInTokens)
+  assert.equal(posted.textOutTokens, expected.textOutTokens)
+  assert.equal(run.sidebandMessages.some((message) => message.type === 'session.close'), true)
+})
+
+test('GPT-Live waits for speech and returns to standby after an idle timeout', async () => {
+  const run = await webrtcSession(async (ws) => {
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    ws.send(JSON.stringify({ type: 'session.paused' }))
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    ws.send(JSON.stringify({ type: 'session.resumed' }))
+    ws.send(JSON.stringify({ type: 'session.usage.updated', usage: { seconds: 4 } }))
+  })
+
+  assert.deepEqual(
+    [run.created.session.wake_policy, run.created.session.idle_timeout_s],
+    [{ type: 'speech' }, LIVE_IDLE_TIMEOUT_S],
+  )
+  // Active until the pause, standby until the resume. A live session does
+  // not start paused: OpenAI sends no resume when the person first speaks.
+  const meter = run.usageBodies[0].meter
+  assert.ok(meter.standbySeconds >= 0.13 && meter.standbySeconds < 0.3, `standby ${meter.standbySeconds}`)
+  assert.equal(meter.seconds, 4)
+})
+
+test('standby comes on top of the active seconds OpenAI reports', async () => {
+  const run = await webrtcSession(async (ws) => {
+    ws.send(JSON.stringify({ type: 'session.paused' }))
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    ws.send(JSON.stringify({ type: 'session.usage.updated', usage: { seconds: 0.05 } }))
+  })
+
+  const meter = run.usageBodies[0].meter
+  assert.equal(meter.seconds, 0.05)
+  assert.ok(meter.standbySeconds >= 0.18, `standby ${meter.standbySeconds}`)
+})
+
+test('the last seconds OpenAI reports after the close reach the closing bill', async () => {
+  const run = await webrtcSession((ws) => {
+    ws.on('message', (raw) => {
+      if (JSON.parse(raw.toString()).type !== 'session.close') return
+      // OpenAI answers the close with the final usage before its close frame.
+      ws.send(JSON.stringify({ type: 'session.closed', usage: { seconds: 14 } }))
+    })
+    ws.send(JSON.stringify({ type: 'session.usage.updated', usage: { seconds: 4 } }))
+  })
+
+  assert.equal(run.usageBodies[0].meter.seconds, 4)
+  assert.equal(run.closedBodies.length, 1)
+  assert.equal(run.closedBodies[0].meter.seconds, 14)
+})
+
+/**
+ * One GPT-Live WebRTC session through the gateway: the backend stops it on
+ * the first usage callback. onSideband scripts the provider sideband.
+ */
+async function webrtcSession(onSideband) {
   const sidebandMessages = []
   const usageBodies = []
+  const closedBodies = []
+  let created = null
   const sideband = new WebSocketServer({ port: 0, host: '127.0.0.1' })
   await once(sideband, 'listening')
   sideband.on('connection', (ws) => {
     ws.on('message', (raw) => sidebandMessages.push(JSON.parse(raw.toString())))
-    ws.send(JSON.stringify({ type: 'session.usage.updated', usage }))
+    void onSideband(ws)
   })
 
   const backend = http.createServer((req, res) => {
@@ -91,6 +163,7 @@ test('a WebRTC sideband bills the same meter as the relay mapper and closes on s
         }))
         return
       }
+      if (String(req.url).endsWith('/closed')) closedBodies.push(JSON.parse(body))
       if (String(req.url).endsWith('/usage')) {
         usageBodies.push(JSON.parse(body))
         res.writeHead(200, { 'content-type': 'application/json' })
@@ -108,12 +181,13 @@ test('a WebRTC sideband bills the same meter as the relay mapper and closes on s
     secret: 'test-secret',
     tickSeconds: 0,
     idleSeconds: 0,
+    finalUsageMs: 500,
     openaiApiKey: 'sk-test',
     sidebandUrlFor: () => `ws://127.0.0.1:${sideband.address().port}`,
     fetch: async (url, init) => {
       if (String(url).includes('/v1/live/sessions')) {
-        const body = JSON.parse(init.body)
-        assert.deepEqual(body.client.data_channel.allowed_client_events, [])
+        created = JSON.parse(init.body)
+        assert.deepEqual(created.session.client.data_channel.allowed_client_events, [])
         return {
           ok: true,
           json: async () => ({ session: { id: 'sess_9' }, transport: { sdp: 'v=answer' } }),
@@ -135,29 +209,20 @@ test('a WebRTC sideband bills the same meter as the relay mapper and closes on s
     const text = raw.toString()
     if (text.startsWith('{')) frames.push(JSON.parse(text))
   })
-  await once(client, 'open')
-  await waitFor(() => frames.some((frame) => frame.type === 'offer_required'))
-  client.send(JSON.stringify({ type: 'offer', sdp: 'v=offer' }))
-  await waitFor(() => frames.some((frame) => frame.type === 'ended'))
+  try {
+    await once(client, 'open')
+    await waitFor(() => frames.some((frame) => frame.type === 'offer_required'))
+    client.send(JSON.stringify({ type: 'offer', sdp: 'v=offer' }))
+    await waitFor(() => frames.some((frame) => frame.type === 'ended'))
+  } finally {
+    client.terminate()
+    gateway.close()
+    backend.close()
+    sideband.close()
+  }
 
-  const answer = frames.find((frame) => frame.type === 'answer')
-  assert.equal(answer.sdp, 'v=answer')
-  assert.equal(usageBodies.length, 1)
-  const posted = usageBodies[0].meter
-  const expected = mapOpenAiUsage(usage)
-  assert.equal(posted.seconds, expected.seconds)
-  assert.equal(posted.audioInTokens, expected.audioInTokens)
-  assert.equal(posted.audioOutTokens, expected.audioOutTokens)
-  assert.equal(posted.audioCacheTokens, expected.audioCacheTokens)
-  assert.equal(posted.textInTokens, expected.textInTokens)
-  assert.equal(posted.textOutTokens, expected.textOutTokens)
-  assert.equal(sidebandMessages.some((message) => message.type === 'session.close'), true)
-
-  client.terminate()
-  gateway.close()
-  backend.close()
-  sideband.close()
-})
+  return { answer: frames.find((frame) => frame.type === 'answer'), created, usageBodies, closedBodies, sidebandMessages }
+}
 
 function listen(server) {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))

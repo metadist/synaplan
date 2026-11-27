@@ -68,7 +68,7 @@ final class OpenAIProviderOfflineTest extends TestCase
         $provider->chat([['role' => 'user', 'content' => 'Hi']], ['model' => 'gpt-4o']);
         $provider->embed('Hello', ['model' => 'text-embedding-3-small']);
         $provider->generateImage('A red bicycle', ['model' => 'gpt-image-1']);
-        $audio = implode('', iterator_to_array($provider->synthesizeStream('Hallo'), false));
+        $audio = implode('', iterator_to_array($provider->synthesizeStream('Hallo', ['model' => 'tts-1']), false));
 
         self::assertSame([], OfflineHttpGuard::attempts());
         self::assertSame(

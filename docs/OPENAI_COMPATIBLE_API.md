@@ -224,7 +224,7 @@ curl https://your-synaplan-instance.com/v1/chat/completions \
 One-shot speech-to-text. Same shape as OpenAI Whisper so local tools and the
 OpenAI SDK work against Synaplan. The `model` field is resolved against the
 user's **SOUND2TEXT** catalogue (local whisper.cpp, Groq Whisper, OpenAI
-`whisper-1`, Mistral Voxtral, …). Omit it to use the user's default.
+`gpt-transcribe`, Mistral Voxtral, …). Omit it to use the user's default.
 
 **Request:** `multipart/form-data` (`file` or `audio`) or a raw `audio/*` /
 `application/octet-stream` body.

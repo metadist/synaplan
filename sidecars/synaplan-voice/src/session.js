@@ -28,6 +28,9 @@ export function shouldDropAudio(bufferedAmount, limit = AUDIO_BUFFER_LIMIT) {
 
 export const TRANSCRIPT_ATTEMPTS = 3
 
+/** How long a closing call waits for the provider's last usage report. */
+export const FINAL_USAGE_WAIT_MS = 2000
+
 /**
  * Posts one transcript until it is stored. A deadlock between the question
  * and the answer returns 500 and drops the sentence unless it is sent again.
@@ -101,6 +104,8 @@ export function handleConnection(socket, request, deps) {
   let dropping = false
   let dropped = 0
   let meter = emptyMeter()
+  let standbyMs = 0
+  let pausedAt = null
   let startedAt = Date.now()
   let lastAudioAt = Date.now()
   let tickTimer = null
@@ -110,9 +115,12 @@ export function handleConnection(socket, request, deps) {
   let clientSocket = socket
   let lastConfig = null
   let adopted = false
+  let providerClosed = false
+  let onProviderClosed = null
   const openTurn = new Map()
   const tickMs = Number(deps.tickSeconds ?? 15) * 1000
   const idleMs = Number(deps.idleSeconds ?? 120) * 1000
+  const finalUsageMs = Number(deps.finalUsageMs ?? FINAL_USAGE_WAIT_MS)
 
   const log = (fields) => {
     deps.log?.({ sessionId, provider, ...fields })
@@ -151,8 +159,25 @@ export function handleConnection(socket, request, deps) {
 
   const usagePayload = () => {
     const payload = { ...meter }
-    if (!(payload.seconds > 0)) payload.seconds = (Date.now() - startedAt) / 1000
+    const standby = (standbyMs + (pausedAt === null ? 0 : Date.now() - pausedAt)) / 1000
+    // OpenAI's seconds leave the paused stretches out; the wall clock does not.
+    if (!(payload.seconds > 0)) payload.seconds = Math.max(0, (Date.now() - startedAt) / 1000 - standby)
+    payload.standbySeconds = standby
     return payload
+  }
+
+  // GPT-Live standby: the seconds while inference is paused are billed at
+  // the lower rate. A second pause without a resume in between means the
+  // resume was missed, so the time since the first pause was active; a
+  // transcript means inference is running. Both err towards the active rate.
+  const setStandby = (paused) => {
+    const now = Date.now()
+    if (paused) {
+      pausedAt = now
+      return
+    }
+    if (pausedAt !== null) standbyMs += now - pausedAt
+    pausedAt = null
   }
 
   const storeTurn = (role, text) => {
@@ -192,17 +217,24 @@ export function handleConnection(socket, request, deps) {
       activeSessions.delete(sessionId)
     }
     const latencyMs = Date.now() - startedAt
+    const gone = new Promise((resolve) => { onProviderClosed = resolve })
     try {
-      adapter?.close()
+      await adapter?.close()
     } catch {
       // The provider socket is already gone. The usage row still has to close.
+    }
+    // OpenAI reports the last seconds with session.closed, after our close.
+    // Without this wait the final stretch of the call is never billed.
+    if (adapter && !providerClosed) {
+      await Promise.race([gone, new Promise((resolve) => setTimeout(resolve, finalUsageMs))])
     }
     try {
       await post(`/internal/voice/sessions/${sessionId}/closed`, { reason, meter: usagePayload(), latencyMs })
     } catch {
       log({ event: 'close_callback_failed', reason })
     }
-    log({ event: 'closed', reason, dropped })
+    const final = usagePayload()
+    log({ event: 'closed', reason, dropped, seconds: final.seconds, standbySeconds: final.standbySeconds, wallSeconds: latencyMs / 1000 })
     send({ type: 'ended', reason })
     if (clientSocket && clientSocket.readyState === 1) clientSocket.close(1000)
   }
@@ -298,6 +330,7 @@ export function handleConnection(socket, request, deps) {
       })
       adapter.on('transcript', (turn) => {
         lastAudioAt = Date.now()
+        if (pausedAt !== null) setStandby(false)
         if (!turn?.text || !turn.role) return
         send({ type: 'transcript', role: turn.role, text: turn.text, final: turn.final === true })
         if (ended) return
@@ -326,9 +359,20 @@ export function handleConnection(socket, request, deps) {
         meter = { ...meter, ...next }
         void reportUsage()
       })
+      adapter.on('standby', (paused) => {
+        setStandby(paused === true)
+        log({ event: 'standby', paused: paused === true, atSeconds: (Date.now() - startedAt) / 1000 })
+      })
       adapter.on('interrupted', () => send({ type: 'interrupted' }))
-      adapter.on('error', () => { void finish('provider_error') })
-      adapter.on('closed', () => { void finish('provider_error') })
+      adapter.on('error', (error) => {
+        log({ event: 'provider_error', code: error?.code ?? '', detail: error?.detail ?? '' })
+        void finish('provider_error')
+      })
+      adapter.on('closed', () => {
+        providerClosed = true
+        onProviderClosed?.()
+        void finish('provider_error')
+      })
     }
     try {
       if (direct) {
@@ -367,7 +411,14 @@ export function handleConnection(socket, request, deps) {
         attach(relay)
         await relay.open(config)
       }
-    } catch {
+    } catch (error) {
+      log({
+        event: 'open_failed',
+        error: String(error?.message ?? 'unknown').slice(0, 80),
+        status: error?.status ?? null,
+        code: error?.code ?? null,
+        param: error?.param ?? null,
+      })
       await finish('provider_error')
       return
     }

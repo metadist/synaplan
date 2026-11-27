@@ -24,7 +24,6 @@ use Psr\Log\LoggerInterface;
  */
 final readonly class VoiceLiveDelegationService
 {
-    private const SPOKEN_CHARS = 1500;
     private const UNREACHABLE = 'I could not reach the answer. Please try again.';
 
     public function __construct(
@@ -121,7 +120,7 @@ final readonly class VoiceLiveDelegationService
      */
     private function reply(string $text, ?array $artifact = null): array
     {
-        return ['text' => mb_substr($text, 0, self::SPOKEN_CHARS), 'facts' => [], 'artifact' => $artifact];
+        return ['text' => $text, 'facts' => [], 'artifact' => $artifact];
     }
 
     /**

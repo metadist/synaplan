@@ -84,7 +84,7 @@ final class OpenAIProviderImageEditRequestTest extends TestCase
     {
         $body = $this->build('Merge them', 'gpt-image-2.5-flare', [self::PHOTO, 'data:image/png;base64,iVBOR'], []);
 
-        self::assertSame('gpt-5.6-terra', $body['model']);
+        self::assertSame('gpt-6.1-terra', $body['model']);
         self::assertSame([
             ['type' => 'input_text', 'text' => 'Merge them'],
             ['type' => 'input_image', 'image_url' => self::PHOTO],

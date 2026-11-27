@@ -133,6 +133,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             $usedResolution,
             'image' === $type ? 'standard' : null,
             'image' === $type ? self::DEFAULT_IMAGE_SIZE : null,
+            $result['images'] ?? [],
         );
 
         $response = [
@@ -254,7 +255,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         // leaves the size to the model, so bill the size it rendered (#2404).
         $renderedSize = $result['images'][0]['size'] ?? null;
         $billedSize = RenderedImageSize::billingKey(is_string($renderedSize) ? $renderedSize : null) ?? self::DEFAULT_IMAGE_SIZE;
-        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId, null, null, 'high', $billedSize);
+        $this->recordUsage($user, 'image', $provider, $modelName, $resolvedModelId, null, null, 'high', $billedSize, $result['images'] ?? []);
 
         // Clean up temporary upload files
         foreach ($imagePaths as $tmpPath) {
@@ -796,6 +797,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
         ?string $resolution = null,
         ?string $quality = null,
         ?string $size = null,
+        array $images = [],
     ): void {
         $action = 'image' === $type ? 'IMAGES' : 'VIDEOS';
 
@@ -809,6 +811,7 @@ final readonly class MediaGenerationService implements MediaGenerationServiceInt
             if (null !== $size && '' !== $size) {
                 $mediaUsage['size'] = $size;
             }
+            $mediaUsage += \App\Model\ImageTokenUsage::mediaUsageOf($images);
         } else {
             $mediaUsage = [
                 'duration_seconds' => $durationSeconds ?? (float) self::DEFAULT_VIDEO_DURATION,

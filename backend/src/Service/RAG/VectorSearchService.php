@@ -3,6 +3,7 @@
 namespace App\Service\RAG;
 
 use App\AI\Service\AiFacade;
+use App\Entity\File;
 use App\Entity\User;
 use App\Plug\Rerank\RerankStage;
 use App\Repository\UserRepository;
@@ -104,8 +105,9 @@ final readonly class VectorSearchService
             $results = $this->vectorStorage->search($searchQuery);
             $storageMs = (int) ((hrtime(true) - $storageStarted) / 1_000_000);
             $names = $this->ownerNames($results, $userId);
+            $fileNames = $this->fileNames($results);
 
-            $mapped = array_map(static function ($result) use ($userId, $names): array {
+            $mapped = array_map(static function ($result) use ($userId, $names, $fileNames): array {
                 $ownerId = $result->ownerId ?? $userId;
                 $shared = $result->shared || $ownerId !== $userId;
 
@@ -119,7 +121,7 @@ final readonly class VectorSearchService
                     'group_key' => $result->groupKey,
                     'distance' => $result->score,
                     'score' => $result->score,
-                    'file_name' => $result->fileName,
+                    'file_name' => $result->fileName ?? $fileNames[$result->fileId] ?? null,
                     'mime_type' => $result->mimeType,
                     'owner_id' => $ownerId,
                     'owner_name' => $shared ? ($names[$ownerId] ?? null) : null,
@@ -566,6 +568,38 @@ final readonly class VectorSearchService
         }
 
         return false;
+    }
+
+    /**
+     * Qdrant keeps no file name in the chunk payload. Without one the model
+     * cannot tell which document a passage comes from, and a question that
+     * names the document gets "no such document".
+     *
+     * @param list<VectorStorage\DTO\SearchResult> $results
+     *
+     * @return array<int, string>
+     */
+    private function fileNames(array $results): array
+    {
+        $ids = [];
+        foreach ($results as $result) {
+            if (null === $result->fileName && $result->fileId > 0) {
+                $ids[$result->fileId] = $result->fileId;
+            }
+        }
+        if ([] === $ids) {
+            return [];
+        }
+
+        $names = [];
+        foreach ($this->em->getRepository(File::class)->findBy(['id' => array_values($ids)]) as $file) {
+            $name = $file->getOriginalName() ?: $file->getFileName();
+            if ('' !== $name) {
+                $names[(int) $file->getId()] = $name;
+            }
+        }
+
+        return $names;
     }
 
     /**

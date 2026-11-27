@@ -982,7 +982,7 @@
                             "role": "user"
                         }
                     ],
-                    "model": "gpt-5.6-terra",
+                    "model": "gpt-6.1-terra",
                     "tools": [
                         {
                             "model": "gpt-image-2.5-flare",
@@ -991,7 +991,7 @@
                         }
                     ]
                 },
-                "body_sha1": "15050710da5ba703d2e78312cab31dfd46d50345",
+                "body_sha1": "623e1bf0c024dedcd9c77805f6c5e031ed66bd28",
                 "headers": [
                     "Accept: */*",
                     "Authorization: Bearer <secret>",
@@ -1042,7 +1042,7 @@
                             "role": "user"
                         }
                     ],
-                    "model": "gpt-5.6-terra",
+                    "model": "gpt-6.1-terra",
                     "tools": [
                         {
                             "model": "gpt-image-1",
@@ -1050,7 +1050,7 @@
                         }
                     ]
                 },
-                "body_sha1": "eccaec4df70cc3f9a760647c1fe814aa2c5edacc",
+                "body_sha1": "3006b0100871b5368649c0ff02978c935e0fc6bb",
                 "headers": [
                     "Accept: */*",
                     "Authorization: Bearer <secret>",
@@ -1363,69 +1363,54 @@
         ]
     },
     "speech.transcribe": {
+        "http": [
+            {
+                "body": "--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-transcribe\r\n--<boundary>\r\nContent-Type: audio/mpeg\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.mp3\"\r\n\r\nID3-test-audio\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"languages[]\"\r\n\r\nde\r\n--<boundary>--\r\n",
+                "body_sha1": "e6f4fb5507d143590ac4a00466ba6e9d55116ad6",
+                "headers": [
+                    "Accept: */*",
+                    "Authorization: Bearer <secret>",
+                    "Content-Type: multipart/form-data; boundary=<boundary>"
+                ],
+                "method": "POST",
+                "timeout": 300,
+                "url": "https://api.openai.com/v1/audio/transcriptions"
+            }
+        ],
         "result": {
             "duration": 2.5,
             "language": "german",
             "segments": [],
             "text": "Hallo Welt"
-        },
-        "sdk": [
-            {
-                "body": {
-                    "file": {
-                        "bytes": 14,
-                        "filename": "voice.mp3",
-                        "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
-                    },
-                    "language": "de",
-                    "model": "whisper-1",
-                    "response_format": "verbose_json"
-                },
-                "headers": [
-                    "Authorization: Bearer <secret>",
-                    "Content-Length: 434",
-                    "Content-Type: multipart/form-data; boundary=<boundary>",
-                    "Host: api.openai.com"
-                ],
-                "method": "POST",
-                "url": "https://api.openai.com/v1/audio/transcriptions"
-            }
-        ]
+        }
     },
     "speech.transcribe_absolute_path": {
-        "result": {
-            "duration": 1,
-            "language": "english",
-            "segments": [],
-            "text": "Hello"
-        },
-        "sdk": [
+        "http": [
             {
-                "body": {
-                    "file": {
-                        "bytes": 14,
-                        "filename": "voice.mp3",
-                        "sha1": "e7d15c3acc2c5fb95bbe75afcd84b712975b2f3d"
-                    },
-                    "model": "gpt-4o-transcribe",
-                    "response_format": "verbose_json"
-                },
+                "body": "--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"model\"\r\n\r\ngpt-4o-transcribe\r\n--<boundary>\r\nContent-Type: audio/mpeg\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"file\"; filename=\"voice.mp3\"\r\n\r\nID3-test-audio\r\n--<boundary>\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: 8bit\r\nContent-Disposition: form-data; name=\"response_format\"\r\n\r\njson\r\n--<boundary>--\r\n",
+                "body_sha1": "399dcd06e2d0eb8f2d652f7403ce98e07242a187",
                 "headers": [
+                    "Accept: */*",
                     "Authorization: Bearer <secret>",
-                    "Content-Length: 360",
-                    "Content-Type: multipart/form-data; boundary=<boundary>",
-                    "Host: api.openai.com"
+                    "Content-Type: multipart/form-data; boundary=<boundary>"
                 ],
                 "method": "POST",
+                "timeout": 300,
                 "url": "https://api.openai.com/v1/audio/transcriptions"
             }
-        ]
+        ],
+        "result": {
+            "duration": 1,
+            "language": "unknown",
+            "segments": [],
+            "text": "Hello"
+        }
     },
     "speech.transcribe_missing_file": {
         "error": {
             "class": "ProviderException",
             "context": null,
-            "message": "OpenAI transcription error: Audio file not found: <uploads>/missing.mp3",
+            "message": "OpenAI transcription error: Audio file not found: missing.mp3",
             "provider": "openai",
             "upstream_status": null
         }
@@ -2208,7 +2193,7 @@
         "error": {
             "class": "ProviderException",
             "context": null,
-            "message": "OpenAI vision returned no text (model=gpt-5.5-pro, status=incomplete, reason=max_output_tokens). Reasoning-heavy models such as the \"pro\" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-5.5).",
+            "message": "OpenAI vision returned no text (model=gpt-5.5-pro, status=incomplete, reason=max_output_tokens). Reasoning-heavy models such as the \"pro\" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-6.2-sol).",
             "provider": "openai",
             "upstream_status": null
         },

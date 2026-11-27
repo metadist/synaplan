@@ -304,6 +304,7 @@ final class VoiceLiveUsageService
         $voice = $this->voiceCost($session, $folded, $this->asBool($meta['zero_cost'] ?? false));
         $meta['voice_meter'] = [
             'seconds' => $folded->seconds,
+            'standby_seconds' => $folded->standbySeconds,
             'audio_in' => $folded->audioInTokens,
             'audio_out' => $folded->audioOutTokens,
             'audio_cache' => $folded->audioCacheTokens,
@@ -330,6 +331,7 @@ final class VoiceLiveUsageService
             textInTokens: max($this->asInt($current['text_in'] ?? 0), $meter->textInTokens),
             textOutTokens: max($this->asInt($current['text_out'] ?? 0), $meter->textOutTokens),
             textItems: max($this->asInt($current['text_items'] ?? 0), $meter->textItems),
+            standbySeconds: max($this->asFloat($current['standby_seconds'] ?? 0), $meter->standbySeconds),
         );
     }
 
