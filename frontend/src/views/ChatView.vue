@@ -290,6 +290,8 @@
               @false-positive="openFalsePositiveModal"
               @report="openReportModal"
               @click-memory="handleClickMemory"
+              @edit-memory="openMemoryEditor"
+              @delete-memory="deleteUsedMemory"
               @continue="handleContinueResponse(message)"
               @look-deeper="handleLookDeeper(message)"
               @media-job-update="onMediaJobUpdate(message, $event)"
@@ -762,6 +764,7 @@ import {
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
+import { useDialog } from '@/composables/useDialog'
 import { requestComposerFocus } from '@/composables/useComposerTyping'
 import { busyGuard, busyRefused as refuseBusyTurn } from '@/composables/useBusyRetryOffer'
 import { chatApi } from '@/services/api'
@@ -866,6 +869,7 @@ const {
   warning: notifyWarning,
   info: notifyInfo,
 } = useNotification()
+const { confirm } = useDialog()
 const smartSearchStore = useSmartSearchStore()
 const { goToProviderSetup } = useFirstRunSetup()
 
@@ -3870,26 +3874,43 @@ const handleRetryMessage = async (message: Message, content: string) => {
 }
 
 // Memory toast handlers
-async function handleMemoryEdit(memory: UserMemory & { toastId: number }) {
-  // Close the toast first
-  const index = activeMemoryToasts.value.findIndex((m) => m.toastId === memory.toastId)
-  if (index !== -1) {
-    activeMemoryToasts.value.splice(index, 1)
-  }
-
-  // Load categories if needed
+async function openMemoryEditor(memory: UserMemory): Promise<void> {
   if (availableMemoryCategories.value.length === 0) {
     try {
       const categories = await getCategories()
       availableMemoryCategories.value = categories.map((c) => c.category)
     } catch {
-      // Continue without categories
+      // The form still opens; category suggestions stay empty.
     }
   }
 
-  // Open the edit dialog in-place (stay in chat!)
   editingMemory.value = memory
   isMemoryEditDialogOpen.value = true
+}
+
+async function handleMemoryEdit(memory: UserMemory & { toastId: number }) {
+  const index = activeMemoryToasts.value.findIndex((m) => m.toastId === memory.toastId)
+  if (index !== -1) {
+    activeMemoryToasts.value.splice(index, 1)
+  }
+
+  await openMemoryEditor(memory)
+}
+
+async function deleteUsedMemory(memory: UserMemory): Promise<void> {
+  const confirmed = await confirm({
+    title: t('memories.deleteConfirm.title'),
+    message: t('memories.deleteConfirm.message'),
+    confirmText: t('memories.deleteConfirm.confirm'),
+    danger: true,
+  })
+  if (!confirmed) return
+
+  try {
+    await memoriesStore.removeMemory(memory.id)
+  } catch {
+    // The store shows the error.
+  }
 }
 
 function closeMemoryEditDialog() {

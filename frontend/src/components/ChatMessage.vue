@@ -466,7 +466,10 @@
           <MessageMemories
             v-if="role === 'assistant' && memories"
             :memories="memories"
+            :editable="!foreignMemory && !isGuestMode"
             @click-memory="(memory) => emit('click-memory', memory)"
+            @edit-memory="(memory) => emit('edit-memory', memory)"
+            @delete-memory="(memory) => emit('delete-memory', memory)"
           />
 
           <!-- Used Feedbacks (AFTER memories, before search results) -->
@@ -1868,6 +1871,8 @@ const emit = defineEmits<{
   falsePositive: [text: string, messageId?: number]
   report: [messageId: number]
   'click-memory': [memory: UserMemory]
+  'edit-memory': [memory: UserMemory]
+  'delete-memory': [memory: UserMemory]
   continue: []
   /** Look deeper under a direct answer: start the research the chat skipped. */
   'look-deeper': []

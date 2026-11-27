@@ -414,18 +414,17 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
 
     const memoryId = parseInt(memoryBadge.getAttribute('data-memory-id') || '-1')
     if (memoryId > 0) {
-      // Find the memory from props or store
       const memory =
         props.memories?.find((m) => m.id === memoryId) ||
         memoriesStore.memories.find((m) => m.id === memoryId)
 
-      // Opens the Memories page; browser Back returns to this chat.
-      if (memory) {
+      // A memory this answer used expands in the message, where it can be
+      // edited or deleted. Anything else opens that line on the Memories page.
+      const listedOnMessage = (props.memories ?? []).some((entry) => entry.id === memoryId)
+      window.dispatchEvent(new CustomEvent('memory-ref-clicked', { detail: { memoryId } }))
+      if (memory && !listedOnMessage) {
         window.dispatchEvent(new CustomEvent('open-memory-dialog', { detail: { memory } }))
       }
-
-      // Also dispatch event for MessageMemories component to highlight
-      window.dispatchEvent(new CustomEvent('memory-ref-clicked', { detail: { memoryId } }))
     }
   }
 }

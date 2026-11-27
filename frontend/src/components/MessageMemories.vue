@@ -1,7 +1,10 @@
 <template>
-  <div v-if="memories.length > 0" class="mt-3">
+  <div v-if="memories.length > 0" class="mt-3" data-testid="section-used-memories">
     <button
+      type="button"
       class="flex items-center gap-2 px-3 py-2 rounded-xl surface-chip hover:bg-black/5 dark:hover:bg-white/5 transition-all w-full text-left"
+      data-testid="btn-used-memories-toggle"
+      :aria-expanded="isExpanded"
       @click="toggleExpand"
     >
       <Icon icon="mdi:brain" class="w-4 h-4 flex-shrink-0 txt-brand" />
@@ -21,6 +24,8 @@
           v-for="(memory, index) in memories"
           :key="memory.id"
           :ref="(el) => (memoryRefs[index] = el as HTMLElement)"
+          :data-memory-id="memory.id"
+          data-testid="item-used-memory"
           :class="[
             'surface-chip rounded-lg p-2.5 transition-all cursor-pointer',
             highlightedMemory === index
@@ -41,6 +46,28 @@
               </div>
               <div class="text-xs txt-primary">{{ memory.value }}</div>
             </div>
+            <div v-if="editable" class="flex items-center shrink-0" @click.stop>
+              <button
+                type="button"
+                class="icon-ghost p-2 rounded-xl"
+                :aria-label="$t('memories.actions.edit')"
+                :title="$t('memories.actions.edit')"
+                data-testid="btn-used-memory-edit"
+                @click="emit('edit-memory', memory)"
+              >
+                <PencilIcon class="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                class="icon-ghost icon-ghost--danger p-2 rounded-xl"
+                :aria-label="$t('memories.actions.delete')"
+                :title="$t('memories.actions.delete')"
+                data-testid="btn-used-memory-delete"
+                @click="emit('delete-memory', memory)"
+              >
+                <TrashIcon class="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -51,17 +78,24 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
+import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 
 interface Props {
   memories: UserMemory[]
+  /** Shared and guest chats can read the rows. They cannot change the owner's memories. */
+  editable?: boolean
 }
 
 interface Emits {
   (e: 'click-memory', memory: UserMemory): void
+  (e: 'edit-memory', memory: UserMemory): void
+  (e: 'delete-memory', memory: UserMemory): void
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  editable: true,
+})
 const emit = defineEmits<Emits>()
 
 const isExpanded = ref(false)
