@@ -1831,7 +1831,7 @@ class ModelCatalogTest extends TestCase
      */
     public function testOpenAiTtsRowsAreRetiredToTheShippedTextToSpeechDefault(): void
     {
-        $gemini = ModelCatalog::findBidByKey('google:gemini-2.5-flash-preview-tts:text2sound');
+        $gemini = ModelCatalog::findBidByKey('google:gemini-3.8-flash-tts:text2sound');
         $this->assertNotNull($gemini);
 
         foreach ([41 => 'tts-1', 83 => 'tts-1-hd'] as $bid => $providerId) {

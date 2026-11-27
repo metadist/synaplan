@@ -113,7 +113,7 @@ final class DesktopMediaController extends AbstractController
             required: ['text', 'model'],
             properties: [
                 new OA\Property(property: 'text', type: 'string', example: 'Good morning'),
-                new OA\Property(property: 'model', type: 'string', example: 'google:gemini-2.5-flash-preview-tts:text2sound'),
+                new OA\Property(property: 'model', type: 'string', example: 'google:gemini-3.8-flash-tts:text2sound'),
                 new OA\Property(property: 'language', type: 'string', description: 'Language of the spoken text (e.g. de, en). Defaults to the user locale when omitted.', example: 'de', nullable: true),
             ]
         )

@@ -270,7 +270,7 @@ OpenAI's [deprecations page](https://developers.openai.com/api/docs/deprecations
 | --- | ----- | ------------ | --------- |
 | 73 | gpt-4o-mini | `gpt-4o-mini` | `openai:gpt-6-luna:chat` (GPT-6 Luna, BID 377) |
 | 82 | whisper-1 | `whisper-1` | `openai:gpt-transcribe:sound2text` (GPT Transcribe, BID 454) |
-| 41 | tts-1 with Nova | `tts-1` | `google:gemini-2.5-flash-preview-tts:text2sound` (BID 37) |
+| 41 | tts-1 with Nova | `tts-1` | `google:gemini-3.8-flash-tts:text2sound` (BID 451) |
 
 ### OpenAI chat models below GPT-6 (2026-11-27)
 
@@ -287,7 +287,7 @@ The GPT-6 family covers every tier the GPT-5.4, 5.5 and 5.6 rows served, at a lo
 | 232 / 233 | GPT-5.4 mini | `gpt-5.4-mini` | `openai:gpt-6.1-terra` (GPT-6.1 Terra) |
 
 Retired via the registry, no migration. Older registry entries whose successor was one of these rows (`gpt-5.3`, `gpt-4.1`, `gpt-5`, `gpt-5.2`, `gpt-5-mini`, `gpt-5.4-nano`) now point at the GPT-6 successor directly. The OpenAI provider defaults moved to GPT-6.2 Sol (`CHAT`, `TOOLS`, `ANALYZE`, `PIC2TEXT`) and GPT-6.1 Terra (`SORT`, `PLAN`, `SUMMARIZE`), the image tool's mainline wrapper to GPT-6.1 Terra, and the OpenAI model mix to GPT-6.2 Astra, GPT-6 Astra, GPT-6.2 Sol, GPT-6.1 Sol. Their long-context tiers left `CONTEXT_PRICING`.
-| 83 | tts-1-hd | `tts-1-hd` | `google:gemini-2.5-flash-preview-tts:text2sound` (BID 37) |
+| 83 | tts-1-hd | `tts-1-hd` | `google:gemini-3.8-flash-tts:text2sound` (BID 451) |
 
 Retired ahead of each shutdown, for the same reason as BID 234, via the registry, no migration. GPT-6 Luna and GPT Transcribe are the replacements OpenAI names. OpenAI has no `/v1/audio/speech` model left: its suggested `tts-1` replacement, `gpt-realtime-2.1-mini`, speaks only over the Realtime API. The two TTS rows therefore follow the shipped `TEXT2SOUND` default, which needs a Google key. The OpenAI provider default `SOUND2TEXT` moved to GPT Transcribe, the OpenAI speed-config mix no longer sets a sound model, and `OpenAISpeech` no longer falls back to `whisper-1` or `tts-1`.
 
