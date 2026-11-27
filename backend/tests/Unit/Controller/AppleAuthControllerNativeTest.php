@@ -10,10 +10,10 @@ use App\Repository\UserRepository;
 use App\Security\AccountAccess;
 use App\Service\Auth\AppleClientSecretGenerator;
 use App\Service\Auth\AppleIdentityTokenVerifier;
+use App\Service\Auth\LoginState;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\TokenService;
-use App\Service\OAuth\OAuthStateService;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
@@ -48,7 +48,7 @@ final class AppleAuthControllerNativeTest extends TestCase
         $controller = new AppleAuthController(
             new MockHttpClient(),
             $users,
-            $this->createStub(OAuthStateService::class),
+            $this->createStub(LoginState::class),
             $this->createStub(OAuthLoginResponder::class),
             $this->createStub(OAuthSignupGate::class),
             $this->createStub(AppleClientSecretGenerator::class),

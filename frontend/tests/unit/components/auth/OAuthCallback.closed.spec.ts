@@ -45,4 +45,28 @@ describe('OAuthCallback closed sign-up', () => {
     expect(wrapper.text()).toContain('This account has been suspended. Please contact support.')
     expect(wrapper.text()).not.toContain('Please try again')
   })
+
+  it('tells a person whose sign-in belongs to another browser to start again', async () => {
+    setActivePinia(createPinia())
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/auth/callback', component: OAuthCallback },
+        { path: '/login', name: 'login', component: { template: '<div />' } },
+      ],
+    })
+    window.history.pushState(
+      {},
+      '',
+      '/auth/callback?error=Invalid+state+parameter&error_code=login_restart&provider=google'
+    )
+    await router.push('/auth/callback')
+    await router.isReady()
+
+    const wrapper = mount(OAuthCallback, { global: { plugins: [router] } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('It expired or was started in another browser.')
+    expect(wrapper.text()).not.toContain('Invalid state parameter')
+  })
 })

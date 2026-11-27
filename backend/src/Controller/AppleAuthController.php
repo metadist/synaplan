@@ -10,13 +10,13 @@ use App\Repository\UserRepository;
 use App\Security\AccountAccess;
 use App\Service\Auth\AppleClientSecretGenerator;
 use App\Service\Auth\AppleIdentityTokenVerifier;
+use App\Service\Auth\LoginState;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupDoor;
 use App\Service\Auth\TokenService;
 use App\Service\Http\ClientAddress;
-use App\Service\OAuth\OAuthStateService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -48,7 +48,7 @@ class AppleAuthController extends AbstractController
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly UserRepository $userRepository,
-        private readonly OAuthStateService $oauthStateService,
+        private readonly LoginState $loginState,
         private readonly OAuthLoginResponder $oauthLoginResponder,
         private readonly OAuthSignupGate $signupGate,
         private readonly AppleClientSecretGenerator $clientSecretGenerator,
@@ -75,8 +75,8 @@ class AppleAuthController extends AbstractController
             return $this->oauthLoginResponder->error('apple', 'Apple Sign-In is not configured', $native);
         }
 
-        $state = $this->oauthStateService->generateState('apple', AccountLanguage::withSignupLanguage(
-            ($native ? ['native' => true] : []) + $this->signupGate->stateExtras($request, 'apple'),
+        $state = $this->loginState->issue($request, 'apple', AccountLanguage::withSignupLanguage(
+            $this->signupGate->stateExtras($request, 'apple'),
             $request->query->get('language'),
         ));
 
@@ -111,14 +111,14 @@ class AppleAuthController extends AbstractController
         $state = (string) ($request->request->get('state') ?? $request->query->get('state') ?? '');
         $userField = (string) ($request->request->get('user') ?? '');
 
-        $statePayload = '' !== $state ? $this->oauthStateService->validateState($state, 'apple') : null;
+        $statePayload = '' !== $state ? $this->loginState->redeem($request, $state, 'apple') : null;
         if (null === $statePayload) {
             $this->logger->error('Apple OAuth state validation failed', ['state_present' => '' !== $state]);
 
-            return $this->oauthLoginResponder->error('apple', 'Invalid state parameter', false);
+            return $this->oauthLoginResponder->error('apple', 'Invalid state parameter', false, ['error_code' => LoginState::RESTART_CODE]);
         }
 
-        $native = (bool) ($statePayload['native'] ?? false);
+        $native = LoginState::isNative($statePayload);
 
         if ('' === $code) {
             return $this->oauthLoginResponder->error('apple', 'Authorization code not received', $native);

@@ -9,11 +9,11 @@ use App\Entity\User;
 use App\Repository\UserRepository;
 use App\Service\Auth\AppleClientSecretGenerator;
 use App\Service\Auth\AppleIdentityTokenVerifier;
+use App\Service\Auth\LoginState;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupDoor;
 use App\Service\Auth\TokenService;
-use App\Service\OAuth\OAuthStateService;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -128,8 +128,8 @@ final class AppleAuthControllerAccountMatchTest extends TestCase
         $verifier = $this->createStub(AppleIdentityTokenVerifier::class);
         $verifier->method('verify')->willReturn(['sub' => self::SUB, 'isPrivateEmail' => false] + $claims);
 
-        $state = $this->createStub(OAuthStateService::class);
-        $state->method('validateState')->willReturn(['native' => false]);
+        $state = $this->createStub(LoginState::class);
+        $state->method('redeem')->willReturn(['browser' => 'bound']);
 
         $responder = $this->createStub(OAuthLoginResponder::class);
         $responder->method('success')->willReturn(new Response());

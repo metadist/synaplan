@@ -8,6 +8,7 @@ use App\Entity\EmailVerificationAttempt;
 use App\Entity\Token;
 use App\Entity\User;
 use App\Entity\VerificationToken;
+use App\Service\Auth\TokenService;
 use App\Service\Chat\GuestSessionService;
 use App\Service\Email\InternalEmailService;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -44,6 +45,7 @@ class AuthControllerTest extends WebTestCase
             'resend-failed@test.com',
             'resend-unknown@test.com',
             'resend-sent@test.com',
+            'refresh-body@test.com',
         ];
         foreach ($testEmails as $email) {
             $user = $this->em->getRepository(User::class)->findOneBy(['mail' => $email]);
@@ -314,6 +316,47 @@ class AuthControllerTest extends WebTestCase
      * once the token refreshes (observed on the native app, which refreshes
      * eagerly on launch).
      */
+    /**
+     * A cross-site form can post a JSON-shaped body as text/plain without a
+     * preflight. Accepting it would sign the visitor in to the sender's account.
+     */
+    public function testLoginRefusesABodyThatIsNotSentAsJson(): void
+    {
+        $body = json_encode(['email' => 'admin@synaplan.com', 'password' => 'irrelevant'], JSON_THROW_ON_ERROR);
+
+        foreach (['text/plain', 'application/x-www-form-urlencoded', ''] as $contentType) {
+            $this->client->request('POST', '/api/v1/auth/login', [], [], ['CONTENT_TYPE' => $contentType], $body);
+
+            $this->assertResponseStatusCodeSame(Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
+            $data = json_decode((string) $this->client->getResponse()->getContent(), true);
+            $this->assertSame('AUTH_JSON_REQUIRED', $data['code']);
+            $this->assertSame([], $this->client->getResponse()->headers->getCookies());
+        }
+    }
+
+    public function testRefreshIgnoresATokenInABodyThatIsNotSentAsJson(): void
+    {
+        $user = new User();
+        $user->setMail('refresh-body@test.com');
+        $user->setPw(password_hash('TestPass123!', PASSWORD_BCRYPT));
+        $user->setType('WEB');
+        $user->setUserLevel('NEW');
+        $user->setProviderId('local');
+        $user->setCreated(date('YmdHis'));
+        $user->setEmailVerified(true);
+        $this->em->persist($user);
+        $this->em->flush();
+        $token = static::getContainer()->get(TokenService::class)->generateRefreshToken($user, '127.0.0.1');
+        $body = json_encode(['refreshToken' => $token], JSON_THROW_ON_ERROR);
+
+        $this->client->request('POST', '/api/v1/auth/refresh', [], [], ['CONTENT_TYPE' => 'text/plain'], $body);
+        $this->assertResponseStatusCodeSame(Response::HTTP_UNAUTHORIZED);
+        $this->assertSame([], $this->client->getResponse()->headers->getCookies());
+
+        $this->client->request('POST', '/api/v1/auth/refresh', [], [], ['CONTENT_TYPE' => 'application/json'], $body);
+        $this->assertResponseIsSuccessful();
+    }
+
     public function testLoginAndRefreshResponsesIncludeFirstName(): void
     {
         $user = new User();
