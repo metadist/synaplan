@@ -46,14 +46,14 @@
               </div>
               <div class="text-xs txt-primary">{{ memory.value }}</div>
             </div>
-            <div v-if="editable" class="flex items-center shrink-0" @click.stop>
+            <div v-if="canEdit" class="flex items-center shrink-0" @click.stop>
               <button
                 type="button"
                 class="icon-ghost p-2 rounded-xl"
                 :aria-label="$t('memories.actions.edit')"
                 :title="$t('memories.actions.edit')"
                 data-testid="btn-used-memory-edit"
-                @click="emit('edit-memory', memory)"
+                @click="editMemory(memory)"
               >
                 <PencilIcon class="w-4 h-4" />
               </button>
@@ -63,7 +63,7 @@
                 :aria-label="$t('memories.actions.delete')"
                 :title="$t('memories.actions.delete')"
                 data-testid="btn-used-memory-delete"
-                @click="emit('delete-memory', memory)"
+                @click="removeMemory(memory)"
               >
                 <TrashIcon class="w-4 h-4" />
               </button>
@@ -76,10 +76,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick, onUnmounted } from 'vue'
+import { computed, inject, ref, watch, nextTick, onUnmounted } from 'vue'
 import { Icon } from '@iconify/vue'
 import { PencilIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
+import {
+  answerMemoryFocusKey,
+  deleteUsedMemoryKey,
+  editUsedMemoryKey,
+  memoryEditableKey,
+} from '@/components/chat/focusUsedMemory'
 
 interface Props {
   memories: UserMemory[]
@@ -100,6 +106,21 @@ const props = withDefaults(defineProps<Props>(), {
   memoryFocus: null,
 })
 const emit = defineEmits<Emits>()
+const injectedFocus = inject(answerMemoryFocusKey, null)
+const injectedEditable = inject(memoryEditableKey, null)
+const editInjected = inject(editUsedMemoryKey, null)
+const deleteInjected = inject(deleteUsedMemoryKey, null)
+const canEdit = computed(() => injectedEditable?.value ?? props.editable)
+
+function editMemory(memory: UserMemory): void {
+  if (editInjected) editInjected(memory)
+  else emit('edit-memory', memory)
+}
+
+function removeMemory(memory: UserMemory): void {
+  if (deleteInjected) deleteInjected(memory)
+  else emit('delete-memory', memory)
+}
 
 const isExpanded = ref(false)
 const highlightedMemory = ref<number | null>(null)
@@ -142,9 +163,9 @@ function revealMemory(memoryId: number): void {
 }
 
 watch(
-  () => props.memoryFocus?.token,
+  () => props.memoryFocus?.token ?? injectedFocus?.value?.token,
   () => {
-    const memoryId = props.memoryFocus?.id
+    const memoryId = props.memoryFocus?.id ?? injectedFocus?.value?.id
     if (memoryId == null) return
     revealMemory(memoryId)
   }

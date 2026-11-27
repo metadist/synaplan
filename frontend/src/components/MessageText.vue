@@ -52,7 +52,7 @@ import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
 import { completeInlineMarkdown } from '@/utils/partialMarkdown'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { renderDocRefPill, type PlatformDocRef } from '@/components/chat/refs/DocRefPill'
-import { focusUsedMemoryKey } from '@/components/chat/focusUsedMemory'
+import { focusUsedMemoryKey, openClickedMemory } from '@/components/chat/focusUsedMemory'
 
 interface Props {
   content: string
@@ -416,20 +416,13 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
 
     const memoryId = parseInt(memoryBadge.getAttribute('data-memory-id') || '-1')
     if (memoryId > 0) {
-      const memory =
-        props.memories?.find((m) => m.id === memoryId) ||
-        memoriesStore.memories.find((m) => m.id === memoryId)
-
-      // A memory this answer used expands only in this answer. Anything else
-      // opens that line on the Memories page.
-      const listedOnMessage = (props.memories ?? []).some((entry) => entry.id === memoryId)
-      if (listedOnMessage && focusUsedMemory) {
-        focusUsedMemory(memoryId)
-        return
-      }
-      if (memory && !listedOnMessage) {
-        window.dispatchEvent(new CustomEvent('open-memory-dialog', { detail: { memory } }))
-      }
+      openClickedMemory(
+        memoryId,
+        (props.memories ?? []).some((entry) => entry.id === memoryId),
+        props.memories?.find((entry) => entry.id === memoryId) ||
+          memoriesStore.memories.find((entry) => entry.id === memoryId),
+        focusUsedMemory
+      )
     }
   }
 }
