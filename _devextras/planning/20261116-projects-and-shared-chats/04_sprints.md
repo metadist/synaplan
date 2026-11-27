@@ -236,8 +236,8 @@ the chat area); PJ33's first plan needs PJ9. PJ21 and PJ22 moved here from
 the old phase D (owner, 2026-11-26); PJ21 comes before PJ31, because the
 extraction writes memory and items in one call (§0 #98). Order: PJ30 →
 PJ21 → PJ31 → PJ29 → PJ32 → PJ33 → PJ22 → PJ34. PJ30, PJ21 and PJ31 can
-start while B is still open. Before PJ32 the mockup gets a second project
-of another kind (§0 #110).
+start while B is still open. Before PJ32 the mockup gets a second project,
+"learning something" (§0 #110, #131).
 
 ### PJ29 — a chat area that a page can embed
 
@@ -283,7 +283,9 @@ of another kind (§0 #110).
   `ModelConfigService::getMemoryModelConfig()`, the `async_ai_low`
   handlers, `PromptCatalog`, PJ21, PJ30.
 - **Tests first:** G14, G16 and G17 with the corpus in
-  `backend/tests/Eval/ProjectBoard/` (40 messages: plain dates, relative
+  `backend/tests/Eval/ProjectBoard/` (40 messages, eight from each of five
+  kinds of project: kitchen, car, learning, client project, move, §0 #132;
+  G14 holds in each kind, not only on average; plain dates, relative
   dates, repetitions, "Ben does it", a cost, a decision, a fact that
   belongs in memory, chatter that must add nothing), run on the seeded
   memory model and on one Ollama model; a statement lands in memory or on
@@ -303,7 +305,8 @@ of another kind (§0 #110).
 
 - **Goal:** J-PJ-12 (the page part) and J-PJ-18; the mockup
   `mockups/project-page.html` as product.
-- **Reads:** the mockup and its second project (§0 #110), `02` §3.2, PJ4's
+- **Reads:** the mockup and its second project, "learning something"
+  (§0 #110, #131), `02` §3.2, PJ4's
   `ProjectView.vue`, PJ29's `ChatArea`, `style.css` tokens, UX contract §4.
 - **Tests first:** Vitest for each card's empty, filled and loading state;
   Playwright `@ci`: open a project, write a task in the chat, see it on
