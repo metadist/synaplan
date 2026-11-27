@@ -23,7 +23,7 @@ to them.
 | Plan review | open | — | §0 #96–#111: board without the loop, four kinds, calendar subscription, copy-first mail, DMARC, two watch kinds, push after sharing. See "2026-11-26 — review" below. |
 | Hands-on comparison | merged | #3288 | §0 #112–#119: update instead of append, confirm before write, receipt only, state read at turn start, files stay in the project, reminders said back, quiet watches, one person first. See "2026-11-26 — hands-on comparison" below. |
 | v1 spec | open | — | §0 #120–#130 and `05_v1_spec.md`: three stages, one store with `note`, sharing only in projects with a project budget, households first, success numbers, order. See "2026-11-27 — v1 spec" below. |
-| PJ30 | open | — | Project items through the API, flag off (`PROJECTS.BOARD_ENABLED` = 0). See "2026-11-27 — PJ30" below. |
+| PJ30 | open | #3307 | Project items through the API, flag off (`PROJECTS.BOARD_ENABLED` = 0). See "2026-11-27 — PJ30" below. |
 | PJ8–PJ47 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
 ---
