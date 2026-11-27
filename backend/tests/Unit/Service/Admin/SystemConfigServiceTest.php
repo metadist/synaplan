@@ -8,6 +8,7 @@ use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
+use App\Model\SecretPlace;
 use App\Module\Contract\FeatureModuleInterface;
 use App\Module\Gate\ModuleGateConfig;
 use App\Module\ModuleRegistry;
@@ -172,7 +173,10 @@ final class SystemConfigServiceTest extends TestCase
         self::assertNotSame('super-secret', $stored);
         self::assertSame(
             'super-secret',
-            (new EncryptionService('test-secret', new NullLogger()))->decrypt($stored),
+            (new EncryptionService('test-secret', new NullLogger()))->decrypt(
+                $stored,
+                SecretPlace::config(0, MicrosoftOAuthConfig::CONFIG_GROUP, MicrosoftOAuthConfig::KEY_CLIENT_SECRET),
+            ),
         );
     }
 

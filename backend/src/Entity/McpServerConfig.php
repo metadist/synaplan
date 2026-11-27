@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use App\Model\SecretPlace;
 use App\Repository\McpServerConfigRepository;
 use App\Service\Mcp\McpOAuthState;
 use App\Service\Security\EncryptionService;
@@ -175,18 +176,34 @@ class McpServerConfig
         return '' !== $this->authToken;
     }
 
+    /**
+     * The place the auth token of one owner's server is bound to.
+     */
+    public static function authTokenPlace(int $userId): string
+    {
+        return SecretPlace::column('BMCPSERVERS', 'BAUTHTOKEN', $userId);
+    }
+
+    /**
+     * The place the OAuth state of one owner's server is bound to.
+     */
+    public static function oauthPlace(int $userId): string
+    {
+        return SecretPlace::column('BMCPSERVERS', 'BOAUTH', $userId);
+    }
+
     public function getDecryptedAuthToken(EncryptionService $encryptionService): string
     {
         if ('' === $this->authToken) {
             return '';
         }
 
-        return $encryptionService->decrypt($this->authToken);
+        return $encryptionService->decrypt($this->authToken, self::authTokenPlace($this->userId));
     }
 
     public function setDecryptedAuthToken(string $plaintext, EncryptionService $encryptionService): self
     {
-        $this->authToken = '' === $plaintext ? '' : $encryptionService->encrypt($plaintext);
+        $this->authToken = '' === $plaintext ? '' : $encryptionService->encrypt($plaintext, self::authTokenPlace($this->userId));
         $this->touch();
 
         return $this;
@@ -250,7 +267,7 @@ class McpServerConfig
             return new McpOAuthState();
         }
 
-        $json = $encryptionService->decrypt($this->oauth);
+        $json = $encryptionService->decrypt($this->oauth, self::oauthPlace($this->userId));
         if ('' === $json) {
             return new McpOAuthState();
         }
@@ -264,14 +281,17 @@ class McpServerConfig
         return is_array($decoded) ? McpOAuthState::fromArray($decoded) : new McpOAuthState();
     }
 
-    public static function encryptOAuthState(McpOAuthState $state, EncryptionService $encryptionService): string
+    /**
+     * @param int $userId the owner of the server the state is stored on
+     */
+    public static function encryptOAuthState(McpOAuthState $state, EncryptionService $encryptionService, int $userId): string
     {
-        return $encryptionService->encrypt(json_encode($state->toArray(), JSON_THROW_ON_ERROR));
+        return $encryptionService->encrypt(json_encode($state->toArray(), JSON_THROW_ON_ERROR), self::oauthPlace($userId));
     }
 
     public function setDecryptedOAuthState(McpOAuthState $state, EncryptionService $encryptionService): self
     {
-        $this->oauth = self::encryptOAuthState($state, $encryptionService);
+        $this->oauth = self::encryptOAuthState($state, $encryptionService, $this->userId);
         $this->touch();
 
         return $this;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\OAuth\Server;
 
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 
@@ -13,8 +14,8 @@ use App\Service\Security\EncryptionService;
  */
 final class AccessTokenKeyStore
 {
-    private const GROUP = 'OAUTH_SERVER';
-    private const SETTING = 'ACCESS_TOKEN_KEY';
+    public const GROUP = 'OAUTH_SERVER';
+    public const SETTING = 'ACCESS_TOKEN_KEY';
 
     /** @var array{private: string, public: string, kid: string}|null */
     private ?array $key = null;
@@ -72,6 +73,7 @@ final class AccessTokenKeyStore
         if (null === $stored) {
             $stored = $this->decode($this->configs->insertIfAbsent(0, self::GROUP, self::SETTING, $this->encryption->encrypt(
                 json_encode($this->generate(), \JSON_THROW_ON_ERROR),
+                SecretPlace::config(0, self::GROUP, self::SETTING),
             ))) ?? throw new \RuntimeException('Access token key could not be stored.');
         }
 
@@ -108,7 +110,7 @@ final class AccessTokenKeyStore
             return null;
         }
         try {
-            $data = json_decode($this->encryption->decrypt($stored), true);
+            $data = json_decode($this->encryption->decrypt($stored, SecretPlace::config(0, self::GROUP, self::SETTING)), true);
         } catch (\RuntimeException) {
             return null;
         }

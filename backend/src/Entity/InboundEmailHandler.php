@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Model\SecretPlace;
 use App\Repository\InboundEmailHandlerRepository;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -195,6 +196,22 @@ class InboundEmailHandler
     }
 
     /**
+     * The place the mailbox password of one owner's handler is bound to.
+     */
+    public static function passwordPlace(int $userId): string
+    {
+        return SecretPlace::column('BINBOUNDEMAILHANDLER', 'BPASSWORD', $userId);
+    }
+
+    /**
+     * The place the SMTP password inside the handler's config is bound to.
+     */
+    public static function smtpPasswordPlace(int $userId): string
+    {
+        return SecretPlace::column('BINBOUNDEMAILHANDLER', 'BCONFIG.smtp.password', $userId);
+    }
+
+    /**
      * Get decrypted password
      * Note: Requires EncryptionService - use in Service layer.
      */
@@ -204,7 +221,7 @@ class InboundEmailHandler
             return '';
         }
 
-        return $encryptionService->decrypt($this->password);
+        return $encryptionService->decrypt($this->password, self::passwordPlace($this->userId));
     }
 
     /**
@@ -216,7 +233,7 @@ class InboundEmailHandler
         if (empty($plaintext)) {
             $this->password = '';
         } else {
-            $this->password = $encryptionService->encrypt($plaintext);
+            $this->password = $encryptionService->encrypt($plaintext, self::passwordPlace($this->userId));
         }
 
         return $this;
@@ -329,7 +346,7 @@ class InboundEmailHandler
             'server' => $smtpServer,
             'port' => $smtpPort,
             'username' => $smtpUsername,
-            'password' => empty($smtpPassword) ? '' : $encryptionService->encrypt($smtpPassword),
+            'password' => empty($smtpPassword) ? '' : $encryptionService->encrypt($smtpPassword, self::smtpPasswordPlace($this->userId)),
             'security' => $smtpSecurity,
         ];
         $this->config = $config;
@@ -353,7 +370,7 @@ class InboundEmailHandler
             'server' => $smtp['server'] ?? '',
             'port' => $smtp['port'] ?? 587,
             'username' => $smtp['username'] ?? '',
-            'password' => empty($smtp['password']) ? '' : $encryptionService->decrypt($smtp['password']),
+            'password' => empty($smtp['password']) ? '' : $encryptionService->decrypt($smtp['password'], self::smtpPasswordPlace($this->userId)),
             'security' => $smtp['security'] ?? 'SSL/TLS',
         ];
     }

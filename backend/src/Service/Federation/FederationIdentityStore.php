@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Federation;
 
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 
@@ -28,7 +29,7 @@ final class FederationIdentityStore
             return null;
         }
         try {
-            $json = $this->encryption->decrypt($stored);
+            $json = $this->encryption->decrypt($stored, SecretPlace::config(0, self::GROUP, self::SETTING));
         } catch (\RuntimeException) {
             return null;
         }
@@ -54,6 +55,6 @@ final class FederationIdentityStore
             'name' => $identity->name,
             'opened' => $identity->opened,
         ], JSON_THROW_ON_ERROR);
-        $this->configs->setValue(0, self::GROUP, self::SETTING, $this->encryption->encrypt($json));
+        $this->configs->setValue(0, self::GROUP, self::SETTING, $this->encryption->encrypt($json, SecretPlace::config(0, self::GROUP, self::SETTING)));
     }
 }

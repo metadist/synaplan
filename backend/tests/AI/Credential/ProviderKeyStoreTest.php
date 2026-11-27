@@ -8,6 +8,7 @@ use App\AI\Catalog\ProviderCatalog;
 use App\AI\Credential\ProviderKeyCatalog;
 use App\AI\Credential\ProviderKeyStore;
 use App\Entity\Config;
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use PHPUnit\Framework\MockObject\Stub;
@@ -99,7 +100,7 @@ final class ProviderKeyStoreTest extends TestCase
         }
 
         /* @var array{key: string, origin: string, secret?: string} */
-        return json_decode($this->encryption->decrypt($config->getValue()), true, 8, JSON_THROW_ON_ERROR);
+        return json_decode($this->encryption->decrypt($config->getValue(), SecretPlace::config(0, ProviderKeyStore::CONFIG_GROUP, $provider)), true, 8, JSON_THROW_ON_ERROR);
     }
 
     // ---- key + secret pairs (Higgsfield) ----

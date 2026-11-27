@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\AI\Credential;
 
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\Security\EncryptionService;
 use Psr\Log\LoggerInterface;
@@ -173,7 +174,10 @@ final class ProviderKeyStore
         if (null !== $secret) {
             $payload['secret'] = $secret;
         }
-        $this->configRepository->setValue(0, self::CONFIG_GROUP, $provider, $this->encryption->encrypt(json_encode($payload, JSON_THROW_ON_ERROR)));
+        $this->configRepository->setValue(0, self::CONFIG_GROUP, $provider, $this->encryption->encrypt(
+            json_encode($payload, JSON_THROW_ON_ERROR),
+            SecretPlace::config(0, self::CONFIG_GROUP, $provider),
+        ));
         unset($this->memo[$provider]);
 
         // Never log the key itself — only that one was stored.
@@ -370,7 +374,7 @@ final class ProviderKeyStore
         }
 
         try {
-            $decoded = json_decode($this->encryption->decrypt($cipher), true, 8, JSON_THROW_ON_ERROR);
+            $decoded = json_decode($this->encryption->decrypt($cipher, SecretPlace::config(0, self::CONFIG_GROUP, $provider)), true, 8, JSON_THROW_ON_ERROR);
         } catch (\Throwable $e) {
             // Most likely APP_SECRET changed since the row was written. Treat
             // as not-configured (env fallback still applies) and log the cause.

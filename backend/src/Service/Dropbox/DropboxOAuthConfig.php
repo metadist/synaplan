@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Dropbox;
 
 use App\AI\Credential\SecretValueGuard;
+use App\Model\SecretPlace;
 use App\Repository\ConfigRepository;
 use App\Service\OAuth\OAuthProviderConfig;
 use App\Service\OAuth\OAuthProviderSource;
@@ -79,7 +80,7 @@ final readonly class DropboxOAuthConfig implements OAuthProviderSource
         }
 
         try {
-            return trim($this->encryption->decrypt($stored));
+            return trim($this->encryption->decrypt($stored, SecretPlace::config(0, self::CONFIG_GROUP, self::KEY_APP_SECRET)));
         } catch (\Throwable) {
             return '';
         }

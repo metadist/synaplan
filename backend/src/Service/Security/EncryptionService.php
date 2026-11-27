@@ -16,12 +16,14 @@ use Psr\Log\LoggerInterface;
  * to something else. The key is derived from APP_SECRET for this purpose
  * alone ({@see PurposeKey}).
  *
- * Values written by earlier releases (base64 of an IV and AES-256-CBC
- * ciphertext, no prefix) stay readable. They are replaced by v2 the next time
- * their owner saves them.
+ * The context ties a value to a place ({@see \App\Model\SecretPlace}): a
+ * value encrypted with a context opens only with the same one, so it cannot
+ * be moved to another owner's row.
  *
- * The optional context ties a value to a place: a value encrypted with a
- * context opens only with the same one, so it cannot be moved to another row.
+ * Two older shapes stay readable until an installation has run
+ * `app:secrets:reencrypt`: values from earlier releases (base64 of an IV and
+ * AES-256-CBC ciphertext, no prefix), and v2 values written before callers
+ * named a place. A save or that command replaces either with a bound value.
  */
 final class EncryptionService
 {
@@ -62,9 +64,14 @@ final class EncryptionService
         }
 
         try {
-            return str_starts_with($ciphertext, self::V2_PREFIX)
-                ? $this->open(substr($ciphertext, strlen(self::V2_PREFIX)), $context)
-                : $this->openLegacy($ciphertext);
+            if (!str_starts_with($ciphertext, self::V2_PREFIX)) {
+                return $this->openLegacy($ciphertext);
+            }
+            $encoded = substr($ciphertext, strlen(self::V2_PREFIX));
+
+            return $this->open($encoded, $context)
+                ?? ('' !== $context ? $this->open($encoded, '') : null)
+                ?? throw new \RuntimeException('The value was altered or belongs to another key or place');
         } catch (\Throwable $e) {
             $this->logger->error('Decryption failed', ['error' => $e->getMessage()]);
             throw new \RuntimeException('Decryption failed: '.$e->getMessage());
@@ -79,7 +86,41 @@ final class EncryptionService
         return '' !== $ciphertext && !str_starts_with($ciphertext, self::V2_PREFIX);
     }
 
-    private function open(string $encoded, string $context): string
+    /**
+     * The ciphertext to store at $context in place of $stored, or null when
+     * $stored is already bound to that place. Used to move values written by
+     * an earlier release to the current format without their owner saving them.
+     *
+     * @throws \RuntimeException when the value cannot be read
+     */
+    public function rewrap(string $stored, string $context): ?string
+    {
+        if ('' === $stored) {
+            return null;
+        }
+
+        return $this->isBoundTo($stored, $context)
+            ? null
+            : $this->encrypt($this->decrypt($stored, $context), $context);
+    }
+
+    private function isBoundTo(string $stored, string $context): bool
+    {
+        if (!str_starts_with($stored, self::V2_PREFIX)) {
+            return false;
+        }
+
+        try {
+            return null !== $this->open(substr($stored, strlen(self::V2_PREFIX)), $context);
+        } catch (\RuntimeException) {
+            return false;
+        }
+    }
+
+    /**
+     * Null when the value does not authenticate under this key and context.
+     */
+    private function open(string $encoded, string $context): ?string
     {
         $data = base64_decode($encoded, true);
         $nonceLength = \SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES;
@@ -93,11 +134,8 @@ final class EncryptionService
             substr($data, 0, $nonceLength),
             $this->key(),
         );
-        if (false === $plaintext) {
-            throw new \RuntimeException('The value was altered or belongs to another key or place');
-        }
 
-        return $plaintext;
+        return false === $plaintext ? null : $plaintext;
     }
 
     private function openLegacy(string $ciphertext): string

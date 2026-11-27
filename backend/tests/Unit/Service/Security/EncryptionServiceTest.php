@@ -57,6 +57,53 @@ final class EncryptionServiceTest extends TestCase
         $service->decrypt($stored, 'provider_keys|openai|7');
     }
 
+    public function testAValueWrittenBeforePlacesWereNamedStaysReadableAtItsPlace(): void
+    {
+        $service = $this->service();
+        $unbound = $service->encrypt('secret');
+
+        self::assertSame('secret', $service->decrypt($unbound, 'provider_keys|openai|0'));
+    }
+
+    public function testRewrapBindsAnOlderValueToItsPlace(): void
+    {
+        $service = $this->service();
+
+        foreach ([$this->legacyCiphertext('sk-key'), $service->encrypt('sk-key')] as $older) {
+            $rewrapped = $service->rewrap($older, 'place-a');
+
+            self::assertIsString($rewrapped);
+            self::assertStringStartsWith('v2:', $rewrapped);
+            self::assertSame('sk-key', $service->decrypt($rewrapped, 'place-a'));
+            self::assertNull($service->rewrap($rewrapped, 'place-a'), 'a bound value is left alone');
+        }
+    }
+
+    public function testARewrappedValueDoesNotOpenInAnotherPlace(): void
+    {
+        $service = $this->service();
+        $rewrapped = $service->rewrap($this->legacyCiphertext('sk-key'), 'place-a');
+        self::assertIsString($rewrapped);
+
+        $this->expectException(\RuntimeException::class);
+
+        $service->decrypt($rewrapped, 'place-b');
+    }
+
+    public function testRewrapRefusesAValueItCannotRead(): void
+    {
+        $foreign = (new EncryptionService('another-secret', new NullLogger()))->encrypt('secret', 'place-a');
+
+        $this->expectException(\RuntimeException::class);
+
+        $this->service()->rewrap($foreign, 'place-a');
+    }
+
+    public function testRewrapLeavesAnEmptyValueAlone(): void
+    {
+        self::assertNull($this->service()->rewrap('', 'place-a'));
+    }
+
     public function testAnotherSecretDoesNotOpenTheValue(): void
     {
         $stored = $this->service()->encrypt('secret');
