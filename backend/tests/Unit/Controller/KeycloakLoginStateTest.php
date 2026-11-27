@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Controller;
 
 use App\Controller\KeycloakAuthController;
+use App\Service\Auth\AuthCookieFactory;
 use App\Service\Auth\ImpersonationService;
+use App\Service\Auth\LoginBrowserBinding;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OidcAuthorizeParams;
 use App\Service\Auth\OidcLoginState;
@@ -27,7 +29,11 @@ final class KeycloakLoginStateTest extends TestCase
 {
     public function testTheAuthorizeRedirectCarriesAShortStateAndNotTheVerifier(): void
     {
-        $state = new OidcLoginState(new ArrayAdapter(), new LockFactory(new InMemoryStore()));
+        $state = new OidcLoginState(
+            new ArrayAdapter(),
+            new LockFactory(new InMemoryStore()),
+            new LoginBrowserBinding(new AuthCookieFactory('prod', 'https://app.example.com'), new NullLogger()),
+        );
         $controller = $this->controller($state, new MockHttpClient([
             new MockResponse(json_encode([
                 'authorization_endpoint' => 'https://idp.example/auth',
@@ -50,7 +56,7 @@ final class KeycloakLoginStateTest extends TestCase
         self::assertSame(32, strlen($issued));
         self::assertLessThan(80, strlen($issued));
 
-        $attempt = $state->consume($issued);
+        $attempt = $state->consume(new Request(), $issued);
         self::assertIsArray($attempt);
         self::assertStringNotContainsString($attempt['pkce_verifier'], $location);
         self::assertTrue($attempt['native']);
@@ -58,7 +64,7 @@ final class KeycloakLoginStateTest extends TestCase
         self::assertSame('openid email profile offline_access', $params['scope'] ?? null);
         self::assertSame($this->challenge($attempt['pkce_verifier']), $params['code_challenge'] ?? null);
         self::assertSame('S256', $params['code_challenge_method'] ?? null);
-        self::assertNull($state->consume($issued));
+        self::assertNull($state->consume(new Request(), $issued));
     }
 
     private function challenge(string $verifier): string

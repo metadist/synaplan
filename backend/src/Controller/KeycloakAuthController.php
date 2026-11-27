@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Model\AccountLanguage;
 use App\Security\AccountAccess;
 use App\Service\Auth\ImpersonationService;
+use App\Service\Auth\LoginState;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcAuthorizeParams;
@@ -98,7 +99,7 @@ class KeycloakAuthController extends AbstractController
             $codeVerifier = $this->generateCodeVerifier();
             $codeChallenge = $this->generateCodeChallenge($codeVerifier);
             $state = $this->oidcLoginState->issue(
-                $codeVerifier,
+                $request, $codeVerifier,
                 $resolved['scopes'],
                 $request->query->getBoolean('native'),
                 AccountLanguage::normalize($request->query->get('language')),
@@ -167,7 +168,7 @@ class KeycloakAuthController extends AbstractController
 
         // The attempt lives in the shared cache; the state is only its id.
         $statePayload = is_string($state) && '' !== $state
-            ? $this->oidcLoginState->consume($state)
+            ? $this->oidcLoginState->consume($request, $state)
             : null;
 
         if (!$statePayload) {
@@ -175,10 +176,7 @@ class KeycloakAuthController extends AbstractController
                 'state_present' => !empty($state),
             ]);
 
-            return $this->redirect($this->frontendUrl.'/auth/callback?'.http_build_query([
-                'error' => 'Invalid state parameter',
-                'provider' => 'keycloak',
-            ]));
+            return $this->oauthLoginResponder->error('keycloak', 'Invalid state parameter', false, ['error_code' => LoginState::RESTART_CODE]);
         }
 
         $native = $statePayload['native'];
@@ -328,7 +326,7 @@ class KeycloakAuthController extends AbstractController
         $description = is_string($description) ? $description : null;
         $state = $request->query->get('state');
         $statePayload = is_string($state) && '' !== $state
-            ? $this->oidcLoginState->consume($state)
+            ? $this->oidcLoginState->consume($request, $state)
             : null;
         $native = (bool) ($statePayload['native'] ?? false);
 

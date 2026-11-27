@@ -330,6 +330,7 @@ class AuthController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Invalid credentials')]
+    #[OA\Response(response: 415, description: 'The body must be sent as application/json (AUTH_JSON_REQUIRED)')]
     #[OA\Response(
         response: 403,
         description: 'Email not verified (code EMAIL_NOT_VERIFIED, sent only after the password matched) or the account cannot sign in',
@@ -343,6 +344,12 @@ class AuthController extends AbstractController
     )]
     public function login(Request $request): Response
     {
+        // JSON only: a cross-site `text/plain` form could otherwise post valid
+        // credentials and sign the visitor's browser in to the sender's account.
+        if ('json' !== $request->getContentTypeFormat()) {
+            return $this->json(['error' => 'Send the request as JSON.', 'code' => 'AUTH_JSON_REQUIRED'], Response::HTTP_UNSUPPORTED_MEDIA_TYPE);
+        }
+
         $data = json_decode($request->getContent(), true);
         $email = $data['email'] ?? '';
         $password = $data['password'] ?? '';
@@ -360,16 +367,9 @@ class AuthController extends AbstractController
         // Dummy hash for timing attack prevention (valid bcrypt format)
         $dummyHash = '$2y$13$A5.u1234567890123456789012345678901234567890123456789';
 
-        if (!$user) {
-            $dummy = new User();
-            $dummy->setPw($dummyHash);
-            $this->passwordHasher->isPasswordValid($dummy, $password);
-
-            return $this->json(['error' => 'Invalid credentials'], Response::HTTP_UNAUTHORIZED);
-        }
-
-        // User has no password yet (e.g. registered via Google/GitHub only)
-        if (null === $user->getPw()) {
+        // No such account, or one without a password yet (e.g. registered via
+        // Google/GitHub only): answer after the same hashing work either way.
+        if (!$user || null === $user->getPw()) {
             $dummy = new User();
             $dummy->setPw($dummyHash);
             $this->passwordHasher->isPasswordValid($dummy, $password);
@@ -485,9 +485,9 @@ class AuthController extends AbstractController
         // Regular user - use our internal refresh token
         $refreshTokenString = $request->cookies->get(TokenService::REFRESH_COOKIE);
 
-        // Native shell has no cross-origin refresh cookie → it sends the refresh
-        // token (from secure native storage) in the request body instead.
-        if (!$refreshTokenString) {
+        // Native shell has no refresh cookie → it sends the token in the body.
+        // JSON only, so a cross-site form cannot plant its session in a browser.
+        if (!$refreshTokenString && 'json' === $request->getContentTypeFormat()) {
             $body = json_decode($request->getContent(), true);
             if (is_array($body) && isset($body['refreshToken']) && is_string($body['refreshToken'])) {
                 $refreshTokenString = $body['refreshToken'];

@@ -6,6 +6,7 @@ namespace App\Service\Auth;
 
 use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Lock\LockFactory;
 
 /**
@@ -21,6 +22,10 @@ use Symfony\Component\Lock\LockFactory;
  * signed state used to have, and are spent on the first callback. The cache
  * and the lock have to be the shared ones: the callback may be served by a
  * different web node than the login that started the attempt.
+ *
+ * An attempt started in a browser is spent only by that browser
+ * ({@see LoginBrowserBinding}). One the native app started ends in a handoff
+ * to the app and is not bound here.
  */
 final readonly class OidcLoginState
 {
@@ -29,21 +34,24 @@ final readonly class OidcLoginState
     public const ID_PATTERN = '[a-f0-9]{32}';
 
     private const CACHE_PREFIX = 'oidc_login_';
+    private const PROVIDER = 'keycloak';
 
     public function __construct(
         #[Autowire(service: 'cache.app')]
         private CacheItemPoolInterface $cache,
         private LockFactory $lockFactory,
+        private LoginBrowserBinding $browser,
     ) {
     }
 
     /**
      * Store one login attempt and return the id that goes into the authorize URL.
+     * A browser attempt also puts its cookie on the response to `$request`.
      *
      * @throws \InvalidArgumentException when the verifier or the scopes cannot be stored
      * @throws \RuntimeException         when the cache does not accept the attempt
      */
-    public function issue(string $codeVerifier, string $scopes, bool $native, ?string $language): string
+    public function issue(Request $request, string $codeVerifier, string $scopes, bool $native, ?string $language): string
     {
         if (1 !== preg_match('/^[A-Za-z0-9._~-]{43,128}$/', $codeVerifier)) {
             throw new \InvalidArgumentException('PKCE verifier is not usable.');
@@ -59,6 +67,7 @@ final readonly class OidcLoginState
             'scopes' => $scopes,
             'native' => $native,
             'language' => $this->language($language),
+            'browser' => $native ? null : $this->browser->start($request, self::PROVIDER),
         ]);
         $item->expiresAfter(self::TTL_SECONDS);
         if (!$this->cache->save($item)) {
@@ -69,12 +78,12 @@ final readonly class OidcLoginState
     }
 
     /**
-     * Read the attempt and forget it. A second callback, or one that never
-     * started here, gets nothing.
+     * Read the attempt and forget it. A second callback, one that never
+     * started here, or one in another browser than the attempt's gets nothing.
      *
      * @return array{pkce_verifier: string, scopes: string, native: bool, language: string|null}|null
      */
-    public function consume(string $state): ?array
+    public function consume(Request $request, string $state): ?array
     {
         if (1 !== preg_match('/^'.self::ID_PATTERN.'$/', $state)) {
             return null;
@@ -101,7 +110,7 @@ final readonly class OidcLoginState
                 return null;
             }
 
-            return $this->payload($stored);
+            return $this->payload($stored, $request);
         } finally {
             $lock->release();
         }
@@ -124,7 +133,7 @@ final readonly class OidcLoginState
     /**
      * @return array{pkce_verifier: string, scopes: string, native: bool, language: string|null}|null
      */
-    private function payload(mixed $stored): ?array
+    private function payload(mixed $stored, Request $request): ?array
     {
         if (!is_array($stored)) {
             return null;
@@ -138,6 +147,9 @@ final readonly class OidcLoginState
             return null;
         }
         if (null !== $language && !is_string($language)) {
+            return null;
+        }
+        if (!$native && !$this->browser->confirm($request, self::PROVIDER, $stored['browser'] ?? null)) {
             return null;
         }
 

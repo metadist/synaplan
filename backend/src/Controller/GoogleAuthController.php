@@ -5,12 +5,12 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
+use App\Service\Auth\LoginState;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupDoor;
 use App\Service\Http\ClientAddress;
-use App\Service\OAuth\OAuthStateService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,7 +29,7 @@ class GoogleAuthController extends AbstractController
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
-        private OAuthStateService $oauthStateService,
+        private LoginState $loginState,
         private OAuthLoginResponder $oauthLoginResponder,
         private OAuthSignupGate $signupGate,
         private LoggerInterface $logger,
@@ -53,16 +53,12 @@ class GoogleAuthController extends AbstractController
     {
         $redirectUri = $this->appUrl.'/api/v1/auth/google/callback';
 
-        // Native (mobile) clients open this URL in the system browser and need
-        // the result delivered back via a deep link — remember that intent in
-        // the signed state so the callback knows which flow to complete.
-        $native = $request->query->getBoolean('native');
-
-        // Signed state (no session required). It also records whether the
-        // browser passed the human check, which the callback requires before
-        // it creates a NEW account.
-        $state = $this->oauthStateService->generateState('google', AccountLanguage::withSignupLanguage(
-            ($native ? ['native' => true] : []) + $this->signupGate->stateExtras($request, 'google'),
+        // Signed state (no session required), bound to this browser, or marked
+        // for the deep-link return when the native app opened this URL. It also
+        // records whether the browser passed the human check, which the
+        // callback requires before it creates a NEW account.
+        $state = $this->loginState->issue($request, 'google', AccountLanguage::withSignupLanguage(
+            $this->signupGate->stateExtras($request, 'google'),
             $request->query->get('language'),
         ));
 
@@ -100,8 +96,8 @@ class GoogleAuthController extends AbstractController
         $code = $request->query->get('code');
         $state = $request->query->get('state');
 
-        // Validate signed state token (CSRF protection, no session required)
-        $statePayload = $state ? $this->oauthStateService->validateState($state, 'google') : null;
+        // The signed state, redeemed only in the browser that started the sign-in.
+        $statePayload = $state ? $this->loginState->redeem($request, $state, 'google') : null;
 
         if (!$statePayload) {
             $this->logger->error('Google OAuth state validation failed', [
@@ -110,10 +106,10 @@ class GoogleAuthController extends AbstractController
 
             // Native flag lives inside the (here invalid) state, so default to
             // the web error page when we cannot trust it.
-            return $this->oauthLoginResponder->error('google', 'Invalid state parameter', false);
+            return $this->oauthLoginResponder->error('google', 'Invalid state parameter', false, ['error_code' => LoginState::RESTART_CODE]);
         }
 
-        $native = (bool) ($statePayload['native'] ?? false);
+        $native = LoginState::isNative($statePayload);
 
         if (!$code) {
             return $this->oauthLoginResponder->error('google', 'Authorization code not received', $native);

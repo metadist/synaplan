@@ -5,12 +5,12 @@ namespace App\Controller;
 use App\Entity\User;
 use App\Model\AccountLanguage;
 use App\Repository\UserRepository;
+use App\Service\Auth\LoginState;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OAuthSignupGate;
 use App\Service\Auth\SignupBlockedException;
 use App\Service\Auth\SignupDoor;
 use App\Service\Http\ClientAddress;
-use App\Service\OAuth\OAuthStateService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -30,7 +30,7 @@ class GitHubAuthController extends AbstractController
     public function __construct(
         private HttpClientInterface $httpClient,
         private UserRepository $userRepository,
-        private OAuthStateService $oauthStateService,
+        private LoginState $loginState,
         private OAuthLoginResponder $oauthLoginResponder,
         private OAuthSignupGate $signupGate,
         private LoggerInterface $logger,
@@ -54,14 +54,12 @@ class GitHubAuthController extends AbstractController
     {
         $redirectUri = $this->appUrl.'/api/v1/auth/github/callback';
 
-        // Native (mobile) clients open this in the system browser and need the
-        // result via a deep link — remember that intent in the signed state.
-        $native = $request->query->getBoolean('native');
-
-        // Signed state (no session required); also records the passed human
-        // check the callback requires before creating a NEW account.
-        $state = $this->oauthStateService->generateState('github', AccountLanguage::withSignupLanguage(
-            ($native ? ['native' => true] : []) + $this->signupGate->stateExtras($request, 'github'),
+        // Signed state (no session required), bound to this browser, or marked
+        // for the deep-link return when the native app opened this URL. It also
+        // records the passed human check the callback requires before creating
+        // a NEW account.
+        $state = $this->loginState->issue($request, 'github', AccountLanguage::withSignupLanguage(
+            $this->signupGate->stateExtras($request, 'github'),
             $request->query->get('language'),
         ));
 
@@ -96,18 +94,18 @@ class GitHubAuthController extends AbstractController
         $code = $request->query->get('code');
         $state = $request->query->get('state');
 
-        // Validate signed state token (CSRF protection, no session required)
-        $statePayload = $state ? $this->oauthStateService->validateState($state, 'github') : null;
+        // The signed state, redeemed only in the browser that started the sign-in.
+        $statePayload = $state ? $this->loginState->redeem($request, $state, 'github') : null;
 
         if (!$statePayload) {
             $this->logger->error('GitHub OAuth state validation failed', [
                 'state_present' => !empty($state),
             ]);
 
-            return $this->oauthLoginResponder->error('github', 'Invalid state parameter', false);
+            return $this->oauthLoginResponder->error('github', 'Invalid state parameter', false, ['error_code' => LoginState::RESTART_CODE]);
         }
 
-        $native = (bool) ($statePayload['native'] ?? false);
+        $native = LoginState::isNative($statePayload);
 
         if (!$code) {
             return $this->oauthLoginResponder->error('github', 'Authorization code not received', $native);

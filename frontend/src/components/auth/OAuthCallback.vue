@@ -129,6 +129,7 @@ const oauthErrorMessage = (
   if (errorCode === 'oidc_access_denied') return t('auth.oidcAccessDenied')
   if (errorCode === 'oidc_auth_failed') return t('auth.oidcAuthFailed')
   if (errorCode === 'oidc_not_authorized') return t('auth.oidcNotAuthorized')
+  if (errorCode === 'login_restart') return t('auth.loginRestart')
   const blockedKey = signupBlockedI18nKey(errorCode)
   if (blockedKey) return t(blockedKey)
   if (errorParam) return decodeURIComponent(errorParam)
