@@ -27,7 +27,7 @@ class Config
     #[ORM\Column(name: 'BSETTING', length: 96)]
     private string $setting = '';
 
-    // Types::TEXT (LONGTEXT on MariaDB): rows may hold AES-256-CBC ciphertext
+    // Types::TEXT (LONGTEXT on MariaDB): rows may hold ciphertext
     // (encrypted provider API keys, OpenAI-compatible endpoint JSON) that
     // exceeds the old VARCHAR(250). Widened by Version20260729120000.
     #[ORM\Column(name: 'BVALUE', type: Types::TEXT)]

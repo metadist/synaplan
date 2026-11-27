@@ -22,7 +22,7 @@ Synaplan reads configuration from three places, and it matters which one you rea
 | Where | What belongs there | Takes effect |
 |-------|--------------------|--------------|
 | `backend/.env` (or `deploy/.env`) | Infrastructure and boot settings: database, Redis, public URLs, `APP_SECRET`, channel credentials, and `FEATURE_*` pins | When the container starts |
-| **Admin → AI infrastructure → Providers & keys** (`/admin/setup`) | AI provider API keys — validated live, stored AES-256-CBC encrypted in the database | Immediately, no restart |
+| **Admin → AI infrastructure → Providers & keys** (`/admin/setup`) | AI provider API keys — validated live, stored encrypted in the database | Immediately, no restart |
 | **Admin → System configuration** (`/admin/config`), backed by `BCONFIG` rows | Behavior switches: multi-task routing, async media jobs, access policy, white-label branding | Immediately, no restart |
 
 Provider keys are the common case and belong in the UI — see [AI Providers](#ai-providers) below. Environment variables remain supported for scripted and orchestrated deploys.
@@ -250,7 +250,7 @@ Synaplan supports multiple AI providers. Configure one or more.
 
 **Recommended: the setup UI.** Log in as admin and open **Admin → AI Providers**
 (`/admin/setup`). Keys entered there are validated with a live request, stored
-**AES-256-CBC encrypted in the database** (`BCONFIG`, group `provider_keys`,
+**encrypted in the database** (`BCONFIG`, group `provider_keys`,
 keyed off `APP_SECRET`), and take effect without a restart — web requests use the
 new key at once, long-running processes (the messenger worker, FrankenPHP worker
 mode) within a few seconds, because each memoizes resolved keys briefly. The

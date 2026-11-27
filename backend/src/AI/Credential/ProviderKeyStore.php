@@ -13,7 +13,7 @@ use Psr\Log\LoggerInterface;
  * Gemini, Mistral, TrustedTokens, A2Agent, Meta, Cerebras, HuggingFace, xAI).
  *
  * Keys live in BCONFIG (ownerId = 0, group {@see self::CONFIG_GROUP}, one row
- * per provider) as an AES-256-CBC encrypted JSON payload
+ * per provider) as an encrypted JSON payload
  * `{"key": "...", "origin": "env"|"ui", "secret"?: "..."}` via
  * {@see EncryptionService} — the same at-rest pattern as
  * OpenAiCompatibleEndpointRegistry and the per-user Higgsfield credentials.

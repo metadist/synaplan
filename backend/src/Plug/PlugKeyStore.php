@@ -13,7 +13,7 @@ use Psr\Log\LoggerInterface;
  * Encrypted store for plug API keys (Tavily, Exa, Firecrawl, SpecStream, Jina, Cohere, Voyage).
  *
  * Same at-rest shape as {@see \App\AI\Credential\ProviderKeyStore}: BCONFIG
- * group {@see self::CONFIG_GROUP}, AES-256-CBC JSON `{"key","origin"}`.
+ * group {@see self::CONFIG_GROUP}, encrypted JSON `{"key","origin"}`.
  * Brave stays on `BRAVE_SEARCH_API_KEY`; Perplexity shares
  * {@see \App\AI\Credential\ProviderKeyStore} with the chat provider.
  */

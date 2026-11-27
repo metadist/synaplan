@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\OAuth;
 
+use App\Service\Security\PurposeKey;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -157,10 +158,10 @@ final readonly class OAuthStateService
     }
 
     /**
-     * Sign data with app secret.
+     * Sign data with the key of this token family.
      */
     private function sign(string $data): string
     {
-        return hash_hmac('sha256', $data, $this->appSecret);
+        return hash_hmac('sha256', $data, PurposeKey::derive($this->appSecret, PurposeKey::OAUTH_STATE));
     }
 }

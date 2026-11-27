@@ -8,6 +8,7 @@ use App\Repository\TokenRepository;
 use App\Repository\UserRepository;
 use App\Security\AccountAccess;
 use App\Security\AccountSignInRefused;
+use App\Service\Security\PurposeKey;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\Cookie;
@@ -454,7 +455,7 @@ final readonly class TokenService
      */
     private function sign(string $data): string
     {
-        return hash_hmac('sha256', $data, $this->appSecret);
+        return hash_hmac('sha256', $data, PurposeKey::derive($this->appSecret, PurposeKey::ACCESS_TOKEN));
     }
 
     /**

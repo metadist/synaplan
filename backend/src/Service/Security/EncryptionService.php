@@ -1,98 +1,128 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Service\Security;
 
 use Psr\Log\LoggerInterface;
 
 /**
- * Encryption Service.
+ * Encrypts secrets the database keeps: provider keys, mailbox passwords,
+ * connector tokens.
  *
- * Simple encryption/decryption for sensitive data like IMAP passwords.
- * Uses APP_SECRET as encryption key.
+ * New values are written in format v2: `v2:` followed by base64 of a 24-byte
+ * nonce and the XChaCha20-Poly1305 ciphertext. The cipher authenticates, so a
+ * value that was altered in the database fails to open instead of decrypting
+ * to something else. The key is derived from APP_SECRET for this purpose
+ * alone ({@see PurposeKey}).
+ *
+ * Values written by earlier releases (base64 of an IV and AES-256-CBC
+ * ciphertext, no prefix) stay readable. They are replaced by v2 the next time
+ * their owner saves them.
+ *
+ * The optional context ties a value to a place: a value encrypted with a
+ * context opens only with the same one, so it cannot be moved to another row.
  */
 final class EncryptionService
 {
-    private const CIPHER = 'AES-256-CBC';
-    private const IV_LENGTH = 16;
+    public const KEY_PURPOSE = 'synaplan/encryption/v2';
+
+    private const V2_PREFIX = 'v2:';
+    private const LEGACY_CIPHER = 'AES-256-CBC';
+    private const LEGACY_IV_LENGTH = 16;
 
     public function __construct(
-        private string $secretKey,
-        private LoggerInterface $logger,
+        #[\SensitiveParameter]
+        private readonly string $secretKey,
+        private readonly LoggerInterface $logger,
     ) {
-        // Derive encryption key from APP_SECRET (32 bytes for AES-256)
-        $this->secretKey = hash('sha256', $secretKey, true);
     }
 
-    /**
-     * Encrypt plaintext.
-     */
-    public function encrypt(string $plaintext): string
+    public function encrypt(#[\SensitiveParameter] string $plaintext, string $context = ''): string
     {
-        if (empty($plaintext)) {
+        if ('' === $plaintext) {
             return '';
         }
 
         try {
-            $iv = random_bytes(self::IV_LENGTH);
-            $encrypted = openssl_encrypt(
-                $plaintext,
-                self::CIPHER,
-                $this->secretKey,
-                OPENSSL_RAW_DATA,
-                $iv
-            );
+            $nonce = random_bytes(\SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES);
+            $sealed = sodium_crypto_aead_xchacha20poly1305_ietf_encrypt($plaintext, $context, $nonce, $this->key());
 
-            if (false === $encrypted) {
-                throw new \RuntimeException('Encryption failed');
-            }
-
-            // Prepend IV to encrypted data and base64 encode
-            return base64_encode($iv.$encrypted);
-        } catch (\Exception $e) {
-            $this->logger->error('Encryption failed', [
-                'error' => $e->getMessage(),
-            ]);
+            return self::V2_PREFIX.base64_encode($nonce.$sealed);
+        } catch (\Throwable $e) {
+            $this->logger->error('Encryption failed', ['error' => $e->getMessage()]);
             throw new \RuntimeException('Encryption failed: '.$e->getMessage());
         }
     }
 
-    /**
-     * Decrypt ciphertext.
-     */
-    public function decrypt(string $ciphertext): string
+    public function decrypt(string $ciphertext, string $context = ''): string
     {
-        if (empty($ciphertext)) {
+        if ('' === $ciphertext) {
             return '';
         }
 
         try {
-            $data = base64_decode($ciphertext, true);
-
-            if (false === $data || strlen($data) < self::IV_LENGTH) {
-                throw new \RuntimeException('Invalid ciphertext');
-            }
-
-            $iv = substr($data, 0, self::IV_LENGTH);
-            $encrypted = substr($data, self::IV_LENGTH);
-
-            $decrypted = openssl_decrypt(
-                $encrypted,
-                self::CIPHER,
-                $this->secretKey,
-                OPENSSL_RAW_DATA,
-                $iv
-            );
-
-            if (false === $decrypted) {
-                throw new \RuntimeException('Decryption failed');
-            }
-
-            return $decrypted;
-        } catch (\Exception $e) {
-            $this->logger->error('Decryption failed', [
-                'error' => $e->getMessage(),
-            ]);
+            return str_starts_with($ciphertext, self::V2_PREFIX)
+                ? $this->open(substr($ciphertext, strlen(self::V2_PREFIX)), $context)
+                : $this->openLegacy($ciphertext);
+        } catch (\Throwable $e) {
+            $this->logger->error('Decryption failed', ['error' => $e->getMessage()]);
             throw new \RuntimeException('Decryption failed: '.$e->getMessage());
         }
+    }
+
+    /**
+     * True for a value an earlier release wrote, which a save would upgrade.
+     */
+    public function isLegacy(string $ciphertext): bool
+    {
+        return '' !== $ciphertext && !str_starts_with($ciphertext, self::V2_PREFIX);
+    }
+
+    private function open(string $encoded, string $context): string
+    {
+        $data = base64_decode($encoded, true);
+        $nonceLength = \SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES;
+        if (false === $data || strlen($data) < $nonceLength + \SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_ABYTES) {
+            throw new \RuntimeException('Invalid ciphertext');
+        }
+
+        $plaintext = sodium_crypto_aead_xchacha20poly1305_ietf_decrypt(
+            substr($data, $nonceLength),
+            $context,
+            substr($data, 0, $nonceLength),
+            $this->key(),
+        );
+        if (false === $plaintext) {
+            throw new \RuntimeException('The value was altered or belongs to another key or place');
+        }
+
+        return $plaintext;
+    }
+
+    private function openLegacy(string $ciphertext): string
+    {
+        $data = base64_decode($ciphertext, true);
+        if (false === $data || strlen($data) < self::LEGACY_IV_LENGTH) {
+            throw new \RuntimeException('Invalid ciphertext');
+        }
+
+        $plaintext = openssl_decrypt(
+            substr($data, self::LEGACY_IV_LENGTH),
+            self::LEGACY_CIPHER,
+            hash('sha256', $this->secretKey, true),
+            \OPENSSL_RAW_DATA,
+            substr($data, 0, self::LEGACY_IV_LENGTH),
+        );
+        if (false === $plaintext) {
+            throw new \RuntimeException('Decryption failed');
+        }
+
+        return $plaintext;
+    }
+
+    private function key(): string
+    {
+        return PurposeKey::derive($this->secretKey, self::KEY_PURPOSE);
     }
 }

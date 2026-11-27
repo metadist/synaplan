@@ -55,7 +55,7 @@ class McpServerConfig
     #[ORM\Column(name: 'BAUTHHEADER', length: 128, options: ['default' => ''])]
     private string $authHeader = '';
 
-    /** Encrypted header value (AES-256-CBC via EncryptionService). */
+    /** Encrypted header value (via EncryptionService). */
     #[ORM\Column(name: 'BAUTHTOKEN', type: 'text')]
     private string $authToken = '';
 
@@ -77,7 +77,7 @@ class McpServerConfig
     #[ORM\Column(name: 'BAUTHMODE', length: 16, options: ['default' => self::AUTH_MODE_BEARER])]
     private string $authMode = self::AUTH_MODE_BEARER;
 
-    /** Encrypted OAuth state JSON (AES-256-CBC via EncryptionService). */
+    /** Encrypted OAuth state JSON (via EncryptionService). */
     #[ORM\Column(name: 'BOAUTH', type: 'text')]
     private string $oauth = '';
 

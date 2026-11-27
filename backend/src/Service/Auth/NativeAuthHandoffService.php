@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Service\Auth;
 
 use App\Entity\User;
-use App\Service\OAuth\OAuthStateService;
+use App\Service\Security\PurposeKey;
 use Psr\Cache\CacheItemPoolInterface;
 use Psr\Log\LoggerInterface;
 
@@ -22,7 +22,7 @@ use Psr\Log\LoggerInterface;
  * `POST /api/v1/auth/native/exchange` for real access/refresh tokens, so the
  * long-lived tokens never travel through the browser/deep-link.
  *
- * Signed with HMAC over the app secret (mirroring OAuthStateService). The token
+ * Signed with HMAC under a key derived for this token family alone. The token
  * is additionally made single-use: the embedded nonce is recorded in a
  * short-TTL cache on first successful validation, so a captured handoff URL
  * cannot be replayed to mint a second set of tokens within the TTL window
@@ -54,7 +54,7 @@ final readonly class NativeAuthHandoffService
         ];
 
         $json = json_encode($payload, JSON_THROW_ON_ERROR);
-        $signature = hash_hmac('sha256', $json, $this->appSecret);
+        $signature = $this->sign($json);
 
         return rtrim(strtr(base64_encode($json), '+/', '-_'), '=').'.'.$signature;
     }
@@ -77,7 +77,7 @@ final readonly class NativeAuthHandoffService
             return null;
         }
 
-        if (!hash_equals(hash_hmac('sha256', $json, $this->appSecret), $signature)) {
+        if (!hash_equals($this->sign($json), $signature)) {
             $this->logger->warning('Native handoff token signature verification failed');
 
             return null;
@@ -138,5 +138,10 @@ final readonly class NativeAuthHandoffService
         $this->cache->save($item);
 
         return true;
+    }
+
+    private function sign(string $json): string
+    {
+        return hash_hmac('sha256', $json, PurposeKey::derive($this->appSecret, PurposeKey::NATIVE_AUTH_HANDOFF));
     }
 }

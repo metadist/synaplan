@@ -45,7 +45,7 @@ class InboundEmailHandler
     private string $username = '';
 
     #[ORM\Column(name: 'BPASSWORD', type: 'text')]
-    private string $password = ''; // Encrypted password (AES-256-CBC)
+    private string $password = ''; // Encrypted password (EncryptionService)
 
     // Handler Settings
     #[ORM\Column(name: 'BCHECKINTERVAL', type: 'integer')]

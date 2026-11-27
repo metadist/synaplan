@@ -382,7 +382,7 @@ by `App\Service\Auth\TokenService`:
 
 | Cookie | Lifetime | Where it lives | What a restart does |
 | ------ | -------- | -------------- | ------------------- |
-| `access_token` | 5 minutes | HMAC-signed with `APP_SECRET`, not stored | Nothing — the signature still verifies |
+| `access_token` | 5 minutes | HMAC-signed with a key derived from `APP_SECRET` for access tokens only, not stored | Nothing — the signature still verifies |
 | `refresh_token` | 30 days, sliding on every refresh | `BTOKENS` in MariaDB | Nothing — the row is still there |
 
 Restarting or redeploying the backend, worker, Redis or the whole compose
