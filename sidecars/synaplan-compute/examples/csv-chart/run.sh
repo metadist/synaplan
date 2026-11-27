@@ -6,7 +6,8 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 : "${COMPUTE_URL:=http://127.0.0.1:8080}"
 : "${COMPUTE_AUTH_TOKEN:?set COMPUTE_AUTH_TOKEN}"
-auth=(-H "Authorization: Bearer ${COMPUTE_AUTH_TOKEN}")
+# Reads of a run name the owner from request.json; another owner gets 404.
+auth=(-H "Authorization: Bearer ${COMPUTE_AUTH_TOKEN}" -H "X-Compute-Owner: $(sed -n 's/.*"owner": *"\([^"]*\)".*/\1/p' "${here}/request.json")")
 
 accepted="$(curl -sS "${auth[@]}" \
   -F "request.json=@${here}/request.json;type=application/json" \

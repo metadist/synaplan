@@ -53,7 +53,7 @@ final readonly class ComputeArtefactStore
     public function ingestForUser(string $runId, int $userId, int $maxBytes, ?int $messageId = null): array
     {
         $stored = [];
-        foreach ($this->client->listArtefacts($runId) as $artefact) {
+        foreach ($this->client->listArtefacts(ComputeWorkspaceService::ownerString($userId), $runId) as $artefact) {
             $file = $this->storeOne($runId, $artefact, $userId, $maxBytes, $messageId);
             if ($file instanceof File) {
                 $stored[] = $file;
@@ -85,7 +85,7 @@ final readonly class ComputeArtefactStore
             return null;
         }
 
-        $bytes = $this->client->downloadArtefact($runId, $artefact->name);
+        $bytes = $this->client->downloadArtefact(ComputeWorkspaceService::ownerString($userId), $runId, $artefact->name);
         if (strlen($bytes) > $maxBytes) {
             return null;
         }

@@ -83,7 +83,7 @@ final readonly class ComputeRunReaper
     private function isLost(ComputeRun $run): bool
     {
         try {
-            $status = $this->client->status($run->getRunId());
+            $status = $this->client->status(ComputeWorkspaceService::ownerString($run->getUserId()), $run->getRunId());
         } catch (ComputeRefusedException $e) {
             if (404 === $e->getCode()) {
                 return true;

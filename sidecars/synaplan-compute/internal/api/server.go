@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -241,6 +242,50 @@ func (s *Server) getView(id string) (runView, bool) {
 		return runView{}, false
 	}
 	return rec.view(), true
+}
+
+// OwnerHeader names the account a by-id read is made for. The token says the
+// caller is the backend; this says whose run or folder it may be handed.
+const OwnerHeader = "X-Compute-Owner"
+
+// requestOwner returns the owner a read is made for, or answers 400.
+func requestOwner(w http.ResponseWriter, r *http.Request) (string, bool) {
+	owner := strings.TrimSpace(r.Header.Get(OwnerHeader))
+	if owner == "" {
+		writeError(w, http.StatusBadRequest, contract.ErrMissingOwner, OwnerHeader+" is required", nil)
+		return "", false
+	}
+	return owner, true
+}
+
+// ownedView returns the run only to the owner that submitted it. Another
+// owner's run answers like one that does not exist.
+func (s *Server) ownedView(w http.ResponseWriter, r *http.Request) (runView, bool) {
+	owner, ok := requestOwner(w, r)
+	if !ok {
+		return runView{}, false
+	}
+	v, found := s.getView(r.PathValue("id"))
+	if !found || v.Owner != owner {
+		writeError(w, http.StatusNotFound, contract.ErrRunNotFound, "run not found", nil)
+		return runView{}, false
+	}
+	return v, true
+}
+
+// ownedWorkspace answers 404 or 403 unless the folder belongs to the owner
+// the read is made for.
+func (s *Server) ownedWorkspace(w http.ResponseWriter, r *http.Request) (string, bool) {
+	owner, ok := requestOwner(w, r)
+	if !ok {
+		return "", false
+	}
+	id := r.PathValue("id")
+	if _, err := s.ws.AssertOwner(id, owner); err != nil {
+		writeWorkspaceErr(w, err)
+		return "", false
+	}
+	return id, true
 }
 
 // StartJanitor prunes finished runs older than RunRetention every interval

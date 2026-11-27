@@ -174,7 +174,7 @@ final readonly class ComputeWorkspaceService
 
     public function refreshUsage(ComputeWorkspace $workspace): ComputeWorkspaceUsage
     {
-        $usage = $this->client->workspaceUsage($workspace->getWorkspaceId());
+        $usage = $this->client->workspaceUsage(self::ownerString($workspace->getUserId()), $workspace->getWorkspaceId());
         $lastUsed = '' !== $usage->lastUsedAt
             ? new \DateTimeImmutable($usage->lastUsedAt)
             : new \DateTimeImmutable();
@@ -213,7 +213,7 @@ final readonly class ComputeWorkspaceService
             return [];
         }
 
-        return $this->client->listWorkspaceFiles($workspace->getWorkspaceId(), self::safeRelativePath($path));
+        return $this->client->listWorkspaceFiles(self::ownerString($workspace->getUserId()), $workspace->getWorkspaceId(), self::safeRelativePath($path));
     }
 
     /**
@@ -226,7 +226,7 @@ final readonly class ComputeWorkspaceService
             throw new ComputeRefusedException('workspace_not_found', 'There is no file-work folder yet.');
         }
 
-        return $this->client->downloadWorkspaceFile($workspace->getWorkspaceId(), self::safeRelativePath($path, true));
+        return $this->client->downloadWorkspaceFile(self::ownerString($workspace->getUserId()), $workspace->getWorkspaceId(), self::safeRelativePath($path, true));
     }
 
     /**

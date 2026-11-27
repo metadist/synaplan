@@ -74,6 +74,8 @@ make up
 Compose builds the sidecar and the Python/Node runtimes from this repo,
 creates `.compute-data/`, and injects the fixed demo token
 `synaplan-dev-compute-token-change-me-32b` when `COMPUTE_TOKEN` is unset.
+The sidecar accepts that published value only with `COMPUTE_ENV=dev`, which
+`docker-compose.yml` sets; with any other value it refuses to start.
 That default is part of the developer install — do not change it. A
 production host sets its own token. `deploy/` `prepare.sh` writes
 `data/compute.token` when `COMPOSE_PROFILES` includes `compute`, whether

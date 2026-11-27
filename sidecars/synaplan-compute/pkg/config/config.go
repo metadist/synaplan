@@ -11,6 +11,11 @@ import (
 
 const (
 	minAuthTokenBytes = 32
+	// devAuthToken is the token the development compose file ships. Everyone
+	// can read it in the repository, so it only counts where COMPUTE_ENV says
+	// this is a development stack.
+	devAuthToken = "synaplan-dev-compute-token-change-me-32b"
+	devEnv       = "dev"
 	// DefaultSandboxUID is nobody:nogroup, the uid the sandbox images ship with.
 	DefaultSandboxUID = 65534
 )
@@ -19,6 +24,7 @@ const (
 type Config struct {
 	ListenAddr        string
 	AuthToken         string
+	Env               string
 	ScratchDir        string
 	WorkspacesDir     string
 	Tier              string
@@ -52,6 +58,7 @@ func Load() (*Config, error) {
 	c := &Config{
 		ListenAddr:        env("COMPUTE_LISTEN", ":8080"),
 		AuthToken:         os.Getenv("COMPUTE_AUTH_TOKEN"),
+		Env:               strings.ToLower(strings.TrimSpace(os.Getenv("COMPUTE_ENV"))),
 		ScratchDir:        env("COMPUTE_SCRATCH_DIR", "/var/lib/synaplan-compute/scratch"),
 		WorkspacesDir:     env("COMPUTE_WORKSPACES_DIR", "/var/lib/synaplan-compute/workspaces"),
 		Tier:              strings.ToLower(strings.TrimSpace(os.Getenv("COMPUTE_TIER"))),
@@ -87,6 +94,9 @@ func Load() (*Config, error) {
 func (c *Config) Validate() error {
 	if len(c.AuthToken) < minAuthTokenBytes {
 		return fmt.Errorf("COMPUTE_AUTH_TOKEN must be at least %d bytes", minAuthTokenBytes)
+	}
+	if c.AuthToken == devAuthToken && c.Env != devEnv {
+		return errors.New("COMPUTE_AUTH_TOKEN is the published development token; set COMPUTE_TOKEN to a secret of your own (openssl rand -hex 32), or COMPUTE_ENV=dev on a development machine")
 	}
 	switch c.Tier {
 	case "", "docker", "gvisor", "microvm":

@@ -56,6 +56,42 @@ final class ComputeClientTest extends TestCase
         $client->submitRun($this->request(''), []);
     }
 
+    public function testEveryReadNamesTheOwner(): void
+    {
+        $seen = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$seen): MockResponse {
+            $headers = $options['normalized_headers'] ?? [];
+            $seen[] = [$method, (string) parse_url($url, \PHP_URL_PATH), $headers['x-compute-owner'][0] ?? null];
+
+            return new MockResponse(str_contains($url, '/usage') ? '{"usedMb":0,"quotaMb":1,"fileCount":0,"lastUsedAt":""}' : '[]', ['http_code' => 200]);
+        });
+        $client = new ComputeClient($http, $this->config());
+
+        $client->listArtefacts('user:42', 'run1');
+        $client->downloadArtefact('user:42', 'run1', 'out.txt');
+        $client->workspaceUsage('user:42', 'ws1');
+        $client->listWorkspaceFiles('user:42', 'ws1');
+        $client->downloadWorkspaceFile('user:42', 'ws1', 'a/b.txt');
+        $client->collectLogs('user:42', 'run1');
+
+        $this->assertCount(6, $seen);
+        foreach ($seen as [$method, $path, $owner]) {
+            $this->assertSame('GET', $method);
+            $this->assertSame('X-Compute-Owner: user:42', $owner, $path);
+        }
+    }
+
+    public function testAReadWithoutAnOwnerNeverLeavesTheBackend(): void
+    {
+        $http = new MockHttpClient(static function (): MockResponse {
+            self::fail('No request may be sent without an owner.');
+        });
+
+        $this->expectException(ComputeRefusedException::class);
+        $this->expectExceptionMessage('owner is required');
+        (new ComputeClient($http, $this->config()))->status('', 'run1');
+    }
+
     private static function bodyToString(mixed $body): string
     {
         if ($body instanceof \Closure) {

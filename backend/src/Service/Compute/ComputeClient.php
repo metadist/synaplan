@@ -23,6 +23,8 @@ use Symfony\Contracts\HttpClient\ResponseInterface;
  */
 final readonly class ComputeClient
 {
+    public const OWNER_HEADER = 'X-Compute-Owner';
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private ComputeConfig $config,
@@ -71,9 +73,9 @@ final readonly class ComputeClient
         return $runId;
     }
 
-    public function status(string $runId): ComputeRunStatus
+    public function status(string $owner, string $runId): ComputeRunStatus
     {
-        $response = $this->request('GET', '/v1/runs/'.rawurlencode($runId), ['timeout' => 10]);
+        $response = $this->read($owner, '/v1/runs/'.rawurlencode($runId), ['timeout' => 10]);
 
         return ComputeRunStatus::fromJson($response->getContent());
     }
@@ -81,17 +83,17 @@ final readonly class ComputeClient
     /**
      * @return list<ComputeArtefact>
      */
-    public function listArtefacts(string $runId): array
+    public function listArtefacts(string $owner, string $runId): array
     {
-        $response = $this->request('GET', '/v1/runs/'.rawurlencode($runId).'/artefacts', ['timeout' => 10]);
+        $response = $this->read($owner, '/v1/runs/'.rawurlencode($runId).'/artefacts', ['timeout' => 10]);
 
         return ComputeArtefact::listFromJson($response->getContent());
     }
 
-    public function downloadArtefact(string $runId, string $name): string
+    public function downloadArtefact(string $owner, string $runId, string $name): string
     {
-        $response = $this->request(
-            'GET',
+        $response = $this->read(
+            $owner,
             '/v1/runs/'.rawurlencode($runId).'/artefacts/'.rawurlencode($name),
             ['timeout' => 30],
         );
@@ -118,9 +120,9 @@ final readonly class ComputeClient
         return ComputeWorkspaceCreated::fromJson($response->getContent());
     }
 
-    public function workspaceUsage(string $workspaceId): ComputeWorkspaceUsage
+    public function workspaceUsage(string $owner, string $workspaceId): ComputeWorkspaceUsage
     {
-        $response = $this->request('GET', '/v1/workspaces/'.rawurlencode($workspaceId).'/usage', ['timeout' => 10]);
+        $response = $this->read($owner, '/v1/workspaces/'.rawurlencode($workspaceId).'/usage', ['timeout' => 10]);
 
         return ComputeWorkspaceUsage::fromJson($response->getContent());
     }
@@ -128,10 +130,10 @@ final readonly class ComputeClient
     /**
      * @return list<ComputeWorkspaceFile>
      */
-    public function listWorkspaceFiles(string $workspaceId, string $path = ''): array
+    public function listWorkspaceFiles(string $owner, string $workspaceId, string $path = ''): array
     {
         $query = '' === $path ? '' : '?path='.rawurlencode($path);
-        $response = $this->request('GET', '/v1/workspaces/'.rawurlencode($workspaceId).'/files'.$query, ['timeout' => 15]);
+        $response = $this->read($owner, '/v1/workspaces/'.rawurlencode($workspaceId).'/files'.$query, ['timeout' => 15]);
 
         return ComputeWorkspaceFile::listFromJson($response->getContent());
     }
@@ -139,10 +141,10 @@ final readonly class ComputeClient
     /**
      * @return array{contents: string, mime: string, name: string}
      */
-    public function downloadWorkspaceFile(string $workspaceId, string $path): array
+    public function downloadWorkspaceFile(string $owner, string $workspaceId, string $path): array
     {
-        $response = $this->request(
-            'GET',
+        $response = $this->read(
+            $owner,
             '/v1/workspaces/'.rawurlencode($workspaceId).'/files/'.implode('/', array_map('rawurlencode', explode('/', $path))),
             ['timeout' => 30],
         );
@@ -168,12 +170,12 @@ final readonly class ComputeClient
      *
      * @return array{stdout: string, stderr: string}
      */
-    public function collectLogs(string $runId, int $maxChars = 8000): array
+    public function collectLogs(string $owner, string $runId, int $maxChars = 8000): array
     {
         $stdout = '';
         $stderr = '';
         try {
-            $this->streamLogs($runId, static function (array $event) use (&$stdout, &$stderr): void {
+            $this->streamLogs($owner, $runId, static function (array $event) use (&$stdout, &$stderr): void {
                 $data = json_decode($event['data'], true);
                 $text = is_array($data) ? (string) ($data['text'] ?? '') : '';
                 if ('stdout' === $event['event']) {
@@ -195,13 +197,13 @@ final readonly class ComputeClient
     /**
      * @param callable(array{event: string, data: string, id: ?string}): void $onEvent
      */
-    public function streamLogs(string $runId, callable $onEvent, ?string $lastEventId = null): void
+    public function streamLogs(string $owner, string $runId, callable $onEvent, ?string $lastEventId = null): void
     {
         $headers = [];
         if (null !== $lastEventId && '' !== $lastEventId) {
             $headers['Last-Event-ID'] = $lastEventId;
         }
-        $response = $this->request('GET', '/v1/runs/'.rawurlencode($runId).'/logs', [
+        $response = $this->read($owner, '/v1/runs/'.rawurlencode($runId).'/logs', [
             'timeout' => 60,
             'headers' => $headers,
             'buffer' => false,
@@ -247,6 +249,25 @@ final readonly class ComputeClient
         }
 
         return ['event' => $event, 'data' => implode("\n", $data), 'id' => $id];
+    }
+
+    /**
+     * A read of one run or folder. The sidecar hands it out only to the owner
+     * named here, so a run id or folder id alone opens nothing.
+     *
+     * @param array<string, mixed> $options
+     */
+    private function read(string $owner, string $path, array $options = []): ResponseInterface
+    {
+        if ('' === $owner) {
+            throw new ComputeRefusedException('missing_owner', 'owner is required');
+        }
+        $options['headers'] = array_merge(
+            is_array($options['headers'] ?? null) ? $options['headers'] : [],
+            [self::OWNER_HEADER => $owner],
+        );
+
+        return $this->request('GET', $path, $options);
     }
 
     /**

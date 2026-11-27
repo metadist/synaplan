@@ -39,7 +39,9 @@ make build
 A checkout started with `docker compose up` does not use that command. It
 uses the fixed demo token `synaplan-dev-compute-token-change-me-32b` (see
 [Installation — File work](../../docs/INSTALLATION.md#file-work-secure-compute)). Leave that default alone. Set your own
-`COMPUTE_TOKEN` before any shared or production host.
+`COMPUTE_TOKEN` before any shared or production host. The sidecar starts
+with the demo token only when `COMPUTE_ENV=dev` is set, which the development
+compose file does; anywhere else it stops with a message that names the fix.
 
 If dockerd is unreachable, **health still works**. Runs that pass validation fail with a clean status record (`docker_unavailable`) rather than taking down the process.
 

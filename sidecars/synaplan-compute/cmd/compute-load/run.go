@@ -32,6 +32,9 @@ type apiError struct {
 }
 
 // fireOne submits a single run and follows it to a terminal state.
+// loadOwner submits every load run and is named again when one is polled.
+const loadOwner = "load-test"
+
 func fireOne(client *http.Client, base, token string, tpl Template, deadline time.Time) outcome {
 	out := outcome{name: tpl.Name, timeoutSec: tpl.TimeoutSec, expectTimout: tpl.ExpectTimeout}
 	if time.Now().After(deadline) {
@@ -44,7 +47,7 @@ func fireOne(client *http.Client, base, token string, tpl Template, deadline tim
 	}
 	reqBody := map[string]any{
 		"protocol": 1,
-		"owner":    "load-test",
+		"owner":    loadOwner,
 		"workspace": map[string]string{
 			"kind": "run",
 		},
@@ -146,6 +149,7 @@ func pollStatus(client *http.Client, base, token, id string) (runStatus, bool) {
 	var st runStatus
 	req, _ := http.NewRequest(http.MethodGet, base+"/v1/runs/"+id, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-Compute-Owner", loadOwner)
 	resp, err := client.Do(req)
 	if err != nil {
 		return st, false

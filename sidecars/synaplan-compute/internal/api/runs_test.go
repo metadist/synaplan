@@ -27,6 +27,7 @@ func authed(t *testing.T, method, url string, body io.Reader, contentType string
 		t.Fatal(err)
 	}
 	req.Header.Set("Authorization", "Bearer "+testToken)
+	req.Header.Set(OwnerHeader, testOwner)
 	if contentType != "" {
 		req.Header.Set("Content-Type", contentType)
 	}

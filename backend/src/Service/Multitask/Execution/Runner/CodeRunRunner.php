@@ -404,13 +404,13 @@ final readonly class CodeRunRunner implements TaskRunner
             $audit->setStatus(ComputeRun::STATUS_RUNNING);
             $this->runs->save($audit);
 
-            $status = $this->wait($runId, $limits['timeoutSec']);
+            $status = $this->wait(ComputeWorkspaceService::ownerString($userId), $runId, $limits['timeoutSec']);
             $audit->setExitCode($status->exitCode);
             $audit->setReason($status->reason);
             $audit->setDurationMs($status->durationMs);
             $audit->setBytesIn($status->usage['bytesIn']);
             $audit->setBytesOut($status->usage['bytesOut']);
-            $logs = $this->client->collectLogs($runId);
+            $logs = $this->client->collectLogs(ComputeWorkspaceService::ownerString($userId), $runId);
 
             if ('succeeded' !== $status->status) {
                 $audit->markFinished(ComputeRun::STATUS_FAILED);
@@ -955,13 +955,13 @@ final readonly class CodeRunRunner implements TaskRunner
         return rtrim($this->uploadDir, '/').'/'.$path;
     }
 
-    private function wait(string $runId, int $timeoutSec): ComputeRunStatus
+    private function wait(string $owner, string $runId, int $timeoutSec): ComputeRunStatus
     {
         $deadline = time() + max(1, $timeoutSec) + 5;
-        $status = $this->client->status($runId);
+        $status = $this->client->status($owner, $runId);
         while (!$status->isTerminal() && time() < $deadline) {
             usleep(400000);
-            $status = $this->client->status($runId);
+            $status = $this->client->status($owner, $runId);
         }
         if ($status->isTerminal()) {
             return $status;
@@ -971,7 +971,7 @@ final readonly class CodeRunRunner implements TaskRunner
         } catch (\Throwable) {
         }
         try {
-            $final = $this->client->status($runId);
+            $final = $this->client->status($owner, $runId);
             if ($final->isTerminal()) {
                 return $final;
             }

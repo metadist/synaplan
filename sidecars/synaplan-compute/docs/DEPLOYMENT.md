@@ -5,6 +5,10 @@ Compute is reachable from the Synaplan PHP backend only. Never publish
 
 Authentication: `Authorization: Bearer <COMPUTE_AUTH_TOKEN>` on every path
 except `GET /v1/health`. PHP holds the same value as `COMPUTE_TOKEN`.
+The published development token starts the service only with
+`COMPUTE_ENV=dev`; a production host sets its own token and leaves
+`COMPUTE_ENV` unset. Every `GET` on a run or a workspace also carries
+`X-Compute-Owner` (see `API.md`).
 
 ## T1 — same host (developer / self-host)
 

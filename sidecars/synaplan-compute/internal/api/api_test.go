@@ -212,10 +212,13 @@ func TestUnknownMultipartStillNeedsAuth(t *testing.T) {
 	}
 }
 
+// testOwner submits every run and owns every folder of the shared helpers.
+const testOwner = "user:123"
+
 func validRun() contract.RunRequest {
 	return contract.RunRequest{
 		Protocol:  1,
-		Owner:     "user:123",
+		Owner:     testOwner,
 		Workspace: contract.Workspace{Kind: "run"},
 		Image:     "python",
 		Entry:     contract.Entry{Program: "python", Args: []string{"main.py"}},
@@ -323,6 +326,7 @@ func TestWorkspaceCreateAndUsage(t *testing.T) {
 	id := createWorkspace(t, ts, "user:123", 64)
 	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/workspaces/"+id+"/usage", nil)
 	req.Header.Set("Authorization", "Bearer "+testToken)
+	req.Header.Set(OwnerHeader, testOwner)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -361,6 +365,7 @@ func TestAcceptedRunWithoutDockerFailsCleanly(t *testing.T) {
 	for time.Now().Before(deadline) {
 		gr, _ := http.NewRequest(http.MethodGet, ts.URL+"/v1/runs/"+acc.RunID, nil)
 		gr.Header.Set("Authorization", "Bearer "+testToken)
+		gr.Header.Set(OwnerHeader, testOwner)
 		r2, err := http.DefaultClient.Do(gr)
 		if err != nil {
 			t.Fatal(err)

@@ -39,7 +39,10 @@ func (s *Server) handleCreateWorkspace(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWorkspaceUsage(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, ok := s.ownedWorkspace(w, r)
+	if !ok {
+		return
+	}
 	u, err := s.ws.Usage(id)
 	if err != nil {
 		writeWorkspaceErr(w, err)
@@ -54,7 +57,10 @@ func (s *Server) handleWorkspaceUsage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWorkspaceFiles(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, ok := s.ownedWorkspace(w, r)
+	if !ok {
+		return
+	}
 	rel := r.URL.Query().Get("path")
 	files, err := s.ws.ListFiles(id, rel)
 	if err != nil {
@@ -74,7 +80,10 @@ func (s *Server) handleWorkspaceFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWorkspaceFile(w http.ResponseWriter, r *http.Request) {
-	id := r.PathValue("id")
+	id, ok := s.ownedWorkspace(w, r)
+	if !ok {
+		return
+	}
 	p := r.PathValue("path")
 	if _, ok := names.RelPath(p); !ok {
 		writeError(w, http.StatusBadRequest, contract.ErrBadFileName, "bad file name", nil)

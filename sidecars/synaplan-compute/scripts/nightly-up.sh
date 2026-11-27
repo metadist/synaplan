@@ -45,6 +45,7 @@ args=(
   -v "${scratch_host}:/scratch"
   -v "${workspaces_host}:/workspaces"
   -e "COMPUTE_AUTH_TOKEN=${DEMO_TOKEN}"
+  -e COMPUTE_ENV=dev
   -e COMPUTE_LISTEN=:8080
   -e COMPUTE_SCRATCH_DIR=/scratch
   -e COMPUTE_WORKSPACES_DIR=/workspaces

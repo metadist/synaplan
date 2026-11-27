@@ -47,6 +47,8 @@ The run is queued until a concurrency slot (`COMPUTE_MAX_CONCURRENT`) is free; a
 
 ## `GET /v1/runs/{id}`
 
+Every `GET` on a run or a workspace by id carries `X-Compute-Owner: <owner>`, the value the run or workspace was created with. Without the header the answer is 400 `missing_owner`. A run of another owner answers 404 `run_not_found`, a workspace of another owner 403 `workspace_not_owned`. `DELETE` does not check the owner.
+
 Status enum: `queued` \| `running` \| `succeeded` \| `failed` \| `cancelled`.  
 Reason enum: `timeout` \| `oom` \| `pids_limit` \| `output_limit` \| `program_error` \| `cancelled`; service-side failures use `docker_unavailable` or `internal_error`.
 

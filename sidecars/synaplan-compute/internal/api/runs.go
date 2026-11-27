@@ -654,9 +654,8 @@ func (s *Server) auditFinished(v runView) {
 }
 
 func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
-	v, ok := s.getView(r.PathValue("id"))
+	v, ok := s.ownedView(w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, contract.ErrRunNotFound, "run not found", nil)
 		return
 	}
 	writeJSON(w, http.StatusOK, statusOf(v))
@@ -695,9 +694,8 @@ func statusOf(v runView) contract.RunStatus {
 }
 
 func (s *Server) handleRunLogs(w http.ResponseWriter, r *http.Request) {
-	v, ok := s.getView(r.PathValue("id"))
+	v, ok := s.ownedView(w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, contract.ErrRunNotFound, "run not found", nil)
 		return
 	}
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -730,9 +728,8 @@ func (s *Server) handleRunLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleListArtefacts(w http.ResponseWriter, r *http.Request) {
-	v, ok := s.getView(r.PathValue("id"))
+	v, ok := s.ownedView(w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, contract.ErrRunNotFound, "run not found", nil)
 		return
 	}
 	if status, code := artefactsBlocked(v); code != "" {
@@ -760,9 +757,8 @@ func artefactsBlocked(v runView) (int, string) {
 }
 
 func (s *Server) handleGetArtefact(w http.ResponseWriter, r *http.Request) {
-	v, ok := s.getView(r.PathValue("id"))
+	v, ok := s.ownedView(w, r)
 	if !ok {
-		writeError(w, http.StatusNotFound, contract.ErrRunNotFound, "run not found", nil)
 		return
 	}
 	name := r.PathValue("name")

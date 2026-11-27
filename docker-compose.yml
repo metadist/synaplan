@@ -1472,6 +1472,8 @@ services:
         condition: service_healthy
     environment:
       COMPUTE_AUTH_TOKEN: ${COMPUTE_TOKEN:-synaplan-dev-compute-token-change-me-32b}
+      # The sidecar accepts the published default token above only here.
+      COMPUTE_ENV: dev
       COMPUTE_LISTEN: :8080
       COMPUTE_EGRESS_ENABLED: ${COMPUTE_EGRESS_ENABLED:-false}
       COMPUTE_SCRATCH_DIR: /scratch

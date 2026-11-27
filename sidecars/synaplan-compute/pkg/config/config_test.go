@@ -61,3 +61,17 @@ func TestLoadSandboxUserOverride(t *testing.T) {
 		t.Fatal(c.SandboxUser())
 	}
 }
+
+func TestLoadRefusesThePublishedDevTokenOutsideDev(t *testing.T) {
+	t.Setenv("COMPUTE_AUTH_TOKEN", devAuthToken)
+	for _, env := range []string{"", "prod", "production", "test"} {
+		t.Setenv("COMPUTE_ENV", env)
+		if _, err := Load(); err == nil {
+			t.Fatalf("COMPUTE_ENV=%q must refuse the published development token", env)
+		}
+	}
+	t.Setenv("COMPUTE_ENV", "dev")
+	if _, err := Load(); err != nil {
+		t.Fatalf("a development stack keeps the published token: %v", err)
+	}
+}
