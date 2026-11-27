@@ -22,6 +22,7 @@ final readonly class PluginManifest
      * @param list<array{key: string, dataType: string, labelKey: string, permissions: list<Permission>}>                       $resourceKinds Shareable kinds declared in provides.resourceKinds
      * @param list<array{port: string, class: string, key: string}>                                                             $plugs         Plug adapters declared in provides.plugs
      * @param list<string>                                                                                                      $agentPacks    Relative bundle globs declared in provides.agents
+     * @param string                                                                                                            $displayName   The manifest's displayName, empty when it has none
      */
     public function __construct(
         public string $name,
@@ -33,7 +34,20 @@ final readonly class PluginManifest
         public array $resourceKinds = [],
         public array $plugs = [],
         public array $agentPacks = [],
+        public string $displayName = '',
     ) {
+    }
+
+    /**
+     * The name people see: the manifest's displayName, or the plugin name in words.
+     */
+    public function label(): string
+    {
+        if ('' !== $this->displayName) {
+            return $this->displayName;
+        }
+
+        return ucfirst(str_replace(['_', '-'], ' ', $this->name));
     }
 
     /**
@@ -45,6 +59,7 @@ final readonly class PluginManifest
     {
         $name = (string) ($data['name'] ?? 'unknown');
         $provides = is_array($data['provides'] ?? null) ? $data['provides'] : [];
+        $displayName = $data['displayName'] ?? null;
 
         return new self(
             $name,
@@ -56,6 +71,7 @@ final readonly class PluginManifest
             self::normalizeResourceKinds($provides['resourceKinds'] ?? [], $name),
             self::normalizePlugs($provides['plugs'] ?? null, self::namespaceOf($data, $name)),
             self::normalizeAgentPacks($provides['agents'] ?? null),
+            is_string($displayName) ? trim($displayName) : '',
         );
     }
 

@@ -208,6 +208,7 @@ final class RuntimeConfigResponse extends OA\Response
                 items: new OA\Items(
                     properties: [
                         new OA\Property(property: 'name', type: 'string', example: 'hello_world'),
+                        new OA\Property(property: 'displayName', type: 'string', description: 'The name people see: the manifest displayName, or the plugin name in words', example: 'Hello world'),
                         new OA\Property(property: 'version', type: 'string', example: '1.0.0'),
                         new OA\Property(property: 'description', type: 'string', example: 'A simple hello world plugin'),
                         new OA\Property(property: 'capabilities', type: 'array', items: new OA\Items(type: 'string')),

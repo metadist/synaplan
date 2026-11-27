@@ -89,6 +89,7 @@
     "fallbackTitle": "Plugin",
     "loading": "Plugin wird geladen…",
     "notFound": "Plugin nicht gefunden oder nicht für Ihren Account aktiviert",
+    "loadFailed": "Dieses Plugin konnte nicht geladen werden. Lade die Seite neu.",
     "commandEmpty": "Das Plugin hat eine leere Antwort zurückgegeben.",
     "commandError": "Der Plugin-Befehl ist fehlgeschlagen. Bitte versuche es erneut."
   },

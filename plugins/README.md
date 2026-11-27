@@ -9,12 +9,27 @@ autoconfigures its services. The plugins directory can be overridden with the
 
 ## In this image
 
-`synascriber` and `synamail` are part of this repository and of CI.
+Seven directories ship in the image:
+
+| Plugin          | What it is                                    | Locales            | Still open                                                    |
+| --------------- | --------------------------------------------- | ------------------ | ------------------------------------------------------------- |
+| `synascriber`   | Meeting notes for Jitsi and OpenTalk          | `locales/`, five   | manifest `homepage` points at an archived repository          |
+| `synamail`      | Contact profiles for the Outlook add-in       | `locales/`, five   | —                                                             |
+| `synaform`      | Forms, Word templates and document generation | `i18n/`, no French | controller and page over the size bar, outside PHPStan/ESLint |
+| `synafastbill`  | FastBill from the chat with `/fastbill`       | `i18n/`, no French | French, and a walk against a live FastBill account            |
+| `castingdata`   | Casting platform data in chat                 | none, English page | locale files                                                  |
+| `serper_search` | Reference `web_search` plug adapter, no page  | —                  | —                                                             |
+| `hello_world`   | Smallest page and route, for plugin authors   | `locales/`, five   | —                                                             |
+
+A plugin with a page is installed per user with
+`app:plugin:install <userId> <id>`; `DEFAULT_USER_PLUGINS` is empty unless
+you set it. The page, the Apps card and the menu entry show the manifest's
+`displayName`, or the id in words when there is none.
+
 `synamail` stores contact profiles for the Outlook add-in. The add-in
 itself stays in [metadist/Synamail](https://github.com/metadist/Synamail).
-Install it for one user with `app:plugin:install`. It is not added to
-`DEFAULT_USER_PLUGINS`. To leave it out of a build you make yourself,
-delete `plugins/synamail` before the image is built. A switch that hides
+It is not added to `DEFAULT_USER_PLUGINS`. To leave it out of a build you
+make yourself, delete `plugins/synamail` before the image is built. A switch that hides
 a plugin inside an image you pulled, without rebuilding, is a later step
 and is not available yet. The rules for a plugin we ship are in
 [`_devextras/planning/20261104-hosted-plugins/01_rules.md`](../_devextras/planning/20261104-hosted-plugins/01_rules.md).
