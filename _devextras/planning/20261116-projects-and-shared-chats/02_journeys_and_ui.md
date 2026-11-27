@@ -350,8 +350,9 @@ what it **must survive**.
 
 1. Dates tab → "Add to my calendar". A dialog shows the private address
    with "Copy" and "Open in calendar app" (`webcal://`), and one line: "Your
-   calendar app picks up new and moved dates by itself, usually within a
-   few hours."
+   calendar app picks up new and moved dates by itself. That can take up
+   to a day." (Google refreshes a subscribed feed every 12 to 24 hours and
+   has no refresh button.)
 2. Ana opens it on her phone; her calendar subscribes. "Measuring at home"
    is there on Monday at 10.
 3. Ben moves the measuring to Tuesday in the chat. Ana's calendar shows
@@ -647,7 +648,7 @@ are identical in every locale.
 | Add to my calendar | In meinen Kalender | Añadir a mi calendario | Ajouter à mon agenda | Takvimime ekle |
 | Open in calendar app | In der Kalender-App öffnen | Abrir en la app de calendario | Ouvrir dans l'application d'agenda | Takvim uygulamasında aç |
 | Renew address | Adresse erneuern | Renovar dirección | Renouveler l'adresse | Adresi yenile |
-| Your calendar app picks up new and moved dates by itself, usually within a few hours. | Deine Kalender-App holt neue und verschobene Termine selbst ab, meist innerhalb weniger Stunden. | Tu app de calendario recoge sola las citas nuevas y cambiadas, normalmente en pocas horas. | Votre application d'agenda récupère seule les rendez-vous nouveaux ou déplacés, en général en quelques heures. | Takvim uygulaman yeni ve taşınan randevuları kendisi alır, genellikle birkaç saat içinde. |
+| Your calendar app picks up new and moved dates by itself. That can take up to a day. | Deine Kalender-App holt neue und verschobene Termine selbst ab. Das kann bis zu einem Tag dauern. | Tu app de calendario recoge sola las citas nuevas y cambiadas. Puede tardar hasta un día. | Votre application d'agenda récupère seule les rendez-vous nouveaux ou déplacés. Cela peut prendre jusqu'à un jour. | Takvim uygulaman yeni ve taşınan randevuları kendisi alır. Bu bir güne kadar sürebilir. |
 | Show to everyone | Für alle sichtbar machen | Mostrar a todos | Rendre visible à tous | Herkese göster |
 | Only you see this | Nur du siehst das | Solo tú ves esto | Vous seul le voyez | Bunu yalnızca sen görüyorsun |
 | Added: {what} | Eingetragen: {what} | Añadido: {what} | Ajouté : {what} | Eklendi: {what} |

@@ -10,7 +10,11 @@ decouples the board from the loop, narrows calendar, mail and watches, and
 moves push behind sharing. A hands-on comparison with ChatGPT and Claude
 Projects (§0 #112–#119) adds: update instead of append, confirm before
 write, generated files stay in the project, and a first cut for one
-person. §0 records what the owner said; rows marked ☐ wait for the owner.
+person. A discussion of 2026-11-27 (§0 #120–#130) fixes v1 in
+[`05_v1_spec.md`](./05_v1_spec.md): three stages for writing to the board,
+one store for board and memory, sharing only in projects with a project
+budget, households first, and the numbers that decide what comes after v1.
+§0 records what the owner said; rows marked ☐ wait for the owner.
 **Owner:** product owner.
 **Roadmap:** row 46. Steps `PJ0`–`PJ47`, journeys `J-PJ-1`–`J-PJ-20`.
 **Mockup:** [`mockups/project-page.html`](./mockups/project-page.html), the
@@ -88,17 +92,20 @@ tools (§0 #96). Until G, every reminder goes out by e-mail.
 
 ## Start here
 
-1. §0 — every decision, what the owner already said, what is still open.
+1. [`05_v1_spec.md`](./05_v1_spec.md) — what v1 is, what comes after, and
+   how v1 is measured. It wins where `00`–`04` differ.
+2. §0 — every decision, what the owner already said, what is still open.
    The rows of 2026-11-26 (#74–#95) reshape C–H; the review rows
    (#96–#111) narrow them.
-2. §2 — the target shape in one page.
-3. [`02_journeys_and_ui.md`](./02_journeys_and_ui.md) — what people see.
-4. [`03_contracts.md`](./03_contracts.md) — tables, events, endpoints, flags.
-5. [`04_sprints.md`](./04_sprints.md) — one brief per step.
-6. [`01_research.md`](./01_research.md) — what was read and measured.
-7. [`STATUS.md`](./STATUS.md) — step log.
-8. [`mockups/project-page.html`](./mockups/project-page.html) — the agreed
-   project page.
+3. §2 — the target shape in one page.
+4. [`02_journeys_and_ui.md`](./02_journeys_and_ui.md) — what people see.
+5. [`03_contracts.md`](./03_contracts.md) — tables, events, endpoints, flags.
+6. [`04_sprints.md`](./04_sprints.md) — one brief per step.
+7. [`01_research.md`](./01_research.md) — what was read and measured.
+8. [`STATUS.md`](./STATUS.md) — step log.
+9. [`mockups/project-page.html`](./mockups/project-page.html) — the agreed
+   project page. It still shows a price watch, classified ads and a second
+   member, none of which is in v1 (`05` §8).
 
 ## Rules for the AI assistant
 
@@ -297,7 +304,7 @@ The rest of this plan already follows these rows.
 | 108 | **A project turn has its own cost gate.** The board adds to every project turn: the open items block (at most 40 items and 2,000 tokens), the extraction call and the status call. G20 (§6) bounds it. | G20 | ☐ |
 | 109 | **Small model for the side calls.** Extraction (#96) and the status (#95) use the person's memory model (`ModelConfigService::getMemoryModelConfig()`), as memory extraction does today, not the Chat model. #86 is about the answer; these are not answers. | Memory model | ☐ |
 | 110 | **A second case before PJ32.** The mockup gets a second project of another kind (a PHP upgrade or a client project) before PJ32 builds the page, to prove that the fixed blocks fit more than a kitchen (#76). | Second mockup | ☐ |
-| 111 | **Whom C is for first.** Households (Ana: GMX or Gmail, phone first) or teams and businesses (Microsoft 365, Nextcloud, desktop first). It decides the examples, the mail path of #104 and whether Gmail sending moves up from §9. | — | ☐ Owner |
+| 111 | **Whom C is for first.** Households (Ana: GMX or Gmail, phone first) or teams and businesses (Microsoft 365, Nextcloud, desktop first). It decides the examples, the mail path of #104 and whether Gmail sending moves up from §9. | — | Answered by #128 |
 
 ### Hands-on comparison with ChatGPT and Claude (2026-11-26)
 
@@ -320,7 +327,28 @@ names the row it changes.
 | 116 | **What a project makes stays in the project.** A file the AI makes in a project chat (sheet, document, research report, picture) lands in the project's Files and is a source for later chats. A research result goes through the extraction of #96 like an answer, so its dates, costs and tasks reach the board as offers. Both products put such files into a global gallery outside the project. | Project files | ☐ |
 | 117 | **A reminder is a project item with a confirmed time.** "Remind me on 2 December" offers a date item with the time and the person's time zone said back ("2 Dec, 18:00, Berlin · Add"); nothing is scheduled before "Add". ChatGPT scheduled a task at 08:00 on one click without asking, Claude at 18:00 without saying why. Reminders and watches belong to the project and are listed on its board, not only in a global list. Extends #81 and G16. | Offer, then add | ☐ |
 | 118 | **A watch reports only when something is worth telling.** A check that finds nothing new sends nothing; "Last checked" on the board shows it ran. Claude's scheduled tasks offer exactly this switch. Extends #106. | Quiet when unchanged | ☐ |
-| 119 | **First cut for one person.** Ship C and D without the calendar subscription (board, e-mail reminders, mail preview) before deciding on E–I. Shared chats (E), push (G), forwarded mail (#91, #105) and the calendar subscription (#103) wait until C and D have real use. Neither product has a board or a group chat in a project, so the board is the bet to test first. Changes #107 (owner). | C and D first | ☐ Owner (changes #107) |
+| 119 | **First cut for one person.** Ship C and D without the calendar subscription (board, e-mail reminders, mail preview) before deciding on E–I. Shared chats (E), push (G), forwarded mail (#91, #105) and the calendar subscription (#103) wait until C and D have real use. Neither product has a board or a group chat in a project, so the board is the bet to test first. Changes #107 (owner). | C and D first | Refined by #130 (v1 is C only) |
+
+### Discussion of the plan (2026-11-27)
+
+The owner went through an outside review of the plan and the mockup, point
+by point. The rows below are what the owner decided.
+[`05_v1_spec.md`](./05_v1_spec.md) spells them out; `02`–`04` follow in the
+step that builds each part.
+
+| # | Decision | Default | Agree? |
+| - | -------- | ------- | ------ |
+| 120 | **Three stages for writing to the board.** (1) Written at once with "Undo": what the person says plainly as a fact or a commitment, or a yes to a proposal. (2) Proposed in the chat with one tap: what the AI derives or suggests, what the person hedges, the first plan. (3) "To confirm": everything from a mail, a file or a watch. A decision, closing an item and an estimated cost are never stage 1. Replaces #75 and #113 with one rule (`05` §3). | Three stages | Yes — owner, 2026-11-27 |
+| 121 | **A proposal stays visible until someone decides.** It shows under the message and under "To confirm" (one item, two places), never expires, and "Reject all" clears one source. Only `open` and `done` items go into the open items block of a turn; a `proposed` item is never given to the model as a fact. Extends #115. | Visible until decided | Yes — owner, 2026-11-27 |
+| 122 | **One store for board and memory.** `BPROJECTITEMS` gets a fifth kind, `note` (facts and preferences); `BPROJECTMEMORIES` is not built; PJ21 falls away; PJ22 becomes the notes list and the memory choice per chat. Notes get their own budget in a turn. #51, #53, #54 stay. Changes #50, #97 and #98 (`05` §4). | One store | Yes — owner, 2026-11-27 |
+| 123 | "Remembered" stays behind "Show more" on the overview; no own tab. | As the mockup | Yes — owner, 2026-11-27 |
+| 124 | **Writing together only in projects.** Plain chats keep "Can read" and "Can continue as a copy". "Can write" in a plain chat may come later. Changes #33. | Projects only | Yes — owner, 2026-11-27 |
+| 125 | **Apps when sharing starts:** off in the shared chats of a project, on in a member's private chats inside a shared project. Apps in shared chats with the per-person switches of #43–#46 follow after the first sharing step; the owner wants them then. | Off in shared chats first | Yes — owner, 2026-11-27 |
+| 126 | **Project budget.** The creator sets an amount per month for the members of a project; the creator's own use never counts; when it is used up, a member's messages draw on their own budget automatically; a member without a budget gets one sentence that names who can raise it. Per project, not per chat. Replaces #39; #40 stays. | Per project, monthly | Yes — owner, 2026-11-27 |
+| 127 | **The partner before the guest.** The common case is a member who chats along. A guest link without an account (sees only the dates and tasks that name them, confirms, uploads, ticks; no chat, no costs) comes later. | Member first | Yes — owner, 2026-11-27 |
+| 128 | **Households first.** Answers #111. | Households | Yes — owner, 2026-11-27 |
+| 129 | **How v1 is judged.** Undo rate of stage-1 items below 10 %, accept rate of proposals above 60 %, projects still used in week 3 clearly more often with board than without, G20. Counted on the server without content: `BPROJECTITEMLOG` gets `accepted`, `rejected`, `undone` and `BSTAGE`; one counter for "board opened"; the board flag on for part of the people who use projects. Team use first, then a beta (`05` §6). | As written | Yes — owner, 2026-11-27 |
+| 130 | **Order.** v1 = phase C for one person, measured → sharing with the partner and the project budget → phase D (reminders, mail preview, calendar subscription) → guest link, apps in shared chats, push, forwarded mail and watches, each decided on the numbers of #129. Refines #107 and #119. | As written | Yes — owner, 2026-11-27 |
 
 ---
 
@@ -551,7 +579,7 @@ Full text, wireframes and copy: [`02_journeys_and_ui.md`](./02_journeys_and_ui.m
 | **J-PJ-15** — The electrician has not called back for four days; Ana presses "Follow up", reads the mail, changes a word, opens it in her mail app (or sends it from Microsoft 365) | Ana | PJ38 |
 | **J-PJ-16** — The evening before the measuring Ben gets a reminder (mail, push once G is there); on Monday morning Ana gets the week in one message | Ana, Ben | PJ36, PJ27 |
 | **J-PJ-17** — "Tell me when PHP 8.5.2 is out" and "tell me when the opening hours page of the recycling centre changes": two watches, two kinds, one frame | Ana | PJ44, PJ45 |
-| **J-PJ-19** — Ana subscribes to the project's calendar in her phone's calendar app; a date the chat adds shows up there within the hour | Ana | PJ37 |
+| **J-PJ-19** — Ana subscribes to the project's calendar in her phone's calendar app; a date the chat adds shows up there after the app's next refresh (Google: up to a day) | Ana | PJ37 |
 | **J-PJ-20** — Ana drops an offer as PDF into the project chat while her Chat model is Gemini; the answer comes as today, without the loop, and "To confirm" still shows the offer's cost and delivery date | Ana | PJ31 |
 | **J-PJ-18** — Ana drags the divider, hides the board to read a long answer, opens the project on the phone and lands in the chat | Ana | PJ32 |
 
@@ -833,4 +861,5 @@ refused.
 | 2026-11-26 | Reshaped after the owner's whiteboard session and the mockup (`mockups/project-page.html`, #3282): goals 6–8; §0 #74–#95; #5, #17, #49, #54, #63, #64, #66 changed; phases relettered (C board, D remind and write back with push, E shared chats, F shared projects, G into the project, H watches, I rollout); steps PJ29–PJ47; PJ21 and PJ22 move into C; journeys J-PJ-12–J-PJ-18; gates G14–G19. `01`–`04` follow. |
 | 2026-11-26 | Review of the reshaped plan: §0 #96–#111 (proposals; #97, #102, #107 and #111 need the owner). The board is filled by an extraction after the answer instead of loop tools, so C does not wait for PJ11; four item kinds; memory and board split; private items; quick-add; fewer tabs; calendar as a subscription; copy and mail app before "Send"; DMARC for forwarded mail; watches `version` and `page` only; push moves to G after the shared phases (G → H, H → I, I → J); #95 changed; journeys J-PJ-19, J-PJ-20; gates G20–G22. `02`–`04` follow. |
 | 2026-11-26 | Hands-on comparison with ChatGPT and Claude Projects (`01` §2.7): §0 #112–#119 (proposals; #119 needs the owner because it changes #107); gate G23. `02`–`04` follow once the rows are ticked. |
+| 2026-11-27 | Owner discussion of an outside review: §0 #120–#130 and [`05_v1_spec.md`](./05_v1_spec.md) (three stages, proposals visible until decided, one store with kind `note`, writing together only in projects, apps and project budget for sharing, partner before guest, households first, success numbers, order). #111 answered, #119 refined. J-PJ-19 no longer promises "within the hour". `02`–`04` follow in the steps that build each part. |
 | 2026-11-19 | After PJ4 (`89694c4b2`): §0 #21–#25 ticked; #63 partly; #66 order fixed (AU26 → AH8a → AH8b → PJ5); new rows #68–#73 (end of a run, limits as profile input, budget per call until PJ6, no write share for project chats before PJ20, deleted member's text, projects flag with PJ28). `03` and `04` follow. |

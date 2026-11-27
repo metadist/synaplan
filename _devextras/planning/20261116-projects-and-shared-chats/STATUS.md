@@ -21,10 +21,36 @@ to them.
 | PJ7c | not started | — | Editing a picture by file ID: the chat loop has no image tool yet. |
 | Plan reshaped | merged | #3283 | board, reminders, mail, watches; phases relettered; PJ29–PJ47. See 2026-11-26 below. |
 | Plan review | open | — | §0 #96–#111: board without the loop, four kinds, calendar subscription, copy-first mail, DMARC, two watch kinds, push after sharing. See "2026-11-26 — review" below. |
-| Hands-on comparison | open | — | §0 #112–#119: update instead of append, confirm before write, receipt only, state read at turn start, files stay in the project, reminders said back, quiet watches, one person first. See "2026-11-26 — hands-on comparison" below. |
+| Hands-on comparison | merged | #3288 | §0 #112–#119: update instead of append, confirm before write, receipt only, state read at turn start, files stay in the project, reminders said back, quiet watches, one person first. See "2026-11-26 — hands-on comparison" below. |
+| v1 spec | open | — | §0 #120–#130 and `05_v1_spec.md`: three stages, one store with `note`, sharing only in projects with a project budget, households first, success numbers, order. See "2026-11-27 — v1 spec" below. |
 | PJ8–PJ47 | not started | — | every other ☐ and Ask row of §0 waits for its step |
 
 ---
+
+## 2026-11-27 — v1 spec
+
+The owner went through an outside review of the plan and the mockup, point
+by point. No code. Decisions are §0 #120–#130; `05_v1_spec.md` spells them
+out and wins where `00`–`04` differ.
+
+- **Writing to the board (#120, #121):** three stages (written with Undo,
+  proposed in the chat, to confirm); decisions, closing and estimates never
+  written directly; proposals stay visible until decided; only confirmed
+  items reach the model as facts.
+- **One store (#122, #123):** kind `note` in `BPROJECTITEMS`, no
+  `BPROJECTMEMORIES`, PJ21 falls away, PJ22 shrinks.
+- **Sharing (#124–#127):** writing together only in projects; apps off in
+  shared chats at first, on in private chats of a shared project; a
+  monthly project budget set by the creator; the partner before a guest
+  link.
+- **Whom and how judged (#128, #129):** households first; undo below 10 %,
+  accept above 60 %, week-3 use with board against without, G20; counted
+  from the item log and one "board opened" counter.
+- **Order (#130):** v1 (C, one person) → sharing and project budget → D →
+  the rest on the numbers.
+- Still open (`05` §8): the extraction model, when the status text is
+  written, a v1 mockup, folding superseded rows. J-PJ-19 copy now says
+  "up to a day".
 
 ## 2026-11-26 — hands-on comparison with ChatGPT and Claude
 
