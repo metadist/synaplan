@@ -66,7 +66,7 @@ final readonly class DefaultModelConfigSeeder implements SeederInterface
         // Standard — an image-to-video model. Shares the text2vid BTAG (see
         // ModelCatalog::CAPABILITY_TAGS) but has its own default slot.
         ['group' => 'DEFAULTMODEL', 'setting' => 'IMG2VID',    'modelKey' => 'higgsfield:higgsfield-ai/dop/standard:text2vid'],
-        // Gemini 2.5 Flash TTS: natural DE/EN without Piper's accent issues.
+        // Gemini 3.8 Flash TTS: natural DE/EN without Piper's accent issues.
         // Applied via "select suggested models" / new-user defaults; existing
         // installs are not silently rewritten (seeder is insert-if-missing).
         ['group' => 'DEFAULTMODEL', 'setting' => 'TEXT2SOUND', 'modelKey' => 'google:gemini-3.8-flash-tts:text2sound'],
