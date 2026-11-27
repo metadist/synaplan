@@ -27,7 +27,7 @@ final class ComputeWorkspaceCleanupRoutingTest extends KernelTestCase
         $senders = static::getContainer()->get('messenger.senders_locator');
         self::assertInstanceOf(SendersLocatorInterface::class, $senders);
 
-        $routed = array_keys(iterator_to_array($senders->getSenders(new Envelope(new DeleteComputeWorkspaceCommand('01JLIVE')))));
+        $routed = array_keys(iterator_to_array($senders->getSenders(new Envelope(new DeleteComputeWorkspaceCommand('user:42', '01JLIVE')))));
 
         self::assertSame([self::TRANSPORT], $routed);
     }
@@ -37,7 +37,7 @@ final class ComputeWorkspaceCleanupRoutingTest extends KernelTestCase
         self::bootKernel();
         $strategy = static::getContainer()->get('messenger.retry_strategy_locator')->get(self::TRANSPORT);
         self::assertInstanceOf(RetryStrategyInterface::class, $strategy);
-        $envelope = new Envelope(new DeleteComputeWorkspaceCommand('01JLIVE'));
+        $envelope = new Envelope(new DeleteComputeWorkspaceCommand('user:42', '01JLIVE'));
 
         self::assertTrue($strategy->isRetryable($envelope->with(new RedeliveryStamp(self::MAX_RETRIES - 1))));
         self::assertFalse($strategy->isRetryable($envelope->with(new RedeliveryStamp(self::MAX_RETRIES))));

@@ -46,7 +46,7 @@ final class ComputeEraserTest extends TestCase
         self::assertSame([$live], $removed);
         self::assertSame([], $this->dispatched, 'Nothing may be queued before the commit.');
         $this->runCleanups($erasure);
-        self::assertEquals([new DeleteComputeWorkspaceCommand('01JLIVE')], $this->dispatched);
+        self::assertEquals([new DeleteComputeWorkspaceCommand('user:42', '01JLIVE')], $this->dispatched);
     }
 
     public function testAFolderTheExpirerAlreadyDeletedIsNotQueuedAgain(): void

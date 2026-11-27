@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service\Compute;
 
+use App\Entity\ComputeWorkspace;
 use App\Repository\ComputeWorkspaceRepository;
 use App\Repository\UserRepository;
 use App\Service\Email\InternalEmailService;
@@ -62,7 +63,7 @@ final readonly class ComputeWorkspaceExpirer
 
         foreach ($this->workspaces->findExpiredWorkspaces($now) as $workspace) {
             try {
-                $this->deleteQuietly($workspace->getWorkspaceId());
+                $this->deleteQuietly($workspace);
                 $workspace->markDeleted();
                 $this->workspaces->save($workspace);
                 ++$deleted;
@@ -104,10 +105,13 @@ final readonly class ComputeWorkspaceExpirer
         }
     }
 
-    private function deleteQuietly(string $workspaceId): void
+    private function deleteQuietly(ComputeWorkspace $workspace): void
     {
         try {
-            $this->client->deleteWorkspace($workspaceId);
+            $this->client->deleteWorkspace(
+                ComputeWorkspaceService::ownerString($workspace->getUserId()),
+                $workspace->getWorkspaceId(),
+            );
         } catch (ComputeRefusedException $e) {
             if (404 !== $e->getCode()) {
                 throw $e;

@@ -94,12 +94,12 @@ final readonly class ComputeWorkspaceService
         try {
             $saved = $this->workspaces->saveForExistingOwner($row);
         } catch (\Throwable $e) {
-            $this->discardFolder($created->workspaceId);
+            $this->discardFolder($userId, $created->workspaceId);
 
             throw $e;
         }
         if (!$saved) {
-            $this->discardFolder($created->workspaceId);
+            $this->discardFolder($userId, $created->workspaceId);
 
             throw new ComputeRefusedException('account_deleted', 'This account was deleted while its file-work folder was being created.');
         }
@@ -108,10 +108,10 @@ final readonly class ComputeWorkspaceService
     }
 
     /** Best effort: the folder has no row pointing at it. */
-    private function discardFolder(string $workspaceId): void
+    private function discardFolder(int $userId, string $workspaceId): void
     {
         try {
-            $this->client->deleteWorkspace($workspaceId);
+            $this->client->deleteWorkspace(self::ownerString($userId), $workspaceId);
         } catch (\Throwable) {
         }
     }
@@ -153,7 +153,7 @@ final readonly class ComputeWorkspaceService
     private function forgetIfIdle(ComputeWorkspace $row): bool
     {
         try {
-            $this->client->deleteWorkspace($row->getWorkspaceId());
+            $this->client->deleteWorkspace(self::ownerString($row->getUserId()), $row->getWorkspaceId());
         } catch (ComputeRefusedException $e) {
             if ('workspace_not_found' === $e->errorCode()) {
                 $this->workspaces->remove($row);
@@ -191,7 +191,7 @@ final readonly class ComputeWorkspaceService
             return;
         }
         try {
-            $this->client->deleteWorkspace($workspace->getWorkspaceId());
+            $this->client->deleteWorkspace(self::ownerString($workspace->getUserId()), $workspace->getWorkspaceId());
         } catch (ComputeRefusedException $e) {
             if ('workspace_busy' === $e->errorCode()) {
                 throw new ComputeRefusedException('workspace_busy', 'A file-work run is still using this folder. Wait for it to finish, then delete it.', httpStatus: 409);

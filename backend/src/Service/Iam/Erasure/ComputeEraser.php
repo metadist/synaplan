@@ -9,6 +9,7 @@ use App\Entity\ComputeWorkspace;
 use App\Message\DeleteComputeWorkspaceCommand;
 use App\Repository\ComputeRunRepository;
 use App\Repository\ComputeWorkspaceRepository;
+use App\Service\Compute\ComputeWorkspaceService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\AsTaggedItem;
@@ -41,7 +42,8 @@ final readonly class ComputeEraser implements UserDataEraserInterface
         foreach ($this->workspaces->findForUserLocked($erasure->userId) as $workspace) {
             if (ComputeWorkspace::STATUS_DELETED !== $workspace->getStatus()) {
                 $workspaceId = $workspace->getWorkspaceId();
-                $erasure->afterCommit(fn () => $this->queueFolderDeletion($workspaceId));
+                $owner = ComputeWorkspaceService::ownerString($erasure->userId);
+                $erasure->afterCommit(fn () => $this->queueFolderDeletion($owner, $workspaceId));
             }
             $this->em->remove($workspace);
         }
@@ -52,10 +54,10 @@ final readonly class ComputeEraser implements UserDataEraserInterface
         return [ComputeRun::class, ComputeWorkspace::class];
     }
 
-    private function queueFolderDeletion(string $workspaceId): void
+    private function queueFolderDeletion(string $owner, string $workspaceId): void
     {
         try {
-            $this->bus->dispatch(new DeleteComputeWorkspaceCommand($workspaceId));
+            $this->bus->dispatch(new DeleteComputeWorkspaceCommand($owner, $workspaceId));
         } catch (\Throwable $e) {
             $this->logger->error('The sidecar folder of a deleted account could not be queued for deletion', [
                 'workspace_id' => $workspaceId,

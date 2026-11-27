@@ -967,7 +967,7 @@ final readonly class CodeRunRunner implements TaskRunner
             return $status;
         }
         try {
-            $this->client->cancel($runId);
+            $this->client->cancel($owner, $runId);
         } catch (\Throwable) {
         }
         try {
