@@ -236,8 +236,7 @@ final readonly class PlatformBearerAttribution
      */
     private function externalId(PlatformInstance $instance, array $claims): string
     {
-        $value = $claims[$this->cloud->userClaimFor($instance)] ?? null;
-        $externalId = is_string($value) ? trim($value) : '';
+        $externalId = OidcCloud::claimValue($claims, $this->cloud->userClaimFor($instance));
 
         return strlen($externalId) > PlatformInstanceService::EXTERNAL_ID_MAX_LENGTH ? '' : $externalId;
     }

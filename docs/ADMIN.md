@@ -960,7 +960,8 @@ it is already another link. Change the claim for an identity provider where
 `sub` is not stable, for example one whose operator recreates an account when
 it changes (same login, same mail address): set it to the claim the cloud
 itself knows its users by (one people cannot edit themselves), and have the
-cloud app use the same claim. The app
+cloud app use the same claim. `email` counts only when the token carries
+`email_verified: true`. The app
 reports what it takes with `PUT /api/v1/platform-links/oidc-cloud`, using one
 of those people's tokens (`azp` is `PLATFORM_LINKS_OIDC_CLOUD_CLIENT_ID`).
 Names this Synaplan does not know are ignored, so a newer app and an older

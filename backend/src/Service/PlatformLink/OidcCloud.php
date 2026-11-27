@@ -40,6 +40,7 @@ final readonly class OidcCloud
     ];
 
     public const DEFAULT_USER_CLAIM = 'sub';
+    private const EMAIL_CLAIM = 'email';
 
     public string $client;
     public string $url;
@@ -75,6 +76,27 @@ final readonly class OidcCloud
     public function userClaimFor(PlatformInstance $instance): string
     {
         return $this->isThisCloud($instance) ? $this->userClaim : self::DEFAULT_USER_CLAIM;
+    }
+
+    /**
+     * How a token names its person under the given claim: the trimmed string
+     * value, empty when the token lacks it. A mail address counts only when
+     * the identity provider verified it, since an unverified one is whatever
+     * the person typed in, possibly someone else's.
+     *
+     * @param array<string, mixed> $claims
+     */
+    public static function claimValue(array $claims, string $claim): string
+    {
+        $value = $claims[$claim] ?? null;
+        if (!is_string($value)) {
+            return '';
+        }
+        if (self::EMAIL_CLAIM === $claim && true !== ($claims['email_verified'] ?? null)) {
+            return '';
+        }
+
+        return trim($value);
     }
 
     /**

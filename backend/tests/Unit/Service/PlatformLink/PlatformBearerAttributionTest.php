@@ -212,6 +212,40 @@ final class PlatformBearerAttributionTest extends TestCase
         self::assertSame('sub', $this->cloud()->userClaimFor($configured), 'unset keeps the subject');
     }
 
+    public function testAnUnverifiedMailAddressNamesNobody(): void
+    {
+        self::assertSame('', OidcCloud::claimValue(['email' => 'ada@example.com'], 'email'));
+        self::assertSame('', OidcCloud::claimValue(['email' => 'ada@example.com', 'email_verified' => 'true'], 'email'));
+        self::assertSame('ada@example.com', OidcCloud::claimValue(['email' => ' ada@example.com ', 'email_verified' => true], 'email'));
+        self::assertSame('ada', OidcCloud::claimValue(['preferred_username' => 'ada'], 'preferred_username'));
+        self::assertSame('', OidcCloud::claimValue(['groups' => ['a']], 'groups'));
+    }
+
+    public function testAnUnverifiedMailAddressDoesNotMoveALink(): void
+    {
+        $row = $this->link('ada@example.com', ExternalIdentity::MODE_SSO);
+        $identities = $this->createMock(ExternalIdentityRepository::class);
+        $identities->method('findForUserOnInstance')->willReturn([$row]);
+        $identities->expects(self::never())->method('lock');
+        $audit = $this->createMock(AuditLogWriter::class);
+        $audit->expects(self::never())->method('record');
+
+        $this->attribution(
+            $identities,
+            $this->createStub(EntityManagerInterface::class),
+            $this->createStub(LifecycleEffect::class),
+            $audit,
+            $this->cloud('email'),
+        )->attribute($this->user(4), [
+            'azp' => 'synaplan-opencloud',
+            'sub' => 'person-1',
+            'email' => 'grace@example.com',
+            'email_verified' => false,
+        ]);
+
+        self::assertSame('ada@example.com', $row->getExternalId());
+    }
+
     public function testASsoLinkFollowsAChangedValueAndIsAuditedOnce(): void
     {
         $row = $this->link('person-1', ExternalIdentity::MODE_SSO);

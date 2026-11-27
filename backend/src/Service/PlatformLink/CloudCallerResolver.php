@@ -62,8 +62,7 @@ final readonly class CloudCallerResolver
         if ('' === $subject) {
             throw new CloudDeliveryException(Response::HTTP_UNAUTHORIZED, 'unauthorized');
         }
-        $configured = $claims[$this->cloud->userClaim] ?? null;
-        $configured = is_string($configured) ? $configured : '';
+        $configured = OidcCloud::claimValue($claims, $this->cloud->userClaim);
         $requested = trim($requested);
         if ('' === $requested) {
             if ('' === $configured) {
