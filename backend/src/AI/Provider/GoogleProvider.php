@@ -81,7 +81,7 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     ) {
         $this->api = new GoogleApiClient($httpClient, $logger, $apiKey, $keyStore, $projectId, $region, $vertexAccessToken);
         $this->chat = new GoogleChat($this->api, $logger, $structuredOutputTranslator);
-        $this->images = new GoogleImageGeneration($this->api, $logger, $uploadDir);
+        $this->images = new GoogleImageGeneration($this->api, $logger);
         $this->vision = new GoogleVision($this->api, $logger, $uploadDir);
         $this->video = new GoogleVideoGeneration($this->api, $logger, new GoogleOmniVideo($this->api, $logger));
         $this->speech = new GoogleSpeech($this->api, $logger, $uploadDir);
@@ -243,11 +243,6 @@ class GoogleProvider implements ChatProviderInterface, ToolCallingChatProviderIn
     public function createVariations(string $imageUrl, int $count = 1): array
     {
         return $this->images->createVariations($imageUrl, $count);
-    }
-
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        return $this->images->editImage($imageUrl, $maskUrl, $prompt);
     }
 
     // ==================== VIDEO GENERATION ====================

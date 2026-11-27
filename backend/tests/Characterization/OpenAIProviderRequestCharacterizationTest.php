@@ -19,7 +19,6 @@ use OpenAI\Responses\Audio\TranslationResponse;
 use OpenAI\Responses\Chat\CreateResponse as ChatResponse;
 use OpenAI\Responses\Embeddings\CreateResponse as EmbeddingResponse;
 use OpenAI\Responses\Images\CreateResponse as ImageResponse;
-use OpenAI\Responses\Images\EditResponse;
 use OpenAI\Responses\Images\VariationResponse;
 use OpenAI\Testing\Enums\OverrideStrategy;
 use PHPUnit\Framework\TestCase;
@@ -327,13 +326,6 @@ final class OpenAIProviderRequestCharacterizationTest extends TestCase
             'image.variations' => [
                 'sdk' => [OpenAIFixtures::json(VariationResponse::fake(['data' => [['url' => 'https://example.test/var1.png', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
                 'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): array => $p->createVariations($uploads.'/photo.png', 1),
-            ],
-            'image.edit' => [
-                'sdk' => [OpenAIFixtures::json(EditResponse::fake(['data' => [['url' => 'https://example.test/edited.png', 'b64_json' => null]]], null, OverrideStrategy::Replace)->toArray())],
-                'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): string => $p->editImage($uploads.'/photo.png', $uploads.'/mask.png', 'Add a hat'),
-            ],
-            'image.edit_missing_file' => [
-                'call' => static fn (OpenAIProvider $p, \Closure $onEvent, string $uploads): string => @$p->editImage($uploads.'/missing.png', $uploads.'/mask.png', 'Add a hat'),
             ],
             'image.no_key' => [
                 'provider' => 'none',

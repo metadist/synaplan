@@ -268,11 +268,6 @@ final class TheHiveProvider implements ImageGenerationProviderInterface, Describ
         throw new ProviderException('TheHive does not support image variations', 'thehive');
     }
 
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        throw new ProviderException('TheHive does not support image editing', 'thehive');
-    }
-
     // ==================== HELPER METHODS ====================
 
     /**

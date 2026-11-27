@@ -967,11 +967,6 @@ class TestProvider implements ChatProviderInterface, ToolCallingChatProviderInte
         return array_fill(0, $count, 'https://via.placeholder.com/1024x1024');
     }
 
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        return 'https://via.placeholder.com/1024x1024?text=Edited';
-    }
-
     // SpeechToTextProviderInterface
     public function transcribe(string $audioPath, array $options = []): array
     {

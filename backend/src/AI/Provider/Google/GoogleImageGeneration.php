@@ -16,7 +16,6 @@ final class GoogleImageGeneration
     public function __construct(
         private readonly GoogleApiClient $api,
         private readonly LoggerInterface $logger,
-        private readonly string $uploadDir,
     ) {
     }
 
@@ -347,61 +346,5 @@ final class GoogleImageGeneration
     public function createVariations(string $imageUrl, int $count = 1): array
     {
         throw new ProviderException('Image variations not supported by Google Imagen', 'google');
-    }
-
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        // Google Gemini 2.5 Flash Image supports editing
-        $model = 'gemini-2.5-flash-image-preview';
-
-        $key = $this->api->requireKey();
-
-        try {
-            // Read the image
-            $fullPath = $this->uploadDir.'/'.ltrim($imageUrl, '/');
-            if (!file_exists($fullPath)) {
-                throw new \Exception("Image file not found: {$fullPath}");
-            }
-
-            $imageData = file_get_contents($fullPath);
-            $base64Image = base64_encode($imageData);
-            $mimeType = mime_content_type($fullPath);
-
-            $url = $this->api->modelUrl($model, 'generateContent');
-
-            $payload = [
-                'contents' => [
-                    [
-                        'role' => 'user',
-                        'parts' => [
-                            [
-                                'text' => "Edit this image: {$prompt}",
-                            ],
-                            [
-                                'inline_data' => [
-                                    'mime_type' => $mimeType,
-                                    'data' => $base64Image,
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ];
-
-            $response = $this->api->postJson($url, $payload, $key, 60);
-
-            $data = $response->toArray();
-
-            // Extract image from response
-            if (isset($data['candidates'][0]['content']['parts'][0]['inline_data'])) {
-                $imageBase64 = $data['candidates'][0]['content']['parts'][0]['inline_data']['data'];
-
-                return 'data:image/png;base64,'.$imageBase64;
-            }
-
-            throw new \Exception('No image returned from Google');
-        } catch (\Exception $e) {
-            throw new ProviderException('Google image edit error: '.$e->getMessage(), 'google');
-        }
     }
 }

@@ -463,45 +463,4 @@ final class OpenAIImageGeneration
 
         return file_get_contents($location);
     }
-
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string
-    {
-        if (null === $this->api->sdk()) {
-            throw ProviderException::missingApiKey('openai', 'OPENAI_API_KEY');
-        }
-
-        try {
-            // Download images. A remote URL uses the shared HTTP client; a
-            // local path is read from disk, as the edit and variation tests do.
-            $imageContent = $this->imageBytes($imageUrl);
-            $maskContent = $this->imageBytes($maskUrl);
-
-            if (false === $imageContent || false === $maskContent) {
-                throw new \Exception('Failed to download image or mask');
-            }
-
-            // Create temp files
-            $tmpImage = tmpfile();
-            $tmpMask = tmpfile();
-            fwrite($tmpImage, $imageContent);
-            fwrite($tmpMask, $maskContent);
-            $tmpImagePath = stream_get_meta_data($tmpImage)['uri'];
-            $tmpMaskPath = stream_get_meta_data($tmpMask)['uri'];
-
-            $response = $this->api->sdk()->images()->edit([
-                'image' => fopen($tmpImagePath, 'r'),
-                'mask' => fopen($tmpMaskPath, 'r'),
-                'prompt' => $prompt,
-                'n' => 1,
-                'size' => '1024x1024',
-            ]);
-
-            fclose($tmpImage);
-            fclose($tmpMask);
-
-            return $response['data'][0]['url'] ?? '';
-        } catch (\Exception $e) {
-            throw new ProviderException('OpenAI image edit error: '.$e->getMessage(), 'openai');
-        }
-    }
 }

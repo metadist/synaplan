@@ -13,9 +13,4 @@ interface ImageGenerationProviderInterface extends ProviderMetadataInterface
      * Erstellt Variationen eines Bildes.
      */
     public function createVariations(string $imageUrl, int $count = 1): array;
-
-    /**
-     * Image Editing mit Mask.
-     */
-    public function editImage(string $imageUrl, string $maskUrl, string $prompt): string;
 }

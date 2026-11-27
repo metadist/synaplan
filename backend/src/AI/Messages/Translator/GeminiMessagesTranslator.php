@@ -30,6 +30,7 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     private const DEFAULT_UPSTREAM = 'https://generativelanguage.googleapis.com';
     private const API_VERSION = 'v1beta';
     private const DEFAULT_TIMEOUT = 600;
+    private const MISSING_MODEL_MESSAGE = 'model: Field required';
 
     private const STRIP_KEYS = [
         'thinking',
@@ -53,8 +54,18 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
 
     public function complete(array $requestBody, array $context): array
     {
+        $modelName = $this->modelName($requestBody);
+        if (null === $modelName) {
+            return [
+                'status' => 400,
+                'headers' => [],
+                'body' => $this->missingModelError(),
+                'usage' => new MessagesUsage(),
+            ];
+        }
+
         $payload = $this->toGeminiRequest($requestBody);
-        $response = $this->request($payload, $context, $requestBody, stream: false);
+        $response = $this->request($payload, $context, $modelName, stream: false);
         $status = $response->getStatusCode();
         $headers = $response->getHeaders(false);
         $raw = $response->getContent(false);
@@ -93,8 +104,15 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
 
     public function stream(array $requestBody, array $context, callable $emit): MessagesUsage
     {
+        $modelName = $this->modelName($requestBody);
+        if (null === $modelName) {
+            $emit(['event' => 'error', 'data' => $this->missingModelError()]);
+
+            return new MessagesUsage();
+        }
+
         $payload = $this->toGeminiRequest($requestBody);
-        $response = $this->request($payload, $context, $requestBody, stream: true);
+        $response = $this->request($payload, $context, $modelName, stream: true);
         $status = $response->getStatusCode();
         if ($status >= 400) {
             $raw = $response->getContent(false);
@@ -413,14 +431,37 @@ final readonly class GeminiMessagesTranslator implements MessagesTranslatorInter
     }
 
     /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $context
+     * The gateway always resolves an alias to a provider model before it calls
+     * a translator, so a request without one is malformed. It is refused here
+     * instead of being sent to a guessed default model.
+     *
      * @param array<string, mixed> $requestBody
      */
-    private function request(array $payload, array $context, array $requestBody, bool $stream): ResponseInterface
+    private function modelName(array $requestBody): ?string
+    {
+        $model = $requestBody['model'] ?? null;
+
+        return \is_string($model) && '' !== trim($model) ? $model : null;
+    }
+
+    /**
+     * @return array{type: string, error: array{type: string, message: string}}
+     */
+    private function missingModelError(): array
+    {
+        return [
+            'type' => 'error',
+            'error' => ['type' => 'invalid_request_error', 'message' => self::MISSING_MODEL_MESSAGE],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $context
+     */
+    private function request(array $payload, array $context, string $modelName, bool $stream): ResponseInterface
     {
         $upstream = rtrim((string) ($context['gemini_upstream_url'] ?? self::DEFAULT_UPSTREAM), '/');
-        $modelName = (string) ($requestBody['model'] ?? 'gemini-2.0-flash');
         $model = GoogleApiClient::encodeModelId($modelName);
         $timeout = Gemini4Models::usesThinkingLevel($modelName)
             ? Gemini4Models::TIMEOUT_SECONDS
