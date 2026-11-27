@@ -39,6 +39,13 @@
         <env name="BRAVE_SEARCH_API_KEY" value="" force="true" />
         <env name="BRAVE_SEARCH_API_URL" value="https://api.search.brave.com/res/v1" />
         <env name="BRAVE_SEARCH_ENABLED" value="false" force="true" />
+        <!-- A local SPECSTREAM_API_KEY makes a second search provider look
+             available, so the plugs test sees allowed=true. CI has no key. -->
+        <env name="SPECSTREAM_API_KEY" value="" force="true" />
+        <env name="SPECSTREAM_SEARCH_API_KEY" value="" force="true" />
+        <!-- backend/.env sets CLOUD_FILES_ENABLED=1. The cloud-file tests
+             start from the feature off, which is the CI default. -->
+        <env name="CLOUD_FILES_ENABLED" value="" force="true" />
         <env name="BRAVE_SEARCH_COUNT" value="10" />
         <env name="BRAVE_SEARCH_COUNTRY" value="us" />
         <env name="BRAVE_SEARCH_SEARCH_LANG" value="en" />

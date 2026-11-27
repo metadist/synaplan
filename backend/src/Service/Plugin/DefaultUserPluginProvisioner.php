@@ -9,7 +9,8 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Installs a curated set of default plugins for newly created real users.
+ * Installs the bundled plugins, then any names in DEFAULT_USER_PLUGINS,
+ * for a newly verified user.
  */
 final readonly class DefaultUserPluginProvisioner
 {
@@ -27,7 +28,7 @@ final readonly class DefaultUserPluginProvisioner
     public function provisionNewUser(User $user): void
     {
         $userId = $user->getId();
-        if (null === $userId || empty($this->defaultPlugins)) {
+        if (null === $userId) {
             return;
         }
 
@@ -36,8 +37,7 @@ final readonly class DefaultUserPluginProvisioner
             $availablePlugins[$plugin->name] = true;
         }
 
-        foreach (array_unique($this->defaultPlugins) as $pluginName) {
-            $pluginName = trim($pluginName);
+        foreach ($this->pluginNames() as $pluginName) {
             if ('' === $pluginName) {
                 continue;
             }
@@ -71,5 +71,25 @@ final readonly class DefaultUserPluginProvisioner
                 ]);
             }
         }
+    }
+
+    /**
+     * Bundled plugins first, then whatever this deployment adds. A name
+     * that appears in both lists is installed once.
+     *
+     * @return list<string>
+     */
+    private function pluginNames(): array
+    {
+        $names = [];
+        foreach ([...BundledPlugins::NAMES, ...$this->defaultPlugins] as $pluginName) {
+            $pluginName = trim($pluginName);
+            if ('' === $pluginName || in_array($pluginName, $names, true)) {
+                continue;
+            }
+            $names[] = $pluginName;
+        }
+
+        return $names;
     }
 }

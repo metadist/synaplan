@@ -193,8 +193,7 @@ final readonly class PluginManager
             return;
         }
 
-        $pluginSlug = $this->slugify($pluginName);
-        $group = 'P_'.substr($pluginSlug, 0, 62);
+        $group = $this->configGroup($pluginName);
 
         $sqlFiles = glob($migrationsDir.'/*.sql');
         if (!$sqlFiles) {
@@ -219,6 +218,29 @@ final readonly class PluginManager
                 'group' => $group,
             ]);
         }
+    }
+
+    /**
+     * BCONFIG group for this plugin's per-user settings (`P_` plus the slug).
+     */
+    public function configGroup(string $pluginName): string
+    {
+        return 'P_'.substr($this->slugify($this->requireValidPluginName($pluginName)), 0, 62);
+    }
+
+    /**
+     * True when this user's upload tree has the plugin symlink.
+     *
+     * The sidebar lists installed plugins from that directory. The
+     * `enabled` row in BCONFIG is a separate gate and can be missing
+     * after the database is recreated while the files remain.
+     */
+    public function isInstalled(int $userId, string $pluginName): bool
+    {
+        $pluginName = $this->requireValidPluginName($pluginName);
+        $targetDir = $this->fileStorageService->getUserBaseAbsolutePath($userId).'/plugins/'.$pluginName;
+
+        return is_dir($targetDir);
     }
 
     /**

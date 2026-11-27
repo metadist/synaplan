@@ -1,7 +1,9 @@
 # Synaform
 
 Forms, templates, and document generation. The page and the API live here
-and ship in the Synaplan image.
+and ship in the Synaplan image. `app:seed` installs it for every verified
+account that does not have it yet. An account that already has `enabled`
+set to `0` stays off.
 
 This directory was taken on 2026-11-06 from the copy already running beside
 this checkout (manifest 4.4.3). That copy uses `AiFacade` and this

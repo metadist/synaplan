@@ -21,6 +21,7 @@ commands** for production-essential catalog data. Demo/test data lives in DataFi
 | Saved Tasks flag (`BCONFIG`)     | `App\Seed\SavedTaskConfigSeeder` / `app:seed`                | dev + prod      |
 | Saved Tasks + connections (`BSAVEDTASKS`, `BSAVEDTASK_RUNS`, `BCONNECTIONS`, `BCREDENTIALS`) | Doctrine migration `Version20260815140000` | dev + prod      |
 | Demo widget config (`BCONFIG`)   | `App\Seed\DemoWidgetConfigSeeder`                                | dev + test only |
+| Synaform and Synamail install    | `App\Seed\BundledPluginSeeder` / `app:seed`                      | dev + prod      |
 | Demo users (`BUSER`)             | `App\DataFixtures\UserFixtures`                                  | dev + test only |
 
 

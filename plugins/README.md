@@ -21,17 +21,20 @@ Seven directories ship in the image:
 | `serper_search` | Reference `web_search` plug adapter, no page  | —                  | —                                                             |
 | `hello_world`   | Smallest page and route, for plugin authors   | `locales/`, five   | —                                                             |
 
-A plugin with a page is installed per user with
-`app:plugin:install <userId> <id>`; `DEFAULT_USER_PLUGINS` is empty unless
-you set it. The page, the Apps card and the menu entry show the manifest's
-`displayName`, or the id in words when there is none.
+`synaform` and `synamail` are installed for every verified account by
+`app:seed` (every container start, after demo users exist). An account
+whose `enabled` setting is already `0` is left off. Any other plugin is
+installed per user with `app:plugin:install <userId> <id>`, or for new
+signups by naming it in `DEFAULT_USER_PLUGINS`. The page, the Apps card
+and the menu entry show the manifest's `displayName`, or the id in words
+when there is none.
 
 `synamail` stores contact profiles for the Outlook add-in. The add-in
 itself stays in [metadist/Synamail](https://github.com/metadist/Synamail).
-It is not added to `DEFAULT_USER_PLUGINS`. To leave it out of a build you
-make yourself, delete `plugins/synamail` before the image is built. A switch that hides
-a plugin inside an image you pulled, without rebuilding, is a later step
-and is not available yet. The rules for a plugin we ship are in
+To leave it out of a build you make yourself, delete `plugins/synamail`
+before the image is built. A switch that hides a plugin inside an image
+you pulled, without rebuilding, is a later step and is not available yet.
+The rules for a plugin we ship are in
 [`_devextras/planning/20261104-hosted-plugins/01_rules.md`](../_devextras/planning/20261104-hosted-plugins/01_rules.md).
 
 ## Frontend files

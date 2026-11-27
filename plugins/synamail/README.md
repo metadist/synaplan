@@ -19,9 +19,9 @@ The storage key is a hash of the address. The address itself is inside the JSON.
 
 The stored narrative and that one email go to the user's chat model. Nothing is sent until the add-in asks for an update. This plugin does not read a mailbox.
 
-## Install it for one user
+## Install
 
-The directory ships in the Synaplan image. It is not installed for anyone until you say so. `DEFAULT_USER_PLUGINS` is left unchanged.
+The directory ships in the Synaplan image. `app:seed` installs it for every verified account that does not have it yet, including the demo users on a fresh database. An account that already has `enabled` set to `0` stays off.
 
 ```bash
 docker compose exec backend php bin/console app:plugin:install <userId> synamail
@@ -31,7 +31,7 @@ Open **Plugins → Synamail**, or visit `/plugins/synamail`.
 
 ## Leave it out
 
-- Do not run the install command. A person who does not have it sees an unknown page, not an empty one.
+- Set `P_synamail` / `enabled` to `0` for one account. The next seed leaves that account off.
 - Source build: delete `plugins/synamail` before `docker build` or before `docker compose up`. The kernel never sees the manifest.
 - Uninstall for one person with the existing uninstall command. That removes their symlink. The code stays in the image.
 - Deleting the directory inside a running container is undone by the next image pull.
