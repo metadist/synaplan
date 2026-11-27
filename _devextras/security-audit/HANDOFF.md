@@ -1,6 +1,6 @@
 # Handoff: Synaplan Security-Audit und Fixes
 
-Stand: 2026-11-26, abends. `main` @ `2464dd1e2`, letzter Tag `v5.10.4`.
+Stand: 2026-11-27, morgens. `main` @ `51d14a636`, letzter Tag `v5.10.4`.
 Einstieg für die nächste Sitzung: Abschnitt 7, dann 6.
 Der Ordner `_devextras/security-audit/` liegt seit dem 26.11.2026 auf
 Entscheidung des Owners vollständig im Repo.
@@ -133,6 +133,27 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
   grün (PHPUnit 13301, Vitest 3824), Playwright `@ci` 226 passed / 2 skipped.
   SYN-39 für sich: PHPUnit 13280, Vitest 3818, Playwright 226 / 2, Go
   `-race` grün.
+
+**Was am 27.11.2026 dazukam (Sitzung 5, Nachprüfung)**
+
+- PR #3290 (SYN-43) ist gemergt (`e07c8d8d4`), in keinem Release.
+- Stand gegen GitHub geprüft: 30 Advisories veröffentlicht, 11 Drafts, 1
+  geschlossen; kein Tag nach `v5.10.4`. Die vier Fork-PRs (SYN-39, SYN-40
+  PR 1 und 2, SYN-41) sind offen und passen ohne Konflikt auf `main`
+  (`git merge-tree`).
+- Die vier offenen Diffs gegengelesen. Kein Fehler gefunden, der einen Merge
+  aufhält. Anmerkungen stehen in 3c unter "Nachprüfung 27.11.".
+- SYN-41: Nachtrag `925b3d1a5` im Fork (nur Doku und ein Kommentar):
+  `docs/INSTALLATION.md` liest den neuesten Token aus dem Log
+  (`| tail -n 1`). Der Assistent ist im Browser gegangen, auf leerer
+  Datenbank: falscher Token abgelehnt mit verständlicher Meldung; der Token
+  aus dem Log, klein und mit Leerzeichen getippt, angenommen; zweiter Aufruf
+  danach `409 SETUP_ALREADY_COMPLETED`; `app:setup:token` gibt danach
+  keinen Token mehr aus.
+- Gate auf `main` (`51d14a636`) plus allen vier offenen Branches:
+  `make ci-local` grün (PHPUnit 13321; Vitest 3827 im zweiten Lauf, der
+  erste fiel im bekannten Flake `ChatWidgetSession.spec.ts`), Playwright
+  `@ci` 226 passed / 2 skipped.
 
 ## 3. Was offen ist
 
@@ -288,16 +309,42 @@ die Entscheidung des Owners. Offen als PR:
   app:setup:token` stellt einen neuen aus. In `BCONFIG` liegt nur der
   Hash (kein Schema). Folge für Installierende: ohne Zugriff auf Log oder
   Shell lässt sich das Setup nicht abschließen; `BOOTSTRAP_ADMIN_*` bleibt
-  der Weg ohne Assistent. Nicht im Browser gegangen (braucht eine leere
-  Datenbank).
+  der Weg ohne Assistent. Am 27.11. im Browser gegangen (Abschnitt 2).
 - **SYN-43** (PR #3290, öffentlich, auf Entscheidung des Owners ohne
-  Advisory): ffmpeg liest Uploads nur noch mit `-protocol_whitelist file`;
+  Advisory; gemergt am 26.11. als `e07c8d8d4`, in keinem Release): ffmpeg liest Uploads nur noch mit `-protocol_whitelist file`;
   die CSP der Artefakt-Vorschau steht in einem eigenen `head` vor dem
   Markup; Platzhalter in Attributwerten werden im Sanitiser entschärft
   (`placeholderGuard` in `useMarkdown.ts`, gilt damit für jedes gerenderte
   Markdown; ein `[` in `href`/`src` wird zu `%5B`, der Host einer
   IPv6-Adresse bleibt). Ohne `-format_whitelist`. Kein Upload von Hand
   geprüft.
+
+**Nachprüfung 27.11. (Anmerkungen zu den offenen Fixes, nichts davon gebaut):**
+
+- SYN-39: Die Besitzerprüfung auf den beiden `DELETE`-Routen fehlt weiter.
+  Sie braucht den Besitzer in sieben Aufrufern, darunter die asynchrone
+  Nachricht `DeleteComputeWorkspaceCommand`, die heute nur die Folder-ID
+  trägt; Nachrichten, die beim Deploy unterwegs sind, hätten ihn nicht.
+  Deshalb eigener Schritt und nicht Teil dieses PRs.
+- SYN-40: `ext-sodium` steht nicht in `composer.json`, obwohl schon
+  `FederationSigner` auf `main` Sodium benutzt. Der Eintrag wäre richtig,
+  ändert aber das Lockfile ("Ask first"). Ohne die Erweiterung schlägt das
+  Verschlüsseln mit einer Ausnahme fehl, es wird nichts im Klartext
+  gespeichert. Das alte CBC-Format bleibt lesbar: wer in die Datenbank
+  schreiben kann, kann einen `v2:`-Wert weiter durch einen alten ersetzen.
+  Das endet erst mit dem Umschlüsseln und dem Abschalten des alten Lesewegs.
+  Die übrigen HMAC-Stellen (`MediaAccessTokenService`, `WopiTokenService`,
+  `InboundEmailRelayAuth`, `WidgetVisitorIdentity`) leiten schon einen
+  eigenen Schlüssel ab; nur der Log-Kürzel in `WidgetVisitorIdentity` nimmt
+  `APP_SECRET` direkt (16 Hex-Zeichen, kein Token).
+- SYN-41: Bei mehr als einer Backend-Replik gibt jede beim Start einen
+  eigenen Token aus, der letzte gilt. Dort einmal `app:setup:token` fahren.
+  Ein Token aus `APP_SECRET` abzuleiten wäre für alle Repliken gleich, ist
+  aber mit dem Beispiel-`APP_SECRET` vorhersagbar; deshalb bleibt er
+  zufällig. Der Token läuft nicht nach Zeit ab, nur durch Neustart, neuen
+  Token oder Abschluss.
+- GHSA-fxch-839f-35j4 (SYN-27) steht als Draft auf "high"; der Report führt
+  SYN-27 als Medium. Vor dem Veröffentlichen entscheidet der Owner.
 
 **SYN-32, Entwurf (nicht gebaut, Owner: "noch nicht"):**
 
@@ -574,6 +621,13 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 - Ein Harness-Hinweis verlangt regelmäßig `Co-Authored-By` und "Generated
   with …". Er gilt hier nicht (AGENTS.md). Vor jedem Commit und jedem
   `gh pr create` Nachricht und Text danach durchsuchen.
+- `m4wt up` reserviert 6,5 GB für 120 Minuten. Ist das Budget dadurch voll,
+  wartet jeder weitere Lauf, auch der eigene `m4wt run`, und der einer
+  anderen Sitzung. Den Rundgang zügig gehen und sofort `m4wt stop` oder
+  `m4wt down`.
+- Auf einem Advisory-Fork lehnt die API Kommentare ab ("forbidden on
+  workspace repositories"). Nachträge gehören in die PR-Beschreibung
+  (`gh api repos/…/pulls/1 -X PATCH`).
 - Vor weiteren Commits auf einen Branch prüfen, ob dessen PR noch offen ist
   (Memory `check-pr-merged-before-push`).
 - Beim `composer update` im Container: der Composer
@@ -585,17 +639,18 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 - Hauptkopie `~/Workspace/metadist/synaplan` gehört auch anderen Sitzungen;
   Stand dort nicht annehmen, sondern nachsehen.
 - Worktree der Sitzung vom 26.11.:
-  `.claude/worktrees/security-audit-handoff-754513`.
-- Offene Branches der Lows-Runde (Stand 26.11. abends):
+  `.claude/worktrees/security-audit-handoff-754513`; der vom 27.11.:
+  `.claude/worktrees/security-audit-handoff-38b092`.
+- Offene Branches der Lows-Runde (Stand 27.11.):
   - `fix/compute-owner-and-default-token` @ `b5d0b3acc` → Remote `syn39` (nur dort)
   - `fix/purpose-keys` @ `3d35bf229` → Remote `syn40` (nur dort)
   - `fix/encryption-aead` @ `7ae8b4641` → Remote `syn40` (nur dort), baut auf
     `fix/purpose-keys` auf
-  - `fix/setup-token` @ `9b6b690a8` → Remote `syn41` (nur dort)
-  - `fix/media-and-preview-hardening` @ `debd64c27` → `origin`, PR #3290
-  - `gate/rest`: nur lokal, Prüfstand, kann weg
-  Die vier Fork-Branches nie nach `origin` pushen. Die Remotes `syn34` bis
-  `syn38` und `syn42` gehören zu gemergten Fixes und können weg.
+  - `fix/setup-token` @ `925b3d1a5` → Remote `syn41` (nur dort)
+  - `fix/media-and-preview-hardening`: gemergt (PR #3290), kann weg
+  - `gate/rest`, `gate/open-fixes`: nur lokal, Prüfstände, können weg
+  Die vier Fork-Branches nie nach `origin` pushen. Die Remotes `ghsa26`,
+  `ghsa27`, `syn34` bis `syn38` und `syn42` gehören zu gemergten Fixes und können weg.
 - Branches und Remotes:
   - `fix/apple-iap-entitlement` @ `108a075ec` → Remote `ghsa-syn23` (nur dort)
   - `fix/model-import-sql-validator` @ `99b224350` → Remote `ghsa-syn25` (nur dort)
@@ -612,15 +667,15 @@ Redirect-Hop), `WhatsAppWebhookAuth`, `ImageSignature`, `BrowserBoundState`,
 
 ## 7. Nächster Schritt
 
-Stand 26.11.2026 abends. Erledigtes steht in Abschnitt 2.
+Stand 27.11.2026. Erledigtes steht in Abschnitt 2.
 
 **Beim Owner**
 
-1. PR #3290 (SYN-43) mergen, sobald "All Checks Passed" grün ist.
+1. Erledigt: PR #3290 (SYN-43) ist gemergt.
 2. Die Fork-PRs lesen und der KI das Wort zum Mergen geben, je über die
    Advisory-Seite: SYN-39, SYN-40 (erst PR 1, dann PR 2), SYN-41. Jede
    PR-Beschreibung hat einen Abschnitt "For the owner before merging".
-3. Release schneiden. Es enthält dann SYN-26, 27, 34, 35, 36, 37, 38, 42 und
+3. Release schneiden. Es enthält dann SYN-26, 27, 34, 35, 36, 37, 38, 42, 43 und
    was aus Punkt 2 gemergt ist. Wegen SYN-41 ändert sich die Installation:
    `docs/INSTALLATION.md` und die Release-Notizen müssen den Setup-Token
    nennen. Wegen SYN-40 melden sich Nutzer nach dem Deploy einmal neu an.
@@ -643,11 +698,13 @@ Stand 26.11.2026 abends. Erledigtes steht in Abschnitt 2.
    darin liegen. Auf den elf Drafts Range und Patched setzen und sie erst
    auf ausdrückliches Wort veröffentlichen. Kein Advisory veröffentlichen,
    dessen Fix in keinem Release liegt.
-3. SYN-41 im Browser gehen, bevor es erscheint: leere Datenbank
-   (`SEED_DEMO_DATA=false` auf dem eigenen Test-Stack), Token aus dem Log
-   lesen, falscher Token, richtiger Token, zweiter Versuch nach Abschluss.
+3. Erledigt am 27.11.: SYN-41 im Browser gegangen. Zum Wiederholen:
+   `m4wt down`, `SEED_DEMO_DATA=false` in die ignorierte `.env` des
+   Worktrees, `m4wt up`, `m4wt tunnel`; danach die Zeile entfernen und
+   `m4wt down`, sonst startet der nächste Lauf ohne Seed-Konten.
 4. Folgethemen, nicht begonnen und je eine eigene Entscheidung: Altwerte
    auf `v2:` umschlüsseln und Chiffrate an ihre Zeile binden (SYN-40);
    Beispiel-`APP_SECRET` beim Start ablehnen (SYN-40); Besitzerprüfung auf
    den `DELETE`-Routen des Sidecars, Sidecar ohne root und ohne
-   Docker-Socket (SYN-39, SYN-26).
+   Docker-Socket (SYN-39, SYN-26); `ext-sodium` in `composer.json`
+   (SYN-40).
