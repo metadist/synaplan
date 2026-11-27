@@ -51,6 +51,29 @@ final readonly class SessionStore
         $this->data->set(self::STORE_OWNER, self::PLUGIN, self::TYPE_SESSION, $key, $session);
     }
 
+    /**
+     * Read, change and write one session while holding its row lock.
+     * The callback receives the session as stored now. A copy read earlier
+     * must not be written back: two participant reports would otherwise
+     * each replace the whole document and one person would be lost.
+     *
+     * @param callable(array<string, mixed>): array<string, mixed> $change
+     *
+     * @return array<string, mixed>
+     */
+    public function update(string $ref, callable $change): array
+    {
+        $key = 1 === preg_match('/^[a-f0-9]{16}$/', $ref) ? $ref : self::sessionKey($ref);
+
+        return $this->data->update(self::STORE_OWNER, self::PLUGIN, self::TYPE_SESSION, $key, function (?array $current) use ($change): array {
+            if (!is_array($current)) {
+                throw new SessionException('unknown_session', 'These meeting notes do not exist.', 404);
+            }
+
+            return $change($current);
+        });
+    }
+
     public function activeRefForRoom(string $room): ?string
     {
         $pointer = $this->data->get(self::STORE_OWNER, self::PLUGIN, self::TYPE_ROOM, self::roomKey($room));

@@ -8,6 +8,7 @@ use App\Entity\PluginData;
 use App\Service\Iam\Permission;
 use App\Service\Iam\SharedResourceIds;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -37,6 +38,26 @@ class PluginDataRepository extends ServiceEntityRepository
             ->setParameter('dataType', $dataType)
             ->setParameter('dataKey', $dataKey)
             ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * The same row as findOneByKey, locked for the surrounding transaction.
+     * A second update of this key waits, then reads what the first one stored.
+     */
+    public function findOneByKeyLocked(int $userId, string $pluginName, string $dataType, string $dataKey): ?PluginData
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.userId = :userId')
+            ->andWhere('p.pluginName = :pluginName')
+            ->andWhere('p.dataType = :dataType')
+            ->andWhere('p.dataKey = :dataKey')
+            ->setParameter('userId', $userId)
+            ->setParameter('pluginName', $pluginName)
+            ->setParameter('dataType', $dataType)
+            ->setParameter('dataKey', $dataKey)
+            ->getQuery()
+            ->setLockMode(LockMode::PESSIMISTIC_WRITE)
             ->getOneOrNullResult();
     }
 

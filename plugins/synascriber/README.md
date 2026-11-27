@@ -10,7 +10,7 @@ An administrator installs it by starting one small program and telling the meeti
 
 Jitsi on openDesk, with the Helm charts: add the block in the Jitsi page and apply. The **Meeting notes** button appears. You do not edit Jitsi by hand.
 
-OpenTalk: turn on **OpenTalk meetings** on this plugin's page, start a second program, and paste its address into the OpenTalk controller. A moderator then uses **More options → Enable subtitles**. Nothing is saved.
+OpenTalk: turn on **OpenTalk meetings** on this plugin's page, start a second program, and paste its address into the OpenTalk controller. A moderator then uses **More options → Enable subtitles**. When the lines stop, the transcript is saved the same way as a Jitsi meeting.
 
 ## For people changing this plugin
 

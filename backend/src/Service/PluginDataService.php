@@ -62,6 +62,37 @@ final readonly class PluginDataService
     }
 
     /**
+     * Re-read one row under a write lock, apply $change, and store the result.
+     * Callers that read the row earlier must put the merge in $change: the
+     * callback sees the row as it is now, not as it was before the lock.
+     *
+     * @param callable(array<string, mixed>|null): array<string, mixed> $change
+     *
+     * @return array<string, mixed>
+     */
+    public function update(int $userId, string $plugin, string $type, string $key, callable $change): array
+    {
+        /** @var array<string, mixed> $next */
+        $next = $this->em->wrapInTransaction(function () use ($userId, $plugin, $type, $key, $change): array {
+            $entry = $this->repository->findOneByKeyLocked($userId, $plugin, $type, $key);
+            $updated = $change($entry?->getData());
+            if (null === $entry) {
+                $entry = new PluginData();
+                $entry->setUserId($userId);
+                $entry->setPluginName($plugin);
+                $entry->setDataType($type);
+                $entry->setDataKey($key);
+                $this->em->persist($entry);
+            }
+            $entry->setData($updated);
+
+            return $updated;
+        });
+
+        return $next;
+    }
+
+    /**
      * List all data entries of a specific type.
      *
      * @return array<string, array<string, mixed>> Map of key => data

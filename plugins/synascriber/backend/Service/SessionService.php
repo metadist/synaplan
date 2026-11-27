@@ -98,9 +98,10 @@ final readonly class SessionService
     }
 
     /**
-     * OpenTalk asked for subtitles. The transcriber joins the meeting; this
-     * session only turns the audio windows into text. Nothing is stored,
-     * because OpenTalk's own notice does not say that a transcript is kept.
+     * OpenTalk asked for subtitles. The transcriber joins the meeting and
+     * the spoken lines are kept. When the meeting stops, each person we can
+     * match to a Synaplan account gets the transcript. When nobody matches,
+     * every administrator gets it, so the meeting is not lost.
      *
      * A second request for a meeting that already has subtitles returns that
      * session, so a retry does not start a second one.
@@ -136,7 +137,7 @@ final readonly class SessionService
         $session = [
             'ref' => rtrim(strtr(base64_encode(random_bytes(16)), '+/', '-_'), '='),
             'source' => 'opentalk',
-            'keep' => false,
+            'keep' => true,
             'room' => $room,
             'starterId' => 0,
             'starterName' => '',
@@ -173,10 +174,12 @@ final readonly class SessionService
 
         $session = $this->refresh($session);
         $session = $this->markStopping($session);
-        try {
-            $this->prosody->stop((string) $session['room'], $ref);
-        } catch (SessionException $e) {
-            $this->logger->warning('synascriber: stop not confirmed by Jitsi', ['ref' => $ref, 'error' => $e->errorCode]);
+        if ('opentalk' !== ($session['source'] ?? '')) {
+            try {
+                $this->prosody->stop((string) $session['room'], $ref);
+            } catch (SessionException $e) {
+                $this->logger->warning('synascriber: stop not confirmed by Jitsi', ['ref' => $ref, 'error' => $e->errorCode]);
+            }
         }
 
         return $session;
@@ -217,8 +220,13 @@ final readonly class SessionService
             throw new SessionException('wrong_meeting', 'These meeting notes belong to another meeting.', 409);
         }
         if ('' === $known && '' !== $meetingId) {
-            $session['meetingId'] = $meetingId;
-            $this->store->save($session);
+            $session = $this->store->update($ref, function (array $current) use ($meetingId): array {
+                if ('' === (string) ($current['meetingId'] ?? '')) {
+                    $current['meetingId'] = $meetingId;
+                }
+
+                return $current;
+            });
         }
 
         $speakers = [];
@@ -262,15 +270,22 @@ final readonly class SessionService
         }
 
         $result = $this->whisper->recognize($window['audio'], (string) $session['language']);
-        // Recognition waited. A language change in that time must survive this save.
-        $fresh = $this->store->find($ref) ?? $session;
-        $fresh['lastAudioAt'] = time();
-        if ('' !== $result['text'] && false !== ($fresh['keep'] ?? true)) {
-            $this->store->addSegment($ref, $segment + ['text' => $result['text']]);
-            $fresh['segmentCount'] = (int) ($fresh['segmentCount'] ?? 0) + 1;
-            $fresh = $this->learnSpeaker($fresh, $window['endpointId']);
+        // Recognition waited. Learn the speaker before the locked write, and
+        // apply the write to the session stored now so a participant report
+        // or a language change from that wait is not replaced.
+        $snapshot = $this->store->find($ref) ?? $session;
+        if ('' !== $result['text'] && false !== ($snapshot['keep'] ?? true)) {
+            $this->learnSpeaker($snapshot, $window['endpointId']);
         }
-        $this->store->save($fresh);
+        $fresh = $this->store->update($ref, function (array $current) use ($result, $ref, $segment): array {
+            $current['lastAudioAt'] = time();
+            if ('' !== $result['text'] && false !== ($current['keep'] ?? true)) {
+                $this->store->addSegment($ref, $segment + ['text' => $result['text']]);
+                $current['segmentCount'] = (int) ($current['segmentCount'] ?? 0) + 1;
+            }
+
+            return $current;
+        });
 
         return $answer + ['text' => $result['text'], 'dropped' => $result['dropped'], 'speaker' => $this->speakerName($fresh, $window['endpointId'])];
     }
@@ -308,47 +323,53 @@ final readonly class SessionService
      */
     public function event(string $ref, array $event): void
     {
-        $session = $this->store->find($ref);
-        if (null === $session) {
-            throw new SessionException('unknown_session', 'These meeting notes do not exist.', 404);
-        }
         $type = (string) ($event['type'] ?? '');
-        if ('connected' === $type) {
-            if (empty($session['connectedAt'])) {
-                $session['connectedAt'] = time();
-                $session['originMs'] = is_numeric($event['at'] ?? null) ? (int) $event['at'] : time() * 1000;
-                $this->store->save($session);
-            }
-
-            return;
-        }
-        if ('stt-failure' === $type) {
-            $session['gaps'] = (int) ($session['gaps'] ?? 0) + 1;
-            $this->store->save($session);
-            $this->logger->warning('synascriber: speech recognition gap', ['ref' => $ref, 'detail' => mb_substr((string) ($event['detail'] ?? ''), 0, 200)]);
-
-            return;
-        }
         if ('finished' === $type) {
+            $session = $this->store->find($ref);
+            if (null === $session) {
+                throw new SessionException('unknown_session', 'These meeting notes do not exist.', 404);
+            }
             $this->finish($ref, (string) ($session['endReason'] ?? 'bridge_closed'));
 
             return;
         }
-        if ('language' === $type) {
-            $language = (string) ($event['language'] ?? '');
-            if (!in_array($language, $this->settings->languages(), true)) {
-                throw new SessionException('language_not_offered', sprintf('Language "%s" is not offered here.', $language), 422);
-            }
-            if (!in_array($session['state'], self::ACTIVE, true)) {
-                throw new SessionException('not_accepting', 'These meeting notes do not accept audio any more.', 409);
-            }
-            $session['language'] = $language;
-            $this->store->save($session);
+        $this->store->update($ref, function (array $session) use ($event, $type): array {
+            if ('connected' === $type) {
+                if (empty($session['connectedAt'])) {
+                    $session['connectedAt'] = time();
+                    $session['originMs'] = is_numeric($event['at'] ?? null) ? (int) $event['at'] : time() * 1000;
+                }
 
-            return;
-        }
-        if (!in_array($type, ['speaker-start', 'speaker-stop', 'session-end'], true)) {
-            throw new SessionException('unknown_event', sprintf('Unknown transcriber event "%s".', mb_substr($type, 0, 40)), 422);
+                return $session;
+            }
+            if ('stt-failure' === $type) {
+                $session['gaps'] = (int) ($session['gaps'] ?? 0) + 1;
+
+                return $session;
+            }
+            if ('participants' === $type && in_array($session['state'], self::ACTIVE, true)) {
+                return $this->absorb($session, ['participants' => $event['participants'] ?? []]);
+            }
+            if ('language' === $type) {
+                $language = (string) ($event['language'] ?? '');
+                if (!in_array($language, $this->settings->languages(), true)) {
+                    throw new SessionException('language_not_offered', sprintf('Language "%s" is not offered here.', $language), 422);
+                }
+                if (!in_array($session['state'], self::ACTIVE, true)) {
+                    throw new SessionException('not_accepting', 'These meeting notes do not accept audio any more.', 409);
+                }
+                $session['language'] = $language;
+
+                return $session;
+            }
+            if (!in_array($type, ['speaker-start', 'speaker-stop', 'session-end'], true)) {
+                throw new SessionException('unknown_event', sprintf('Unknown transcriber event "%s".', mb_substr($type, 0, 40)), 422);
+            }
+
+            return $session;
+        });
+        if ('stt-failure' === $type) {
+            $this->logger->warning('synascriber: speech recognition gap', ['ref' => $ref, 'detail' => mb_substr((string) ($event['detail'] ?? ''), 0, 200)]);
         }
     }
 
@@ -404,8 +425,12 @@ final readonly class SessionService
     private function speakerName(array $session, string $endpoint): string
     {
         $roster = is_array($session['roster'] ?? null) ? $session['roster'] : [];
+        $name = trim((string) ($roster[$endpoint] ?? ''));
+        if ('' === $name) {
+            $name = trim((string) ($roster[TranscriptRenderer::endpointOf($endpoint)] ?? ''));
+        }
 
-        return (string) ($roster[$endpoint] ?? '');
+        return $name;
     }
 
     /**
@@ -415,16 +440,23 @@ final readonly class SessionService
      */
     public function finish(string $ref, string $reason): array
     {
-        $session = $this->load($ref);
-        if (in_array($session['state'], self::FINAL, true) || 'saving' === $session['state']) {
+        $proceed = false;
+        $session = $this->store->update($ref, function (array $session) use ($reason, &$proceed): array {
+            if (in_array($session['state'], self::FINAL, true) || 'saving' === $session['state']) {
+                return $session;
+            }
+            $proceed = true;
+            if (empty($session['stoppedAt'])) {
+                $session['stoppedAt'] = time();
+            }
+            $session['state'] = 'saving';
+            $session['endReason'] = $reason;
+
+            return $session;
+        });
+        if (!$proceed) {
             return $session;
         }
-        if (empty($session['stoppedAt'])) {
-            $session['stoppedAt'] = time();
-        }
-        $session['state'] = 'saving';
-        $session['endReason'] = $reason;
-        $this->store->save($session);
 
         $segments = $this->store->segments($ref);
         if (false === ($session['keep'] ?? true)) {
@@ -463,12 +495,23 @@ final readonly class SessionService
         $session['fileName'] = $filename;
         $session['segmentCount'] = count($segments);
         $session['deliveryFailures'] = $failures;
-        if (!isset($files[(int) $session['starterId']])) {
+        $starterId = (int) $session['starterId'];
+        if ($starterId > 0 && !isset($files[$starterId])) {
             return $this->fail($session, 'file_not_saved');
+        }
+        if ([] === $files) {
+            if ($failures > 0) {
+                return $this->fail($session, 'file_not_saved');
+            }
+            $this->store->deleteSegments($ref);
+            $session['state'] = 'nothing_to_save';
+            $session['endReason'] = 'no_recipient';
+
+            return $this->close($session);
         }
 
         $session['state'] = 'saved';
-        $session['fileId'] = $files[(int) $session['starterId']];
+        $session['fileId'] = $files[$starterId] ?? reset($files);
         $this->store->deleteSegments($ref);
         $this->logger->info('synascriber: transcript saved', ['ref' => $ref, 'recipients' => count($files), 'failed' => $failures, 'segments' => count($segments)]);
 
@@ -490,9 +533,16 @@ final readonly class SessionService
         if ($starter instanceof User) {
             $recipients[(int) $starter->getId()] = $starter;
         }
-        if ($this->settings->shareWithParticipants()) {
+        if ($this->settings->shareWithParticipants() || 'opentalk' === ($session['source'] ?? '')) {
             $attendees = is_array($session['attendees'] ?? null) ? $session['attendees'] : [];
             $recipients += $this->participants->accounts($attendees);
+        }
+        if ([] === $recipients && 'opentalk' === ($session['source'] ?? '')) {
+            foreach ($this->users->findAdministrators() as $admin) {
+                if (null !== $admin->getId()) {
+                    $recipients[(int) $admin->getId()] = $admin;
+                }
+            }
         }
 
         return $recipients;
@@ -583,11 +633,11 @@ final readonly class SessionService
         if ('jitsi' !== ($session['source'] ?? 'jitsi')) {
             return $session;
         }
+        $ref = (string) $session['ref'];
 
-        $session['checkedAt'] = $now;
         if (empty($session['connectedAt']) && $now - (int) $session['startedAt'] > self::CONNECT_GRACE_SECONDS) {
             try {
-                $this->prosody->stop((string) $session['room'], (string) $session['ref']);
+                $this->prosody->stop((string) $session['room'], $ref);
             } catch (SessionException) {
             }
 
@@ -595,21 +645,29 @@ final readonly class SessionService
         }
 
         try {
-            $state = $this->prosody->state((string) $session['room']);
+            $remote = $this->prosody->state((string) $session['room']);
         } catch (SessionException) {
-            $this->store->save($session);
+            return $this->store->update($ref, function (array $current) use ($now): array {
+                $current['checkedAt'] = $now;
 
-            return $session;
+                return $current;
+            });
         }
-        $session = $this->absorb($session, $state);
-        if (true !== ($state['transcribing'] ?? false) || ($state['ref'] ?? null) !== $session['ref']) {
-            $session['endReason'] = true === ($state['exists'] ?? false) ? 'stopped_in_jitsi' : 'meeting_ended';
 
-            return $this->markStopping($session);
-        }
-        $this->store->save($session);
+        return $this->store->update($ref, function (array $current) use ($remote, $now): array {
+            if ('running' !== $current['state']) {
+                return $current;
+            }
+            $current['checkedAt'] = $now;
+            $current = $this->absorb($current, $remote);
+            if (true !== ($remote['transcribing'] ?? false) || ($remote['ref'] ?? null) !== $current['ref']) {
+                $current['endReason'] = true === ($remote['exists'] ?? false) ? 'stopped_in_jitsi' : 'meeting_ended';
+                $current['state'] = 'stopping';
+                $current['stoppedAt'] = $current['stoppedAt'] ?? $now;
+            }
 
-        return $session;
+            return $current;
+        });
     }
 
     /**
@@ -644,11 +702,18 @@ final readonly class SessionService
      */
     private function refresh(array $session): array
     {
+        // OpenTalk's roster comes from LiveKit. The same room name can exist
+        // in Jitsi; asking Prosody would attach those people to this transcript.
+        if ('opentalk' === ($session['source'] ?? '')) {
+            return $session;
+        }
         try {
-            return $this->absorb($session, $this->prosody->state((string) $session['room']));
+            $answer = $this->prosody->state((string) $session['room']);
         } catch (SessionException) {
             return $session;
         }
+
+        return $this->store->update((string) $session['ref'], fn (array $current): array => $this->absorb($current, $answer));
     }
 
     /**
@@ -661,13 +726,18 @@ final readonly class SessionService
             return $identities;
         }
         foreach ($participants as $participant) {
-            if (!is_array($participant) || !is_string($participant['sub'] ?? null) || !is_string($participant['email'] ?? null)) {
+            if (!is_array($participant)) {
                 continue;
             }
-            $identities[$participant['sub']] = [
+            $sub = is_string($participant['sub'] ?? null) ? trim($participant['sub']) : '';
+            $email = is_string($participant['email'] ?? null) ? trim($participant['email']) : '';
+            if ('' === $sub) {
+                continue;
+            }
+            $identities[$sub] = [
                 'name' => mb_substr(trim((string) ($participant['name'] ?? '')), 0, 80),
-                'email' => mb_substr(trim($participant['email']), 0, 200),
-                'sub' => mb_substr(trim($participant['sub']), 0, 80),
+                'email' => mb_substr($email, 0, 200),
+                'sub' => mb_substr($sub, 0, 80),
             ];
         }
 
@@ -681,9 +751,7 @@ final readonly class SessionService
      */
     private function learnSpeaker(array $session, string $speaker): array
     {
-        $endpoint = TranscriptRenderer::endpointOf($speaker);
-        $roster = is_array($session['roster'] ?? null) ? $session['roster'] : [];
-        if ('' !== trim((string) ($roster[$endpoint] ?? ''))) {
+        if ('' !== $this->speakerName($session, $speaker)) {
             return $session;
         }
 
@@ -715,11 +783,18 @@ final readonly class SessionService
      */
     private function markStopping(array $session): array
     {
-        $session['state'] = 'stopping';
-        $session['stoppedAt'] = $session['stoppedAt'] ?? time();
-        $this->store->save($session);
+        return $this->store->update((string) $session['ref'], function (array $current) use ($session): array {
+            if (!in_array($current['state'], self::ACTIVE, true)) {
+                return $current;
+            }
+            $current['state'] = 'stopping';
+            $current['stoppedAt'] = $current['stoppedAt'] ?? time();
+            if (isset($session['endReason']) && is_string($session['endReason']) && '' !== $session['endReason']) {
+                $current['endReason'] = $session['endReason'];
+            }
 
-        return $session;
+            return $current;
+        });
     }
 
     /**
@@ -743,11 +818,26 @@ final readonly class SessionService
      */
     private function close(array $session): array
     {
-        $session['finishedAt'] = time();
-        $this->store->save($session);
-        $this->store->clearRoom((string) $session['room'], (string) $session['ref']);
+        $ref = (string) $session['ref'];
+        $saved = $this->store->update($ref, function (array $current) use ($session): array {
+            if (in_array($current['state'], self::FINAL, true)) {
+                return $current;
+            }
+            $session['roster'] = array_replace(
+                is_array($current['roster'] ?? null) ? $current['roster'] : [],
+                is_array($session['roster'] ?? null) ? $session['roster'] : [],
+            );
+            $session['attendees'] = array_replace(
+                is_array($current['attendees'] ?? null) ? $current['attendees'] : [],
+                is_array($session['attendees'] ?? null) ? $session['attendees'] : [],
+            );
+            $session['finishedAt'] = time();
 
-        return $session;
+            return $session;
+        });
+        $this->store->clearRoom((string) $saved['room'], $ref);
+
+        return $saved;
     }
 
     /**

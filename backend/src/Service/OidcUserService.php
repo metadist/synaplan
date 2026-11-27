@@ -205,6 +205,15 @@ class OidcUserService
     }
 
     /**
+     * The account already linked to this identity-provider subject.
+     * Unknown subjects are not created.
+     */
+    public function findExistingBySubject(string $sub): ?User
+    {
+        return $this->findBySub(['sub' => $sub]);
+    }
+
+    /**
      * Resolve by the configured issuer first so a colliding `sub` from another
      * IdP cannot log into the wrong local account. Legacy JSON `oidc_sub` is
      * the fallback for rows written before BEXTERNALIDENTITIES existed.
@@ -230,12 +239,13 @@ class OidcUserService
             }
         }
 
-        $qb = $this->userRepository->createQueryBuilder('u');
-        $qb->where('u.userDetails LIKE :pattern')
-            ->setParameter('pattern', '%"oidc_sub":"'.addcslashes($sub, '"\\').'"%')
-            ->setMaxResults(1);
+        $user = $this->userRepository->findByLegacyOidcSub($sub);
+        if (!$user instanceof User) {
+            return null;
+        }
+        $stored = $user->getUserDetails()['oidc_sub'] ?? null;
 
-        return $qb->getQuery()->getOneOrNullResult();
+        return is_string($stored) && $stored === $sub ? $user : null;
     }
 
     /**
