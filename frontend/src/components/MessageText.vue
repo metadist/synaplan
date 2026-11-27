@@ -34,7 +34,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onBeforeUnmount, inject } from 'vue'
 import morphdom from 'morphdom'
 import { useI18n } from 'vue-i18n'
 import { useMarkdown } from '@/composables/useMarkdown'
@@ -52,6 +52,7 @@ import { findStableMarkdownBoundary } from '@/utils/streamingBoundary'
 import { completeInlineMarkdown } from '@/utils/partialMarkdown'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
 import { renderDocRefPill, type PlatformDocRef } from '@/components/chat/refs/DocRefPill'
+import { focusUsedMemoryKey, openClickedMemory } from '@/components/chat/focusUsedMemory'
 
 interface Props {
   content: string
@@ -68,6 +69,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const focusUsedMemory = inject(focusUsedMemoryKey, null)
 const { t } = useI18n()
 const { render, renderAsync } = useMarkdown()
 const { theme } = useTheme()
@@ -414,18 +416,13 @@ const handleMemoryBadgeClick = (event: MouseEvent) => {
 
     const memoryId = parseInt(memoryBadge.getAttribute('data-memory-id') || '-1')
     if (memoryId > 0) {
-      // Find the memory from props or store
-      const memory =
-        props.memories?.find((m) => m.id === memoryId) ||
-        memoriesStore.memories.find((m) => m.id === memoryId)
-
-      // Opens the Memories page; browser Back returns to this chat.
-      if (memory) {
-        window.dispatchEvent(new CustomEvent('open-memory-dialog', { detail: { memory } }))
-      }
-
-      // Also dispatch event for MessageMemories component to highlight
-      window.dispatchEvent(new CustomEvent('memory-ref-clicked', { detail: { memoryId } }))
+      openClickedMemory(
+        memoryId,
+        (props.memories ?? []).some((entry) => entry.id === memoryId),
+        props.memories?.find((entry) => entry.id === memoryId) ||
+          memoriesStore.memories.find((entry) => entry.id === memoryId),
+        focusUsedMemory
+      )
     }
   }
 }

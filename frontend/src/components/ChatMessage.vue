@@ -1156,6 +1156,7 @@ import ResearchTurn from '@/components/research/ResearchTurn.vue'
 import { useResearchTurn } from '@/composables/useResearchTurn'
 import WhatWasSentDialog from '@/components/chat/WhatWasSentDialog.vue'
 import MessageMemories from './MessageMemories.vue'
+import { useAnswerMemoryFocus } from '@/components/chat/focusUsedMemory'
 import MessageFeedbacks from './MessageFeedbacks.vue'
 import ServiceIcon from '@/components/icons/ServiceIcon.vue'
 import ExternalLinkWarning from '@/components/common/ExternalLinkWarning.vue'
@@ -1563,12 +1564,10 @@ const openSourceCard = (index: number, url: string) => {
 // Separate thinking blocks from content
 const thinkingParts = computed(() => props.parts.filter((p) => p.type === 'thinking'))
 
-// Resolve memoryIds to full UserMemory objects from the store
 const memoriesStore = useMemoriesStore()
 const feedbackStore = useFeedbackStore()
 const config = useConfigStore()
 
-// Check if feedback service (same as memory service) is available
 const isFeedbackServiceAvailable = computed(() => config.features.memoryService)
 
 const memories = computed(() => {
@@ -1583,6 +1582,7 @@ const memories = computed(() => {
   return resolved.length > 0 ? resolved : null
 })
 
+useAnswerMemoryFocus(() => !props.foreignMemory && !props.isGuestMode)
 const feedbacks = computed(() => {
   if (!props.feedbackIds || props.feedbackIds.length === 0) {
     return null

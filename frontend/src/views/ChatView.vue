@@ -650,6 +650,7 @@
       :available-categories="availableMemoryCategories"
       @close="closeMemoryEditDialog"
       @save="handleMemoryEditSave"
+      @save-multiple="handleMemoryEasySave"
     />
 
     <MemoryDeleteDialog
@@ -762,6 +763,7 @@ import {
 } from '@/utils/processingTimeline'
 import { useLimitCheck, type LimitCheckResult } from '@/composables/useLimitCheck'
 import { useNotification } from '@/composables/useNotification'
+import { useChatMemoryEditing } from '@/composables/useChatMemoryEditing'
 import { requestComposerFocus } from '@/composables/useComposerTyping'
 import { busyGuard, busyRefused as refuseBusyTurn } from '@/composables/useBusyRetryOffer'
 import { chatApi } from '@/services/api'
@@ -811,7 +813,7 @@ import {
 } from '@/utils/messageMapper'
 import { chatErrorSuggestsOtherModel } from '@/utils/chatErrorDisplay'
 import type { UserMemory } from '@/services/api/userMemoriesApi'
-import { getCategories, deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
+import { deleteMemory as deleteMemoryApi } from '@/services/api/userMemoriesApi'
 import { deleteFeedback as deleteFeedbackApi } from '@/services/api/userFeedbackApi'
 import MemoryToast from '@/components/MemoryToast.vue'
 import FalsePositiveModal from '@/components/feedback/FalsePositiveModal.vue'
@@ -1654,10 +1656,18 @@ const pendingSaveData = ref<{
   relatedMemoryIds: number[]
 } | null>(null)
 
-// Memory edit dialog state
-const isMemoryEditDialogOpen = ref(false)
-const editingMemory = ref<UserMemory | null>(null)
-const availableMemoryCategories = ref<string[]>([])
+const {
+  isMemoryEditDialogOpen,
+  editingMemory,
+  availableMemoryCategories,
+  handleMemoryEdit,
+  closeMemoryEditDialog,
+  handleMemoryEditSave,
+  handleMemoryEasySave,
+} = useChatMemoryEditing((toastId) => {
+  const index = activeMemoryToasts.value.findIndex((memory) => memory.toastId === toastId)
+  if (index !== -1) activeMemoryToasts.value.splice(index, 1)
+})
 
 // Memory delete dialog state
 const isMemoryDeleteDialogOpen = ref(false)
@@ -3867,57 +3877,6 @@ const handleRetryMessage = async (message: Message, content: string) => {
 
   // Stream the AI response (don't add new user message, it already exists)
   await streamAIResponse(content)
-}
-
-// Memory toast handlers
-async function handleMemoryEdit(memory: UserMemory & { toastId: number }) {
-  // Close the toast first
-  const index = activeMemoryToasts.value.findIndex((m) => m.toastId === memory.toastId)
-  if (index !== -1) {
-    activeMemoryToasts.value.splice(index, 1)
-  }
-
-  // Load categories if needed
-  if (availableMemoryCategories.value.length === 0) {
-    try {
-      const categories = await getCategories()
-      availableMemoryCategories.value = categories.map((c) => c.category)
-    } catch {
-      // Continue without categories
-    }
-  }
-
-  // Open the edit dialog in-place (stay in chat!)
-  editingMemory.value = memory
-  isMemoryEditDialogOpen.value = true
-}
-
-function closeMemoryEditDialog() {
-  isMemoryEditDialogOpen.value = false
-  editingMemory.value = null
-}
-
-async function handleMemoryEditSave(memoryData: {
-  category?: string
-  key?: string
-  value: string
-}) {
-  if (!editingMemory.value) return
-
-  try {
-    await memoriesStore.editMemory(
-      editingMemory.value.id,
-      {
-        value: memoryData.value,
-        category: memoryData.category,
-        key: memoryData.key,
-      },
-      { silent: false }
-    )
-    closeMemoryEditDialog()
-  } catch {
-    // Store shows error notification
-  }
 }
 
 // Opens the Memories page; browser Back returns to this chat.
