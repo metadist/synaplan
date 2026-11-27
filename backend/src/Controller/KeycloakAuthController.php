@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
 use App\Model\AccountLanguage;
@@ -8,11 +10,11 @@ use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OidcAccessDeniedException;
 use App\Service\Auth\OidcAuthorizeParams;
+use App\Service\Auth\OidcLoginState;
 use App\Service\Auth\OidcScopeResolver;
 use App\Service\Auth\OidcTokenService;
 use App\Service\Auth\TokenService;
 use App\Service\Http\ClientAddress;
-use App\Service\OAuth\OAuthStateService;
 use App\Service\OidcUserService;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
@@ -35,6 +37,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * 6. If Keycloak rejects refresh: Session ends (user logged out from Keycloak)
  *
  * PKCE (Proof Key for Code Exchange) protects against authorization code interception attacks.
+ * The state sent to the provider is a short id. {@see OidcLoginState} keeps the
+ * verifier, so the provider's redirect stays inside a 4 kB header buffer.
  */
 #[Route('/api/v1/auth/keycloak')]
 class KeycloakAuthController extends AbstractController
@@ -46,7 +50,7 @@ class KeycloakAuthController extends AbstractController
         private TokenService $tokenService,
         private OidcTokenService $oidcTokenService,
         private OidcUserService $oidcUserService,
-        private OAuthStateService $oauthStateService,
+        private OidcLoginState $oidcLoginState,
         private OAuthLoginResponder $oauthLoginResponder,
         private ImpersonationService $impersonationService,
         private LoggerInterface $logger,
@@ -89,23 +93,16 @@ class KeycloakAuthController extends AbstractController
                 ]);
             }
 
-            // PKCE (RFC 7636): Generate code_verifier and code_challenge
+            // PKCE (RFC 7636). The verifier stays in the shared cache: Keycloak
+            // echoes state twice, and a signed blob of it overflows a 4 kB proxy buffer.
             $codeVerifier = $this->generateCodeVerifier();
             $codeChallenge = $this->generateCodeChallenge($codeVerifier);
-
-            // Native (mobile) clients open this in the system browser and need
-            // the result via a deep link — remember that intent in the state.
-            $stateData = [
-                'pkce_verifier' => $codeVerifier,
-                'scopes' => $resolved['scopes'],
-            ];
-            if ($request->query->getBoolean('native')) {
-                $stateData['native'] = true;
-            }
-            $stateData = AccountLanguage::withSignupLanguage($stateData, $request->query->get('language'));
-
-            // Generate signed state token with PKCE verifier embedded (no session required)
-            $state = $this->oauthStateService->generateState('keycloak', $stateData);
+            $state = $this->oidcLoginState->issue(
+                $codeVerifier,
+                $resolved['scopes'],
+                $request->query->getBoolean('native'),
+                AccountLanguage::normalize($request->query->get('language')),
+            );
 
             $params = [
                 'client_id' => $this->oidcClientId,
@@ -168,9 +165,9 @@ class KeycloakAuthController extends AbstractController
             return $this->authorizationRejected($request, $oauthError);
         }
 
-        // Validate signed state token and extract PKCE verifier (no session required)
+        // The attempt lives in the shared cache; the state is only its id.
         $statePayload = is_string($state) && '' !== $state
-            ? $this->oauthStateService->validateState($state, 'keycloak')
+            ? $this->oidcLoginState->consume($state)
             : null;
 
         if (!$statePayload) {
@@ -184,15 +181,8 @@ class KeycloakAuthController extends AbstractController
             ]));
         }
 
-        $native = (bool) ($statePayload['native'] ?? false);
-
-        // Extract PKCE verifier from validated state
-        $codeVerifier = $statePayload['pkce_verifier'] ?? null;
-        if (!$codeVerifier) {
-            $this->logger->error('PKCE code_verifier missing from state token');
-
-            return $this->oauthLoginResponder->error('keycloak', 'PKCE verification failed', $native);
-        }
+        $native = $statePayload['native'];
+        $codeVerifier = $statePayload['pkce_verifier'];
 
         if (!$code) {
             return $this->oauthLoginResponder->error('keycloak', 'Authorization code not received', $native);
@@ -225,9 +215,7 @@ class KeycloakAuthController extends AbstractController
             }
 
             if (!$refreshToken) {
-                $requestedScopes = is_string($statePayload['scopes'] ?? null)
-                    ? $statePayload['scopes']
-                    : $this->oidcScopes;
+                $requestedScopes = $statePayload['scopes'];
                 $offlineRequested = $this->oidcScopeResolver->requestsRefreshToken($requestedScopes);
                 $this->logger->log(
                     $offlineRequested ? 'warning' : 'info',
@@ -256,7 +244,7 @@ class KeycloakAuthController extends AbstractController
             $user = $this->oidcUserService->findOrCreateFromClaims(
                 $userInfo,
                 $refreshToken,
-                AccountLanguage::normalize($statePayload['language'] ?? null),
+                AccountLanguage::normalize($statePayload['language']),
             );
 
             // Native (mobile) cannot use cross-origin OIDC cookies — hand the app
@@ -340,7 +328,7 @@ class KeycloakAuthController extends AbstractController
         $description = is_string($description) ? $description : null;
         $state = $request->query->get('state');
         $statePayload = is_string($state) && '' !== $state
-            ? $this->oauthStateService->validateState($state, 'keycloak')
+            ? $this->oidcLoginState->consume($state)
             : null;
         $native = (bool) ($statePayload['native'] ?? false);
 

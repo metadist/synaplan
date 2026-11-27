@@ -30,6 +30,7 @@ use App\Service\Auth\ImpersonationService;
 use App\Service\Auth\NativeAuthHandoffService;
 use App\Service\Auth\OAuthLoginResponder;
 use App\Service\Auth\OidcAuthorizeParams;
+use App\Service\Auth\OidcLoginState;
 use App\Service\Auth\OidcScopeResolver;
 use App\Service\Auth\OidcTokenService;
 use App\Service\Auth\TokenService;
@@ -39,7 +40,6 @@ use App\Service\Desktop\Exception\PairingException;
 use App\Service\Desktop\PairingService;
 use App\Service\Iam\AuditLogWriter;
 use App\Service\Iam\IamConfig;
-use App\Service\OAuth\OAuthStateService;
 use App\Service\OAuth\Server\AccessTokenValidator;
 use App\Service\OidcUserService;
 use App\Service\PlatformLink\Exception\PlatformLinkValidationException;
@@ -218,8 +218,13 @@ final class AccountAccessTest extends TestCase
         $oidcTokens->method('resolveLoginClaims')->willReturn(['sub' => 'sub-1', 'email' => 'ada@example.com']);
         $oidcUsers = $this->createStub(OidcUserService::class);
         $oidcUsers->method('findOrCreateFromClaims')->willReturn($user);
-        $stateService = $this->createStub(OAuthStateService::class);
-        $stateService->method('validateState')->willReturn(['pkce_verifier' => 'verifier']);
+        $stateService = $this->createStub(OidcLoginState::class);
+        $stateService->method('consume')->willReturn([
+            'pkce_verifier' => 'verifier',
+            'scopes' => 'openid email profile',
+            'native' => false,
+            'language' => null,
+        ]);
 
         $keycloak = new KeycloakAuthController(
             $httpClient,
