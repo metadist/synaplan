@@ -1473,7 +1473,7 @@
         "effort_voted": false,
         "effort_why": "simple",
         "intent": "image_generation",
-        "language": "de",
+        "language": "en",
         "media_type": "audio",
         "model_id": null,
         "model_name": null,

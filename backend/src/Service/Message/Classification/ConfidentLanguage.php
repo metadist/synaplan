@@ -94,7 +94,7 @@ final class ConfidentLanguage
             ' ich ', ' der ', ' die ', ' das ', ' und ', ' nicht ', ' ist ', ' für ',
             ' können ', ' kannst ', ' möchte ', ' über ', ' wäre ', ' mit ', ' auch ',
             ' wer ', ' wie ', ' was ', ' warum ', ' wo ', ' wann ', ' welche ', ' welcher ',
-            ' du ', ' bist ', ' bin ', ' sind ', ' hast ', ' habe ', ' mir ', ' mich ',
+            ' du ', ' bist ', ' bin ', ' sind ', ' hast ', ' habe ', ' es ', ' mir ', ' mich ',
             ' dich ', ' dein ', ' deine ', ' machst ', ' heißt ', ' gibt ', ' soll ',
             ' mein ', ' eine ', ' einen ', ' hallo ', ' danke ', ' bitte ', ' guten ',
         ] as $w) {
