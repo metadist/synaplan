@@ -7,6 +7,7 @@
         "php": ">=8.4",
         "ext-ctype": "*",
         "ext-iconv": "*",
+        "ext-sodium": "*",
         "api-platform/doctrine-orm": "^5.0.1",
         "api-platform/symfony": "^5.0.1",
         "ardagnsrn/ollama-php": "^1.0.5",
