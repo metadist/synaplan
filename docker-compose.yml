@@ -1494,10 +1494,11 @@ services:
     networks:
       - synaplan-network
 
-  # Meeting notes for openDesk. Off unless you start the profile AND set
-  # OPENDESK_STT_URL=http://transcriber:8095 in backend/.env (empty keeps the
-  # Synaplan module absent). Jitsi reaches the published port; Element needs
-  # the Matrix variables. See docs/OPENDESK_MEETING_NOTES.md.
+  # Meeting notes. Off unless you start the profile. One mode per process.
+  # jitsi plus SYNAPLAN_TRANSCRIBER_SECRET is the plugin. The default mode
+  # opendesk is the older path and also needs OPENDESK_STT_URL plus
+  # SYNAPLAN_API_KEY. OpenTalk is TRANSCRIBER_MODE=opentalk on this service
+  # or on a second one. See docs/OPENDESK_MEETING_NOTES.md.
   transcriber:
     profiles: [transcriber]
     pull_policy: build
@@ -1524,6 +1525,10 @@ services:
       NEXTCLOUD_USER: ${NEXTCLOUD_USER:-}
       NEXTCLOUD_APP_PASSWORD: ${NEXTCLOUD_APP_PASSWORD:-}
       NOTES_NEXTCLOUD_FOLDER: ${NOTES_NEXTCLOUD_FOLDER:-/Meetings}
+      OPENTALK_CONTROLLER_URL: ${OPENTALK_CONTROLLER_URL:-}
+      OPENTALK_SERVICE_KEY: ${OPENTALK_SERVICE_KEY:-}
+      OPENTALK_INIT_KEY: ${OPENTALK_INIT_KEY:-}
+      OPENTALK_LIVEKIT_URL: ${OPENTALK_LIVEKIT_URL:-}
     depends_on:
       backend:
         condition: service_healthy

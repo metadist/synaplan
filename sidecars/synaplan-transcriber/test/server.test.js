@@ -32,7 +32,11 @@ test('health, Element Call, and the Jitsi socket', async () => {
     assert.equal(health.status, 200)
     const body = await health.json()
     assert.equal(body.product, 'Meeting notes')
+    assert.equal(body.mode, 'jitsi')
     assert.equal(body.jitsi, true)
+    assert.equal(body.plugin, false)
+    assert.equal(body.captionsWithoutPlugin, true)
+    assert.equal(body.opentalk, false)
     assert.match(body.elementCall, /not in this version/)
 
     const later = await fetch(`http://${host}/element-call`)
@@ -60,6 +64,36 @@ test('health, Element Call, and the Jitsi socket', async () => {
       ws.on('error', reject)
     })
     assert.deepEqual(opened, { event: 'pong', id: 4 })
+  } finally {
+    await new Promise((resolve) => server.close(resolve))
+  }
+})
+
+test('health names an OpenTalk process and hides the Jitsi socket', async () => {
+  const server = createApp(loadConfig({
+    SYNAPLAN_URL: 'http://synaplan',
+    SYNAPLAN_TRANSCRIBER_SECRET: 'plugin-secret',
+    TRANSCRIBER_MODE: 'opentalk',
+    OPENTALK_CONTROLLER_URL: 'https://controller.example',
+    OPENTALK_SERVICE_KEY: 'controller:secret',
+    OPENTALK_INIT_KEY: 'transcription:secret',
+    OPENTALK_LIVEKIT_URL: 'http://livekit:7880',
+  }), {
+    plugin: {},
+    opentalk: { async accept() { return { status: 204, body: {} } } },
+  })
+  const host = await listen(server)
+  try {
+    const health = await fetch(`http://${host}/health`)
+    const body = await health.json()
+    assert.equal(body.mode, 'opentalk')
+    assert.equal(body.opentalk, true)
+    assert.equal(body.jitsi, false)
+    assert.equal(body.plugin, true)
+    assert.equal(body.captionsWithoutPlugin, false)
+    const home = await (await fetch(`http://${host}/`)).json()
+    assert.equal(home.opentalk, '/v1/init')
+    assert.equal(home.transcribe, null)
   } finally {
     await new Promise((resolve) => server.close(resolve))
   }

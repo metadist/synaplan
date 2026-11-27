@@ -232,6 +232,7 @@ test('an oversized init is refused before a session starts', async () => {
     OPENTALK_CONTROLLER_URL: 'http://controller',
     OPENTALK_SERVICE_KEY: 'controller:secret',
     OPENTALK_INIT_KEY: 'transcription:secret',
+    OPENTALK_LIVEKIT_URL: 'http://livekit:7880',
   })
   let created = 0
   const server = createApp(config, {

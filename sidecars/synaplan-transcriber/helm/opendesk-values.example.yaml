@@ -1,10 +1,12 @@
-# Drop these values next to an openDesk Helmfile. This is not an openDesk fork.
-# Meeting notes stays off until synaplan.url and synaplan.transcribeToken are set.
+# Older path only: Jitsi captions and Element voice messages with an API key.
+# This is not the synaplan-charts release. That release deploys the
+# synascriber plugin (technical.synaplan.synascriber). See
+# docs/OPENDESK_MEETING_NOTES.md, section "Older path".
 #
+# Meeting notes stay off until synaplan.url and synaplan.transcribeToken are set.
 # Jitsi (Nordeck) then points jicofo.transcription.url-template at
 #   wss://<notes-host>/transcribe?sessionId={{MEETING_ID}}&sendBack=true
 # with an Authorization header of the transcriber auth token.
-# See docs/OPENDESK_MEETING_NOTES.md in the Synaplan repository.
 
 synaplan:
   url: https://synaplan.example
