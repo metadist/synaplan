@@ -237,7 +237,7 @@ Claude Haiku 5.5 is the current small Anthropic model: $0.10 / $0.50 per 1M (Hai
 | 162 | Claude Haiku 4.5 | `claude-haiku-4-5-20251001` | `anthropic:claude-haiku-5-5:chat` (BID 448) |
 | 235 | Claude Haiku 4.5 (Vision) | `claude-haiku-4-5-20251001` | `anthropic:claude-haiku-5-5:pic2text` (BID 449) |
 
-Retired via the registry, no migration. Claude 3 Haiku (BID 92) now points straight at Haiku 5.5. The Anthropic provider defaults (`SORT`, `PLAN`, `SUMMARIZE`) moved to Haiku 5.5. Omitting `thinking` runs adaptive thinking on this model, so reasoning off sends `thinking.type: disabled`; a classifier call with a small `max_tokens` would otherwise spend it on thinking. Effort is low, medium or high.
+Retired via the registry, no migration. Claude 3 Haiku (BID 92) now points straight at Haiku 5.5. The Anthropic provider defaults (`SORT`, `PLAN`, `SUMMARIZE`) moved to Haiku 5.5. Omitting `thinking` runs adaptive thinking on this model, so reasoning off sends `thinking.type: disabled`; a classifier or vision call with a small `max_tokens` would otherwise spend it on thinking. Effort is low, medium, high, xhigh or max; `disabled` is a 400 next to xhigh or max, so a chosen xhigh or max keeps adaptive thinking. Anthropic still serves Haiku 4.5 (retirement not before 2026-10-15); the catalog retires it because Haiku 5.5 is the same tier at a tenth of the price.
 
 ### OpenAI deprecation notice (2026-10-02, shutdown 2027-04-01)
 

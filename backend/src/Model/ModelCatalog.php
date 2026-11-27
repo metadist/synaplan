@@ -484,10 +484,12 @@ class ModelCatalog
         ],
 
         // --- 2026-11-27 (Claude Haiku 5.5 replaces Claude Haiku 4.5) ---
-        // Anthropic's deprecations page lists Haiku 4.5 with a retirement date
-        // of 2026-10-15. Haiku 5.5 (BIDs 448/449) is the same tier on the same
-        // key: $0.10 / $0.50 up to 100K prompt tokens (vs $1 / $5), 1M context,
-        // 128K output, vision, tools and adaptive thinking.
+        // Anthropic still serves Haiku 4.5 (retirement not before 2026-10-15),
+        // so this is our retirement, not a shutdown. Haiku 5.5 (BIDs 448/449)
+        // is the same tier on the same key at a tenth of the price: $0.10 /
+        // $0.50 up to 100K prompt tokens (vs $1 / $5), 1M context, 128K
+        // output, vision, tools and adaptive thinking. Stored bindings move to
+        // it so nobody keeps paying ten times as much for the older model.
         162 => [
             'providerId' => 'claude-haiku-4-5-20251001',
             'retiredOn' => '2026-11-27',
@@ -6555,7 +6557,7 @@ class ModelCatalog
             // $0.50 / $2.50 (CONTEXT_PRICING). Cache reads are the Anthropic-wide
             // 0.1x ($0.01), so no `cache_read_price_per_1M` is authored.
             // Adaptive thinking is on when the field is omitted; `disabled` is
-            // accepted at effort high or below. Default effort is medium.
+            // accepted at effort high or below. Effort low..max, default medium.
             // Forced tool_choice is accepted. Non-default temperature / top_p /
             // top_k and assistant prefill are a 400.
             'id' => 448,
