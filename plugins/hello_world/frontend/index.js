@@ -30,8 +30,8 @@ export default {
     const button = document.createElement('button')
     button.type = 'button'
     button.textContent = t('button')
+    button.className = 'btn-secondary px-4 py-2.5 text-sm font-medium'
     button.style.marginTop = '20px'
-    button.style.padding = '8px 16px'
     button.addEventListener('click', () => {
       line.textContent = t('clicked')
     })

@@ -59,6 +59,7 @@
     "fallbackTitle": "Extension",
     "loading": "Chargement de l’extension…",
     "notFound": "Extension introuvable ou non activée pour votre compte",
+    "loadFailed": "Cette extension n’a pas pu être chargée. Rechargez la page.",
     "commandEmpty": "L’extension a renvoyé une réponse vide.",
     "commandError": "La commande de l’extension a échoué. Veuillez réessayer."
   },

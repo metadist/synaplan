@@ -42,6 +42,7 @@ final readonly class ModulesRuntimeConfig implements RuntimeConfigContributorInt
             foreach ($this->pluginManager->listInstalledPlugins($user->getId()) as $plugin) {
                 $plugins[] = [
                     'name' => $plugin->name,
+                    'displayName' => $plugin->label(),
                     'version' => $plugin->version,
                     'description' => $plugin->description,
                     'capabilities' => $plugin->capabilities,

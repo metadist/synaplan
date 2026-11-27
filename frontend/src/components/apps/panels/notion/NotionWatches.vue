@@ -53,7 +53,7 @@
             </button>
             <button
               type="button"
-              class="icon-ghost p-2 rounded-lg text-red-400/70 hover:text-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="icon-ghost icon-ghost--danger p-2 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed"
               :aria-label="$t('apps.notion.watches.remove')"
               :title="$t('apps.notion.watches.remove')"
               :disabled="busy === row.id"
