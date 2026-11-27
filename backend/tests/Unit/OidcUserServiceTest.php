@@ -475,6 +475,45 @@ class OidcUserServiceTest extends TestCase
         ]);
     }
 
+    // ========== findOrCreateFromClaims: mail address fallback ==========
+
+    public function testAnUnverifiedMailAddressDoesNotSignInToAnExistingAccount(): void
+    {
+        $service = $this->createService();
+        $this->userRepository->method('findOneBy')->willReturn($this->makeKeycloakUser('victim@example.com', 'NEW'));
+        $this->em->expects($this->never())->method('persist');
+
+        foreach ([false, 'false'] as $verified) {
+            try {
+                $service->findOrCreateFromClaims([
+                    'sub' => 'someone-else',
+                    'email' => 'victim@example.com',
+                    'email_verified' => $verified,
+                ]);
+                self::fail('An unverified address must not sign in to the account that owns it.');
+            } catch (OidcAccessDeniedException $e) {
+                self::assertSame(OidcAccessDenialReason::EmailNotVerified, $e->reason);
+            }
+        }
+    }
+
+    public function testAVerifiedOrUnstatedMailAddressStillFindsTheAccount(): void
+    {
+        $service = $this->createService();
+        $user = $this->makeKeycloakUser('ada@example.com', 'NEW');
+        $this->userRepository->method('findOneBy')->willReturn($user);
+
+        self::assertSame($user, $service->findOrCreateFromClaims([
+            'sub' => 'recreated-sub',
+            'email' => 'ada@example.com',
+            'email_verified' => true,
+        ]));
+        self::assertSame($user, $service->findOrCreateFromClaims([
+            'sub' => 'recreated-sub',
+            'email' => 'ada@example.com',
+        ]), 'a provider that sends no email_verified is trusted as before');
+    }
+
     // ========== findOrCreateFromClaims: provisioning switch ==========
 
     public function testNoAccountIsCreatedWhenProvisioningIsOff(): void
