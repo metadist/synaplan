@@ -1021,7 +1021,7 @@
                             "role": "user"
                         }
                     ],
-                    "model": "gpt-5.6-terra",
+                    "model": "gpt-6.1-terra",
                     "tools": [
                         {
                             "model": "gpt-image-2.5-flare",
@@ -1030,7 +1030,7 @@
                         }
                     ]
                 },
-                "body_sha1": "15050710da5ba703d2e78312cab31dfd46d50345",
+                "body_sha1": "623e1bf0c024dedcd9c77805f6c5e031ed66bd28",
                 "headers": [
                     "Accept: */*",
                     "Authorization: Bearer <secret>",
@@ -1081,7 +1081,7 @@
                             "role": "user"
                         }
                     ],
-                    "model": "gpt-5.6-terra",
+                    "model": "gpt-6.1-terra",
                     "tools": [
                         {
                             "model": "gpt-image-1",
@@ -1089,7 +1089,7 @@
                         }
                     ]
                 },
-                "body_sha1": "eccaec4df70cc3f9a760647c1fe814aa2c5edacc",
+                "body_sha1": "3006b0100871b5368649c0ff02978c935e0fc6bb",
                 "headers": [
                     "Accept: */*",
                     "Authorization: Bearer <secret>",
@@ -2232,7 +2232,7 @@
         "error": {
             "class": "ProviderException",
             "context": null,
-            "message": "OpenAI vision returned no text (model=gpt-5.5-pro, status=incomplete, reason=max_output_tokens). Reasoning-heavy models such as the \"pro\" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-5.5).",
+            "message": "OpenAI vision returned no text (model=gpt-5.5-pro, status=incomplete, reason=max_output_tokens). Reasoning-heavy models such as the \"pro\" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-6.2-sol).",
             "provider": "openai",
             "upstream_status": null
         },

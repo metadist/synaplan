@@ -234,7 +234,7 @@ OpenAI announced by email on 2026-10-02 that `gpt-5.4-nano`, `gpt-5.1` and `gpt-
 
 | BID | Model | `providerId` | Successor |
 | --- | ----- | ------------ | --------- |
-| 234 | GPT-5.4 nano | `gpt-5.4-nano` | `openai:gpt-5.6-luna:chat` (GPT-5.6 Luna, BID 255) |
+| 234 | GPT-5.4 nano | `gpt-5.4-nano` | `openai:gpt-6-luna:chat` (GPT-6 Luna, BID 377; was GPT-5.6 Luna until 2026-11-27) |
 
 **Retired ahead of the shutdown, on purpose.** Neither detector sees an announced deprecation: `app:models:check-availability` reports a model only once the provider stops serving it, and OpenAI's `/v1/models` carries no deprecation date. Waiting for the check means users hit the failure first on 2027-04-01. The provider's notice (mail or [deprecations page](https://developers.openai.com/api/docs/deprecations)) is the only early signal, so a notice is retired by hand on the day it arrives.
 
@@ -260,6 +260,22 @@ OpenAI's [deprecations page](https://developers.openai.com/api/docs/deprecations
 | 73 | gpt-4o-mini | `gpt-4o-mini` | `openai:gpt-6-luna:chat` (GPT-6 Luna, BID 377) |
 | 82 | whisper-1 | `whisper-1` | `openai:gpt-transcribe:sound2text` (GPT Transcribe, BID 448) |
 | 41 | tts-1 with Nova | `tts-1` | `google:gemini-2.5-flash-preview-tts:text2sound` (BID 37) |
+
+### OpenAI chat models below GPT-6 (2026-11-27)
+
+The GPT-6 family covers every tier the GPT-5.4, 5.5 and 5.6 rows served, at a lower price, on the same provider, key and Responses API. OpenAI still serves the older ids, so they were retired by decision, not by a notice. Chat and vision rows retire together.
+
+| BID | Model | `providerId` | Successor |
+| --- | ----- | ------------ | --------- |
+| 180 / 181 | GPT-5.4 | `gpt-5.4` | `openai:gpt-6.2-sol` (GPT-6.2 Sol) |
+| 204 / 205 | GPT-5.5 | `gpt-5.5` | `openai:gpt-6.2-sol` (GPT-6.2 Sol) |
+| 206 / 207 | GPT-5.5 Pro | `gpt-5.5-pro` | `openai:gpt-6.2-astra` (GPT-6.2 Astra) |
+| 251 / 252 | GPT-5.6 Sol | `gpt-5.6-sol` | `openai:gpt-6.2-sol` (GPT-6.2 Sol) |
+| 253 / 254 | GPT-5.6 Terra | `gpt-5.6-terra` | `openai:gpt-6.1-terra` (GPT-6.1 Terra) |
+| 255 / 256 | GPT-5.6 Luna | `gpt-5.6-luna` | `openai:gpt-6-luna` (GPT-6 Luna) |
+| 232 / 233 | GPT-5.4 mini | `gpt-5.4-mini` | `openai:gpt-6.1-terra` (GPT-6.1 Terra) |
+
+Retired via the registry, no migration. Older registry entries whose successor was one of these rows (`gpt-5.3`, `gpt-4.1`, `gpt-5`, `gpt-5.2`, `gpt-5-mini`, `gpt-5.4-nano`) now point at the GPT-6 successor directly. The OpenAI provider defaults moved to GPT-6.2 Sol (`CHAT`, `TOOLS`, `ANALYZE`, `PIC2TEXT`) and GPT-6.1 Terra (`SORT`, `PLAN`, `SUMMARIZE`), the image tool's mainline wrapper to GPT-6.1 Terra, and the OpenAI model mix to GPT-6.2 Astra, GPT-6 Astra, GPT-6.2 Sol, GPT-6.1 Sol. Their long-context tiers left `CONTEXT_PRICING`.
 | 83 | tts-1-hd | `tts-1-hd` | `google:gemini-2.5-flash-preview-tts:text2sound` (BID 37) |
 
 Retired ahead of each shutdown, for the same reason as BID 234, via the registry, no migration. GPT-6 Luna and GPT Transcribe are the replacements OpenAI names. OpenAI has no `/v1/audio/speech` model left: its suggested `tts-1` replacement, `gpt-realtime-2.1-mini`, speaks only over the Realtime API. The two TTS rows therefore follow the shipped `TEXT2SOUND` default, which needs a Google key. The OpenAI provider default `SOUND2TEXT` moved to GPT Transcribe, the OpenAI speed-config mix no longer sets a sound model, and `OpenAISpeech` no longer falls back to `whisper-1` or `tts-1`.
@@ -754,7 +770,7 @@ GPT Image 2.5 Flare and Sunburst share OpenAI's token rates ($5/1M text in, $8/1
 OpenAI bills GPT Image per token, and every answer reports the tokens, so these four rows (BID 348, 349, 451, 452) are billed exactly; the quality × size table above is only the fallback.
 
 - **Images API** (`/v1/images/generations`, text2pic): `usage.input_tokens_details.{text_tokens,image_tokens}` and `usage.output_tokens`. No cached tokens on this endpoint.
-- **Responses API** (pic2pic with the image tool): `tool_usage.image_gen` carries the same fields plus `cached_tokens_details.{cached_text_tokens,cached_image_tokens}`. The mainline model that calls the tool (`gpt-5.6-terra`, `OpenAIImageGeneration::pickResponsesModel()`) is reported separately in `usage` and billed at its own chat row.
+- **Responses API** (pic2pic with the image tool): `tool_usage.image_gen` carries the same fields plus `cached_tokens_details.{cached_text_tokens,cached_image_tokens}`. The mainline model that calls the tool (`gpt-6.1-terra`, `OpenAIImageGeneration::pickResponsesModel()`) is reported separately in `usage` and billed at its own chat row.
 
 `OpenAIImageGeneration` puts the parsed usage (`App\Model\ImageTokenUsage`) on the first returned image as `token_usage`. Every image billing site copies it into `media_usage.tokens` (`MediaTurnBilling`, `SyncMediaJobGenerator` for detached jobs, `AiUsageSpecBuilder`, `OpenAiImageGenerationService`, `MediaGenerationService`). `CostCalculationService::calculateMediaUsageCost()` then bills, at the rates in the row's `meta` (`ImageTokenRates`):
 
@@ -774,16 +790,10 @@ OpenAI publishes no text-output rate for these models, so all output tokens are 
 
 Some providers charge a higher per-token rate for the **whole request** once the prompt crosses a token threshold (Gemini 3.1 Pro and Grok above 200k, GPT-5.x / GPT-6 above 272k — roughly input ×2, output ×1.5). Billing only the flat base rate under-bills large-context requests. The tiers live in `ModelCatalog::CONTEXT_PRICING` keyed by `providerId` (one place, applies to every BTAG row of a model — the tier is a model property, not a per-row one) and are read via `ModelCatalog::contextPricing()`. `CostCalculationService::calculateCost()` switches input, output **and the cached-input rate** to the above values when `promptTokens > threshold`; models without a tier are unaffected. Prices are per 1M tokens, same unit as base `priceIn`/`priceOut`, and are read from the current catalog (not the historical snapshot) — acceptable because tiers are stable and rare.
 
-The cached rate rises with the tier at every provider ("2x input **and cache** rates" at OpenAI; Gemini and xAI publish an explicit long-context cache row), and it is always exactly 2× the short-context rate — `ModelCatalogTest::testLongContextTiersDoubleTheCachedInputRate()` enforces that, and also that no tiered model omits its cache rate. `gpt-5.5-pro` is the one model OpenAI sells **without** a cached-input discount; it still states a cache rate, equal to its plain input rate (30 / 60), because an omitted rate would fall through to the 50% default discount and halve the bill.
+The cached rate rises with the tier at every provider ("2x input **and cache** rates" at OpenAI; Gemini and xAI publish an explicit long-context cache row), and it is always exactly 2× the short-context rate — `ModelCatalogTest::testLongContextTiersDoubleTheCachedInputRate()` enforces that, and also that no tiered model omits its cache rate. A model sold **without** a cached-input discount still states a cache rate, equal to its plain input rate, because an omitted rate would fall through to the 50% default discount and halve the bill.
 
 | Model | Threshold | Base in/out (cache) | Above in/out (cache) |
 | ----- | --------- | ------------------- | -------------------- |
-| gpt-5.4 | 272k | 2.50 / 15 (0.25) | 5.00 / 22.50 (0.50) |
-| gpt-5.6-terra | 272k | 2.00 / 12 (0.20) | 4.00 / 18 (0.40) |
-| gpt-5.5 | 272k | 5.00 / 30 (0.50) | 10.00 / 45 (1.00) |
-| gpt-5.6-sol | 272k | 4.00 / 20 (0.40) | 8.00 / 30 (0.80) |
-| gpt-5.5-pro | 272k | 30 / 180 (30 — no discount) | 60 / 270 (60) |
-| gpt-5.6-luna | 272k | 0.20 / 1.20 (0.02) | 0.40 / 1.80 (0.04) |
 | gpt-6-astra | 272k | 10.00 / 50 (1.00) | 20.00 / 75 (2.00) |
 | gpt-6-sol | 272k | 2.00 / 10 (0.20) | 4.00 / 15 (0.40) |
 | gpt-6.1-sol | 272k | 2.00 / 10 (0.10) | 4.00 / 15 (0.20) |
@@ -800,7 +810,7 @@ The cached rate rises with the tier at every provider ("2x input **and cache** r
 
 Cache billing has three independent knobs, and getting any of them wrong is invisible in normal testing because a cache hit needs a repeated prefix:
 
-1. **Cache-read rate** — `json.cache_read_price_per_1M` on the model row. When a row authors nothing, `CostCalculationService` falls back to `CACHE_READ_DISCOUNT_DEFAULT` (50%), which is right for the GPT-4o generation but **5× too expensive for everything from GPT-5 up and for Gemini Pro**, where reads are 0.1× the input rate. Author the explicit price on every new row; `ModelCatalogTest::testCachedInputRateIsAuthoredOnEveryVariant()` pins the current lineup. A model sold with **no** cached-input discount (`gpt-5.5-pro`) gets its plain input rate authored as the cache rate — the fallback cuts in on a *missing* key, not on a missing discount, so leaving it blank would under-bill by 2× instead.
+1. **Cache-read rate** — `json.cache_read_price_per_1M` on the model row. When a row authors nothing, `CostCalculationService` falls back to `CACHE_READ_DISCOUNT_DEFAULT` (50%), which is right for the GPT-4o generation but **5× too expensive for everything from GPT-5 up and for Gemini Pro**, where reads are 0.1× the input rate. Author the explicit price on every new row; `ModelCatalogTest::testCachedInputRateIsAuthoredOnEveryVariant()` pins the current lineup. A model sold with **no** cached-input discount gets its plain input rate authored as the cache rate — the fallback cuts in on a *missing* key, not on a missing discount, so leaving it blank would under-bill by 2× instead.
 2. **Cache-write multiplier** — `json.cache_write_multiplier`. OpenAI began charging for cache *writes* with GPT-5.6 (1.25× the uncached input rate); GPT-5.5 and earlier incur "no additional cache-write charge", so the field belongs only on the GPT-5.6 family and GPT-6 (Astra / Sol / Luna). Anthropic keeps its provider-wide 1.25× / 2.0× (1-hour TTL) constants.
 3. **Long-context cache rate** — `cache_price_in_above` in `CONTEXT_PRICING`, see the table above.
 

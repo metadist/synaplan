@@ -99,13 +99,23 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
     icon: { kind: 'service', service: 'OpenAI' },
     resetsToRecommended: false,
     candidates: {
-      CHAT: [openai('gpt-6-astra'), openai('gpt-5.6-sol'), openai('gpt-5.5'), openai('gpt-5.4')],
-      ANALYZE: [openai('gpt-6-astra'), openai('gpt-5.6-sol'), openai('gpt-5.5'), openai('gpt-5.4')],
-      PIC2TEXT: [
+      CHAT: [
+        openai('gpt-6.2-astra'),
         openai('gpt-6-astra'),
-        openai('gpt-5.6-sol'),
-        openai('gpt-5.5'),
-        openai('gpt-5.4'),
+        openai('gpt-6.2-sol'),
+        openai('gpt-6.1-sol'),
+      ],
+      ANALYZE: [
+        openai('gpt-6.2-astra'),
+        openai('gpt-6-astra'),
+        openai('gpt-6.2-sol'),
+        openai('gpt-6.1-sol'),
+      ],
+      PIC2TEXT: [
+        openai('gpt-6.2-astra'),
+        openai('gpt-6-astra'),
+        openai('gpt-6.2-sol'),
+        openai('gpt-6.1-sol'),
       ],
       TEXT2PIC: [
         openai('gpt-image-2.5-flare'),

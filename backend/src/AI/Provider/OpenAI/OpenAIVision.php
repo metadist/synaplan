@@ -254,7 +254,7 @@ final class OpenAIVision
                 $status = (string) ($arr['status'] ?? 'unknown');
                 $reason = $arr['incomplete_details']['reason'] ?? null;
 
-                throw new ProviderException(sprintf('OpenAI vision returned no text (model=%s, status=%s%s). Reasoning-heavy models such as the "pro" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-5.5).', $model, $status, null !== $reason ? ', reason='.$reason : ''), 'openai');
+                throw new ProviderException(sprintf('OpenAI vision returned no text (model=%s, status=%s%s). Reasoning-heavy models such as the "pro" tiers are a poor fit for synchronous OCR; select a non-pro vision model (e.g. gpt-6.2-sol).', $model, $status, null !== $reason ? ', reason='.$reason : ''), 'openai');
             }
 
             return VisionReply::fromChatCompletion($text, OpenAIResponsesFormat::normalizeResponsesUsage($response->toArray()));

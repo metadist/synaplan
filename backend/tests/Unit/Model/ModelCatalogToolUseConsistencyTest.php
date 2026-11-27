@@ -65,7 +65,7 @@ final class ModelCatalogToolUseConsistencyTest extends TestCase
     {
         self::assertTrue(CatalogToolUse::supports('test', 'test-model'));
         self::assertFalse(CatalogToolUse::supports('test', 'test-vectorize'));
-        self::assertTrue(CatalogToolUse::supports('OpenAI', 'gpt-5.4'));
+        self::assertTrue(CatalogToolUse::supports('OpenAI', 'gpt-6.2-sol'));
         self::assertFalse(CatalogToolUse::supports('OpenAI', 'whisper-1'));
     }
 }

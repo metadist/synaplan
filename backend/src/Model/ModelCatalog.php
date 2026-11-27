@@ -117,14 +117,14 @@ class ModelCatalog
         193 => [
             'providerId' => 'gpt-5.3',
             'retiredOn' => '2026-04-29',
-            'successor' => 'openai:gpt-5.4:chat',
-            'reason' => 'Superseded by GPT-5.4.',
+            'successor' => 'openai:gpt-6.2-sol:chat',
+            'reason' => 'Superseded by GPT-5.4, itself retired on 2026-11-27; migrate to GPT-6.2 Sol.',
         ],
         194 => [
             'providerId' => 'gpt-5.3',
             'retiredOn' => '2026-04-29',
-            'successor' => 'openai:gpt-5.4:pic2text',
-            'reason' => 'Superseded by GPT-5.4.',
+            'successor' => 'openai:gpt-6.2-sol:pic2text',
+            'reason' => 'Superseded by GPT-5.4, itself retired on 2026-11-27; migrate to GPT-6.2 Sol.',
         ],
 
         // --- 2026-05-08 (Version20260508120000) ---
@@ -210,8 +210,8 @@ class ModelCatalog
         30 => [
             'providerId' => 'gpt-4.1',
             'retiredOn' => '2026-07-27',
-            'successor' => 'openai:gpt-5.6-terra:chat',
-            'reason' => 'Superseded by GPT-5.6 Terra.',
+            'successor' => 'openai:gpt-6.1-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra, itself retired on 2026-11-27; migrate to GPT-6.1 Terra.',
         ],
         49 => [
             'providerId' => 'meta-llama/llama-4-maverick-17b-128e-instruct',
@@ -224,20 +224,20 @@ class ModelCatalog
         70 => [
             'providerId' => 'gpt-5',
             'retiredOn' => '2026-07-28',
-            'successor' => 'openai:gpt-5.6-terra:chat',
-            'reason' => 'Superseded by GPT-5.6 Terra.',
+            'successor' => 'openai:gpt-6.1-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra, itself retired on 2026-11-27; migrate to GPT-6.1 Terra.',
         ],
         106 => [
             'providerId' => 'gpt-5.2-2025-12-11',
             'retiredOn' => '2026-07-28',
-            'successor' => 'openai:gpt-5.6-terra:chat',
-            'reason' => 'Superseded by GPT-5.6 Terra.',
+            'successor' => 'openai:gpt-6.1-terra:chat',
+            'reason' => 'Superseded by GPT-5.6 Terra, itself retired on 2026-11-27; migrate to GPT-6.1 Terra.',
         ],
         150 => [
             'providerId' => 'gpt-5-mini',
             'retiredOn' => '2026-07-28',
-            'successor' => 'openai:gpt-5.4-mini:chat',
-            'reason' => 'Superseded by GPT-5.4 mini.',
+            'successor' => 'openai:gpt-6.1-terra:chat',
+            'reason' => 'Superseded by GPT-5.4 mini, itself retired on 2026-11-27; migrate to GPT-6.1 Terra.',
         ],
         125 => [
             'providerId' => 'deepseek-ai/DeepSeek-R1',
@@ -393,8 +393,8 @@ class ModelCatalog
         234 => [
             'providerId' => 'gpt-5.4-nano',
             'retiredOn' => '2026-10-02',
-            'successor' => 'openai:gpt-5.6-luna:chat',
-            'reason' => 'Deprecated by OpenAI; access ends on 2027-04-01. Migrate to GPT-5.6 Luna.',
+            'successor' => 'openai:gpt-6-luna:chat',
+            'reason' => 'Deprecated by OpenAI; access ends on 2027-04-01. Migrate to GPT-6 Luna.',
         ],
 
         // --- 2026-10-08 (OpenAI image model shutdowns, 2026-10-23 and 2026-12-01) ---
@@ -518,6 +518,97 @@ class ModelCatalog
             'successor' => 'google:gemini-2.5-flash-preview-tts:text2sound',
             'reason' => 'Deprecated by OpenAI; access ends on 2027-01-06. OpenAI has no /v1/audio/speech successor; migrate to Gemini TTS.',
         ],
+
+        // --- 2026-11-27 (OpenAI chat models below GPT-6) ---
+        // The GPT-6 family covers every tier these served, at a lower price,
+        // on the same provider, key and Responses API: Sol for the flagship
+        // tier, Astra for the pro tier, Terra for the mid tier and the mini,
+        // Luna for the small tier. OpenAI still serves them, so the
+        // availability check would not move a binding on its own.
+        180 => [
+            'providerId' => 'gpt-5.4',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-sol:chat',
+            'reason' => 'Superseded by GPT-6.2 Sol.',
+        ],
+        181 => [
+            'providerId' => 'gpt-5.4',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-sol:pic2text',
+            'reason' => 'Superseded by GPT-6.2 Sol.',
+        ],
+        204 => [
+            'providerId' => 'gpt-5.5',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-sol:chat',
+            'reason' => 'Superseded by GPT-6.2 Sol.',
+        ],
+        205 => [
+            'providerId' => 'gpt-5.5',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-sol:pic2text',
+            'reason' => 'Superseded by GPT-6.2 Sol.',
+        ],
+        206 => [
+            'providerId' => 'gpt-5.5-pro',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-astra:chat',
+            'reason' => 'Superseded by GPT-6.2 Astra.',
+        ],
+        207 => [
+            'providerId' => 'gpt-5.5-pro',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-astra:pic2text',
+            'reason' => 'Superseded by GPT-6.2 Astra.',
+        ],
+        232 => [
+            'providerId' => 'gpt-5.4-mini',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.1-terra:chat',
+            'reason' => 'Superseded by GPT-6.1 Terra.',
+        ],
+        233 => [
+            'providerId' => 'gpt-5.4-mini',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.1-terra:pic2text',
+            'reason' => 'Superseded by GPT-6.1 Terra.',
+        ],
+        251 => [
+            'providerId' => 'gpt-5.6-sol',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-sol:chat',
+            'reason' => 'Superseded by GPT-6.2 Sol.',
+        ],
+        252 => [
+            'providerId' => 'gpt-5.6-sol',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.2-sol:pic2text',
+            'reason' => 'Superseded by GPT-6.2 Sol.',
+        ],
+        253 => [
+            'providerId' => 'gpt-5.6-terra',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.1-terra:chat',
+            'reason' => 'Superseded by GPT-6.1 Terra.',
+        ],
+        254 => [
+            'providerId' => 'gpt-5.6-terra',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6.1-terra:pic2text',
+            'reason' => 'Superseded by GPT-6.1 Terra.',
+        ],
+        255 => [
+            'providerId' => 'gpt-5.6-luna',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6-luna:chat',
+            'reason' => 'Superseded by GPT-6 Luna.',
+        ],
+        256 => [
+            'providerId' => 'gpt-5.6-luna',
+            'retiredOn' => '2026-11-27',
+            'successor' => 'openai:gpt-6-luna:pic2text',
+            'reason' => 'Superseded by GPT-6 Luna.',
+        ],
     ];
 
     /**
@@ -563,16 +654,6 @@ class ModelCatalog
      * @var array<string, array{threshold_tokens: int, price_in_above: float, price_out_above: float, cache_price_in_above?: float}>
      */
     private const CONTEXT_PRICING = [
-        'gpt-5.4' => ['threshold_tokens' => 272000, 'price_in_above' => 5.0, 'price_out_above' => 22.5, 'cache_price_in_above' => 0.50],
-        'gpt-5.5' => ['threshold_tokens' => 272000, 'price_in_above' => 10.0, 'price_out_above' => 45.0, 'cache_price_in_above' => 1.00],
-        // gpt-5.5-pro offers no cached-input discount, so its cache rate equals
-        // the plain input rate at both tiers — never omit it, or the 50% fallback
-        // in CostCalculationService would halve the bill on any cached token.
-        'gpt-5.5-pro' => ['threshold_tokens' => 272000, 'price_in_above' => 60.0, 'price_out_above' => 270.0, 'cache_price_in_above' => 60.00],
-        // Price cut 2026-08-21 (see the chat row below): long-context tier fell 10/45 -> 8/30.
-        'gpt-5.6-sol' => ['threshold_tokens' => 272000, 'price_in_above' => 8.0, 'price_out_above' => 30.0, 'cache_price_in_above' => 0.80],
-        'gpt-5.6-terra' => ['threshold_tokens' => 272000, 'price_in_above' => 4.0, 'price_out_above' => 18.0, 'cache_price_in_above' => 0.40],
-        'gpt-5.6-luna' => ['threshold_tokens' => 272000, 'price_in_above' => 0.40, 'price_out_above' => 1.80, 'cache_price_in_above' => 0.04],
         // Official OpenAI pricing 2026-09-04: base $10/$50, >272k is 2x input
         // and 1.5x output for the full request (https://developers.openai.com/api/docs/models/gpt-6-astra).
         'gpt-6-astra' => ['threshold_tokens' => 272000, 'price_in_above' => 20.0, 'price_out_above' => 75.0, 'cache_price_in_above' => 2.00],
@@ -1674,377 +1755,6 @@ class ModelCatalog
                 'meta' => ['dimensions' => 3072],
             ],
         ],
-        [
-            'id' => 180,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4',
-            'priceIn' => 2.50,
-            'inUnit' => 'per1M',
-            'priceOut' => 15,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 - latest flagship model with improved reasoning, document workflows, agentic search, and coding. Configurable reasoning effort.',
-                'max_tokens' => 16384,
-                'params' => ['model' => 'gpt-5.4'],
-                'features' => ['reasoning', 'vision', 'tool_use'],
-                'cache_read_price_per_1M' => 0.25,
-                'meta' => ['context_window' => '270000', 'max_output' => '16384'],
-            ],
-        ],
-        [
-            'id' => 181,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4 (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4',
-            'priceIn' => 2.50,
-            'inUnit' => 'per1M',
-            'priceOut' => 15,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 for image analysis and vision tasks.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.4'],
-                'features' => ['vision'],
-                'cache_read_price_per_1M' => 0.25,
-                'meta' => ['supports_images' => true],
-            ],
-        ],
-        [
-            'id' => 204,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.5',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.5',
-            'priceIn' => 5,
-            'inUnit' => 'per1M',
-            'priceOut' => 30,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.5 - frontier model for complex professional work, coding, long-context retrieval, and tool-heavy agents. 1.05M context, 128K max output, configurable reasoning effort.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.5'],
-                'features' => ['reasoning', 'vision', 'tool_use'],
-                'cache_read_price_per_1M' => 0.50,
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-12-01',
-                    'reasoning_effort_default' => 'medium',
-                ],
-            ],
-        ],
-        [
-            'id' => 205,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.5 (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.5',
-            'priceIn' => 5,
-            'inUnit' => 'per1M',
-            'priceOut' => 30,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.5 for image analysis and vision tasks. Preserves high visual detail by default and supports large multimodal contexts.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.5'],
-                'features' => ['reasoning', 'vision'],
-                'cache_read_price_per_1M' => 0.50,
-                'meta' => [
-                    'api' => 'responses',
-                    'supports_images' => true,
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-12-01',
-                ],
-            ],
-        ],
-        [
-            'id' => 206,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.5 Pro',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.5-pro',
-            'priceIn' => 30,
-            'inUnit' => 'per1M',
-            'priceOut' => 180,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.5 Pro - deeper-compute variant for the hardest professional, coding, and reasoning tasks. 1.05M context, 128K max output. Streaming is not supported by the API.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.5-pro'],
-                'features' => ['reasoning', 'vision', 'tool_use'],
-                // "GPT-5.5 Pro does not offer a cached input discount" — and it
-                // does not list prompt_caching as a supported feature, so cached
-                // tokens should never appear. Authored at the FULL input rate
-                // anyway: leaving it unset would let the 50% fallback discount
-                // halve the bill the moment a payload does report cached tokens.
-                'cache_read_price_per_1M' => 30.00,
-                'supportsStreaming' => false,
-                // Responses API takes system prompts via `instructions` — only
-                // streaming is unsupported. Without this flag the legacy
-                // "no streaming ⇒ no system messages" heuristic silently drops
-                // every topic prompt (broke officemaker document generation).
-                'supportsSystemMessages' => true,
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-12-01',
-                    'reasoning_effort_default' => 'medium',
-                ],
-            ],
-        ],
-        [
-            'id' => 207,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.5 Pro (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.5-pro',
-            'priceIn' => 30,
-            'inUnit' => 'per1M',
-            'priceOut' => 180,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.5 Pro for difficult image analysis and vision tasks that benefit from deeper reasoning.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.5-pro'],
-                'features' => ['reasoning', 'vision'],
-                // No cached-input discount — see the chat row above.
-                'cache_read_price_per_1M' => 30.00,
-                'supportsStreaming' => false,
-                'supportsSystemMessages' => true,
-                'meta' => [
-                    'api' => 'responses',
-                    'supports_images' => true,
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-12-01',
-                ],
-            ],
-        ],
-        // ----------------------------------------------------------------
-        // GPT-5.6 family (Sol / Terra / Luna) — GA 2026-07-09.
-        // Sol: flagship. Terra: balanced, ~GPT-5.5-competitive. Luna:
-        // fastest / most affordable. All use the Responses API, support
-        // configurable reasoning effort and vision.
-        // Pricing per 1M tokens from https://developers.openai.com/api/docs/pricing.
-        // 2026-07-30 price cut: Terra 2.50/15 -> 2.00/12 (-20%), Luna 1.00/6 ->
-        // 0.20/1.20 (-80%); Sol unchanged. Long-context (>272k) tiers updated in
-        // CONTEXT_PRICING accordingly.
-        //
-        // Caching: GPT-5.6 is the first family OpenAI charges for cache WRITES
-        // (1.25x the uncached input rate); reads are 0.1x. Earlier families incur
-        // "no additional cache-write charge", which is why cache_write_multiplier
-        // is set here but not on the gpt-5.5 / gpt-5.4 rows.
-        // See https://developers.openai.com/api/docs/guides/prompt-caching.
-        // ----------------------------------------------------------------
-        [
-            'id' => 251,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.6 Sol',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.6-sol',
-            // Price cut 2026-08-21: OpenAI dropped Sol from 5/30 to 4/20 (cached 0.50->0.40,
-            // long-context 10/45->8/30). Verified against the official OpenAI pricing page
-            // (https://openai.com/api/pricing/) on 2026-08-30; #1561. Marked promotional
-            // "at least through 2026-11-21" — see the reminder in docs/PRICING_MAINTENANCE.md.
-            'priceIn' => 4,
-            'inUnit' => 'per1M',
-            'priceOut' => 20,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.6 Sol - flagship model for coding, knowledge work, cybersecurity, and science. State-of-the-art results with strong performance per dollar. Configurable reasoning effort.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.6-sol'],
-                'features' => ['reasoning', 'vision', 'tool_use'],
-                'cache_read_price_per_1M' => 0.40,
-                'cache_write_multiplier' => 1.25,
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                    'reasoning_effort_default' => 'medium',
-                ],
-            ],
-        ],
-        [
-            'id' => 252,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.6 Sol (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.6-sol',
-            // Price cut 2026-08-21, same as the chat row above (#1561).
-            'priceIn' => 4,
-            'inUnit' => 'per1M',
-            'priceOut' => 20,
-            'outUnit' => 'per1M',
-            'quality' => 10,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.6 Sol for image analysis and vision tasks. Strong computer-use and design judgment.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.6-sol'],
-                'features' => ['reasoning', 'vision'],
-                'cache_read_price_per_1M' => 0.40,
-                'cache_write_multiplier' => 1.25,
-                'meta' => [
-                    'api' => 'responses',
-                    'supports_images' => true,
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                ],
-            ],
-        ],
-        [
-            'id' => 253,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.6 Terra',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.6-terra',
-            'priceIn' => 2.00,
-            'inUnit' => 'per1M',
-            'priceOut' => 12,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.6 Terra - balanced model for everyday work with performance competitive with GPT-5.5 at a lower cost. Configurable reasoning effort.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.6-terra'],
-                'features' => ['reasoning', 'vision', 'tool_use'],
-                'cache_read_price_per_1M' => 0.20,
-                'cache_write_multiplier' => 1.25,
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                    'reasoning_effort_default' => 'medium',
-                ],
-            ],
-        ],
-        [
-            'id' => 254,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.6 Terra (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.6-terra',
-            'priceIn' => 2.00,
-            'inUnit' => 'per1M',
-            'priceOut' => 12,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.6 Terra for image analysis and vision tasks. Balanced multimodal option.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.6-terra'],
-                'features' => ['reasoning', 'vision'],
-                'cache_read_price_per_1M' => 0.20,
-                'cache_write_multiplier' => 1.25,
-                'meta' => [
-                    'api' => 'responses',
-                    'supports_images' => true,
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                ],
-            ],
-        ],
-        [
-            'id' => 255,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.6 Luna',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.6-luna',
-            'priceIn' => 0.20,
-            'inUnit' => 'per1M',
-            'priceOut' => 1.20,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.6 Luna - fastest and most affordable model of the GPT-5.6 family. Strong coding and knowledge work at a fraction of the cost. Configurable reasoning effort.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.6-luna'],
-                'features' => ['reasoning', 'vision', 'tool_use'],
-                'cache_read_price_per_1M' => 0.02,
-                'cache_write_multiplier' => 1.25,
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                    'reasoning_effort_default' => 'medium',
-                ],
-            ],
-        ],
-        [
-            'id' => 256,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.6 Luna (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.6-luna',
-            'priceIn' => 0.20,
-            'inUnit' => 'per1M',
-            'priceOut' => 1.20,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.6 Luna for image analysis and vision tasks. Fast, cost-efficient multimodal option.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.6-luna'],
-                'features' => ['reasoning', 'vision'],
-                'cache_read_price_per_1M' => 0.02,
-                'cache_write_multiplier' => 1.25,
-                'meta' => [
-                    'api' => 'responses',
-                    'supports_images' => true,
-                    'context_window' => '1050000',
-                    'max_output' => '128000',
-                ],
-            ],
-        ],
         // ----------------------------------------------------------------
         // GPT-6 Astra — GA rollout 2026-09-04 (Trusted Access first;
         // Plus/Pro/Business/Enterprise and API in the following days).
@@ -2734,66 +2444,6 @@ class ModelCatalog
                     'image_cached_input_price_per_1M' => 2,
                     'text_input_price_per_1M' => 5,
                     'text_cached_input_price_per_1M' => 1.25,
-                ],
-            ],
-        ],
-        // ----------------------------------------------------------------
-        // GPT-5.4 mini (snapshot 2026-05-27, probed live before
-        // seeding via https://developers.openai.com/api/docs/models).
-        // ----------------------------------------------------------------
-        [
-            'id' => 232,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4 mini',
-            'tag' => 'chat',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4-mini',
-            'priceIn' => 0.75,
-            'inUnit' => 'per1M',
-            'priceOut' => 4.50,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 mini - the strongest mini model yet for coding, computer use, and subagents. 400K context, low latency, configurable reasoning effort.',
-                'max_tokens' => 128000,
-                'params' => ['model' => 'gpt-5.4-mini'],
-                'features' => ['reasoning', 'vision', 'tool_use'],
-                'cache_read_price_per_1M' => 0.075,
-                'meta' => [
-                    'api' => 'responses',
-                    'context_window' => '400000',
-                    'max_output' => '128000',
-                    'knowledge_cutoff' => '2025-08-31',
-                ],
-            ],
-        ],
-        [
-            'id' => 233,
-            'service' => 'OpenAI',
-            'name' => 'GPT-5.4 mini (Vision)',
-            'tag' => 'pic2text',
-            'selectable' => 1,
-            'active' => 1,
-            'providerId' => 'gpt-5.4-mini',
-            'priceIn' => 0.75,
-            'inUnit' => 'per1M',
-            'priceOut' => 4.50,
-            'outUnit' => 'per1M',
-            'quality' => 9,
-            'rating' => 1,
-            'json' => [
-                'description' => 'OpenAI GPT-5.4 mini for image analysis and vision tasks. Cost-efficient multimodal option.',
-                'prompt' => 'Describe the image in detail. Extract any text you see.',
-                'params' => ['model' => 'gpt-5.4-mini'],
-                'features' => ['reasoning', 'vision'],
-                'cache_read_price_per_1M' => 0.075,
-                'meta' => [
-                    'api' => 'responses',
-                    'supports_images' => true,
-                    'context_window' => '400000',
-                    'max_output' => '128000',
                 ],
             ],
         ],

@@ -50,7 +50,7 @@ final class OpenAIImageGenerationTest extends TestCase
 
         $body = $this->http->requests()[0]['body'];
         self::assertSame('1024x1536', $result[0]['size']);
-        self::assertSame(['gpt-5.6-terra', ['type' => 'image_generation', 'model' => 'gpt-image-1']], [$body['model'], $body['tools'][0]]);
+        self::assertSame(['gpt-6.1-terra', ['type' => 'image_generation', 'model' => 'gpt-image-1']], [$body['model'], $body['tools'][0]]);
         self::assertSame('input_image', $body['input'][0]['content'][1]['type']);
     }
 
@@ -99,7 +99,7 @@ final class OpenAIImageGenerationTest extends TestCase
             'image_in' => 1000,
             'cached_image_in' => 500,
             'out' => 1756,
-            'wrapper_model' => 'gpt-5.6-terra',
+            'wrapper_model' => 'gpt-6.1-terra',
             'wrapper_in' => 300,
             'wrapper_cached_in' => 100,
             'wrapper_out' => 40,

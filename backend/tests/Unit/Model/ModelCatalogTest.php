@@ -459,18 +459,18 @@ class ModelCatalogTest extends TestCase
 
     public function testFindBidByKeyResolvesUniqueMatch(): void
     {
-        $bid = ModelCatalog::findBidByKey('openai:gpt-5.4:chat');
+        $bid = ModelCatalog::findBidByKey('openai:gpt-6.2-sol:chat');
 
         $this->assertNotNull($bid);
-        $found = ModelCatalog::find('openai:gpt-5.4:chat');
+        $found = ModelCatalog::find('openai:gpt-6.2-sol:chat');
         $this->assertSame((int) $found[0]['id'], $bid);
     }
 
     public function testFindBidByKeyReturnsNullForAmbiguousKey(): void
     {
-        // Bare service:providerId for openai:gpt-5.4 matches both chat + pic2text variants,
+        // Bare service:providerId for openai:gpt-6.2-sol matches both chat + pic2text variants,
         // so it intentionally cannot resolve to a single BID — callers must add the tag suffix.
-        $this->assertNull(ModelCatalog::findBidByKey('openai:gpt-5.4'));
+        $this->assertNull(ModelCatalog::findBidByKey('openai:gpt-6.2-sol'));
     }
 
     public function testFindBidByKeyReturnsNullForUnknownKey(): void
@@ -809,12 +809,6 @@ class ModelCatalogTest extends TestCase
             'gpt-6.2-astra' => ['openai:gpt-6.2-astra', 0.40],
             'gpt-6.2-sol' => ['openai:gpt-6.2-sol', 0.10],
             'gpt-6-luna' => ['openai:gpt-6-luna', 0.01],
-            'gpt-5.6-sol' => ['openai:gpt-5.6-sol', 0.40],
-            'gpt-5.6-terra' => ['openai:gpt-5.6-terra', 0.20],
-            'gpt-5.6-luna' => ['openai:gpt-5.6-luna', 0.02],
-            'gpt-5.5' => ['openai:gpt-5.5', 0.50],
-            'gpt-5.4' => ['openai:gpt-5.4', 0.25],
-            'gpt-5.4-mini' => ['openai:gpt-5.4-mini', 0.075],
             'gemini-2.5-pro' => ['google:gemini-2.5-pro', 0.125],
             'gemini-3.1-pro' => ['google:gemini-3.1-pro-preview', 0.20],
             'gemini-2.5-flash' => ['google:gemini-2.5-flash', 0.03],
@@ -860,8 +854,8 @@ class ModelCatalogTest extends TestCase
      * Both halves are required. A tiered row that authors no base cache rate
      * silently falls back to the 50% default discount, and a tier that omits
      * `cache_price_in_above` keeps charging the short-context cache rate on a
-     * long-context request. Models without a cached-input discount (gpt-5.5-pro)
-     * satisfy this by stating their plain input rate on both sides.
+     * long-context request. A model without a cached-input discount satisfies
+     * this by stating its plain input rate on both sides.
      */
     public function testLongContextTiersDoubleTheCachedInputRate(): void
     {
@@ -902,39 +896,13 @@ class ModelCatalogTest extends TestCase
     }
 
     /**
-     * gpt-5.5-pro is the one catalog model OpenAI ships without a cached-input
-     * discount. "No discount" is expressed as the FULL input rate on every row
-     * and at the long-context tier, never as a missing key: an absent rate hands
-     * billing to CostCalculationService's 50% fallback, which would halve the
-     * bill on any payload that reports cached tokens.
-     */
-    public function testGpt55ProAuthorsCachedInputAtTheFullRate(): void
-    {
-        $rows = ModelCatalog::find('openai:gpt-5.5-pro');
-        $this->assertCount(2, $rows, 'Expected gpt-5.5-pro chat + vision variants');
-
-        foreach ($rows as $row) {
-            $this->assertEqualsWithDelta(
-                (float) $row['priceIn'],
-                (float) ($row['json']['cache_read_price_per_1M'] ?? 0.0),
-                1e-9,
-                sprintf('gpt-5.5-pro (%s) must bill cached tokens at the plain input rate', $row['tag']),
-            );
-        }
-
-        $tier = ModelCatalog::contextPricing('gpt-5.5-pro');
-        $this->assertNotNull($tier);
-        $this->assertEqualsWithDelta($tier['price_in_above'], $tier['cache_price_in_above'] ?? 0.0, 1e-9);
-    }
-
-    /**
      * The 1.25x cache-write charge starts with GPT-5.6; GPT-5.5 and earlier incur
      * "no additional cache-write charge". Authoring the multiplier on the wrong
      * row silently over-bills, so pin which rows carry it.
      */
     public function testCacheWriteMultiplierIsAuthoredOnlyForChargingFamilies(): void
     {
-        $charging = ['gpt-6-astra', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'];
+        $charging = ['gpt-6-astra', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-6.1-terra', 'gpt-6.2-astra', 'gpt-6.2-sol', 'gpt-6-luna'];
 
         foreach (ModelCatalog::all() as $row) {
             $authored = $row['json']['cache_write_multiplier'] ?? null;
@@ -953,27 +921,6 @@ class ModelCatalogTest extends TestCase
                 $row['providerId'],
                 $row['tag'],
             ));
-        }
-    }
-
-    public function testGpt55ModelsAreAvailableWithExpectedApiIds(): void
-    {
-        $gpt55 = ModelCatalog::find('openai:gpt-5.5');
-        $gpt55Pro = ModelCatalog::find('openai:gpt-5.5-pro');
-
-        $this->assertCount(2, $gpt55, 'Expected gpt-5.5 chat + vision variants');
-        $this->assertCount(2, $gpt55Pro, 'Expected gpt-5.5-pro chat + vision variants');
-        $this->assertSame(['chat', 'pic2text'], array_column($gpt55, 'tag'));
-        $this->assertSame(['chat', 'pic2text'], array_column($gpt55Pro, 'tag'));
-
-        // Both variants of each family must talk to the same upstream OpenAI model id.
-        foreach ($gpt55 as $variant) {
-            $this->assertSame('gpt-5.5', $variant['providerId']);
-            $this->assertSame('gpt-5.5', $variant['json']['params']['model'] ?? null);
-        }
-        foreach ($gpt55Pro as $variant) {
-            $this->assertSame('gpt-5.5-pro', $variant['providerId']);
-            $this->assertSame('gpt-5.5-pro', $variant['json']['params']['model'] ?? null);
         }
     }
 
@@ -1713,15 +1660,6 @@ class ModelCatalogTest extends TestCase
             $this->assertNotContains($retiredProviderId, $providerIds, sprintf('%s was retired and must not be re-added.', $retiredProviderId));
             $this->assertNotContains($retiredBid, $ids, sprintf('BID %d belongs to a retired model and must not be reused.', $retiredBid));
         }
-    }
-
-    public function testGpt55ProModelsAreMarkedAsNonStreaming(): void
-    {
-        $chat = ModelCatalog::find('openai:gpt-5.5-pro:chat')[0];
-        $vision = ModelCatalog::find('openai:gpt-5.5-pro:pic2text')[0];
-
-        $this->assertFalse($chat['json']['supportsStreaming']);
-        $this->assertFalse($vision['json']['supportsStreaming']);
     }
 
     /**

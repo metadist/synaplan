@@ -418,14 +418,14 @@ final class OpenAIImageGeneration
      * Pick the mainline model to use with the Responses API image generation tool.
      * Image-specific models (gpt-image-*) need a mainline model wrapper.
      *
-     * The wrapper is GPT-5.6 Terra, the successor ModelCatalog::RETIREMENTS[30]
-     * records for gpt-4.1: the catalog stopped carrying gpt-4.1 on 2026-07-27, so
-     * that wrapper billed tokens against a model with no price row.
+     * The wrapper is GPT-6.1 Terra, the successor ModelCatalog::RETIREMENTS
+     * records for gpt-4.1 and GPT-5.6 Terra: a wrapper the catalog no longer
+     * carries bills tokens against a model with no price row.
      */
     private function pickResponsesModel(string $imageModel): string
     {
         if (str_starts_with($imageModel, 'gpt-image-')) {
-            return 'gpt-5.6-terra';
+            return 'gpt-6.1-terra';
         }
 
         return $imageModel;
