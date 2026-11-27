@@ -223,6 +223,31 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
   `prod`, der E2E-Stack läuft in `test`).
 - In keinem Tag; `main` enthält beide.
 
+**Was am 27.11.2026 danach kam (Sitzung 8, Bindung und Umschlüsseln)**
+
+- PR #3320 (`2a85bca25`, gemergt): jedes gespeicherte Chiffrat ist an
+  Tabelle, Feld und Besitzer gebunden (`App\Model\SecretPlace`), an allen
+  Lese- und Schreibstellen von `EncryptionService`. Ein Wert, der in die
+  Zeile eines anderen Kontos kopiert wird, öffnet dort nicht. Gebunden wird
+  an den Besitzer, nicht an die Zeilen-ID, weil der Wert vor dem ersten
+  Speichern verschlüsselt wird.
+- `app:secrets:reencrypt` schreibt Altwerte (CBC ohne Präfix, `v2:` ohne
+  Ort) an Ort und Stelle neu; `--dry-run` zählt nur. Ein Wert, den das
+  `APP_SECRET` nicht öffnet, wird gemeldet und nicht angefasst. Die Liste
+  der Stellen steht in `SecretReencryptor::CONFIG_SECRETS` und im Enum
+  `SecretColumn`; eine neue verschlüsselte Stelle gehört dort hinein.
+- Beide alten Lesewege bleiben. Solange sie da sind, kann ein Altwert aus
+  einem Backup weiter eingesetzt werden.
+- Folge für Betreiber: nach dem Update den Befehl einmal fahren, bei
+  mehreren Nodes erst, wenn alle das neue Image haben, weil ein älterer
+  Stand gebundene Werte nicht liest. Aus demselben Grund geht nach dem Lauf
+  kein Zurückrollen auf einen Stand vor diesem PR. Steht in `docs/ADMIN.md`.
+- Gate: `make ci-local` grün (PHPUnit 13429), Playwright `@ci` grün (226).
+- Laut Owner auf Produktion deployt und gefahren: 40 Werte umgeschrieben,
+  danach dort geprüft. Vier Mail-Handler ließen sich nicht öffnen; sie
+  stehen seit Monaten auf `error` und blieben unverändert.
+- In keinem Tag; `main` enthält den PR.
+
 ## 3. Was offen ist
 
 ### 3a. Sofort, beim Owner
@@ -266,8 +291,10 @@ Teilweise erledigt: SYN-17 (Forgot-Password hat Human-Check und Limits, PR
 9. Erledigt: der Compute-Sidecar läuft laut Owner auf dem Stand von `main`
    nach PR #3305 (siehe Abschnitt 2, Sitzung 6).
 10. Erledigt: die Release-Notizen zu 5.10.5 nennen den Setup-Token.
-11. Mit dem nächsten Release geht PR #3305 an Selbst-Hoster. In den
-    Release-Notizen die Reihenfolge nennen: erst Backend, dann Sidecar.
+11. Mit dem nächsten Release gehen PR #3305, #3313 und #3320 an
+    Selbst-Hoster. In den Release-Notizen nennen: erst Backend, dann
+    Sidecar; Produktion startet nicht mit dem Beispiel-`APP_SECRET`; nach
+    dem Update einmal `app:secrets:reencrypt` fahren.
 
 ### 3b. Erst nach Entscheidung des Owners ("Ask first" in AGENTS.md)
 
@@ -372,9 +399,10 @@ die Entscheidung des Owners. Offen als PR:
   OAuth-States werden einmal ungültig; Nutzer melden sich neu an oder der
   Refresh greift. PR 2 (`fix/encryption-aead`): `EncryptionService`
   schreibt `v2:` (XChaCha20-Poly1305, eigener abgeleiteter Schlüssel) und
-  liest das alte Format weiter. Nicht gebaut: Umschlüsseln der Altwerte,
-  Bindung eines Chiffrats an seine Zeile (der Parameter `context` ist da,
-  kein Aufrufer nutzt ihn). Nachgezogen in Sitzung 7: Ablehnen des
+  liest das alte Format weiter. Nachgezogen in Sitzung 8 (PR #3320):
+  Umschlüsseln der Altwerte und Bindung eines Chiffrats an Besitzer und
+  Feld. Nicht gebaut: Entfernen der alten Lesewege. Nachgezogen in
+  Sitzung 7: Ablehnen des
   Beispiel-`APP_SECRET` beim Start (PR #3313), `ext-sodium` in
   `composer.json` (PR #3312).
 - **SYN-41** (`metadist/synaplan-ghsa-9c29-f2f7-5rxc`, PR 1, Branch
@@ -403,7 +431,8 @@ die Entscheidung des Owners. Offen als PR:
   Deshalb eigener Schritt und nicht Teil dieses PRs.
 - SYN-40: `ext-sodium` steht seit PR #3312 in `composer.json`. Das alte CBC-Format bleibt lesbar: wer in die Datenbank
   schreiben kann, kann einen `v2:`-Wert weiter durch einen alten ersetzen.
-  Das endet erst mit dem Umschlüsseln und dem Abschalten des alten Lesewegs.
+  Umgeschlüsselt wird seit PR #3320; das Ersetzen endet erst mit dem
+  Abschalten der alten Lesewege.
   Die übrigen HMAC-Stellen (`MediaAccessTokenService`, `WopiTokenService`,
   `InboundEmailRelayAuth`, `WidgetVisitorIdentity`) leiten schon einen
   eigenen Schlüssel ab; nur der Log-Kürzel in `WidgetVisitorIdentity` nimmt
@@ -779,6 +808,9 @@ die Folgethemen in Punkt 4 bei der KI.
    `m4wt down`, `SEED_DEMO_DATA=false` in die ignorierte `.env` des
    Worktrees, `m4wt up`, `m4wt tunnel`; danach die Zeile entfernen und
    `m4wt down`, sonst startet der nächste Lauf ohne Seed-Konten.
-4. Folgethemen, nicht begonnen und je eine eigene Entscheidung: Altwerte
-   auf `v2:` umschlüsseln und Chiffrate an ihre Zeile binden (SYN-40);
-   Sidecar ohne root und ohne Docker-Socket (SYN-39, SYN-26).
+4. Folgethemen, nicht begonnen und je eine eigene Entscheidung: die
+   alten Lesewege in `EncryptionService` entfernen (SYN-40), frühestens
+   ein bis zwei Releases nach dem mit PR #3320, und in den Notizen davor
+   ankündigen, weil Werte ohne Lauf von `app:secrets:reencrypt` dann
+   unlesbar sind; Sidecar ohne root und ohne Docker-Socket (SYN-39,
+   SYN-26).
