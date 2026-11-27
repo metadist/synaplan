@@ -56,11 +56,13 @@ final class GoogleImageGeneration
 
     /**
      * Check if model uses Gemini native image generation API.
-     * Pattern: gemini-*-image* (e.g., gemini-2.5-flash-image, gemini-3-pro-image-preview).
+     * Pattern: gemini-*-image* (e.g., gemini-3.1-flash-image, gemini-3-pro-image)
+     * or gemini-nano-banana-* (e.g., gemini-nano-banana-2.1, which drops the
+     * "-image" suffix).
      */
     private function isGeminiNativeImageModel(string $model): bool
     {
-        return (bool) preg_match('/^gemini-.*-image/', $model);
+        return (bool) preg_match('/^gemini-(.*-image|nano-banana-)/', $model);
     }
 
     /**

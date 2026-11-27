@@ -170,23 +170,25 @@ export const MODEL_MIXES: ModelMixDefinition[] = [
     icon: { kind: 'service', service: 'Google' },
     resetsToRecommended: false,
     candidates: {
-      CHAT: [google('gemini-3.1-pro-preview'), google('gemini-3.5-flash')],
-      ANALYZE: [google('gemini-3.5-flash'), google('gemini-3.1-pro-preview')],
+      CHAT: [google('gemini-4-carbon'), google('gemini-3.8-flash')],
+      ANALYZE: [google('gemini-3.8-flash'), google('gemini-4-carbon')],
       // A Flash model is fast and JSON-reliable enough to take over sorting.
-      SORT: [google('gemini-3.5-flash'), google('gemini-3.5-flash-lite')],
-      PIC2TEXT: [google('gemini-3.1-pro-preview'), google('gemini-3.5-flash')],
+      SORT: [google('gemini-3.6-flash'), google('gemini-3.8-flash')],
+      PIC2TEXT: [google('gemini-4-carbon'), google('gemini-3.8-flash')],
       TEXT2PIC: [
+        google('gemini-nano-banana-2.1'),
         google('gemini-3.1-flash-image'),
         google('gemini-3-pro-image'),
         google('gemini-3.1-flash-lite-image'),
       ],
       PIC2PIC: [
+        google('gemini-nano-banana-2.1'),
         google('gemini-3.1-flash-image'),
         google('gemini-3-pro-image'),
         google('gemini-3.1-flash-lite-image'),
       ],
-      TEXT2VID: [google('veo-3.1-generate-preview'), google('veo-3.1-fast-generate-preview')],
-      TEXT2SOUND: [google('gemini-2.5-flash-preview-tts')],
+      TEXT2VID: [google('gemini-omni-1.2-flash')],
+      TEXT2SOUND: [google('gemini-3.8-flash-tts'), google('gemini-3.8-flash-lite-tts')],
     },
   },
   {
