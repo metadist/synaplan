@@ -102,11 +102,24 @@ strangers may sign up or chat as guests. Everything else is closed while that is
 pending — the API answers `503 SETUP_REQUIRED` for every other route — so there
 is no half-configured state to stumble into.
 
-> **The window between the first start and the first administrator is open.** The
-> account belongs to whoever fills in that form first, exactly as in Open WebUI,
-> Immich or n8n. On a publicly reachable host, either complete the wizard right
-> after the deployment, or use the bootstrap variables below so the window never
-> exists.
+The wizard asks for a **setup token** first. The backend prints it to its log
+on every start while no administrator exists, so only someone who can read
+that log can create the account:
+
+```bash
+docker compose logs backend | grep "Setup token" | tail -n 1
+```
+
+A restart prints a new token and the earlier one stops working, so the last
+line is the one that counts. To get a new
+one without a restart:
+
+```bash
+docker compose exec backend php bin/console app:setup:token
+```
+
+The token is removed once the administrator exists. To skip the browser
+entirely, use the bootstrap variables below.
 
 Set `SETUP_WIZARD_ENABLED=false` to switch the wizard off entirely. An instance
 without an administrator then has no way in through the browser, which is what

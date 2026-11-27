@@ -45,13 +45,13 @@ describe('setupApi.createFirstAdmin', () => {
    * logs the administrator out in the middle of the wizard.
    */
   it('records the session hint so the refresh path stays open during the wizard', async () => {
-    await createFirstAdmin('admin@example.com', 'Sup3rSecret')
+    await createFirstAdmin('admin@example.com', 'Sup3rSecret', 'K7QM-2XRD-9HTP-WNB4-E3VC')
 
     expect(setSessionHint).toHaveBeenCalled()
   })
 
   it('adopts the signed-in administrator so the SPA does not wait for /auth/me', async () => {
-    await createFirstAdmin('admin@example.com', 'Sup3rSecret')
+    await createFirstAdmin('admin@example.com', 'Sup3rSecret', 'K7QM-2XRD-9HTP-WNB4-E3VC')
 
     expect(adoptSession).toHaveBeenCalledWith({
       id: 1,
@@ -66,13 +66,13 @@ describe('setupApi.createFirstAdmin', () => {
     const tokens = { accessToken: 'a', refreshToken: 'r', tokenType: 'Bearer', expiresIn: 300 }
     httpClient.mockResolvedValue({ ...adminResult, tokens })
 
-    await createFirstAdmin('admin@example.com', 'Sup3rSecret')
+    await createFirstAdmin('admin@example.com', 'Sup3rSecret', 'K7QM-2XRD-9HTP-WNB4-E3VC')
 
     expect(setNativeTokens).toHaveBeenCalledWith(tokens)
   })
 
   it('tolerates the web response, which carries no tokens at all', async () => {
-    await createFirstAdmin('admin@example.com', 'Sup3rSecret')
+    await createFirstAdmin('admin@example.com', 'Sup3rSecret', 'K7QM-2XRD-9HTP-WNB4-E3VC')
 
     expect(setNativeTokens).toHaveBeenCalledWith(undefined)
   })
@@ -80,7 +80,9 @@ describe('setupApi.createFirstAdmin', () => {
   it('adopts nothing when the server refuses the administrator', async () => {
     httpClient.mockRejectedValue(new Error('SETUP_ALREADY_COMPLETED'))
 
-    await expect(createFirstAdmin('admin@example.com', 'Sup3rSecret')).rejects.toThrow()
+    await expect(
+      createFirstAdmin('admin@example.com', 'Sup3rSecret', 'K7QM-2XRD-9HTP-WNB4-E3VC')
+    ).rejects.toThrow()
     expect(setSessionHint).not.toHaveBeenCalled()
     expect(setNativeTokens).not.toHaveBeenCalled()
     expect(adoptSession).not.toHaveBeenCalled()

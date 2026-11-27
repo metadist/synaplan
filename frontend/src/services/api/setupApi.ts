@@ -42,11 +42,12 @@ export const getSetupState = async (): Promise<SetupState> =>
  */
 export const createFirstAdmin = async (
   email: string,
-  password: string
+  password: string,
+  setupToken: string
 ): Promise<SetupAdminResult> => {
   const result = await httpClient('/api/v1/setup/admin', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, setupToken }),
     schema: PostApiSetupAdminResponseSchema,
     skipAuth: true,
   })

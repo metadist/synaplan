@@ -6,6 +6,25 @@
     </div>
 
     <label class="flex flex-col gap-1.5">
+      <span class="text-sm font-medium txt-primary">{{ $t('setup.admin.tokenLabel') }}</span>
+      <input
+        v-model="setupToken"
+        type="text"
+        autocomplete="off"
+        autocapitalize="characters"
+        spellcheck="false"
+        required
+        placeholder="XXXX-XXXX-XXXX-XXXX-XXXX"
+        class="w-full px-3 py-2.5 rounded-xl surface-chip txt-primary placeholder:txt-secondary text-sm font-mono"
+        data-testid="setup-admin-token"
+      />
+      <span class="text-xs txt-secondary">{{ $t('setup.admin.tokenHint') }}</span>
+      <code class="text-xs txt-secondary break-all" data-testid="setup-admin-token-command">{{
+        TOKEN_COMMAND
+      }}</code>
+    </label>
+
+    <label class="flex flex-col gap-1.5">
       <span class="text-sm font-medium txt-primary">{{ $t('setup.admin.emailLabel') }}</span>
       <input
         v-model="email"
@@ -88,6 +107,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const setupToken = ref('')
 const email = ref('')
 const password = ref('')
 const confirmation = ref('')
@@ -97,6 +117,9 @@ const serverError = ref('')
 const localError = ref('')
 
 const message = computed(() => localError.value || serverError.value)
+
+/** Shown as is: a shell command reads the same in every language. */
+const TOKEN_COMMAND = 'docker compose exec backend php bin/console app:setup:token'
 
 /**
  * Mirrors the server-side rule in SetupAdminRequest so a typo costs a keystroke
@@ -120,7 +143,7 @@ async function submit(): Promise<void> {
 
   busy.value = true
   try {
-    await createFirstAdmin(email.value.trim(), password.value)
+    await createFirstAdmin(email.value.trim(), password.value, setupToken.value.trim())
     emit('created')
   } catch (err) {
     serverError.value = describe(err)
@@ -144,6 +167,7 @@ async function submit(): Promise<void> {
  */
 function describe(err: unknown): string {
   if (err instanceof ApiError) {
+    if ('SETUP_TOKEN_INVALID' === err.code) return t('setup.admin.errorToken')
     if ('SETUP_IN_PROGRESS' === err.code) return t('setup.admin.errorInProgress')
     if ('SETUP_ALREADY_COMPLETED' === err.code) return t('setup.admin.errorAlreadyDone')
     if ('SETUP_WIZARD_DISABLED' === err.code) return t('setup.admin.errorDisabled')

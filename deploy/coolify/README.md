@@ -34,16 +34,16 @@ differently.
    address from the server's wildcard domain.
 4. Click **Deploy**. The first start applies the database migrations and seeds
    the model catalog; the web role reports healthy after a few minutes.
-5. Open the address of `backend` right away and finish the setup:
-   create the administrator, connect an AI provider, and decide whether
-   visitors may sign up.
+5. Open the address of `backend` and finish the setup: enter the setup
+   token, create the administrator, connect an AI provider, and decide
+   whether visitors may sign up. The token is in the **Logs** of the `backend`
+   service, in the line that starts with `Setup token:`; every restart prints
+   a new one.
 
-**Finish step 5 immediately.** Until an administrator exists, the first visitor
-of the address can claim the server through `/setup`. If the address is public
-and you cannot finish setup at once, set `BOOTSTRAP_ADMIN_EMAIL` and
-`BOOTSTRAP_ADMIN_PASSWORD` in **Environment Variables** before the first
-deployment; the administrator is then created on the first start and `/setup`
-is closed.
+Without the token nobody can claim the server through `/setup`. To skip the
+browser step, set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` in
+**Environment Variables** before the first deployment; the administrator is
+then created on the first start and `/setup` is closed.
 
 Set both or neither: one without the other stops every app container at
 start. The password needs 8 to 64 characters; below 16 it must mix lower

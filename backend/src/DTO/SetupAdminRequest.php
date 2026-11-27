@@ -34,4 +34,12 @@ class SetupAdminRequest
         message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number'
     )]
     public string $password;
+
+    /**
+     * Proof that the caller can read this installation's log. Not validated
+     * here: a missing token is refused like a wrong one, after the checks
+     * that tell a stale wizard its installation is already set up.
+     */
+    #[Assert\Length(max: 64)]
+    public string $setupToken = '';
 }

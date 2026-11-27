@@ -454,6 +454,7 @@ write_boot_status "seeding" "Loading starter data"
 if [ "${SEED_DEMO_DATA:-true}" != "true" ]; then
     echo "⏭️  SEED_DEMO_DATA=${SEED_DEMO_DATA} → skipping demo user fixtures."
     echo "   🧭 An empty database starts in first-run setup: open http://localhost:5173/setup"
+    echo "      The setup token it asks for is printed further down in this log."
 elif [ "$APP_ENV" = "dev" ] || [ "$APP_ENV" = "test" ]; then
     # A marker on an empty DB (tmpfs wipe, marker on a host volume after
     # down/up) is stale, so fixtures load again. doctrine:fixtures:load purges
@@ -524,6 +525,14 @@ if [ -n "${BOOTSTRAP_ADMIN_EMAIL:-}" ] || [ -n "${BOOTSTRAP_ADMIN_PASSWORD:-}" ]
     echo "👤 Bootstrapping initial administrator..."
     php bin/console app:bootstrap-admin --no-interaction
 fi
+
+# An installation without any account waits for its first administrator in the
+# setup wizard. The wizard asks for a one-time token that only someone with
+# access to this log can read; a new one is printed on every start until the
+# administrator exists. Prints nothing once setup is done or switched off.
+php bin/console app:setup:token --no-interaction || {
+    echo "⚠️  Could not issue a setup token. Run: php bin/console app:setup:token"
+}
 
 # Ollama model downloads (optional, only if AUTO_DOWNLOAD_MODELS=true).
 # Progress is mirrored to var/ollama-download.json for GET /api/v1/config/local-ai/status.

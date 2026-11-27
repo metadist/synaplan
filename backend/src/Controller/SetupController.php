@@ -14,8 +14,10 @@ use App\Service\Chat\GuestChatConfig;
 use App\Service\Client\ClientContextResolver;
 use App\Service\Email\MailerConfig;
 use App\Service\Http\ClientAddress;
-use App\Service\Setup\FirstAdminCreator;
+use App\Service\Setup\SetupRefusal;
+use App\Service\Setup\SetupRefusedException;
 use App\Service\Setup\SetupStateService;
+use App\Service\Setup\WizardFirstAdmin;
 use OpenApi\Attributes as OA;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,7 +25,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
-use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -48,17 +49,14 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[OA\Tag(name: 'Setup')]
 final class SetupController extends AbstractController
 {
-    private const LOCK_TTL_SECONDS = 30.0;
-
     public function __construct(
         private readonly SetupStateService $setupState,
         private readonly UserRepository $userRepository,
-        private readonly FirstAdminCreator $firstAdminCreator,
+        private readonly WizardFirstAdmin $wizardFirstAdmin,
         private readonly TokenService $tokenService,
         private readonly ClientContextResolver $clientContextResolver,
         private readonly RegistrationConfig $registrationConfig,
         private readonly GuestChatConfig $guestChatConfig,
-        private readonly LockFactory $lockFactory,
         private readonly RateLimiterFactoryInterface $setupAttemptLimiter,
         private readonly LoggerInterface $logger,
         private readonly MailerConfig $mailerConfig,
@@ -115,14 +113,15 @@ final class SetupController extends AbstractController
     #[OA\Post(
         path: '/api/v1/setup/admin',
         summary: 'Create the first administrator',
-        description: 'Public, but only while setup is required. Creates an ADMIN account with a verified email address (there is no mailbox to confirm through yet, and no second account that could be hijacked) and signs it in, so the wizard can continue against the admin API. Refuses with 409 as soon as the installation has any user. A new installation starts closed: sign-up off, no usage for Free-plan accounts, plan limits applied without billing.',
+        description: 'Public, but only while setup is required and only with the setup token from the backend log. Creates an ADMIN account with a verified email address (there is no mailbox to confirm through yet, and no second account that could be hijacked) and signs it in, so the wizard can continue against the admin API. Refuses with 409 as soon as the installation has any user. A new installation starts closed: sign-up off, no usage for Free-plan accounts, plan limits applied without billing.',
         tags: ['Setup']
     )]
     #[OA\RequestBody(
         required: true,
         content: new OA\JsonContent(
-            required: ['email', 'password'],
+            required: ['email', 'password', 'setupToken'],
             properties: [
+                new OA\Property(property: 'setupToken', type: 'string', description: 'The one-time token the backend prints to its log while setup is open. `php bin/console app:setup:token` prints a new one. Case, spaces and dashes are ignored.', example: 'K7QM-2XRD-9HTP-WNB4-E3VC'),
                 new OA\Property(property: 'email', type: 'string', format: 'email', example: 'admin@example.com'),
                 new OA\Property(property: 'password', type: 'string', format: 'password', description: '8-64 characters with at least one uppercase letter, one lowercase letter and one digit.', example: 'SecurePass123'),
             ]
@@ -166,6 +165,7 @@ final class SetupController extends AbstractController
         )
     )]
     #[OA\Response(response: 400, description: 'Validation error (email format, password rules)')]
+    #[OA\Response(response: 403, description: 'The setup token is missing, wrong or was replaced by a newer one — code SETUP_TOKEN_INVALID')]
     #[OA\Response(response: 409, description: 'Setup is already complete — code SETUP_ALREADY_COMPLETED; the wizard is switched off through SETUP_WIZARD_ENABLED=false — code SETUP_WIZARD_DISABLED; or another caller is creating the administrator right now — code SETUP_IN_PROGRESS, retriable')]
     #[OA\Response(response: 429, description: 'Too many setup attempts from this IP')]
     public function createFirstAdmin(
@@ -182,37 +182,19 @@ final class SetupController extends AbstractController
                 : $this->wizardDisabled();
         }
 
-        // Two containers starting at once (Compose scale, a Kubernetes rollout),
-        // or simply a second browser tab, would otherwise both pass the check
-        // above and create two "first" administrators. Same lock discipline as
-        // BootstrapAdminService, which solves the identical race on the headless
-        // path.
-        //
-        // Non-blocking on purpose: the caller is a person waiting on a form, and
-        // the loser of this race has nothing to wait for — the request holding
-        // the lock is about to create the one administrator there will be. An
-        // answer it can act on beats holding the connection open for the lock's
-        // whole lifetime.
-        $lock = $this->lockFactory->createLock('first-run-setup-admin', self::LOCK_TTL_SECONDS, false);
-        if (!$lock->acquire()) {
-            return $this->setupInProgress();
-        }
-
         try {
-            // Re-checked under the lock: the loser of the race must not create a
-            // second administrator on the strength of a stale read.
-            if (0 !== $this->userRepository->countAll()) {
-                return $this->alreadyCompleted();
-            }
-
-            $user = $this->firstAdminCreator->create($dto->email, $dto->password);
-
-            $this->logger->notice('First administrator created through the setup wizard', [
-                'user_id' => $user->getId(),
-            ]);
-        } finally {
-            $lock->release();
+            $user = $this->wizardFirstAdmin->create($dto->email, $dto->password, $dto->setupToken);
+        } catch (SetupRefusedException $refused) {
+            return match ($refused->reason) {
+                SetupRefusal::TokenInvalid => $this->tokenInvalid(),
+                SetupRefusal::InProgress => $this->setupInProgress(),
+                SetupRefusal::AlreadyCompleted => $this->alreadyCompleted(),
+            };
         }
+
+        $this->logger->notice('First administrator created through the setup wizard', [
+            'user_id' => $user->getId(),
+        ]);
 
         return $this->signIn($user, $request);
     }
@@ -264,6 +246,15 @@ final class SetupController extends AbstractController
             'registrationEnabled' => $this->registrationConfig->isEnabled(),
             'guestChatEnabled' => $this->guestChatConfig->isEnabled(),
         ]);
+    }
+
+    private function tokenInvalid(): JsonResponse
+    {
+        return $this->json([
+            'error' => 'Setup token is not valid',
+            'code' => 'SETUP_TOKEN_INVALID',
+            'message' => 'Enter the setup token from the backend log. `php bin/console app:setup:token` prints a new one.',
+        ], Response::HTTP_FORBIDDEN);
     }
 
     private function alreadyCompleted(): JsonResponse

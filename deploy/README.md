@@ -131,10 +131,11 @@ The bootstrap administrator is created only when no administrator exists. A
 restart must not rotate this account. `BOOTSTRAP_ADMIN_EMAIL` and
 `BOOTSTRAP_ADMIN_PASSWORD` must be set together or left empty together; leaving
 both empty is valid and skips the bootstrap, in which case the stack serves the
-first-run setup wizard at `/setup` and the first visitor creates the
-administrator there. On a publicly reachable host, either finish that wizard
-right after deploying or set the bootstrap pair, so the claim window never
-exists; `SETUP_WIZARD_ENABLED=false` closes the browser route entirely. See
+first-run setup wizard at `/setup`. The wizard asks for the setup token the
+backend prints to its log on every start (`docker compose logs backend | grep
+"Setup token"`; a new one: `docker compose exec backend php bin/console
+app:setup:token`), so only someone with access to the host can create the
+administrator. `SETUP_WIZARD_ENABLED=false` closes the browser route entirely. See
 [First-Run Setup](../docs/CONFIGURATION.md#first-run-setup), and
 [SSO-only instances](../docs/CONFIGURATION.md#sso-only-instances-no-local-accounts)
 for a deployment whose administrator comes from an identity provider instead.

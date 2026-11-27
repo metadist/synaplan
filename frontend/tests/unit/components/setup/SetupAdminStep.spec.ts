@@ -15,6 +15,7 @@ async function fillAndSubmit(
   password: string,
   confirmation: string
 ) {
+  await wrapper.get('[data-testid="setup-admin-token"]').setValue(' k7qm-2xrd-9htp-wnb4-e3vc ')
   await wrapper.get('[data-testid="setup-admin-email"]').setValue(email)
   await wrapper.get('[data-testid="setup-admin-password"]').setValue(password)
   await wrapper.get('[data-testid="setup-admin-confirm"]').setValue(confirmation)
@@ -33,7 +34,11 @@ describe('SetupAdminStep', () => {
 
     await fillAndSubmit(wrapper, ' admin@example.com ', 'Sup3rSecret', 'Sup3rSecret')
 
-    expect(createFirstAdmin).toHaveBeenCalledWith('admin@example.com', 'Sup3rSecret')
+    expect(createFirstAdmin).toHaveBeenCalledWith(
+      'admin@example.com',
+      'Sup3rSecret',
+      'k7qm-2xrd-9htp-wnb4-e3vc'
+    )
     expect(wrapper.emitted('created')).toHaveLength(1)
   })
 
@@ -67,6 +72,21 @@ describe('SetupAdminStep', () => {
     )
     expect(wrapper.get('[data-testid="setup-admin-submit"]').attributes('disabled')).toBeUndefined()
     expect(wrapper.emitted('created')).toBeUndefined()
+  })
+
+  it('says where the setup token comes from when the server refuses it', async () => {
+    createFirstAdmin.mockRejectedValue(
+      new ApiError(403, 'Setup token is not valid', 'SETUP_TOKEN_INVALID')
+    )
+    const wrapper = mount(SetupAdminStep)
+
+    await fillAndSubmit(wrapper, 'admin@example.com', 'Sup3rSecret', 'Sup3rSecret')
+
+    expect(wrapper.get('[data-testid="setup-admin-error"]').text()).toContain('server log')
+    expect(wrapper.get('[data-testid="setup-admin-token-command"]').text()).toContain(
+      'app:setup:token'
+    )
+    expect(wrapper.emitted('stale')).toBeUndefined()
   })
 
   /**

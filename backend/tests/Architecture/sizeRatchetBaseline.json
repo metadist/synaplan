@@ -79,7 +79,6 @@
         "src/Controller/MessagesGatewayController.php::MessagesGatewayController": 15,
         "src/Controller/OpenAICompatibleController.php::OpenAICompatibleController": 11,
         "src/Controller/PromptController.php::PromptController": 16,
-        "src/Controller/SetupController.php::SetupController": 11,
         "src/Controller/SubscriptionController.php::SubscriptionController": 16,
         "src/Controller/WebhookController.php::WebhookController": 11,
         "src/Controller/WidgetController.php::WidgetController": 20,

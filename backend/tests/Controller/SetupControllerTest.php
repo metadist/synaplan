@@ -15,6 +15,7 @@ use App\Service\Chat\GuestChatConfig;
 use App\Service\Setup\FreshInstallDefaults;
 use App\Service\Setup\SetupConstants;
 use App\Service\Setup\SetupStateService;
+use App\Service\Setup\SetupTokenService;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -42,6 +43,7 @@ final class SetupControllerTest extends WebTestCase
     private array $createdUserIds = [];
 
     private bool $wroteConfigRows = false;
+    private bool $issuedSetupToken = false;
 
     /** @var array<string, string> what a first-admin request wrote as closed defaults, by GROUP.SETTING */
     private array $freshInstallRows = [];
@@ -49,6 +51,14 @@ final class SetupControllerTest extends WebTestCase
     protected function tearDown(): void
     {
         $this->restoreSetupWizardEnv();
+        if ($this->issuedSetupToken) {
+            static::getContainer()->get(SetupTokenService::class)->clear();
+        }
+        // The attempt limiter counts per address across test methods and
+        // classes; without this the suite's own requests run into it.
+        foreach (['127.0.0.1', 'unknown'] as $address) {
+            static::getContainer()->get('limiter.setup_attempt')->create($address)->reset();
+        }
         $this->deleteCreatedRows();
 
         parent::tearDown();
@@ -85,6 +95,41 @@ final class SetupControllerTest extends WebTestCase
      * The single most important refusal in the feature: an instance with accounts
      * must never hand out an administrator to an anonymous caller.
      */
+    public function testCreateFirstAdminIsRefusedWithoutTheSetupToken(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+        $this->issueSetupToken();
+
+        $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'SecurePass123', 'AAAA-BBBB-CCCC-DDDD-EEEE');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertSame('SETUP_TOKEN_INVALID', $this->payload($client)['code'] ?? null);
+        self::assertNull($this->findUser($client, self::NEW_ADMIN_EMAIL));
+    }
+
+    public function testCreateFirstAdminIsRefusedWhenNoTokenWasEverIssued(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+        static::getContainer()->get(SetupTokenService::class)->clear();
+
+        $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'SecurePass123', '');
+
+        self::assertResponseStatusCodeSame(Response::HTTP_FORBIDDEN);
+        self::assertNull($this->findUser($client, self::NEW_ADMIN_EMAIL));
+    }
+
+    public function testTheSetupTokenIsGoneOnceTheAdministratorExists(): void
+    {
+        $client = $this->clientOnAVirginInstance();
+        $token = $this->issueSetupToken();
+
+        $this->postAdmin($client, self::NEW_ADMIN_EMAIL, 'SecurePass123', strtolower(str_replace('-', ' ', $token)));
+
+        self::assertResponseStatusCodeSame(Response::HTTP_CREATED);
+        $this->rememberCreatedUser($client, self::NEW_ADMIN_EMAIL);
+        self::assertFalse(static::getContainer()->get(SetupTokenService::class)->matches($token));
+    }
+
     public function testCreateFirstAdminIsRefusedOnAnInstallationThatHasUsers(): void
     {
         $client = $this->clientWithUsers();
@@ -374,16 +419,24 @@ final class SetupControllerTest extends WebTestCase
         return $client;
     }
 
-    private function postAdmin(KernelBrowser $client, string $email, string $password): void
+    private function postAdmin(KernelBrowser $client, string $email, string $password, ?string $setupToken = null): void
     {
+        $setupToken ??= $this->issueSetupToken();
         $client->request(
             'POST',
             '/api/v1/setup/admin',
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode(['email' => $email, 'password' => $password], JSON_THROW_ON_ERROR),
+            json_encode(['email' => $email, 'password' => $password, 'setupToken' => $setupToken], JSON_THROW_ON_ERROR),
         );
+    }
+
+    private function issueSetupToken(): string
+    {
+        $this->issuedSetupToken = true;
+
+        return static::getContainer()->get(SetupTokenService::class)->issue();
     }
 
     private function postComplete(KernelBrowser $client, bool $registration, bool $guestChat): void

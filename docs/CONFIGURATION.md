@@ -71,11 +71,11 @@ While the wizard is pending, every other API route answers
 config stay open. The frontend follows that and sends every route to `/setup`, so
 there is no half-configured state to stumble into.
 
-> **The window between the first start and the first administrator is open.** The
-> account belongs to whoever fills in that form first, as in Open WebUI, Immich
-> or n8n. Complete the wizard right after deploying a publicly reachable host, or
-> create the administrator through `BOOTSTRAP_ADMIN_*` so the window never
-> exists.
+The wizard asks for a setup token that the backend prints to its log on every
+start while no administrator exists (`docker compose logs backend | grep "Setup
+token"`). `docker compose exec backend php bin/console app:setup:token` prints
+a new one and retires the earlier one. Only someone who can read that log can
+create the administrator; `BOOTSTRAP_ADMIN_*` creates it without the browser.
 
 `SETUP_WIZARD_ENABLED=false` switches the wizard off. An installation without an
 administrator then has no browser route in at all, which is the right choice when
