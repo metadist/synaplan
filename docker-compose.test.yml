@@ -162,7 +162,7 @@ services:
 
   # Apache Tika Test (Optional - Integration Profile)
   tika_test:
-    image: apache/tika:3.3.3.1@sha256:3049611264bb18cf66e6629f59818cad75ea5d46f770c504ae46537949838c67
+    image: apache/tika:3.4.0.0@sha256:9f3e5bb9da4229a971a4839416b3204499f20668ee834fa741a6a7504bbea7bf
     container_name: synaplan-tika-test
     command: -h 0.0.0.0 -p 9998
     ports:
