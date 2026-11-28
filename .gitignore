@@ -99,6 +99,9 @@ _devextras/local-ignore/
 /mobile-release-manifest.json
 /mobile-impact-manifest.json
 
+# Semgrep SARIF from scripts/semgrep-scan.sh. CI uploads it; it is not source.
+/semgrep.sarif
+
 # Local git worktrees; committing one adds a submodule entry without a URL,
 # which breaks every checkout that initializes submodules.
 /.worktrees/

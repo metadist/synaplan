@@ -1,0 +1,9 @@
+# Not shipped. Fixtures and notes live here; GitHub secret scanning still
+# covers them. The product tree is the CI gate.
+_devextras/
+
+# Dependency and generated trees.
+vendor/
+node_modules/
+var/
+frontend/dist/

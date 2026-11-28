@@ -11,6 +11,7 @@ use App\Entity\User;
 use App\Repository\PromptRepository;
 use App\Repository\UserRepository;
 use App\Security\AccountAccess;
+use App\Security\TimingDummyHash;
 use App\Service\File\FileProcessor;
 use App\Service\File\FileStorageService;
 use App\Service\File\VectorizationService;
@@ -70,9 +71,9 @@ final readonly class WordPressIntegrationService
 
         $existingUser = $this->userRepository->findByEmail($email);
 
-        $dummyHash = '$2y$10$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
+        // Same verify cost for a missing account. The hash is not a credential.
         $hash = $existingUser instanceof User ? $existingUser->getPassword() : '';
-        $passwordMatched = password_verify($password, '' !== $hash ? $hash : $dummyHash) && '' !== $hash;
+        $passwordMatched = password_verify($password, '' !== $hash ? $hash : TimingDummyHash::WORDPRESS) && '' !== $hash;
 
         if (!$existingUser instanceof User || !$passwordMatched || null !== AccountAccess::credential($existingUser)) {
             $this->logger->info(
