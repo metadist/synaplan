@@ -47,7 +47,10 @@ docker run --rm \
 # Anything else fails the gate. The filter prints path, line, and rule only.
 if [ ! -f "$sarif" ] || ! command -v python3 >/dev/null 2>&1; then
   echo "Semgrep failed (exit ${status}). The scan log was omitted because it can contain a matched secret." >&2
-  exit "${status:-1}"
+  if [ "$status" -eq 0 ]; then
+    exit 1
+  fi
+  exit "$status"
 fi
 
 filter_status=0

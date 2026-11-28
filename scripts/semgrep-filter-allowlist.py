@@ -43,6 +43,10 @@ def snippet_of(result: dict) -> str:
 
 
 def listed(result: dict, allow: set[str]) -> bool:
+    rule = str(result.get("ruleId") or "")
+    # A PHP finding on a line that also mentions a dummy must still fail.
+    if "secret" not in rule.lower():
+        return False
     tokens = TOKEN.findall(snippet_of(result))
     return bool(tokens) and all(token in allow for token in tokens)
 

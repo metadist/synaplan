@@ -98,12 +98,26 @@ test('the allowlist drops a listed fake and keeps an unlisted one', () => {
         {
           results: [
             {
-              ruleId: 'listed',
+              ruleId: 'generic.secrets.security.detected-google-oauth-access-token',
               locations: [
                 {
                   physicalLocation: {
                     artifactLocation: { uri: 'backend/tests/Example.php' },
                     region: { startLine: 4, snippet: { text: "yield ['ya29.a0ARrdaM-abc_def'];" } },
+                  },
+                },
+              ],
+            },
+            {
+              ruleId: 'php.lang.security.injection.echoed-request',
+              locations: [
+                {
+                  physicalLocation: {
+                    artifactLocation: { uri: 'backend/src/Example.php' },
+                    region: {
+                      startLine: 2,
+                      snippet: { text: "echo whsec_your_webhook_secret_here;" },
+                    },
                   },
                 },
               ],
@@ -133,6 +147,15 @@ test('the allowlist drops a listed fake and keeps an unlisted one', () => {
   const left = JSON.parse(readFileSync(sarif, 'utf8'))
   assert.deepEqual(
     left.runs[0].results.map((result) => result.ruleId),
-    ['unlisted']
+    ['php.lang.security.injection.echoed-request', 'unlisted']
   )
+  assert.ok(
+    !left.runs[0].results.some((result) => String(result.ruleId).includes('secrets')),
+    'a listed secret finding was kept'
+  )
+})
+
+test('a missing SARIF report fails the scan even when Semgrep itself exited 0', () => {
+  assert.match(SCRIPT, /if \[ "\$status" -eq 0 \]; then\n    exit 1/m)
+  assert.doesNotMatch(SCRIPT, /status:-\d/)
 })
