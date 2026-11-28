@@ -30,7 +30,7 @@ FROM ghcr.io/metadist/synaplan-base-php:1.2.1@sha256:e10e74c5047cd9218ad8337b8e3
 # into `dev` below, so the dev and prod images both carry it. A stage has to
 # be declared before COPY --from can name it, which is why it sits here and
 # not at the top.
-FROM golang:1.27-bookworm@sha256:4fa7c968ba93f1635670522dbb01a2c78150443e1385746924566079f36570ea AS watchdog
+FROM golang:1.27-bookworm@sha256:ce59b41415e2524ae99926fe1f37ce48ba8c194dcbd2a56a65436cdcefa2bd34 AS watchdog
 WORKDIR /src
 COPY sidecars/synaplan-watchdog/go.mod sidecars/synaplan-watchdog/go.sum ./
 RUN go mod download
@@ -40,7 +40,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /synaplan-wa
 # Prebuilt c2patool 0.28 binaries link against glibc 2.38, while the bookworm
 # base image ships glibc 2.36. Compile 0.28.4 on bookworm so the binary matches
 # the runtime libc on both amd64 and arm64.
-FROM rust:1.100-bookworm@sha256:ade39a710ef85f3506cffcfec3e8a24ba090badef1dff2fb798f71d878833fea AS c2patool
+FROM rust:1.100-bookworm@sha256:75d26c23c24cc6ea1cdabf0714a6bff8fd7bf3248716043fd7ae86dac7f41b94 AS c2patool
 ARG C2PATOOL_VERSION=0.28.4
 ARG C2PATOOL_SHA256=2ed01103cdcb65184dfcaa6f522beac4c715291b51a44e503b572fa9b5255aba
 WORKDIR /src
