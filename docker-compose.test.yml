@@ -146,7 +146,7 @@ services:
 
   # Ollama Test (Optional - Integration Profile)
   ollama_test:
-    image: ollama/ollama:latest@sha256:1cabd20e1762a7a8444bf4a7110b346d923cd77ab6c97c984434140638c913ec
+    image: ollama/ollama:latest@sha256:7e8c7ba387b11b09dcce1eff1118b1ab433564ed263434a7730c209f2ee346f4
     container_name: synaplan-ollama-test
     ports:
       - "${SYNAPLAN_BIND:-127.0.0.1}:11436:11434"
