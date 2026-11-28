@@ -43,54 +43,20 @@ docker run --rm \
     --config p/secrets \
   >"$log" 2>&1 || status=$?
 
-# nosemgrep stays in the SARIF as a suppression. Drop those before upload so a
-# commented fixture does not become a code-scanning alert.
-if [ -f "$sarif" ] && command -v python3 >/dev/null 2>&1; then
-  python3 - "$sarif" <<'PY'
-import json
-import sys
-
-path = sys.argv[1]
-with open(path) as handle:
-    data = json.load(handle)
-for run in data.get("runs") or []:
-    run["results"] = [
-        result
-        for result in (run.get("results") or [])
-        if not result.get("suppressions")
-    ]
-with open(path, "w") as handle:
-    json.dump(data, handle)
-PY
+# Findings whose tokens are all in .github/dummy-secrets.allow are dropped.
+# Anything else fails the gate. The filter prints path, line, and rule only.
+if [ ! -f "$sarif" ] || ! command -v python3 >/dev/null 2>&1; then
+  echo "Semgrep failed (exit ${status}). The scan log was omitted because it can contain a matched secret." >&2
+  exit "${status:-1}"
 fi
 
-if [ "$status" -ne 0 ]; then
-  summarized=false
-  if [ -f "$sarif" ] && command -v python3 >/dev/null 2>&1; then
-    if python3 - "$sarif" <<'PY' >&2
-import json
-import sys
-
-data = json.load(open(sys.argv[1]))
-count = 0
-for run in data.get("runs") or []:
-    for result in run.get("results") or []:
-        count += 1
-        location = (result.get("locations") or [{}])[0].get("physicalLocation") or {}
-        path = (location.get("artifactLocation") or {}).get("uri") or "?"
-        line = (location.get("region") or {}).get("startLine") or "?"
-        rule = result.get("ruleId") or "?"
-        print(f"{path}:{line}: {rule}")
-if count == 0:
-    sys.exit(1)
-PY
-    then
-      summarized=true
-    fi
-  fi
-  if [ "$summarized" != true ]; then
-    echo "Semgrep failed (exit ${status}). The scan log was omitted because it can contain a matched secret." >&2
-  fi
+filter_status=0
+python3 "$root/scripts/semgrep-filter-allowlist.py" "$sarif" "$root/.github/dummy-secrets.allow" || filter_status=$?
+if [ "$filter_status" -ne 0 ]; then
+  exit "$filter_status"
+fi
+if [ "$status" -ne 0 ] && [ "$status" -ne 1 ]; then
+  echo "Semgrep failed (exit ${status}). The scan log was omitted because it can contain a matched secret." >&2
   exit "$status"
 fi
 

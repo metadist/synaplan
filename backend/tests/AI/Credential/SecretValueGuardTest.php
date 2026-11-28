@@ -48,7 +48,7 @@ final class SecretValueGuardTest extends TestCase
         yield 'groq key' => ['gsk_2f8Xa9Qm10ZbT7LcVhPq'];
         yield 'openai key' => ['sk-proj-AbC123dEf456'];
         yield 'ci dummy key' => ['test-key'];
-        yield 'vertex bearer' => ['ya29.a0ARrdaM-abc_def']; // nosemgrep: detected-google-oauth-access-token
+        yield 'vertex bearer' => ['ya29.a0ARrdaM-abc_def'];
         yield 'short but real' => ['abc123'];
     }
 
