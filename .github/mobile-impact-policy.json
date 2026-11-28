@@ -110,6 +110,7 @@
       "**/Makefile",
       ".editorconfig",
       ".gitignore",
+      ".semgrepignore",
       ".gitattributes",
       ".nvmrc",
       ".dockerignore",

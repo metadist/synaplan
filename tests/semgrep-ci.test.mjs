@@ -4,6 +4,8 @@ import { dirname, join } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
+import { classifyFiles, loadPolicy } from '../scripts/mobile-impact.mjs'
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const WORKFLOW = readFileSync(join(ROOT, '.github/workflows/ci.yml'), 'utf8')
 const SCRIPT = readFileSync(join(ROOT, 'scripts/semgrep-scan.sh'), 'utf8')
@@ -27,8 +29,15 @@ test('the scan fails the build on a PHP or secret finding and does not phone hom
   assert.match(SCRIPT, /--config p\/secrets/)
   assert.match(SCRIPT, /--sarif-output/)
   assert.doesNotMatch(SCRIPT, /--config auto/)
+  assert.match(SCRIPT, /scan log was omitted/)
+  assert.doesNotMatch(SCRIPT, /tail /)
 })
 
 test('dev extras stay out of the product scan', () => {
   assert.match(IGNORE, /^_devextras\/$/m)
+})
+
+test('.semgrepignore does not force a store release', () => {
+  const result = classifyFiles([{ path: '.semgrepignore', status: 'A' }], loadPolicy())
+  assert.equal(result.classification, 'no-app-impact')
 })

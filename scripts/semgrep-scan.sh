@@ -89,7 +89,7 @@ PY
     fi
   fi
   if [ "$summarized" != true ]; then
-    tail -n 40 "$log" >&2
+    echo "Semgrep failed (exit ${status}). The scan log was omitted because it can contain a matched secret." >&2
   fi
   exit "$status"
 fi
