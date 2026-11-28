@@ -70,7 +70,8 @@ final readonly class WordPressIntegrationService
 
         $existingUser = $this->userRepository->findByEmail($email);
 
-        $dummyHash = '$2y$10$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
+        // Public bcrypt test vector, so a missing account costs the same verify. Not a credential.
+        $dummyHash = '$2y$10$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG'; // nosemgrep: detected-bcrypt-hash
         $hash = $existingUser instanceof User ? $existingUser->getPassword() : '';
         $passwordMatched = password_verify($password, '' !== $hash ? $hash : $dummyHash) && '' !== $hash;
 

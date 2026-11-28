@@ -1,4 +1,4 @@
-.PHONY: help up lint format test build deps audit test-stack-build ci-local test-e2e-minimal perf-runtime
+.PHONY: help up lint format test build deps audit semgrep test-stack-build ci-local test-e2e-minimal perf-runtime
 
 up: ## Start the stack (status page first, then remaining images)
 	./scripts/compose-up.sh
@@ -76,6 +76,9 @@ test-stack-build: ## Build frontend + widget + test Docker image + start test st
 	cd frontend && npm run build && npm run build:widget
 	docker compose -f docker-compose.test.yml build
 	docker compose -f docker-compose.test.yml up -d --wait --wait-timeout 600
+
+semgrep: ## Semgrep security scan (PHP rules and secret patterns)
+	bash scripts/semgrep-scan.sh
 
 audit: ## Run security audit (backend)
 	$(MAKE) -C backend audit

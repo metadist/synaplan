@@ -364,8 +364,8 @@ class AuthController extends AbstractController
 
         $user = $this->userRepository->findOneBy(['mail' => $email]);
 
-        // Dummy hash for timing attack prevention (valid bcrypt format)
-        $dummyHash = '$2y$13$A5.u1234567890123456789012345678901234567890123456789';
+        // Dummy hash for timing attack prevention (valid bcrypt format), not a credential.
+        $dummyHash = '$2y$13$A5.u1234567890123456789012345678901234567890123456789'; // nosemgrep: detected-bcrypt-hash
 
         // No such account, or one without a password yet (e.g. registered via
         // Google/GitHub only): answer after the same hashing work either way.
